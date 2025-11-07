@@ -1,0 +1,249 @@
+/* Custom CSS for enhanced UI */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #080707;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #dddbda;
+}
+
+.subsection-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #3e3e3c;
+    margin-bottom: 0.75rem;
+}
+
+.custom-input {
+    --slds-c-input-color-border: #dddbda;
+    --slds-c-input-radius-border: 0.5rem;
+}
+
+.custom-input:focus {
+    --slds-c-input-color-border: #1589ee;
+    --slds-c-input-shadow: 0 0 3px #1589ee;
+}
+
+.custom-textarea {
+    --slds-c-textarea-radius-border: 0.5rem;
+    min-height: 100px;
+}
+
+.custom-combobox {
+    --slds-c-input-radius-border: 0.5rem;
+}
+
+.datetime-section {
+    background: #f3f2f2;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    margin-top: 1rem;
+}
+
+.participants-section {
+    background: #f3f2f2;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    height: 100%;
+}
+
+.current-user-card {
+    background: linear-gradient(135deg, #1589ee 0%, #0d67bc 100%);
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+}
+
+.current-user-card .user-icon {
+    --slds-c-icon-color-foreground: white;
+}
+
+.user-email {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.875rem;
+}
+
+.quick-add-section {
+    background: white;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #dddbda;
+}
+
+.user-chip {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid #dddbda;
+    margin-bottom: 0.5rem;
+}
+
+.user-chip:hover {
+    background: #f3f2f2;
+    border-color: #1589ee;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.add-icon {
+    --slds-c-icon-color-foreground: #1589ee;
+}
+
+.add-participant-section {
+    background: white;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #dddbda;
+}
+
+.add-button {
+    width: 100%;
+}
+
+.participants-list {
+    background: white;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #dddbda;
+}
+
+.participants-container {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.participant-item {
+    margin-bottom: 0.5rem;
+    border: 1px solid #dddbda;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.participant-item:hover {
+    border-color: #1589ee;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.participant-icon {
+    --slds-c-icon-color-foreground: #1589ee;
+}
+
+.participant-email {
+    font-weight: 600;
+    color: #080707;
+}
+
+.participant-name {
+    color: #706e6b;
+}
+
+.remove-btn {
+    --slds-c-icon-color-foreground: #ea001e;
+}
+
+.clear-all-btn {
+    --slds-c-icon-color-foreground: #706e6b;
+}
+
+.empty-state {
+    color: #706e6b;
+    padding: 2rem;
+}
+
+.action-buttons {
+    border-top: 1px solid #dddbda;
+    padding-top: 1.5rem;
+}
+
+.clear-btn {
+    --slds-c-button-neutral-color-border: #ea001e;
+    --slds-c-button-text-color: #ea001e;
+}
+
+.create-btn {
+    min-width: 140px;
+}
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    z-index: 9000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.success-message, .error-message {
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.success-message {
+    border-left: 4px solid #04844b;
+}
+
+.error-message {
+    border-left: 4px solid #ea001e;
+}
+
+/* Scrollbar styling */
+.participants-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.participants-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.participants-container::-webkit-scrollbar-thumb {
+    background: #c9c9c9;
+    border-radius: 3px;
+}
+
+.participants-container::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+.custom-combobox {
+    --slds-c-input-radius-border: 0.5rem;
+    --slds-c-input-color-border: #dddbda;
+}
+
+.custom-combobox:focus {
+    --slds-c-input-color-border: #1589ee;
+    --slds-c-input-shadow: 0 0 3px #1589ee;
+}
+
+
+.slds-combobox_container {
+    position: relative;
+}
+
+.slds-dropdown {
+    position: absolute;
+    z-index: 7000;
+    width: 100%;
+    border: 1px solid #dddbda;
+    border-radius: 0.25rem;
+    background: white;
+    box-shadow: 0 2px 3px 0 rgba(0, 0, 0, 0.16);
+}
+
+.slds-listbox__option:hover {
+    background-color: #f3f2f2;
+}
+
+.slds-listbox__option:focus {
+    outline: none;
+    background-color: #0070d2;
+    color: white;
+}

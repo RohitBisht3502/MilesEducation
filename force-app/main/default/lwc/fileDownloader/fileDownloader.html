@@ -1,0 +1,21 @@
+<template>
+  <lightning-card title="Fetch Download Links" icon-name="utility:download">
+    <div class="slds-p-around_medium slds-grid slds-gutters">
+      <div class="slds-col slds-size_2-of-3">
+        <lightning-button label="Get Links" variant="brand" onclick={getLinks} disabled={isDisabled}></lightning-button>
+      </div>
+    </div>
+
+    <template if:true={loading}>
+      <div class="slds-p-horizontal_medium">
+        <lightning-spinner alternative-text="Loading..." size="small"></lightning-spinner>
+      </div>
+    </template>
+
+    <template if:true={lastResultMessage}>
+      <div class="slds-p-horizontal_medium slds-m-top_small">
+        <lightning-formatted-text value={lastResultMessage}></lightning-formatted-text>
+      </div>
+    </template>
+  </lightning-card>
+</template>

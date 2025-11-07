@@ -1,0 +1,29 @@
+<template>
+  <lightning-card title="Upload to S3" icon-name="utility:upload">
+    <div class="slds-p-around_medium slds-grid slds-gutters">
+      <div class="slds-col slds-size_2-of-3">
+        <input type="file" multiple onchange={handleFileChange} />
+      </div>
+      <div class="slds-col slds-size_1-of-3 slds-text-align_right">
+        <lightning-button 
+          label="Upload" 
+          variant="brand" 
+          onclick={upload} 
+          disabled={isUploadDisabled}>
+        </lightning-button>
+      </div>
+    </div>
+
+    <template if:true={uploading}>
+      <div class="slds-p-horizontal_medium">
+        <lightning-spinner alternative-text="Uploading..." size="small"></lightning-spinner>
+      </div>
+    </template>
+
+    <template if:true={lastResultMessage}>
+      <div class="slds-p-horizontal_medium slds-m-top_small">
+        <lightning-formatted-text value={lastResultMessage}></lightning-formatted-text>
+      </div>
+    </template>
+  </lightning-card>
+</template>
