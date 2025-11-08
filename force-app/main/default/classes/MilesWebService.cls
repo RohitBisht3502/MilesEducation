@@ -82,7 +82,10 @@ global without sharing class MilesWebService {
                 LastName = inputData.first_name,
                 Company = 'Test Company',
                 Phone = inputData.phone,
-                Coming_From__c = inputData.coming_from
+                Email = inputData.email,
+                Coming_From__c = inputData.coming_from,
+                Register_for_Webinar__c = inputData.register_for_webinar,
+                Interested_Webinar_ID__c = inputData.interested_webinar_id
             );
             insert newLead;
 

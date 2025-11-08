@@ -1,11 +1,22 @@
-trigger LeadTrigger on Lead (before insert,after insert,after update,before update) {
-        if (Trigger.isBefore && Trigger.isInsert) {
-       // RoundRobinService.assignForLeads(Trigger.new);
+trigger LeadTrigger on Lead (before insert, after insert, before update, after update) {
+
+    // ===== BEFORE INSERT =====
+    if (Trigger.isBefore && Trigger.isInsert) {
+        LeadTriggerHelperClass.handleBeforeInsert(Trigger.new);
     }
-    
-   if (Trigger.isBefore) {
-        if (Trigger.isUpdate) {
-            TriggerRoundRobinService.handleBeforeUpdate(Trigger.new, Trigger.oldMap);
-        }
-    } 
+
+    // ===== BEFORE UPDATE =====
+    if (Trigger.isBefore && Trigger.isUpdate) {
+        LeadTriggerHelperClass.handleBeforeUpdate(Trigger.new, Trigger.oldMap);
+    }
+
+    // ===== AFTER INSERT =====
+    if (Trigger.isAfter && Trigger.isInsert) {
+        LeadTriggerHelperClass.handleAfterInsert(Trigger.new);
+    }
+
+    // ===== AFTER UPDATE =====
+    if (Trigger.isAfter && Trigger.isUpdate) {
+        LeadTriggerHelperClass.handleAfterUpdate(Trigger.new, Trigger.oldMap);
+    }
 }

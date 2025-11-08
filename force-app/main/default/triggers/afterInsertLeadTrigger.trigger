@@ -1,16 +1,16 @@
 trigger afterInsertLeadTrigger on Lead (after insert) {
-    Set<Id> newLeadIds = new Set<Id>();
+/*  Set<Id> newLeadIds = new Set<Id>();
 
     for (Lead ld : Trigger.new) {
         newLeadIds.add(ld.Id);
     }
 
-    // 1️⃣ Asynchronously update city for new leads
+    //  Asynchronously update city for new leads
     if (!newLeadIds.isEmpty()) {
         LeadCityClassifier.enqueueLeadCityUpdate(newLeadIds);
     }
 
-    // 2️⃣ Enqueue Zoom Webinar Registration (only if lead has valid info)
+    // Enqueue Zoom Webinar Registration (only if lead has valid info)
     Set<Id> leadsForZoom = new Set<Id>();
     for (Lead ld : Trigger.new) {
         // Now using Phone + FirstName as mandatory fields
@@ -21,5 +21,5 @@ trigger afterInsertLeadTrigger on Lead (after insert) {
 
     if (!leadsForZoom.isEmpty()) {
         System.enqueueJob(new LeadZoomRegistrationJob(leadsForZoom));
-    }
+    } */
 }

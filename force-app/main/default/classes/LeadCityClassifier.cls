@@ -39,24 +39,12 @@ public without sharing class LeadCityClassifier {
             }
 
             // Log response
-            logs.add(IntegrationLogUtil.buildLog(
-                'Lead City',
-                requestPayload,
-                responsePayload,
-                String.isBlank(city) ? 'No city found in API response' : null,
-                String.isNotBlank(city) ? 'Success' : 'Failed',
+            logs.add(IntegrationLogUtil.buildLog('Lead City', requestPayload, responsePayload, String.isBlank(city) ? 'No city found in API response' : null, String.isNotBlank(city) ? 'Success' : 'Failed',
                 response.getStatusCode()
             ));
 
         } catch (Exception ex) {
-            logs.add(IntegrationLogUtil.buildLog(
-                'Lead City',
-                requestPayload,
-                responsePayload,
-                'Exception: ' + ex.getMessage(),
-                'Failed',
-                null
-            ));
+            logs.add(IntegrationLogUtil.buildLog('Lead City',requestPayload,responsePayload,'Exception: ' + ex.getMessage(),'Failed',null));
         }
 
         return city;
@@ -91,11 +79,7 @@ public without sharing class LeadCityClassifier {
         public void execute(QueueableContext ctx) {
             if (leadIds == null || leadIds.isEmpty()) return;
 
-            List<Lead> leads = [
-                SELECT Id, FirstName, LastName, Email, Phone, Coming_From__c, City__c
-                FROM Lead
-                WHERE Id IN :leadIds
-            ];
+            List<Lead> leads = [SELECT Id, FirstName, LastName, Email, Phone, Coming_From__c, City__c FROM Lead WHERE Id IN :leadIds];
 
             List<Integration_Log__c> logs = new List<Integration_Log__c>();
             List<Lead> leadsToUpdate = new List<Lead>();

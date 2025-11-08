@@ -16,7 +16,7 @@ public with sharing class AWSFileUploaderService {
                     s.name = (String)m.get('name');
                     s.url = (String)m.get('url');
                     parsedItems.add(s);
-                } // hellg
+                }
             } else if (items instanceof String) {
                 parsedItems = (List<S3Url>)JSON.deserialize((String)items, List<S3Url>.class);
             }
@@ -40,6 +40,7 @@ public with sharing class AWSFileUploaderService {
         rec.put(field, combined);
         update rec;
     }
+
     public class S3Url {
         @AuraEnabled public String name;
         @AuraEnabled public String url;
