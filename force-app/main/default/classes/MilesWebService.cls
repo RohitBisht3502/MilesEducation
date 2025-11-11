@@ -57,7 +57,8 @@ global without sharing class MilesWebService {
                 Highest_Education__c = inputData.highestEducation,
                 Country_of_Residence__c = inputData.country_of_residence,
                 Register_for_Webinar__c = inputData.register_for_webinar,
-                Interested_Webinar_ID__c = inputData.interested_webinar_id
+                Interested_Webinar_ID__c = inputData.interested_webinar_id,
+                Stage__c = 'M3'
             );
             insert enquiry;
 

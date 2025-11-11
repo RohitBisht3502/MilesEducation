@@ -15,8 +15,4 @@ trigger LeadTrigger on Lead (before insert, after insert, before update, after u
         LeadTriggerHelperClass.handleAfterInsert(Trigger.new);
     }
 
-    // ===== AFTER UPDATE =====
-    if (Trigger.isAfter && Trigger.isUpdate) {
-        LeadTriggerHelperClass.handleAfterUpdate(Trigger.new, Trigger.oldMap);
-    }
 }

@@ -1,12 +1,11 @@
 import { LightningElement, api, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
-
+import { CloseActionScreenEvent } from 'lightning/actions';
 import getWebinarsByNameOnly from '@salesforce/apex/WebinarController.getWebinarsByNameOnly';
 import createWebinarMember from '@salesforce/apex/WebinarController.createWebinarMember';
 
 export default class WebinarRegisterPanel extends LightningElement {
-  @api recordId; // Lead Id
-
+  @api recordId;
   @track webinars = [];
   @track selectedWebinar = {};
   loading = true;
@@ -22,8 +21,8 @@ export default class WebinarRegisterPanel extends LightningElement {
   async fetchWebinars() {
     this.loading = true;
     try {
-      // Expecting [{ id: '...', name: '...' }, ...]
-      this.webinars = await getWebinarsByNameOnly();
+      const rows = await getWebinarsByNameOnly();
+      this.webinars = (rows || []).map(r => ({ ...r, isRegistered: false }));
     } catch (e) {
       this.toast('Error loading webinars', this.reduceError(e), 'error');
     } finally {
@@ -31,7 +30,6 @@ export default class WebinarRegisterPanel extends LightningElement {
     }
   }
 
-  // ====== UI Actions ======
   handleCardClick = (event) => {
     const webinarId = event.currentTarget?.dataset?.id;
     this.selectWebinar(webinarId);
@@ -63,17 +61,38 @@ export default class WebinarRegisterPanel extends LightningElement {
     this.selectedWebinar = found ? { ...found } : {};
   }
 
-  // ====== Registration ======
   async confirmRegister() {
+    debugger;
     if (!this.selectedWebinar?.id) {
       this.toast('No webinar selected', 'Please select a webinar and try again.', 'warning');
       return;
     }
+
     this.saving = true;
     try {
-      await createWebinarMember({ leadId: this.recordId, webinarId: this.selectedWebinar.id });
-      this.toast('Registered', `Lead has been registered for "${this.selectedWebinar.name}".`, 'success');
+      await createWebinarMember({
+        leadId: this.recordId,
+        webinarId: this.selectedWebinar.id
+      });
+
+      this.toast(
+        'Registered',
+        `Lead has been registered for "${this.selectedWebinar.name}".`,
+        'success'
+      );
+
       this.confirmOpen = false;
+      this.detailsOpen = false;
+      const idx = this.webinars.findIndex(w => w.id === this.selectedWebinar.id);
+      if (idx > -1) {
+        const updated = [...this.webinars];
+        updated[idx] = { ...updated[idx], isRegistered: true };
+        this.webinars = updated;
+      }
+
+      this.dispatchEvent(new CloseActionScreenEvent());
+      setTimeout(() => window.location.reload(), 800);
+
     } catch (e) {
       this.toast('Registration failed', this.reduceError(e), 'error');
     } finally {
@@ -81,7 +100,6 @@ export default class WebinarRegisterPanel extends LightningElement {
     }
   }
 
-  // ====== Helpers ======
   toast(title, message, variant) {
     this.dispatchEvent(new ShowToastEvent({ title, message, variant }));
   }

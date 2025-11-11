@@ -48,11 +48,11 @@ public class LeadZoomRegistrationJob implements Queueable, Database.AllowsCallou
 
             for (Lead ld : leads) {
                 // Keep (or tweak) your skip rule
-                if (String.isBlank(ld.City__c)) {
-                    logs.add(IntegrationLogUtil.buildLog( 'Zoom Webinar Registration Job', 'LeadId=' + ld.Id,'Skipped: City__c is blank', null, 'SKIPPED', 200 ));
+                // if (String.isBlank(ld.City__c)) {
+                //     logs.add(IntegrationLogUtil.buildLog( 'Zoom Webinar Registration Job', 'LeadId=' + ld.Id,'Skipped: City__c is blank', null, 'SKIPPED', 200 ));
 
-                    continue;
-                }
+                //     continue;
+                // }
 
                 try {
                     String zoomResponse = ZoomIntegrationService.registerLeadForWebinar(ld, token, logs);
