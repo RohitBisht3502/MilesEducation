@@ -1,4 +1,4 @@
-public with sharing class Webservice_RunoAllocationAPI implements Database.AllowsCallouts {
+public without sharing class Webservice_RunoAllocationAPI implements Database.AllowsCallouts {
 
     public class CustomerDTO {
         public String name;

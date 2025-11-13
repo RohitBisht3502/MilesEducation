@@ -1,5 +1,5 @@
 @RestResource(urlMapping='/zoom/*')
-global with sharing class ZoomIntegrationAPI {
+global without sharing class ZoomIntegrationAPI {
 
     @HttpPost
     global static void handleZoomRequest() {

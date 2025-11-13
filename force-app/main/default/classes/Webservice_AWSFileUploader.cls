@@ -1,4 +1,8 @@
-public with sharing class Webservice_AWSFileUploader {
+/*
+    Author       : ROHIT SINGH BISHT
+    Description  : 
+*/
+public without sharing class Webservice_AWSFileUploader {
     @AuraEnabled(cacheable=false)
     public static String getPresignedUrl(String fileName, String uuid, String contentType) {
         if (String.isBlank(fileName)) throw new AuraHandledException('fileName is required.');

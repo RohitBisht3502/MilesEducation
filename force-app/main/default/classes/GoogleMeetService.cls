@@ -1,5 +1,8 @@
-// GoogleMeetService.cls
-public with sharing class GoogleMeetService {
+/*
+    Author       : ROHIT SINGH BISHT
+    Description  : 
+*/
+public without sharing class GoogleMeetService {
     private static final String NC = 'GMeet_Scheduler'; // <-- your Named Credential
 
     public class CreateResult {

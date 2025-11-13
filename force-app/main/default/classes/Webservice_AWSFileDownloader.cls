@@ -1,4 +1,8 @@
-public with sharing class Webservice_AWSFileDownloader {
+/*
+    Author       : ROHIT SINGH BISHT
+    Description  : 
+*/
+public without sharing class Webservice_AWSFileDownloader {
     @AuraEnabled(cacheable=false)
     public static Map<String, String> getDownloadLinks(String uuid) {
         if (String.isBlank(uuid)) throw new AuraHandledException('UUID is required.');

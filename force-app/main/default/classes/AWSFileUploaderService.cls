@@ -1,4 +1,8 @@
-public with sharing class AWSFileUploaderService {
+/*
+    Author       : ROHIT SINGH BISHT
+    Description  : 
+*/
+public without sharing class AWSFileUploaderService {
     @AuraEnabled
     public static void appendUrls(String objectApiName, Id recordId, Object items, String urlsFieldApiName) {
         appendUrlsCtx(objectApiName, recordId, items, urlsFieldApiName, null);

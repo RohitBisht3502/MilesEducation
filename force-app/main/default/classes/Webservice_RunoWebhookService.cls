@@ -1,3 +1,7 @@
+/*
+    Author       : ROHIT SINGH BISHT
+    Description  : 
+*/
 @RestResource(urlMapping='/runo/call-log')
 global without sharing class Webservice_RunoWebhookService {
 
@@ -52,6 +56,11 @@ global without sharing class Webservice_RunoWebhookService {
         try{
             List<Call_Log__c> recs = DTORunoCallLogs.toRecords(body);
             if (!recs.isEmpty()) insert recs;
+            Call_Log__c c = recs[0];
+
+            Integer dur = c.Duration_Seconds__c == null ? null : Integer.valueOf(c.Duration_Seconds__c);
+            RunoEventPublisher.publishCallCompleted(c.Call_Id__c,dur,c.Lead__c,c.Phone_Number__c,'Completed');
+
             logs.add(IntegrationLogUtil.buildLog('Runo Webhook', envelope, JSON.serialize(parsed), null, 'Received', 200));
             IntegrationLogUtil.insertLogs(logs);
             send(res, 200, true, 'OK');

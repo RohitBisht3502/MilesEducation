@@ -1,4 +1,8 @@
-public class Webservice_LeadCityClassifier {
+/*
+    Author       : ROHIT SINGH BISHT
+    Description  : 
+*/
+public without sharing class Webservice_LeadCityClassifier {
 
     @future(callout = true)
     public static void callCityClassifierAsync(Set<Id> leadIds) {

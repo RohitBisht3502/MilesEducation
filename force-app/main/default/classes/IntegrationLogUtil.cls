@@ -1,4 +1,8 @@
-public with sharing class IntegrationLogUtil {
+/*
+    Author       : ROHIT SINGH BISHT
+    Description  : To create logs
+*/
+public without sharing class IntegrationLogUtil {
 
     // Use a safe picklist value
     public static Integration_Log__c buildLog(

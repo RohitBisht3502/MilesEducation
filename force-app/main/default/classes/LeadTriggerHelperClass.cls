@@ -1,4 +1,8 @@
-public with sharing class LeadTriggerHelperClass {
+/*
+    Author       : ROHIT SINGH BISHT
+    Description  : 
+*/
+public without sharing class LeadTriggerHelperClass {
 
     public static void handleBeforeInsert(List<Lead> newLeads) {
         // RoundRobinService.assignForLeads(newLeads);

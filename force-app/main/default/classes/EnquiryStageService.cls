@@ -1,3 +1,7 @@
+/*
+    Author       : ROHIT SINGH BISHT
+    Description  : 
+*/
 public class EnquiryStageService {
 
     public static void validateStageTransitions(List<Enquiry__c> newList, Map<Id, Enquiry__c> oldMap) {

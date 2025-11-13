@@ -1,3 +1,7 @@
+/*
+    Author       : ROHIT SINGH BISHT
+    Description  : 
+*/
 public with sharing class WebinarController {
 
     @AuraEnabled(cacheable=true)
