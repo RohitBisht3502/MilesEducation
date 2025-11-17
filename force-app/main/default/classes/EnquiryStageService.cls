@@ -4,7 +4,7 @@
 */
 public class EnquiryStageService {
 
-    public static void validateStageTransitions(List<Enquiry__c> newList, Map<Id, Enquiry__c> oldMap) {
+    public static void validateStageTransitions(List<Lead__c> newList, Map<Id, Lead__c> oldMap) {
         if (newList == null || newList.isEmpty()) return;
 
         Set<String> oldStages = new Set<String>();
@@ -12,8 +12,8 @@ public class EnquiryStageService {
         Map<Id, String> newStageById = new Map<Id, String>();
         Map<Id, String> programById = new Map<Id, String>();
 
-        for (Enquiry__c rec : newList) {
-            Enquiry__c oldRec = oldMap.get(rec.Id);
+        for (Lead__c rec : newList) {
+            Lead__c oldRec = oldMap.get(rec.Id);
             if (oldRec == null) continue;
 
             String oldStage = oldRec.Stage__c;
@@ -63,7 +63,7 @@ public class EnquiryStageService {
             }
         }
 
-        for (Enquiry__c rec : newList) {
+        for (Lead__c rec : newList) {
             if (!newStageById.containsKey(rec.Id)) continue;
 
             String fromStage = oldMap.get(rec.Id).Stage__c;

@@ -1,117 +1,209 @@
 <template>
-  <lightning-quick-action-panel header="Allocate Lead to Runo">
+  <lightning-quick-action-panel header="Allocate Lead to Runo" class="panel-wrapper">
+
+    <!-- LOADING STATE -->
     <template if:true={loading}>
-      <div class="slds-p-around_medium">
+      <div class="loading-state">
         <lightning-spinner alternative-text="Sending..." size="small"></lightning-spinner>
-        <div class="slds-m-top_small">Calling Runo Allocation API…</div>
+        <div class="loading-text">Calling Runo Allocation API…</div>
       </div>
     </template>
 
-    <template if:true={resultText}>
-      <div class="slds-p-around_medium">
-        <div class="slds-box slds-theme_success slds-m-bottom_small">
-          <div class="slds-grid slds-gutters slds-wrap slds-align_absolute-center">
-            <lightning-icon icon-name="utility:success" size="x-small" class="slds-m-right_x-small"></lightning-icon>
-            <div class="slds-text-body_small">Successfully allocated the record to Runo</div>
+    <!-- CALL POPUP OVERLAY -->
+    <template if:true={showCallPopup}>
+      <div class="call-overlay">
+        <div class="popup-inner wave-container">
+
+          <div class="popup-call-icon pulse-icon">
+            <lightning-icon icon-name="utility:call" size="large"></lightning-icon>
           </div>
-          <code class="slds-text-color_success slds-text-body_small slds-m-top_x-small">{resultText}</code>
+
+          <div class="popup-text">Calling Runo...</div>
+
+          <div class="wave-loader">
+            <span></span><span></span><span></span><span></span>
+          </div>
+
         </div>
       </div>
     </template>
 
+    <!-- ERROR -->
     <template if:true={errorText}>
-      <div class="slds-p-around_medium">
-        <div class="slds-box slds-theme_error slds-m-bottom_small">
-          <div class="slds-grid slds-gutters slds-wrap slds-align_absolute-center">
-            <lightning-icon icon-name="utility:error" size="x-small" class="slds-m-right_x-small"></lightning-icon>
-            <div class="slds-text-body_small">{errorText}</div>
-          </div>
+      <div class="error-box">
+        <div class="error-inner">
+          <lightning-icon icon-name="utility:error" size="x-small" class="error-icon"></lightning-icon>
+          <div class="error-message">{errorText}</div>
         </div>
       </div>
     </template>
 
-    <div class="slds-p-around_medium">
+    <!-- BODY -->
+    <div class="body-wrapper">
+
       <div class="slds-grid slds-gutters slds-wrap">
-        <!-- LEFT: Lead Info -->
+
+        <!-- LEFT : LEAD INFO -->
         <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-2">
-          <div class="slds-box slds-theme_default">
-            <div class="slds-text-title slds-m-bottom_small">Lead Information</div>
-            <div class="slds-text-body_small slds-grid slds-wrap slds-gutters">
-              <div class="slds-col slds-size_1-of-1 slds-m-bottom_x-small slds-grid slds-align_absolute-center slds-wrap">
-                <lightning-icon icon-name="utility:user" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+          <div class="section-card">
+
+            <div class="section-header">
+              <lightning-icon icon-name="standard:lead" size="small"></lightning-icon>
+              <span>Lead Information</span>
+            </div>
+
+            <div class="section-content">
+
+              <div class="info-line">
+                <lightning-icon icon-name="utility:user" size="x-small"></lightning-icon>
                 <span>{identity.name}</span>
               </div>
-              <div class="slds-col slds-size_1-of-1 slds-m-bottom_x-small slds-grid slds-align_absolute-center slds-wrap">
-                <lightning-icon icon-name="utility:email" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+
+              <div class="info-line">
+                <lightning-icon icon-name="utility:email" size="x-small"></lightning-icon>
                 <span>{identity.email}</span>
               </div>
-              <div class="slds-col slds-size_1-of-1 slds-m-bottom_x-small slds-grid slds-align_absolute-center slds-wrap">
-                <lightning-icon icon-name="utility:phone_portrait" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+
+              <div class="info-line">
+                <lightning-icon icon-name="utility:phone_portrait" size="x-small"></lightning-icon>
                 <span>{identity.phone}</span>
               </div>
-              <div class="slds-col slds-size_1-of-2 slds-m-bottom_x-small slds-grid slds-align_absolute-center slds-wrap">
-                <lightning-icon icon-name="utility:location" size="x-small" class="slds-m-right_x-small"></lightning-icon>
-                <span>{identity.city}</span>
+
+              <div class="grid-2">
+                <div class="info-line">
+                  <lightning-icon icon-name="utility:location" size="x-small"></lightning-icon>
+                  <span>{identity.city}</span>
+                </div>
+
+                <div class="info-line align-right">
+                  <lightning-icon icon-name="utility:topic" size="x-small"></lightning-icon>
+                  <span>{identity.source}</span>
+                </div>
               </div>
-              <div class="slds-col slds-size_1-of-2 slds-m-bottom_x-small slds-grid slds-align_absolute-center slds-wrap slds-text-align_right">
-                <lightning-icon icon-name="utility:topic" size="x-small" class="slds-m-right_x-small"></lightning-icon>
-                <span>{identity.source}</span>
-              </div>
+
             </div>
+
           </div>
         </div>
 
-        <!-- RIGHT: Call Status + Feedback -->
+        <!-- RIGHT : CALL STATUS + FEEDBACK -->
         <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-2">
-          <div class="slds-box slds-theme_default slds-m-bottom_small">
-            <div class="slds-grid slds-wrap slds-align_absolute-center slds-m-bottom_small">
-              <div class="slds-text-heading_small slds-m-right_small">{callTitle}</div>
+
+          <!-- CALL STATUS -->
+          <div class="section-card call-box">
+
+            <div class="section-header">
+              <lightning-icon icon-name="utility:phone" size="small"></lightning-icon>
+              <span>{callTitle}</span>
+
               <template if:true={isLive}>
-                <span class="slds-badge slds-theme_error">Live</span>
+                <span class="live-badge live-pulse">LIVE</span>
               </template>
             </div>
-            <div class="slds-grid slds-wrap slds-var-p-vertical_x-small">
-              <div class="slds-col slds-size_1-of-2">
-                <span class="slds-text-title_caps slds-m-right_x-small">Status:</span>
-                <span>{callStatus}</span>
+
+            <div class="section-content call-status-grid">
+
+              <div class="call-status-item">
+                <b>Status:</b> {callStatus}
               </div>
-              <div class="slds-col slds-size_1-of-2 slds-text-align_right">
-                <span class="slds-text-title_caps slds-m-right_x-small">Duration:</span>
-                <span>{elapsedLabel}</span>
+
+              <div class="call-status-item align-right">
+                <b>Duration:</b> {elapsedLabel}
               </div>
+
             </div>
+
           </div>
 
+          <!-- FEEDBACK -->
           <template if:true={showFeedback}>
-            <div class="slds-box slds-theme_default">
+            <div class="section-card feedback-card">
+
+              <!-- L1 -->
+              <lightning-combobox
+                name="l1"
+                class="text-color"
+                label="L1 Status"
+                value={l1Value}
+                options={l1Options}
+                onchange={handleL1Change}>
+              </lightning-combobox>
+
+              <!-- L2 -->
+              <lightning-combobox
+                class="slds-m-top_small text-color"
+                name="l2"
+                label="L2 Sub Status"
+                value={l2Value}
+                options={l2Options}
+                disabled={isL2Disabled}
+                onchange={handleL2Change}>
+              </lightning-combobox>
+
+              <!-- FEEDBACK -->
+              <label class="feedback-label slds-m-top_small">Call Feedback</label>
               <lightning-textarea
-                label="Call Feedback"
                 value={feedback}
                 onchange={handleFeedbackChange}
-                placeholder="Write brief outcome/next steps…"
-                maxlength="2000"
-              ></lightning-textarea>
+                placeholder="Write call outcome…"
+                maxlength="2000">
+              </lightning-textarea>
 
-              <div class="slds-m-top_small">
-                <lightning-button variant="neutral" label="Skip" onclick={close}></lightning-button>
+              <!-- DATE -->
+              <lightning-input
+                class="slds-m-top_small  text-color"
+                type="date"
+                label="Next Follow Up Date"
+                value={nextFollowUpDate}
+                onchange={handleNextFollowUpDateChange}>
+              </lightning-input>
+
+              <!-- BUTTONS -->
+              <div class="button-group">
+
                 <lightning-button
-                  class="slds-m-left_small"
+                  variant="neutral"
+                  label="Skip"
+                  onclick={close}
+                  disabled={disableCancel}>
+                </lightning-button>
+
+                <lightning-button
+                  class="save-btn"
                   variant="brand"
                   label="Save Feedback"
                   onclick={saveFeedback}
-                  disabled={savingFeedback}
-                ></lightning-button>
+                  disabled={savingFeedback}>
+                </lightning-button>
+
               </div>
+
             </div>
           </template>
+
         </div>
       </div>
+      <template if:true={showPopup}>
+    <div class="call-popup">
+        Call Successfully sent
+    </div>
+</template>
+
+
     </div>
 
-    <div slot="footer">
-      <lightning-button variant="neutral" label="Close" onclick={close}></lightning-button>
+    <!-- FOOTER BUTTONS -->
+    <div slot="footer" class="footer-actions">
       <lightning-button
-        class="slds-m-left_small"
+        variant="neutral"
+        label="Close"
+        onclick={close}
+        disabled={disableCancel}>
+      </lightning-button>
+
+      <lightning-button
+        class="call-btn"
+        data-id="callBtn"
         variant="brand"
         label="Call Runo"
         onclick={callApi}>

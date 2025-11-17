@@ -16,6 +16,7 @@ public without sharing class DTORunoCallLogs {
     public String calledBy;
     public String callerId;
     public String callId;
+    public String status;
 
     private static Datetime fromEpoch(Long s) {
         return s == null ? null : Datetime.newInstance(1970, 1, 1, 0, 0, 0).addSeconds((Integer)s);
@@ -45,6 +46,7 @@ public without sharing class DTORunoCallLogs {
         c.Duration_Seconds__c = duration;
         c.Created_At__c = fromEpoch(createdAt);
         c.Start_Time__c = fromEpoch(startTime);
+        c.Status__c = status;
         System.debug('leadByPhone(phoneNumber)  '+leadByPhone(phoneNumber));
         c.Lead__c = leadByPhone(phoneNumber);
         return c;

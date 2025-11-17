@@ -1,0 +1,365 @@
+/* ==========================================================
+   🔥 CYBERPUNK UI (OPTION-B: Purple + Teal Futuristic HUD)
+   LWC-SAFE — NO :root, NO universal selectors, NO shadow hacks
+   ========================================================== */
+
+/* 🌌 Global Cyberpunk Background */
+.panel-wrapper {
+    background: linear-gradient(135deg, #5c5ca7, #0d0d1c, #8d3cbf);
+    padding: 14px;
+    border-radius: 16px;
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.18);
+    position: relative;
+    overflow: hidden;
+}
+
+/* 🌐 Futuristic hologram grid background */
+.panel-wrapper::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(90deg, rgba(0,255,255,0.05) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(237, 13, 237, 0.05) 1px, transparent 1px);
+    background-size: 45px 45px;
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+/* ==========================================================
+   🌌 CYBERPUNK SECTION CARD (Glass + Neon Border)
+   ========================================================== */
+.section-card {
+    background: rgba(10, 10, 22, 0.85);
+    border-radius: 18px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    position: relative;
+    overflow: hidden;
+}
+
+/* 🌈 Neon Plasma Border Animation */
+.section-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 2px;
+
+    background: linear-gradient(
+        120deg,
+        #8b00ff,
+        #00f0ff,
+        #7d00ff,
+        #00eaff,
+        #8b00ff
+    );
+
+    background-size: 350% 350%;
+    animation: plasmaGlow 7s infinite linear;
+
+    mask: linear-gradient(#fff 0 0) content-box,
+          linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+}
+
+@keyframes plasmaGlow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position:   0% 50%; }
+}
+
+/* ==========================================================
+   🔥 Section Header (Cyberpunk HUD Style)
+   ========================================================== */
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #9eefff;
+    text-transform: uppercase;
+    font-weight: 800;
+    font-size: 15px;
+    margin-bottom: 16px;
+    text-shadow: 0 0 10px #00d2ff, 0 0 20px #8b00ff;
+}
+
+/* ==========================================================
+   🔥 Info Lines
+   ========================================================== */
+.info-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    color: #e0dfff;
+    font-size: 13px;
+    text-shadow: 0 0 4px rgba(0,255,255,0.4);
+}
+.text-color{
+    color: #38bbdc !important;
+    font-size: 13px;
+    font-weight: 200;
+    text-shadow: rgba(0, 255, 255, 0.18);
+}
+
+.align-right {
+    margin-left: auto;
+}
+
+/* ==========================================================
+   🔥 Call Box
+   ========================================================== */
+.call-box {
+    background: rgba(18, 18, 35, 0.9);
+    backdrop-filter: blur(5px);
+    border-radius: 14px;
+    padding: 10px 12px;
+}
+
+/* 🔴 LIVE Badge */
+.live-badge {
+    background: #ff0033;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 50px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-left: auto;
+    animation: pulseLive 1.2s infinite;
+    text-shadow: 0 0 8px #ff4060;
+}
+
+@keyframes pulseLive {
+    0% { box-shadow: 0 0 6px #ff0033; }
+    50% { box-shadow: 0 0 18px #ff005e; }
+    100% { box-shadow: 0 0 6px #ff0033; }
+}
+
+/* ==========================================================
+   🔥 Feedback Section
+   ========================================================== */
+.feedback-card {
+    margin-top: 16px;
+}
+
+.feedback-label {
+    color: #d3e0ff;
+    font-weight: 600;
+    text-shadow: 0 0 6px #7d00ff;
+}
+
+/* ==========================================================
+   🔥 Button Group (Cyber Buttons)
+   ========================================================== */
+.button-group {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 18px;
+}
+
+/* 🟣 Purple Neon Button */
+.save-btn {
+    --sds-c-button-brand-color-background: #8b00ff;
+    --sds-c-button-brand-color-border: #a100ff;
+    --sds-c-button-brand-color-background-hover: #b400ff;
+
+    box-shadow: 0 0 18px #a100ff;
+    transition: 0.25s ease;
+}
+
+.save-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 0 30px #d000ff;
+}
+
+/* 💠 Teal Neon Button */
+.call-btn {
+    --sds-c-button-brand-color-background: #00eaff;
+    --sds-c-button-brand-color-border: #0099cc;
+    --sds-c-button-brand-color-background-hover: #18f7ff;
+
+    box-shadow: 0 0 18px #00d2ff;
+    transition: 0.2s ease;
+}
+
+.call-btn:hover {
+    transform: scale(1.06);
+    box-shadow: 0 0 28px #34f1ff;
+}
+
+/* ==========================================================
+   🔥 Popup Overlay (Hologram Window)
+   ========================================================== */
+.call-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 5, 18, 0.75);
+    backdrop-filter: blur(9px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 5000;
+}
+
+/* 🟣 Hologram Popup Window */
+.popup-inner {
+    text-align: center;
+    padding: 35px;
+    background: linear-gradient(145deg, #1a1a33, #0d0d1c);
+    border-radius: 22px;
+    border: 2px solid #00f7ff;
+    animation: holoGlow 2.4s infinite alternate ease-in-out;
+}
+
+@keyframes holoGlow {
+    from { box-shadow: 0 0 15px #00f7ff; }
+    to   { box-shadow: 0 0 40px #8b00ff; }
+}
+
+/* ==========================================================
+   🔥 Cyberpunk Equalizer Loader
+   ========================================================== */
+.wave-loader {
+    margin-top: 16px;
+    display: flex;
+    gap: 8px;
+}
+
+.wave-loader span {
+    width: 7px;
+    height: 22px;
+    background: #00f1ff;
+    border-radius: 4px;
+    animation: equalizer 1s infinite ease-in-out;
+}
+
+.wave-loader span:nth-child(2) { animation-delay: 0.2s; }
+.wave-loader span:nth-child(3) { animation-delay: 0.4s; }
+.wave-loader span:nth-child(4) { animation-delay: 0.6s; }
+
+@keyframes equalizer {
+    0% { transform: scaleY(0.4); }
+    50% { transform: scaleY(1.4); }
+    100% { transform: scaleY(0.4); }
+}
+
+/* ==========================================================
+   🔥 Error Box — Red Hologram Alert
+   ========================================================== */
+.error-box {
+    background: rgba(255, 60, 60, 0.18);
+    border: 1px solid rgba(255, 66, 66, 0.55);
+    color: #ffc8c8;
+    padding: 12px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    text-shadow: 0 0 6px #ff3366;
+}
+
+/* ==========================================================
+   🔥 Footer
+   ========================================================== */
+.footer-actions {
+    display: flex;
+    justify-content: space-between;
+    padding: 14px 5px;
+    background: rgba(12, 12, 25, 0.75);
+    border-top: 1px solid #29324d;
+}
+
+/* ==========================================================
+   🟢 CALL SUCCESS POPUP (Cyber Neon)
+   ========================================================== */
+.call-popup {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    padding: 1.2rem 1.6rem;
+
+    background: linear-gradient(135deg, #22c55e, #16a34a, #0f7939);
+    color: #ffffff;
+
+    font-size: 1.1rem;
+    font-weight: 800;
+    border-radius: 16px;
+
+    box-shadow: 0 12px 32px rgba(22, 163, 74, 0.55);
+
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+
+    opacity: 0;
+    transform: translateY(28px);
+
+    animation: popupSlideUp 0.45s ease-out forwards,
+               popupFadeOut 4s ease-in forwards;
+
+    z-index: 999999;
+}
+
+.call-popup::before {
+    content: '📞';
+    font-size: 2rem;
+    animation: iconWobble 1.4s infinite ease-in-out;
+}
+
+@keyframes popupSlideUp {
+    from { opacity: 0; transform: translateY(28px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes popupFadeOut {
+    0%   { opacity: 1; }
+    85%  { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+@keyframes iconWobble {
+    0%, 100% { transform: rotate(0deg); }
+    50%      { transform: rotate(18deg); }
+}
+/* ==========================================================
+   🔥 CYBERPUNK GLOW FOR L1 / L2 LABELS
+   Only inside feedback-card
+   ========================================================== */
+
+.feedback-card .slds-form-element__label {
+    color: #00f7ff !important;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+
+    /* Neon Glow */
+    text-shadow:
+        0 0 6px #00eaff,
+        0 0 12px #8b00ff,
+        0 0 18px #00eaff;
+    
+    /* Smooth fade in */
+    animation: labelGlowPulse 2.4s infinite ease-in-out;
+}
+
+/* Glow animation */
+@keyframes labelGlowPulse {
+    0% {
+        text-shadow:
+            0 0 4px #00eaff,
+            0 0 8px #8b00ff,
+            0 0 12px #00eaff;
+    }
+    50% {
+        text-shadow:
+            0 0 10px #00faff,
+            0 0 18px #9f00ff,
+            0 0 28px #00eaff;
+    }
+    100% {
+        text-shadow:
+            0 0 4px #00eaff,
+            0 0 8px #8b00ff,
+            0 0 12px #00eaff;
+    }
+}

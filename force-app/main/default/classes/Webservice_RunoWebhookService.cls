@@ -61,6 +61,31 @@ global without sharing class Webservice_RunoWebhookService {
             Integer dur = c.Duration_Seconds__c == null ? null : Integer.valueOf(c.Duration_Seconds__c);
             RunoEventPublisher.publishCallCompleted(c.Call_Id__c,dur,c.Lead__c,c.Phone_Number__c,'Completed');
 
+            String callType = null;
+            String phoneFromPayload = null;
+            String firstNameFromPayload = null;
+            String emailFromPayload = null;
+            try {
+                if (parsed instanceof Map<String, Object>) {
+                    Map<String, Object> m = (Map<String, Object>) parsed;
+                    Object tVal = m.get('type');
+                    Object pVal = m.get('phoneNumber');
+                    Object fnVal = m.get('name');
+                    Object emVal = m.get('email');
+                    callType = tVal == null ? null : String.valueOf(tVal);
+                    phoneFromPayload = pVal == null ? null : String.valueOf(pVal);
+                    firstNameFromPayload = fnVal == null ? null : String.valueOf(fnVal);
+                    emailFromPayload = emVal == null ? null : String.valueOf(emVal);
+                }
+            } catch (Exception ign) {}
+
+            if (String.isBlank(callType) && c.getSObjectType().getDescribe().fields.getMap().containsKey('Call_Type__c')) {
+                try { callType = (String) c.get('Call_Type__c'); } catch (Exception e2) {}
+            }
+            if (String.isBlank(phoneFromPayload)) phoneFromPayload = c.Phone_Number__c;
+
+            RunoEnquiryTaskService.handle(callType, phoneFromPayload, firstNameFromPayload, emailFromPayload);
+
             logs.add(IntegrationLogUtil.buildLog('Runo Webhook', envelope, JSON.serialize(parsed), null, 'Received', 200));
             IntegrationLogUtil.insertLogs(logs);
             send(res, 200, true, 'OK');

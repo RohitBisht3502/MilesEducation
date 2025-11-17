@@ -3,8 +3,8 @@ public without sharing class LeadCityClassifier {
     private static final String API_ENDPOINT = 'https://gvqz37ay7d.execute-api.ap-south-1.amazonaws.com/miles360/city_classifier';
     private static final String API_KEY = 'gAkgs8n3PQ8QnanrfsueA5KpXNOlpwJw6WtjD2hR';
 
-    // Fetch city for a given lead and log the process
-    public static String fetchCityForLeadWithLogging(Lead ld, List<Integration_Log__c> logs) {
+    // Fetch city for a given custom Lead__c and log the process
+    public static String fetchCityForLeadWithLogging(Lead__c ld, List<Integration_Log__c> logs) {
         Http http = new Http();
         String requestPayload = '';
         String responsePayload = '';
@@ -18,12 +18,10 @@ public without sharing class LeadCityClassifier {
             request.setHeader('x-api-key', API_KEY);
 
             // Prepare request payload
-            String fullName = ((ld.FirstName != null ? ld.FirstName : '') + ' ' + (ld.LastName != null ? ld.LastName : '')).trim();
+           // String fullName = ((ld.First_Name__c != null ? ld.First_Name__c : '') + ' ' + (ld.Last_Name__c != null ? ld.Last_Name__c : '')).trim();
             Map<String, Object> payload = new Map<String, Object>{
-                'email' => ld.Email,
-                'phone' => ld.Phone,
-                'first_name' => fullName,
-                'coming_from' => ld.Coming_From__c != null ? ld.Coming_From__c : ''
+                'email' => ld.Email__c,
+                'phone' => ld.Phone__c
             };
 
             requestPayload = JSON.serialize(payload);
@@ -39,12 +37,24 @@ public without sharing class LeadCityClassifier {
             }
 
             // Log response
-            logs.add(IntegrationLogUtil.buildLog('Lead City', requestPayload, responsePayload, String.isBlank(city) ? 'No city found in API response' : null, String.isNotBlank(city) ? 'Success' : 'Failed',
+            logs.add(IntegrationLogUtil.buildLog(
+                'Lead__c City',
+                requestPayload,
+                responsePayload,
+                String.isBlank(city) ? 'No city found in API response' : null,
+                String.isNotBlank(city) ? 'Success' : 'Failed',
                 response.getStatusCode()
             ));
 
         } catch (Exception ex) {
-            logs.add(IntegrationLogUtil.buildLog('Lead City',requestPayload,responsePayload,'Exception: ' + ex.getMessage(),'Failed',null));
+            logs.add(IntegrationLogUtil.buildLog(
+                'Lead__c City',
+                requestPayload,
+                responsePayload,
+                'Exception: ' + ex.getMessage(),
+                'Failed',
+                null
+            ));
         }
 
         return city;
@@ -79,12 +89,16 @@ public without sharing class LeadCityClassifier {
         public void execute(QueueableContext ctx) {
             if (leadIds == null || leadIds.isEmpty()) return;
 
-            List<Lead> leads = [SELECT Id, FirstName, LastName, Email, Phone, Coming_From__c, City__c FROM Lead WHERE Id IN :leadIds];
+            List<Lead__c> leads = [
+                SELECT Id, Email__c, Phone__c,  City__c 
+                FROM Lead__c 
+                WHERE Id IN :leadIds
+            ];
 
             List<Integration_Log__c> logs = new List<Integration_Log__c>();
-            List<Lead> leadsToUpdate = new List<Lead>();
+            List<Lead__c> leadsToUpdate = new List<Lead__c>();
 
-            for (Lead ld : leads) {
+            for (Lead__c ld : leads) {
                 String city = fetchCityForLeadWithLogging(ld, logs);
                 if (!String.isBlank(city) && ld.City__c != city) {
                     ld.City__c = city;

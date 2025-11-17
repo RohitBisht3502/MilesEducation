@@ -1,0 +1,44 @@
+<template>
+  <div class="wrap">
+    <div class="toolbar">
+      <div></div>
+      <div></div>
+      <div class="actions">
+        <button class="btn" onclick={handleStart}>Start</button>
+        <button class="btn ghost" onclick={handleEnd}>End</button>
+      </div>
+    </div>
+
+    <div class="table-scroller">
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Lead Name</th>
+            <th>Phone Number</th>
+            <th>Source</th>
+            <th>City</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template if:true={hasLeads}>
+            <template for:each={leads} for:item="lead">
+              <tr key={lead.id}>
+                <td>{lead.rowNumber}</td>
+                <td>{lead.name}</td>
+                <td>{lead.phone}</td>
+                <td>{lead.source}</td>
+                <td>{lead.city}</td>
+              </tr>
+            </template>
+          </template>
+          <template if:false={hasLeads}>
+            <tr>
+              <td colspan="5" class="no-data">No leads to display.</td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</template>

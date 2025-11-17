@@ -1,0 +1,80 @@
+<template>
+    <div class="slds-p-around_small">
+        <template if:true={showFeedback}>
+            <!-- Duration info -->
+            <div class="slds-m-bottom_small slds-grid slds-justify_between">
+                <span class="slds-text-title_caps">Last Call Duration:</span>
+                <span>{elapsedLabel}</span>
+            </div>
+
+            <!-- L1 Picklist -->
+            <div class="slds-m-top_small">
+                <lightning-combobox
+                    name="l1"
+                    label="L1 Status"
+                    value={l1Value}
+                    options={l1Options}
+                    onchange={handleL1Change}
+                ></lightning-combobox>
+            </div>
+
+            <!-- L2 Picklist (dependent) -->
+            <div class="slds-m-top_small">
+                <lightning-combobox
+                    name="l2"
+                    label="L2 Sub Status"
+                    value={l2Value}
+                    options={l2Options}
+                    disabled={isL2Disabled}
+                    onchange={handleL2Change}
+                ></lightning-combobox>
+            </div>
+
+            <!-- Feedback + Next Follow Up -->
+            <div class="slds-box slds-theme_default slds-m-top_small">
+                <label class="slds-text-title slds-m-bottom_x-small">
+                    Call Feedback
+                </label>
+
+                <lightning-textarea
+                    value={feedback}
+                    onchange={handleFeedbackChange}
+                    placeholder="Write brief outcome/next steps…"
+                    maxlength="2000"
+                ></lightning-textarea>
+
+                <div class="slds-m-top_small">
+                    <lightning-input
+                        type="date"
+                        label="Next Follow Up Date"
+                        value={nextFollowUpDate}
+                        onchange={handleNextFollowUpDateChange}
+                        message-when-bad-input="Please select a valid date"
+                    ></lightning-input>
+                </div>
+
+                <div class="slds-m-top_small">
+                    <lightning-button
+                        variant="neutral"
+                        label="Skip"
+                        onclick={skip}
+                    ></lightning-button>
+
+                    <lightning-button
+                        class="slds-m-left_small"
+                        variant="brand"
+                        label="Save Feedback"
+                        onclick={saveFeedback}
+                        disabled={savingFeedback}
+                    ></lightning-button>
+                </div>
+            </div>
+        </template>
+
+        <template if:false={showFeedback}>
+            <p class="slds-text-color_weak slds-text-body_small">
+                No Runo calls are waiting for feedback.
+            </p>
+        </template>
+    </div>
+</template>

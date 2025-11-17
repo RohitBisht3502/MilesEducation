@@ -1,18 +1,13 @@
-trigger LeadTrigger on Lead (before insert, after insert, before update, after update) {
-
-    // ===== BEFORE INSERT =====
-    if (Trigger.isBefore && Trigger.isInsert) {
-        LeadTriggerHelperClass.handleBeforeInsert(Trigger.new);
-    }
-
-    // ===== BEFORE UPDATE =====
+trigger LeadTrigger on Lead__c (before insert, after insert, before update, after update) {
+    
     if (Trigger.isBefore && Trigger.isUpdate) {
-        LeadTriggerHelperClass.handleBeforeUpdate(Trigger.new, Trigger.oldMap);
+        EnquiryStageService.validateStageTransitions(Trigger.new, Trigger.oldMap);
     }
-
-    // ===== AFTER INSERT =====
+    
+     // ===== AFTER INSERT =====
     if (Trigger.isAfter && Trigger.isInsert) {
         LeadTriggerHelperClass.handleAfterInsert(Trigger.new);
     }
-
+    
+    
 }
