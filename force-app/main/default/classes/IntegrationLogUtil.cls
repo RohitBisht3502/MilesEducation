@@ -53,10 +53,11 @@ public without sharing class IntegrationLogUtil {
 
     public static void insertLogs(List<Integration_Log__c> logs) {
         if (logs == null || logs.isEmpty()) return;
-        try {
+       // try {
+            System.debug('logs>>>>> '+logs);
             insert logs;
-        } catch (Exception e) {
-            System.debug('Failed to insert Integration_Log__c list: ' + e.getMessage());
-        }
+        //} catch (Exception e) {
+            //System.debug('Failed to insert Integration_Log__c list: ' + e.getMessage());
+        //}
     }
 }

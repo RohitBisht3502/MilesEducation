@@ -1,3 +1,7 @@
+/*
+    Author       : ROHIT SINGH BISHT
+    Description  : 
+*/
 @RestResource(urlMapping='/runo/call-log/recording/*')
 global without sharing class Webservice_RunoCallRecordingWebhook {
     private static final String VENDOR_TOKEN = '4f029d1bcee05d32cdc8a3d32b0fcda7';
@@ -55,7 +59,7 @@ global without sharing class Webservice_RunoCallRecordingWebhook {
             }
 
             System.debug('dto.callId   '+dto.callId);
-            List<Call_Log__c> logs = [ SELECT Id ,Call_Id__c,Recording_Url__c FROM Call_Log__c  WHERE Call_Id__c = :dto.callId  LIMIT 1 ];
+            List<Call_Log__c> logs = [ SELECT Id ,Call_Id__c,Recording_Url__c FROM Call_Log__c  WHERE Call_Id__c = :dto.callId ORDER BY CreatedDate DESC LIMIT 1 ];
             System.debug('logs   '+logs);
             if (!logs.isEmpty()) {
                 update new Call_Log__c(
@@ -84,13 +88,23 @@ global without sharing class Webservice_RunoCallRecordingWebhook {
             IntegrationLogUtil.insertLog( 'Runo → Miles Force',  requestBody, responseBody, 'Call log not found', 'Failed', statusCode );
 
         } catch (Exception ex) {
-            errorMessage = ex.getMessage();
-            statusCode = 500;
-            responseBody = '{"error":"Internal Server Error"}';
-            res.statusCode = statusCode;
-            res.responseBody = Blob.valueOf(responseBody);
+    errorMessage = ex.getMessage();
+    statusCode = 500;
 
-            IntegrationLogUtil.insertLog('Runo → Miles Force', requestBody,  responseBody,errorMessage,'Failed', statusCode );
-        }
+    
+    res.statusCode = statusCode;
+    res.responseBody = Blob.valueOf('');
+
+    // Log full details internally
+    IntegrationLogUtil.insertLog(
+        'Runo → Miles Force',
+        requestBody,
+        responseBody,       
+        errorMessage,
+        'Failed',
+        statusCode
+    );
+}
+
     }
 }

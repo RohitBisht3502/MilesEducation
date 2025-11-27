@@ -1,0 +1,223 @@
+<template>
+    <div class="dashboard-container">
+        <div class="dashboard-wrapper">
+            
+            <!-- Header -->
+            <header class="dashboard-header">
+                <div class="header-icon">
+                    <svg class="icon-users" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z">
+                        </path>
+                    </svg>
+                </div>
+                <h1 class="header-title">GM Webinar Dashboard</h1>
+            </header>
+
+            <!-- Loading State -->
+            <template if:true={isLoading}>
+                <div class="loading-container">
+                    <div class="spinner"></div>
+                    <p class="loading-text">Loading webinar data...</p>
+                </div>
+            </template>
+
+            <!-- Main Content -->
+            <template if:false={isLoading}>
+                
+                <!-- Metrics Grid -->
+                <section class="metrics-section">
+                    <div class="metric-card metric-card--primary">
+                        <div class="metric-value">{metrics.totalRegistrations}</div>
+                        <div class="metric-divider"></div>
+                        <div class="metric-label">Total Registrations</div>
+                    </div>
+
+                    <div class="metric-card metric-card--success">
+                        <div class="metric-value">{metrics.attended}</div>
+                        <div class="metric-divider"></div>
+                        <div class="metric-label">Attended</div>
+                    </div>
+
+                    <div class="metric-card metric-card--info">
+                        <div class="metric-value">{metrics.attendanceRate}%</div>
+                        <div class="metric-divider"></div>
+                        <div class="metric-label">Attendance Rate</div>
+                    </div>
+
+                    <div class="metric-card metric-card--warning">
+                        <div class="metric-value">{metrics.pendingFollowups}</div>
+                        <div class="metric-divider"></div>
+                        <div class="metric-label">Absent</div>
+                    </div>
+
+                    <div class="metric-card metric-card--secondary">
+                        <div class="metric-value">{metrics.totalSpocs}</div>
+                        <div class="metric-divider"></div>
+                        <div class="metric-label">Active SPOCs</div>
+                    </div>
+                </section>
+
+                <!-- Filters Section -->
+                <section class="filters-section">
+                    <div class="filters-container">
+                        <!-- Search Input -->
+                        <div class="search-wrapper">
+                            <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z">
+                                </path>
+                            </svg>
+                            <input 
+                                type="text" 
+                                placeholder="Search by name, email, phone, or SPOC..." 
+                                value={searchTerm}
+                                oninput={handleSearchChange}
+                                class="search-input"
+                                aria-label="Search attendees"
+                            />
+                        </div>
+                        
+                        <!-- SPOC Filter Dropdown -->
+                        <div class="filter-group">
+                            <label class="filter-label">Filter by SPOC:</label>
+                            <div class="select-wrapper">
+                                <select 
+                                    value={spocFilter}
+                                    onchange={handleSpocFilter}
+                                    class="spoc-select"
+                                    aria-label="Filter by SPOC"
+                                >
+                                    <template for:each={computedSpocOptions} for:item="spoc">
+                                        <option key={spoc.value} value={spoc.value}>{spoc.label}</option>
+                                    </template>
+                                </select>
+                                <svg class="select-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        
+                        <!-- Status Filters -->
+                        <div class="status-filters">
+                            <template for:each={computedStatusOptions} for:item="status">
+                                <button 
+                                    key={status.value}
+                                    data-value={status.value}
+                                    onclick={handleStatusFilter}
+                                    class={status.buttonClass}
+                                    aria-pressed={status.ariaPressed}>
+                                    <svg class="filter-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                              d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z">
+                                        </path>
+                                    </svg>
+                                    {status.label}
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Data Table -->
+                <section class="table-section">
+                    <div class="table-container">
+                        <h2 class="table-heading">Attendee Records</h2>
+                        
+                        <div class="table-scroll">
+                            <table class="data-table">
+                                <thead class="table-header">
+                                    <tr>
+                                        <th scope="col" class="table-header-cell">Student</th>
+                                        <th scope="col" class="table-header-cell">Email</th>
+                                        <th scope="col" class="table-header-cell">Phone</th>
+                                        <th scope="col" class="table-header-cell">Assigned SPOC</th>
+                                        <th scope="col" class="table-header-cell">Status</th>
+                                        <th scope="col" class="table-header-cell">Registration Date</th>
+                                        <th scope="col" class="table-header-cell table-header-cell--actions">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="table-body">
+                                    <template for:each={filteredData} for:item="item">
+                                        <tr key={item.webinarMemberId} class="table-row">
+                                            <td class="table-cell">
+                                                <div class="student-info">
+                                                    <div class="student-avatar">
+                                                        {item.studentInitials}
+                                                    </div>
+                                                    <span class="student-name">{item.leadName}</span>
+                                                </div>
+                                            </td>
+                                            <td class="table-cell">
+                                                <div class="contact-info">
+                                                    <svg class="contact-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                                              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                                                        </path>
+                                                    </svg>
+                                                    <span class="contact-text">{item.email}</span>
+                                                </div>
+                                            </td>
+                                            <td class="table-cell">
+                                                <div class="contact-info">
+                                                    <svg class="contact-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                                              d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z">
+                                                        </path>
+                                                    </svg>
+                                                    <span class="contact-text">{item.phone}</span>
+                                                </div>
+                                            </td>
+                                            <td class="table-cell">
+                                                <div class="spoc-info">
+                                                    <div class="spoc-avatar">
+                                                        <!-- {item.spocName ? item.spocName.substring(0, 2).toUpperCase() : 'NA'} -->
+                                                         {item.spocName}
+                                                    </div>
+                                                    <span class="spoc-name">{item.spocName}</span>
+                                                </div>
+                                            </td>
+                                            <td class="table-cell">
+                                                <span class={item.statusBadgeClass}>
+                                                    {item.status}
+                                                </span>
+                                            </td>
+                                            <td class="table-cell">
+                                                <span class="date-text">{item.formattedDate}</span>
+                                            </td>
+                                            <td class="table-cell table-cell--actions">
+                                                <div class="action-buttons">
+                                                    <button 
+                                                        data-phone={item.phone}
+                                                        onclick={handleCall}
+                                                        class="action-btn action-btn--primary"
+                                                        title="Call Student">
+                                                        Call
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                            
+                            <!-- No Data State -->
+                            <template if:true={isNoData}>
+                                <div class="empty-state">
+                                    <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                        </path>
+                                    </svg>
+                                    <p class="empty-text">No records found matching your criteria</p>
+                                    <p class="empty-subtext">Try adjusting your filters or search terms</p>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </section>
+
+            </template>
+        </div>
+    </div>
+</template>

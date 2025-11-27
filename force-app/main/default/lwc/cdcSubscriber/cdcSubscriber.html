@@ -1,0 +1,160 @@
+<template>
+    <lightning-card title="CDC Event Monitor" icon-name="standard:data_streams">
+        <div class="slds-m-around_medium">
+            <!-- Channel Input Section -->
+            <div class="slds-grid slds-gutters slds-m-bottom_medium">
+                <div class="slds-col slds-size_2-of-5">
+                    <lightning-combobox
+                        name="channel"
+                        label="Select Object"
+                        value={selectedObject}
+                        options={objectOptions}
+                        onchange={handleObjectChange}>
+                    </lightning-combobox>
+                </div>
+                <div class="slds-col slds-size_2-of-5">
+                    <lightning-input
+                        label="Channel Name"
+                        value={channelName}
+                        onchange={handleChannelChange}
+                        placeholder="/data/AccountChangeEvent"
+                        message-when-value-missing="Channel name is required">
+                    </lightning-input>
+                </div>
+                <div class="slds-col slds-size_1-of-5 slds-align_absolute-center">
+                    <lightning-button
+                        label="Subscribe"
+                        onclick={handleSubscribe}
+                        variant="brand"
+                        disabled={subscribeDisabled}
+                        class="slds-m-right_x-small">
+                    </lightning-button>
+                    <lightning-button
+                        label="Unsubscribe"
+                        onclick={handleUnsubscribe}
+                        variant="destructive"
+                        disabled={unsubscribeDisabled}>
+                    </lightning-button>
+                </div>
+            </div>
+
+            <!-- Status Panel -->
+            <div class="slds-m-bottom_medium">
+                <lightning-card>
+                    <div class="slds-p-around_small">
+                        <div class="slds-grid slds-grid_align-spread">
+                            <div>
+                                <div class="slds-text-heading_small">Subscription Status</div>
+                                <div class="slds-m-top_x-small">
+                                    <lightning-badge 
+                                        if:true={isSubscribed} 
+                                        label="SUBSCRIBED" 
+                                        class="slds-theme_success">
+                                    </lightning-badge>
+                                    <lightning-badge 
+                                        if:false={isSubscribed} 
+                                        label="NOT SUBSCRIBED" 
+                                        class="slds-theme_error">
+                                    </lightning-badge>
+                                    <span class="slds-m-left_small slds-text-color_weak">
+                                        Channel: {channelName}
+                                    </span>
+                                </div>
+                            </div>
+                            <div>
+                                <lightning-button
+                                    label="Clear Events"
+                                    onclick={clearEvents}
+                                    variant="neutral"
+                                    disabled={clearEventsDisabled}>
+                                </lightning-button>
+                            </div>
+                        </div>
+                    </div>
+                </lightning-card>
+            </div>
+
+            <!-- Events Display -->
+            <div>
+                <lightning-card>
+                    <div class="slds-p-around_small">
+                        <div class="slds-text-heading_medium slds-m-bottom_small">
+                            Captured Events ({events.length})
+                        </div>
+                        
+                        <template if:true={events.length}>
+                            <div class="event-container">
+                                <template for:each={events} for:item="event">
+                                    <div key={event.id} class="slds-box slds-m-bottom_small event-item">
+                                        <!-- Event Header -->
+                                        <div class="slds-grid slds-wrap slds-m-bottom_small">
+                                            <div class="slds-col slds-size_2-of-12">
+                                                <div class="slds-text-title">Change Type</div>
+                                                <lightning-badge 
+                                                    label={event.changeType} 
+                                                    class={event.badgeClass}>
+                                                </lightning-badge>
+                                            </div>
+                                            <div class="slds-col slds-size_3-of-12">
+                                                <div class="slds-text-title">Record ID</div>
+                                                <div class="slds-truncate" title={event.recordId}>
+                                                    <a href="javascript:void(0);" onclick={handleRecordClick} data-recordid={event.recordId}>
+                                                        {event.recordId}
+                                                    </a>
+                                                </div>
+                                            </div>
+                                            <div class="slds-col slds-size_3-of-12">
+                                                <div class="slds-text-title">Changed Fields</div>
+                                                <div>{event.changedFields}</div>
+                                            </div>
+                                            <div class="slds-col slds-size_2-of-12">
+                                                <div class="slds-text-title">User</div>
+                                                <div>{event.commitUser}</div>
+                                            </div>
+                                            <div class="slds-col slds-size_2-of-12">
+                                                <div class="slds-text-title">Timestamp</div>
+                                                <div>{event.timestamp}</div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Current Values Display -->
+                                        <div class="slds-m-top_small">
+                                            <div class="slds-text-heading_small slds-m-bottom_x-small">
+                                                Current Field Values:
+                                            </div>
+                                            <div class="slds-grid slds-wrap">
+                                                <template for:each={event.fieldValues} for:item="field">
+                                                    <div key={field.name} class="slds-col slds-size_3-of-12 slds-m-bottom_x-small">
+                                                        <div class="slds-text-title">{field.label}</div>
+                                                        <div class="slds-truncate" title={field.value}>{field.value}</div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+
+                                        <!-- Full Payload -->
+                                        <div class="slds-m-top_small">
+                                            <details>
+                                                <summary class="slds-text-link slds-text-heading_small">
+                                                    View Full Event Payload
+                                                </summary>
+                                                <pre class="slds-m-top_x-small slds-p-around_small slds-background_color-shade payload-display">{event.payload}</pre>
+                                            </details>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <template if:false={events.length}>
+                            <div class="slds-align_absolute-center slds-m-vertical_x-large">
+                                <div class="slds-text-heading_small slds-text-color_weak">
+                                    No events received yet. Subscribe to a channel and create/update records.
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </lightning-card>
+            </div>
+        </div>
+    </lightning-card>
+</template>

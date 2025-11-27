@@ -1,6 +1,52 @@
 <template>
     <div class="slds-p-around_small">
-        <template if:true={showFeedback}>
+                <template if:true={showFeedback}>
+        <!-- Lead Information Card -->
+        <div class="lead-card slds-box slds-m-bottom_medium">
+            <div class="section-header">
+                <lightning-icon icon-name="standard:lead" size="small"></lightning-icon>
+                <span>Lead Information</span>
+            </div>
+
+            <div class="section-content">
+                <div class="info-line">
+                    <lightning-icon icon-name="utility:user" size="x-small"></lightning-icon>
+                    <span>{identity.name}</span>
+                </div>
+
+                <div class="info-line">
+                    <lightning-icon icon-name="utility:email" size="x-small"></lightning-icon>
+                    <span>{identity.email}</span>
+                </div>
+
+                <div class="info-line">
+                    <lightning-icon icon-name="utility:phone_portrait" size="x-small"></lightning-icon>
+                    <span>{identity.phone}</span>
+                </div>
+
+                <div class="grid-2">
+                    <div class="info-line">
+                        <lightning-icon icon-name="utility:location" size="x-small"></lightning-icon>
+                        <span>{identity.city}</span>
+                    </div>
+
+                    <div class="info-line align-right">
+                        <lightning-icon icon-name="utility:topic" size="x-small"></lightning-icon>
+                        <span>{identity.source}</span>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="info-line">
+                        <lightning-icon icon-name="utility:collection" size="x-small"></lightning-icon>
+                        <span>{identity.stage}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feedback Section -->
+
             <!-- Duration info -->
             <div class="slds-m-bottom_small slds-grid slds-justify_between">
                 <span class="slds-text-title_caps">Last Call Duration:</span>
@@ -30,22 +76,52 @@
                 ></lightning-combobox>
             </div>
 
+            <!-- STAGE -->
+            <lightning-combobox
+                class="slds-m-top_small text-color"
+                name="stage"
+                label="Stage"
+                value={stageValue}
+                options={stageOptions}
+                onchange={handleStageChange}>
+            </lightning-combobox>
+
+            <!-- COURSE / LEVEL  -->
+            <lightning-combobox
+                class="slds-m-top_small text-color"
+                name="course"
+                label="Course"
+                value={levelValue}
+                options={levelOptions}
+                onchange={handleLevelChange}>
+            </lightning-combobox>
+
             <!-- Feedback + Next Follow Up -->
             <div class="slds-box slds-theme_default slds-m-top_small">
                 <label class="slds-text-title slds-m-bottom_x-small">
                     Call Feedback
                 </label>
 
-                <lightning-textarea
-                    value={feedback}
-                    onchange={handleFeedbackChange}
-                    placeholder="Write brief outcome/next steps…"
-                    maxlength="2000"
-                ></lightning-textarea>
+              <label class="feedback-label slds-m-top_small">
+                Call Feedback
+                <template if:true={isCommentMandatory}>
+                  <span style="color:#c23934;"> (Mandatory)</span>
+                </template>
+                <template if:false={isCommentMandatory}>
+                  <span style="color:#888;"> (Optional)</span>
+                </template>
+              </label>
+              <lightning-textarea
+                value={feedback}
+                onchange={handleFeedbackChange}
+                placeholder="Write call outcome…"
+                maxlength="2000">
+              </lightning-textarea>
+
 
                 <div class="slds-m-top_small">
                     <lightning-input
-                        type="date"
+                        type="datetime-local"
                         label="Next Follow Up Date"
                         value={nextFollowUpDate}
                         onchange={handleNextFollowUpDateChange}
@@ -55,16 +131,10 @@
 
                 <div class="slds-m-top_small">
                     <lightning-button
-                        variant="neutral"
-                        label="Skip"
-                        onclick={skip}
-                    ></lightning-button>
-
-                    <lightning-button
                         class="slds-m-left_small"
                         variant="brand"
                         label="Save Feedback"
-                        onclick={saveFeedback}
+                        onclick={handleSaveClick}
                         disabled={savingFeedback}
                     ></lightning-button>
                 </div>

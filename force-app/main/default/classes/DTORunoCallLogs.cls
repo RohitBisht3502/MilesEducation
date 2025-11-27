@@ -22,15 +22,6 @@ public without sharing class DTORunoCallLogs {
         return s == null ? null : Datetime.newInstance(1970, 1, 1, 0, 0, 0).addSeconds((Integer)s);
     }
 
-    private static Id leadByPhone(String p) {
-        if (String.isBlank(p)) return null;
-        String d = p.replaceAll('[^0-9]', '');
-        if (d.startsWith('91')) d = d.substring(2);
-        if (d.length() > 10) d = d.right(10);
-        List<Lead> ls = [SELECT Id FROM Lead WHERE Phone != null AND Phone LIKE :('%' + d) LIMIT 1];
-        return ls.isEmpty() ? null : ls[0].Id;
-    }
-
     public Call_Log__c toSObject(String raw) {
         Call_Log__c c = new Call_Log__c();
         c.Call_Id__c = callId;
@@ -47,8 +38,9 @@ public without sharing class DTORunoCallLogs {
         c.Created_At__c = fromEpoch(createdAt);
         c.Start_Time__c = fromEpoch(startTime);
         c.Status__c = status;
-        System.debug('leadByPhone(phoneNumber)  '+leadByPhone(phoneNumber));
-        c.Lead__c = leadByPhone(phoneNumber);
+        Id candidateId = Utility.candidateByPhone(phoneNumber);
+        System.debug('candidateId  '+candidateId);
+        c.Candidate__c = candidateId;
         return c;
     }
 

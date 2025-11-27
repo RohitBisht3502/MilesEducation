@@ -2,7 +2,7 @@
     Author       : ROHIT SINGH BISHT
     Description  : 
 */
-public without sharing class LeadZoomRegistrationJob implements Queueable, Database.AllowsCallouts {
+public without sharing class LeadZoomRegistrationJob implements Queueable, Database.AllowsCallouts{
 
     private final Set<Id> leadIds;
     private final Id fixedWebinarId; 

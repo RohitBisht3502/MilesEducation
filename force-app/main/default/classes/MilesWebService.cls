@@ -9,6 +9,7 @@ global without sharing class MilesWebService {
         RestResponse res = RestContext.response;
 
         try {
+            /* ------------ SECURITY CHECK ------------- */
             String securityCode = req.headers.get('securityCode');
             if (String.isBlank(securityCode)) {
                 res.statusCode = 400;
@@ -19,6 +20,7 @@ global without sharing class MilesWebService {
                 return 'Unauthorized: Invalid security code';
             }
 
+            /* ------------ BODY CHECK ------------- */
             String requestBody = req.requestBody != null ? req.requestBody.toString() : '';
             if (String.isBlank(requestBody)) {
                 res.statusCode = 400;
@@ -37,6 +39,8 @@ global without sharing class MilesWebService {
             }
 
             Boolean whatsappAllow = (inputData.whatsappAllow != null && inputData.whatsappAllow == 1);
+
+            /* ------------ CREATE ENQUIRY ------------- */
             Enquiry__c enquiry = new Enquiry__c(
                 Name                     = inputData.first_name,
                 First_Name__c            = inputData.first_name,
@@ -57,86 +61,133 @@ global without sharing class MilesWebService {
             );
             insert enquiry;
 
-            // -------- NEW: Find existing STANDARD Lead by phone only --------
-            Lead existingStdLead;
-            List<Lead> stdLeads = [
-                SELECT Id
-                FROM Lead
-                WHERE Phone = :inputData.phone
-                LIMIT 1
-            ];
-            if (!stdLeads.isEmpty()) {
-                existingStdLead = stdLeads[0];
-                // Update enquiry with existing standard Lead
-                enquiry.Candidate__c = existingStdLead.Id;
+            /* =====================================================
+                     FLOW IMPLEMENTATION (Candidate = Lead)
+               ===================================================== */
+
+            /* 1. CHECK CANDIDATE (BY PHONE) */
+            Lead candidate;
+            List<Lead> candidateList = [SELECT Id, Phone FROM Lead WHERE Phone = :inputData.phone LIMIT 1];
+            if (!candidateList.isEmpty()) {
+                candidate = candidateList[0];
             }
 
-            // -------- Existing custom Lead__c logic (now by Phone + Course) --------
-            Lead__c existingLeadC;
-            List<Lead__c> leadCs = [ SELECT Id FROM Lead__c WHERE Phone__c = :inputData.phone AND Course__c = :inputData.course LIMIT 1 ];
-            if (!leadCs.isEmpty()) existingLeadC = leadCs[0];
+            Lead__c leadToReturn;
 
-            Lead__c leadCToUse = existingLeadC;
-            if (leadCToUse == null) {
-                leadCToUse = new Lead__c(
+            /* ------------------- NO CANDIDATE ------------------- */
+            if (candidate == null) {
+
+                // (a) Create Candidate (Lead)
+                candidate = new Lead(
+                    FirstName                = inputData.first_name,
+                    LastName                 = inputData.first_name,
+                    Company                  = 'Test Company',
+                    Phone                    = inputData.phone,
+                    Email                    = inputData.email,
+                    Coming_From__c           = inputData.coming_from,
+                    Register_for_Webinar__c  = inputData.register_for_webinar,
+                    Interested_Webinar_ID__c = inputData.interested_webinar_id
+                );
+                insert candidate;
+
+                // (b) Create Phone_Number__c mapped with Candidate
+                Phone_Number__c phoneRec = new Phone_Number__c(
+                    Name         = inputData.phone,
+                    Phone__c     = inputData.phone,
+                    Candidate__c = candidate.Id
+                );
+                insert phoneRec;
+
+                // (c) Create Lead__c with course + phone
+                Lead__c newLead = new Lead__c(
                     Name      = inputData.first_name,
                     Phone__c  = inputData.phone,
                     Email__c  = inputData.email,
                     Stage__c  = 'M3',
-                    Course__c = inputData.course
+                    Course__c = inputData.course,
+                    Source__c = inputData.coming_from,
+                    Candidate__c = candidate.Id
                 );
-                insert leadCToUse;
-            }
+                insert newLead;
 
-            List<Phone_Number__c> existingPhones = [ SELECT Id, Lead__c FROM Phone_Number__c WHERE Phone__c = :inputData.phone LIMIT 1 ];
+                // (d) Tag phone record with this Lead__c
+                phoneRec.Lead__c = newLead.Id;
+                update phoneRec;
 
-            if (!existingPhones.isEmpty()) {
-                // Link Enquiry with existing custom Lead__c via Phone_Number__c
-                enquiry.Lead__c = existingPhones[0].Lead__c;
-                // Candidate__c might already be set from existingStdLead (if found)
+                // (e) Link Enquiry
+                enquiry.Candidate__c = candidate.Id;
+                enquiry.Lead__c      = newLead.Id;
                 update enquiry;
+
+                leadToReturn = newLead;
+
             } else {
-                // No Phone_Number__c entry yet
-                // Use existing standard Lead if present, otherwise create a new one
-                Lead stdLeadToUse = existingStdLead;
+                /* ------------------- CANDIDATE EXISTS ------------------- */
 
-                if (stdLeadToUse == null) {
-                    stdLeadToUse = new Lead(
-                        FirstName                = inputData.first_name,
-                        LastName                 = inputData.first_name,
-                        Company                  = 'Test Company',
-                        Phone                    = inputData.phone,
-                        Email                    = inputData.email,
-                        Coming_From__c           = inputData.coming_from,
-                        Register_for_Webinar__c  = inputData.register_for_webinar,
-                        Interested_Webinar_ID__c = inputData.interested_webinar_id
-                    );
-                    insert stdLeadToUse;
-                }
-
-                Phone_Number__c phoneRecord = new Phone_Number__c(
-                    Name         = inputData.phone,
-                    Phone__c     = inputData.phone,
-                    Candidate__c = stdLeadToUse.Id
-                );
-                insert phoneRecord;
-
-                if (Schema.sObjectType.Lead.fields.getMap().containsKey('Phone_Number__c')) {
-                    stdLeadToUse.Phone_Number__c = phoneRecord.Id;
-                    update stdLeadToUse;
-                }
-
-                enquiry.Lead__c     = leadCToUse.Id;
-                enquiry.Candidate__c = stdLeadToUse.Id;
+                enquiry.Candidate__c = candidate.Id;
                 update enquiry;
+
+                // 2. Check Lead__c with same Phone + Course
+                Lead__c existingLeadC;
+                List<Lead__c> leadCs = [SELECT Id, Stage__c FROM Lead__c WHERE Phone__c = :inputData.phone AND Course__c  = :inputData.course LIMIT 1 ];
+                if (!leadCs.isEmpty()) {
+                    existingLeadC = leadCs[0];
+                }
+
+                if (existingLeadC != null) {
+                    // (2A) Lead exists → mark as ReEnquiry
+                    existingLeadC.Is_ReEnquiry__c = true;
+                    update existingLeadC;
+
+                    enquiry.Lead__c = existingLeadC.Id;
+                    // safely set enquiry as ReEnquiry if field exists
+                    enquiry.put('Is_ReEnquiry__c', true);
+                    update enquiry;
+
+                    leadToReturn = existingLeadC;
+                } else {
+                    // (2B) No Lead__c for this phone+course → Create new
+                    Lead__c newLead2 = new Lead__c(
+                        Name      = inputData.first_name,
+                        Phone__c  = inputData.phone,
+                        Email__c  = inputData.email,
+                        Stage__c  = 'M3',
+                        Course__c = inputData.course,
+                        Source__c = inputData.coming_from
+                    );
+                    insert newLead2;
+
+                    // Tag phone number also
+                    List<Phone_Number__c> phoneList = [SELECT Id, Candidate__c, Lead__c FROM Phone_Number__c WHERE Phone__c = :inputData.phone LIMIT 1 ];
+
+                    if (phoneList.isEmpty()) {
+                        Phone_Number__c newPhone = new Phone_Number__c(
+                            Name         = inputData.phone,
+                            Phone__c     = inputData.phone,
+                            Candidate__c = candidate.Id,
+                            Lead__c      = newLead2.Id
+                        );
+                        insert newPhone;
+                    } else {
+                        Phone_Number__c ph = phoneList[0];
+                        ph.Lead__c = newLead2.Id;
+                        update ph;
+                    }
+
+                    enquiry.Lead__c = newLead2.Id;
+                    update enquiry;
+
+                    leadToReturn = newLead2;
+                }
             }
 
+            /* ------------------- CREATE FOLLOW-UP TASK ------------------- */
             String taskSubject = 'Follow Up Call';
             Task t = MilesExistingEnquiryWebService.createFollowUpTask(enquiry, taskSubject);
 
             res.statusCode = 201;
             return JSON.serialize(
-                new ApiResponse(true, 'Enquiry created successfully.', leadCToUse.Id)
+                new ApiResponse(true, 'Enquiry processed as per flow.', leadToReturn != null ? leadToReturn.Id : null)
             );
 
         } catch (Exception ex) {
@@ -145,6 +196,7 @@ global without sharing class MilesWebService {
         }
     }
 
+    /* ------------ WRAPPERS ------------- */
     global class EnquiryWrapper {
         public String city;
         public String email;

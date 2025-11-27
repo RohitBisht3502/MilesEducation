@@ -10,33 +10,11 @@
     --slds-c-modal-footer-text-color: #ffffff;
 }
 
-/* CRITICAL: Remove all default padding and overflow from panel */
 .panel-wrapper {
-    padding: 0 !important;
-    margin: 0 !important;
+    padding: 12px;
     font-family: system-ui, Segoe UI, Arial, sans-serif;
     background-color: #f8fafc;
-    height: 100%;
-    overflow: hidden !important;
-}
-
-/* CRITICAL: Single scrollable content area */
-.content-grid {
-    padding: 16px;
-    height: 100%;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-}
-
-/* Force all child elements to not create scroll contexts */
-.content-grid * {
-    overflow: visible !important;
-}
-
-/* Exception: Keep scroll for content-grid itself */
-.content-grid {
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
+    border-radius: 8px;
 }
 
 /* ===========================================
@@ -50,7 +28,6 @@
     margin-bottom: 16px;
     border: 1px solid #e2e8f0;
     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    overflow: visible !important;
 }
 
 .section-header {
@@ -61,10 +38,6 @@
     font-weight: 600;
     font-size: 14px;
     margin-bottom: 12px;
-}
-
-.section-content {
-    overflow: visible !important;
 }
 
 /* ===========================================
@@ -139,11 +112,6 @@
     font-weight: 500;
 }
 
-/* Fix textarea height to prevent internal scrolling */
-.feedback-card lightning-textarea {
-    --slds-c-textarea-sizing-min-height: 80px;
-}
-
 /* ===========================================
    BUTTONS
    =========================================== */
@@ -167,7 +135,7 @@
 .footer-actions {
     display: flex;
     justify-content: space-between;
-    padding: 10px 16px;
+    padding: 10px 4px;
     background: #1e3a5f;
     border-top: 1px solid #1e3a5f;
     color: #ffffff;
@@ -188,7 +156,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 16px;
+    padding: 8px 0;
 }
 
 .loading-text {
@@ -206,7 +174,7 @@
     color: #b91c1c;
     padding: 12px;
     border-radius: 6px;
-    margin: 16px;
+    margin-bottom: 14px;
     font-size: 13px;
 }
 
@@ -312,56 +280,4 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
-}
-
-/* ===========================================
-   AGGRESSIVE SCROLLBAR PREVENTION
-   =========================================== */
-
-/* Target SLDS grid wrappers */
-.slds-grid {
-    overflow: visible !important;
-}
-
-.slds-col {
-    overflow: visible !important;
-}
-
-/* Target all Lightning components */
-lightning-combobox,
-lightning-input,
-lightning-textarea {
-    overflow: visible !important;
-}
-
-/* Target SLDS form elements */
-.slds-form-element,
-.slds-form-element__control {
-    overflow: visible !important;
-}
-
-/* Remove any nested scrolling from dropdown menus */
-.slds-dropdown,
-.slds-listbox {
-    overflow: visible !important;
-}
-
-/* Ensure the quick action panel itself doesn't scroll */
-lightning-quick-action-panel {
-    overflow: hidden !important;
-}
-
-/* Target the actual modal body that Salesforce creates */
-.slds-modal__content {
-    overflow: hidden !important;
-    padding: 0 !important;
-}
-
-.slds-p-around_medium {
-    padding: 0 !important;
-}
-
-/* If there's a flexipage wrapper */
-.flexipageComponent {
-    overflow: hidden !important;
 }

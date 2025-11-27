@@ -20,7 +20,7 @@ public without sharing class RoundRobinHelper {
         return rows;
     }
 
-    private static List<Round_Robin_Pool__c> q(String obj, String city, String src) {
+    public static List<Round_Robin_Pool__c> q(String obj, String city, String src) {
         return [
             SELECT Id, Name, Object_Api_Name__c, City__c, Lead_Source__c, Sales_Rep__c, Sequence__c, Max_Weight__c, Assigned_Weight__c, Max_Leads__c, Total_Assigned__c, Maximum_Weightage__c, Current_Assigned_Weight__c, Active__c
             FROM Round_Robin_Pool__c
@@ -32,9 +32,9 @@ public without sharing class RoundRobinHelper {
         ];
     }
 
-    private static void sortBySequenceThenId(List<Round_Robin_Pool__c> rows) { rows.sort(new RRMemberComparator()); }
+    public static void sortBySequenceThenId(List<Round_Robin_Pool__c> rows) { rows.sort(new RRMemberComparator()); }
 
-    private class RRMemberComparator implements System.Comparator<Round_Robin_Pool__c> {
+    public class RRMemberComparator implements System.Comparator<Round_Robin_Pool__c> {
         public Integer compare(Round_Robin_Pool__c a, Round_Robin_Pool__c b) {
             Decimal sa = (a.Sequence__c == null) ? 0 : a.Sequence__c;
             Decimal sb = (b.Sequence__c == null) ? 0 : b.Sequence__c;
@@ -126,7 +126,7 @@ public without sharing class RoundRobinHelper {
         System.debug('>>> pickNext without lastOwnerId called');
         return pickNext(pool, null); 
     }
-    private static Round_Robin_Pool__c findEligible(List<Round_Robin_Pool__c> pool, Id lastOwnerId, Boolean avoidSame) {
+    public static Round_Robin_Pool__c findEligible(List<Round_Robin_Pool__c> pool, Id lastOwnerId, Boolean avoidSame) {
         System.debug('>>> findEligible START | avoidSame=' + avoidSame + ' | lastOwnerId=' + lastOwnerId);
 
         if (pool == null || pool.isEmpty()) {
@@ -168,7 +168,7 @@ public without sharing class RoundRobinHelper {
         return null;
     }
 
-    private static void resetCycle(List<Round_Robin_Pool__c> pool) {
+    public static void resetCycle(List<Round_Robin_Pool__c> pool) {
         for (Round_Robin_Pool__c p : pool) p.Current_Assigned_Weight__c = 0;
     }
 

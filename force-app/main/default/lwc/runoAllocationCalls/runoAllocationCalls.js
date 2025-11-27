@@ -10,7 +10,7 @@ import getStageLevelValues from '@salesforce/apex/Webservice_RunoAllocationAPI.g
 import { CloseActionScreenEvent } from 'lightning/actions';
 import { subscribe, unsubscribe, onError } from 'lightning/empApi';
 
-export default class RunoAllocationCall extends LightningElement {
+export default class RunoAllocationCalls extends LightningElement {
     @api recordId;
 
     // UI / state
@@ -75,7 +75,6 @@ export default class RunoAllocationCall extends LightningElement {
     noResponseTimer = null;
 
     // mandatory comment logic
-    // comment box always visible; mandatory controlled by isCommentMandatory
     showCommentBox = true;
     isCommentMandatory = false;
     mandatoryCommentRules = {
@@ -105,7 +104,6 @@ export default class RunoAllocationCall extends LightningElement {
     };
 
     // ---------------- WIRE ----------------
-
     @wire(getIdentity, { recordId: '$recordId' })
     wiredIdentity({ data, error }) {
         if (data) {
@@ -114,11 +112,11 @@ export default class RunoAllocationCall extends LightningElement {
             if (data.level) this.levelValue = data.level;
         } else if (error) {
             this.errorText = error?.body?.message || 'Failed to load identity';
+            console.error('wiredIdentity error', error);
         }
     }
 
     // --------------- LIFECYCLE -------------
-
     connectedCallback() {
         this.loadPicklists();
         this.loadStageLevel();
@@ -130,16 +128,20 @@ export default class RunoAllocationCall extends LightningElement {
         this.stopTimer();
         this.clearFeedbackTimers();
         if (this.subscription) {
-            unsubscribe(this.subscription, () => {});
+            try {
+                unsubscribe(this.subscription, () => {});
+            } catch (e) {
+                console.warn('unsubscribe failed', e);
+            }
             this.subscription = null;
         }
     }
 
     // -------------- DATA LOAD --------------
-
     async loadPicklists() {
         try {
-            this.fullMap = await getL1L2Values();
+            const map = await getL1L2Values();
+            this.fullMap = map || {};
             this.l1Options = Object.keys(this.fullMap).map(k => ({
                 label: k,
                 value: k
@@ -166,7 +168,6 @@ export default class RunoAllocationCall extends LightningElement {
     }
 
     // -------------- HANDLERS ---------------
-
     updateCommentVisibility() {
         const key = `${this.l1Value}:${this.l2Value}`;
         this.isCommentMandatory = this.mandatoryCommentRules[key] === true;
@@ -205,16 +206,24 @@ export default class RunoAllocationCall extends LightningElement {
     }
 
     close() {
-        this.dispatchEvent(new CloseActionScreenEvent());
+        try {
+            this.dispatchEvent(new CloseActionScreenEvent());
+        } catch (err) {
+            // not always running in quick-action context - safe to ignore
+            console.warn('CloseActionScreenEvent dispatch failed (ignored):', err);
+        }
     }
 
     @api
     startCall() {
+        if (!this.recordId) {
+            console.warn('startCall: missing recordId');
+            return;
+        }
         this.callApi();
     }
 
     // -------------- CALL API ---------------
-
     async callApi() {
         this.callButtonDisabled = true;
         this.loading = true;
@@ -234,8 +243,13 @@ export default class RunoAllocationCall extends LightningElement {
         try {
             const response = await allocateLeadNow({ leadId: this.recordId });
 
-            const parsed =
-                typeof response === 'string' ? JSON.parse(response) : response || {};
+            let parsed = {};
+            try {
+                parsed = typeof response === 'string' ? JSON.parse(response) : (response || {});
+            } catch (parseErr) {
+                parsed = response || {};
+                console.warn('Non-JSON allocateLeadNow response', parseErr, response);
+            }
 
             this.lastCallId = parsed?.callId || this.lastCallId;
             this.callTitle = parsed?.displayName || 'Calling via Runo';
@@ -245,7 +259,6 @@ export default class RunoAllocationCall extends LightningElement {
             this.showPopup = true;
             setTimeout(() => (this.showPopup = false), 4200);
 
-            // 30s no-response timer → show End Call option
             this.clearFeedbackTimers();
             this.noResponseTimer = setTimeout(() => {
                 if (this.isLive && this.callStatus !== 'Ended') {
@@ -260,17 +273,22 @@ export default class RunoAllocationCall extends LightningElement {
             this.showCallPopup = false;
             this.stopTimer();
 
-            // still allow feedback when call setup fails
             this.showFeedback = true;
             this.callButtonDisabled = false;
 
-            this.dispatchEvent(
-                new ShowToastEvent({
-                    title: 'Failed',
-                    message: this.errorText,
-                    variant: 'error'
-                })
-            );
+            try {
+                this.dispatchEvent(
+                    new ShowToastEvent({
+                        title: 'Failed',
+                        message: this.errorText,
+                        variant: 'error'
+                    })
+                );
+            } catch (toastErr) {
+                console.error('toast dispatch failed', toastErr);
+            }
+
+            console.error('callApi error', e);
         } finally {
             this.loading = false;
         }
@@ -289,7 +307,6 @@ export default class RunoAllocationCall extends LightningElement {
         this.stopTimer();
         this.clearFeedbackTimers();
 
-        // show feedback when call is manually ended
         this.showFeedbackSection();
         this.callButtonDisabled = false;
     }
@@ -316,30 +333,16 @@ export default class RunoAllocationCall extends LightningElement {
         }
     }
 
-
     // -------------- SAVE FEEDBACK ----------
-
     async saveFeedback() {
         debugger;
         if (this.isCommentMandatory && !this.feedback?.trim()) {
-            this.dispatchEvent(
-                new ShowToastEvent({
-                    title: 'Mandatory',
-                    message: 'Feedback comment is required.',
-                    variant: 'warning'
-                })
-            );
+            this.toast('Mandatory', 'Feedback comment is required.', 'warning');
             return;
         }
 
-        if (!this.stageValue ) {
-            this.dispatchEvent(
-                new ShowToastEvent({
-                    title: 'Required',
-                    message: 'Stage and Course are required.',
-                    variant: 'warning'
-                })
-            );
+        if (!this.stageValue) {
+            this.toast('Required', 'Stage and Course are required.', 'warning');
             return;
         }
 
@@ -357,47 +360,54 @@ export default class RunoAllocationCall extends LightningElement {
                 level: this.levelValue
             });
 
-            this.dispatchEvent(
-                new ShowToastEvent({
-                    title: 'Saved',
-                    message: 'Feedback saved successfully.',
-                    variant: 'success'
-                })
-            );
+            this.toast('Saved', 'Feedback saved successfully.', 'success');
+
+            const eventDetail = {
+                recordId: this.recordId,
+                callId: this.lastCallId,
+                feedback: this.feedback?.trim() || '',
+                nextFollowUpDate: this.nextFollowUpDate || null,
+                l1: this.l1Value || '',
+                l2: this.l2Value || '',
+                stage: this.stageValue || '',
+                level: this.levelValue || ''
+            };
 
             this.clearFeedbackTimers();
-
             this.showFeedback = false;
-            this.disableCancel = true;
             this.callStatus = 'Idle';
             this.isLive = false;
             this.showCallPopup = false;
             this.setElapsed(0);
 
+            // reset fields after we captured eventDetail
             this.feedback = '';
             this.l1Value = '';
             this.l2Value = '';
             this.updateCommentVisibility();
-            this.dispatchEvent(new CloseActionScreenEvent());
-            setTimeout(() => window.location.reload(), 800);
+            this.nextFollowUpDate = null;
 
-            // this.dispatchEvent(
-            //     new CustomEvent('nextlead', {
-            //         detail: { leadId: this.recordId }
-            //     })
-            // );
+            try {
+                this.dispatchEvent(
+                    new CustomEvent('callcomplete', {
+                        detail: eventDetail,
+                        bubbles: true,
+                        composed: true
+                    })
+                );
+            } catch (evErr) {
+                console.error('callcomplete dispatch failed (non-fatal):', evErr);
+            }
+
         } catch (e) {
-            this.dispatchEvent(
-                new ShowToastEvent({
-                    title: 'Save Failed',
-                    message:
-                        e?.body?.message || e?.message || 'Failed to save feedback.',
-                    variant: 'error'
-                })
+            this.toast(
+                'Save Failed',
+                e?.body?.message || e?.message || 'Failed to save feedback.',
+                'error'
             );
+            console.error('saveFeedback error', e);
         } finally {
             this.savingFeedback = false;
-            this.disableCancel = false;
         }
     }
 
@@ -408,10 +418,8 @@ export default class RunoAllocationCall extends LightningElement {
         }
         this.canEndCall = false;
     }
-    
 
     // -------------- TIMER ------------------
-
     startTimer() {
         if (this.timerId) return;
         const start = Date.now() - this.elapsedMs;
@@ -435,9 +443,7 @@ export default class RunoAllocationCall extends LightningElement {
         this.elapsedLabel = `${mm}:${ss}`;
     }
 
-
     // -------------- EMP / EVENT ------------
-
     channelName = '/event/Runo_Call_Completed__e';
     subscription = null;
 
@@ -448,11 +454,12 @@ export default class RunoAllocationCall extends LightningElement {
             .then(resp => {
                 this.subscription = resp;
             })
-            .catch(() => {});
+            .catch(err => {
+                console.warn('subscribe failed', err);
+            });
     }
 
     onRunoEvent(msg) {
-        debugger;
         const p = (msg && msg.data && msg.data.payload) || {};
 
         const evtLeadId =
@@ -490,8 +497,11 @@ export default class RunoAllocationCall extends LightningElement {
         this.stopTimer();
         this.clearFeedbackTimers();
 
-        // show feedback when platform event says call ended
-        this.showFeedbackSection();
+        try {
+            this.showFeedbackSection();
+        } catch (e) {
+            console.error('showFeedbackSection failed', e);
+        }
 
         this.callButtonDisabled = false;
 
@@ -499,14 +509,17 @@ export default class RunoAllocationCall extends LightningElement {
     }
 
     // -------------- UTIL -------------------
-
     toast(title, message, variant) {
-        this.dispatchEvent(
-            new ShowToastEvent({
-                title,
-                message,
-                variant
-            })
-        );
+        try {
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title,
+                    message,
+                    variant
+                })
+            );
+        } catch (e) {
+            console.error('toast dispatch failed', e);
+        }
     }
 }

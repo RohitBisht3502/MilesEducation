@@ -3,7 +3,7 @@ public without sharing class ZoomIntegrationService {
     // ====== ZOOM CONFIGURATION ======
     private static final String TOKEN_URL   = 'https://zoom.us/oauth/token';
     private static final String REGISTER_URL = 'https://api.zoom.us/v2/webinars/';
-    private static final String WEBINAR_ID   = '92080917918'; // for now manual
+    private static final String WEBINAR_ID   = '98977181346'; // for now manual
 
     private static final String CLIENT_ID     = 'VR_eUey6TBaTGU7hRx01jA';
     private static final String CLIENT_SECRET = 'szw5yQDVHOIH3DmBniKBmHFX7H2j9ekT';
