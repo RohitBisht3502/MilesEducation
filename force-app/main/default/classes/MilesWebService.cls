@@ -79,7 +79,7 @@ global without sharing class MilesWebService {
 
                 // (a) Create Candidate (Lead)
                 candidate = new Lead(
-                    FirstName                = inputData.first_name,
+                   // FirstName                = inputData.first_name,
                     LastName                 = inputData.first_name,
                     Company                  = 'Test Company',
                     Phone                    = inputData.phone,
@@ -100,13 +100,15 @@ global without sharing class MilesWebService {
 
                 // (c) Create Lead__c with course + phone
                 Lead__c newLead = new Lead__c(
-                    Name      = inputData.first_name,
-                    Phone__c  = inputData.phone,
-                    Email__c  = inputData.email,
-                    Stage__c  = 'M3',
-                    Course__c = inputData.course,
-                    Source__c = inputData.coming_from,
-                    Candidate__c = candidate.Id
+                    Name                     = inputData.first_name,
+                    Phone__c                 = inputData.phone,
+                    Email__c                 = inputData.email,
+                    Stage__c                 = 'M3',
+                    Course__c                = inputData.course,
+                    Source__c                = inputData.coming_from,
+                    Register_for_Webinar__c  = inputData.register_for_webinar,
+                    Interested_Webinar_ID__c = inputData.interested_webinar_id,
+                    Candidate__c             = candidate.Id
                 );
                 insert newLead;
 
@@ -148,12 +150,14 @@ global without sharing class MilesWebService {
                 } else {
                     // (2B) No Lead__c for this phone+course → Create new
                     Lead__c newLead2 = new Lead__c(
-                        Name      = inputData.first_name,
-                        Phone__c  = inputData.phone,
-                        Email__c  = inputData.email,
-                        Stage__c  = 'M3',
-                        Course__c = inputData.course,
-                        Source__c = inputData.coming_from
+                        Name                     = inputData.first_name,
+                        Phone__c                 = inputData.phone,
+                        Email__c                 = inputData.email,
+                        Stage__c                 = 'M3',
+                        Course__c                = inputData.course,
+                        Register_for_Webinar__c  = inputData.register_for_webinar,
+                        Interested_Webinar_ID__c = inputData.interested_webinar_id,
+                        Source__c                = inputData.coming_from
                     );
                     insert newLead2;
 

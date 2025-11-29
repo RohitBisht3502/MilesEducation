@@ -32,7 +32,7 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
             return;
         }
 
-        List<Lead> leads = [ SELECT Id, FirstName, LastName, Email, Phone, City__c, Interested_Webinar_Id__c FROM Lead WHERE Id IN :leadIds ];
+        List<Lead__c> leads = [ SELECT Id, Name, Email__c, Phone__c, City__c, Stage__c, Owner.Name, Interested_Webinar_Id__c FROM Lead__c WHERE Id IN :leadIds ];
 
         if (leads.isEmpty()) {
             logs.add(IntegrationLogUtil.buildLog( 'Zoom Webinar Registration Job', 'LeadIds=' + JSON.serialize(leadIds), 'No leads found', null, 'NO_OP', 204 ));
@@ -47,7 +47,7 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
             String token = ZoomIntegrationService.generateZoomAccessToken(logs);
             System.debug('✅ Token generated.');
 
-            for (Lead ld : leads) {
+            for (Lead__c ld : leads) {
                 // Keep (or tweak) your skip rule
                 // if (String.isBlank(ld.City__c)) {
                 //     logs.add(IntegrationLogUtil.buildLog( 'Zoom Webinar Registration Job', 'LeadId=' + ld.Id,'Skipped: City__c is blank', null, 'SKIPPED', 200 ));
@@ -79,7 +79,7 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
                 }
             } else {
                 Set<String> wantedWebinarIds = new Set<String>();
-                for (Lead ld : leads) {
+                for (Lead__c ld : leads) {
                     if (String.isNotBlank(ld.Interested_Webinar_Id__c) && leadIdToMeetingDetails.containsKey(ld.Id)) {
                         wantedWebinarIds.add(ld.Interested_Webinar_Id__c.trim());
                     }
@@ -97,7 +97,7 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
                         }
                     }
 
-                    for (Lead ld : leads) {
+                    for (Lead__c ld : leads) {
                         if (String.isNotBlank(ld.Interested_Webinar_Id__c) && leadIdToMeetingDetails.containsKey(ld.Id)) {
                             Id resolved = webinarByExternal.get(ld.Interested_Webinar_Id__c.trim());
                             if (resolved != null) {
@@ -135,11 +135,16 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
 
         List<Webinar_Member__c> toInsert = new List<Webinar_Member__c>();
         List<Webinar_Member__c> toUpdate = new List<Webinar_Member__c>();
+        
+        Map<Id, Lead__c> leadMap = new Map<Id, Lead__c>([SELECT Id, Stage__c, OwnerId FROM Lead__c WHERE Id IN :pairLeads]);
+
 
         for (Id lId : leadToWebinar.keySet()) {
             Id wId = leadToWebinar.get(lId);
             String details = leadIdToMeetingDetails.get(lId);
             if (details == null) continue; 
+            
+            Lead__c ld = leadMap.get(lId); // Correct per-lead data
 
             String k = key(lId, wId);
             Webinar_Member__c existing = existingByPair.get(k);
@@ -148,10 +153,14 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
                 toInsert.add(new Webinar_Member__c(
                     Lead__c = lId,
                     Webinar__c = wId,
-                    Meeting_Details__c = details
+                    Meeting_Details__c = details,
+                    Lead_Owner_at_Registration__c = ld.OwnerId,
+            		Lead_Stage_at_Registration__c = ld.Stage__c
                 ));
             } else {
                 existing.Meeting_Details__c = details;
+                existing.Lead_Owner_at_Registration__c = ld.OwnerId;
+        		existing.Lead_Stage_at_Registration__c = ld.Stage__c;
                 toUpdate.add(existing);
             }
         }

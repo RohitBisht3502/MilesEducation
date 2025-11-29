@@ -10,17 +10,19 @@ public class LeadQueueManagementController {
                    Next_Follow_Up_Date__c,
                    Candidate__c,
                    Is_ReEnquiry__c
-            FROM Lead__c WHERE Next_Follow_Up_Date__c <= :Datetime.now()
-            AND ownerId = :UserInfo.getUserId()
-            ORDER BY CreatedDate DESC LIMIT 200];
+            FROM Lead__c 
+             WHERE OwnerId = :UserInfo.getUserId()
+             AND (Next_Follow_Up_Date__c = NULL OR Next_Follow_Up_Date__c <= :Datetime.now())
+             ORDER BY CreatedDate DESC LIMIT 200 ];
 
-        List<Enquiry__c> enquiries = [
-            SELECT Id, Name, Phone_Number__c, Email__c, Course__c, City__c,
-                   Coming_From__c, Stage__c, CreatedDate,
-                   Primary_tag__c, Source_Bucket__c
-            FROM Enquiry__c
-            WHERE Stage__c = 'Untracked'
-            ORDER BY CreatedDate DESC LIMIT 200];
+        // List<Enquiry__c> enquiries = [
+        //     SELECT Id, Name, Phone_Number__c, Email__c, Course__c, City__c,
+        //            Coming_From__c, Stage__c, CreatedDate,
+        //            Primary_tag__c, Source_Bucket__c
+        //     FROM Enquiry__c
+        //     WHERE Stage__c = 'Untracked'
+        //     AND OwnerId = :UserInfo.getUserId()
+        //     ORDER BY CreatedDate DESC LIMIT 200];
 
         User currentUser = [SELECT Id, UserRole.Name FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1 ];
 
@@ -69,22 +71,22 @@ public class LeadQueueManagementController {
             allItems.add(dto);
         }
 
-        for (Enquiry__c e : enquiries) {
-            LeadQueueItemDTO dto = new LeadQueueItemDTO();
-            dto.id          = e.Id;
-            dto.name        = e.Name;
-            dto.phone       = e.Phone_Number__c;
-            dto.course      = e.Course__c;
-            dto.city        = e.City__c;
-            dto.stage       = e.Stage__c;
-            dto.source      = e.Coming_From__c;
-            dto.createdDate = e.CreatedDate;
-            dto.isEnquiry   = true;
-            dto.primaryTag  = 'Untracked';
-            dto.roleTag     = currentUser.UserRole != null ? currentUser.UserRole.Name : null;
-            dto.bucketTag   = e.Source_Bucket__c;
-            allItems.add(dto);
-        }
+        // for (Enquiry__c e : enquiries) {
+        //     LeadQueueItemDTO dto = new LeadQueueItemDTO();
+        //     dto.id          = e.Id;
+        //     dto.name        = e.Name;
+        //     dto.phone       = e.Phone_Number__c;
+        //     dto.course      = e.Course__c;
+        //     dto.city        = e.City__c;
+        //     dto.stage       = e.Stage__c;
+        //     dto.source      = e.Coming_From__c;
+        //     dto.createdDate = e.CreatedDate;
+        //     dto.isEnquiry   = true;
+        //     dto.primaryTag  = 'Untracked';
+        //     dto.roleTag     = currentUser.UserRole != null ? currentUser.UserRole.Name : null;
+        //     dto.bucketTag   = e.Source_Bucket__c;
+        //     allItems.add(dto);
+        // }
 
         List<LeadQueueItemDTO> prioritizedItems = QueuePriorityService.assignPriorities(allItems);
 
