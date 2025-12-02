@@ -7,7 +7,7 @@ export default class LeadMerge extends LightningElement {
     @api recordId; // Current Lead record ID
     searchKey = '';
     @track leads = [];
-    @track selectedLead = null;
+    @track selectedLeads = []; // Array to store multiple selected leads
 
     handleChange(event) {
         this.searchKey = event.target.value;
@@ -25,16 +25,20 @@ export default class LeadMerge extends LightningElement {
             return;
         }
 
-        searchLeads({ searchKey: this.searchKey, currentLeadId: this.recordId })
+        // Get IDs of already selected leads
+        const selectedLeadIds = this.selectedLeads.map(lead => lead.Id);
+
+        searchLeads({ 
+            searchKey: this.searchKey, 
+            currentLeadId: this.recordId,
+            selectedLeadIds: selectedLeadIds 
+        })
             .then(result => {
-                // Add properties to each lead for styling and display
                 this.leads = result.map(lead => ({
                     ...lead,
-                    isSelected: false,
                     ownerName: lead.Owner ? lead.Owner.Name : 'Unknown',
                     cardStyle: 'border: 1px solid #e4e7ec; border-radius: 8px; padding: 16px; margin-bottom: 12px; cursor: pointer; background: white; transition: all 0.15s;'
                 }));
-                this.selectedLead = null; // Reset selection on new search
             })
             .catch(error => {
                 console.error(error);
@@ -51,40 +55,53 @@ export default class LeadMerge extends LightningElement {
     handleSelectLead(event) {
         const leadId = event.currentTarget.dataset.id;
         
-        // Update styling for all leads with distinct selected state
-        this.leads = this.leads.map(lead => {
-            const isSelected = lead.Id === leadId;
-            return {
-                ...lead,
-                isSelected: isSelected,
-                cardStyle: isSelected 
-                    ? 'border: 2px solid #1570ef; border-radius: 8px; padding: 15px; margin-bottom: 12px; cursor: pointer; background: #e0f2fe; transition: all 0.15s; box-shadow: 0 2px 8px rgba(21, 112, 239, 0.2);'
-                    : 'border: 1px solid #e4e7ec; border-radius: 8px; padding: 16px; margin-bottom: 12px; cursor: pointer; background: white; transition: all 0.15s;'
-            };
-        });
+        // Find the selected lead
+        const selectedLead = this.leads.find(lead => lead.Id === leadId);
         
-        this.selectedLead = leadId;
+        if (selectedLead) {
+            // Add to selected leads array
+            this.selectedLeads = [...this.selectedLeads, {
+                ...selectedLead,
+                cardStyle: 'border: 2px solid #1570ef; border-radius: 8px; padding: 15px; margin-bottom: 12px; background: #e0f2fe; box-shadow: 0 2px 8px rgba(21, 112, 239, 0.2);'
+            }];
+            
+            // Remove from search results
+            this.leads = this.leads.filter(lead => lead.Id !== leadId);
+        }
     }
 
-    get showMergeButton() {
-        return this.selectedLead !== null;
+    handleRemoveLead(event) {
+        const leadId = event.currentTarget.dataset.id;
+        
+        // Remove from selected leads
+        this.selectedLeads = this.selectedLeads.filter(lead => lead.Id !== leadId);
+    }
+
+    get hasSelectedLeads() {
+        return this.selectedLeads.length > 0;
+    }
+
+    get selectedLeadsCount() {
+        return this.selectedLeads.length;
     }
 
     handleMerge() {
-        if (!this.selectedLead) {
+        if (this.selectedLeads.length === 0) {
             this.dispatchEvent(
                 new ShowToastEvent({
                     title: "Warning",
-                    message: "Please select a lead to merge",
+                    message: "Please select at least one lead to merge",
                     variant: "warning"
                 })
             );
             return;
         }
 
+        const leadIdsToMerge = this.selectedLeads.map(lead => lead.Id);
+
         submitMergeForApproval({
-            lead1Id: this.recordId,
-            lead2Id: this.selectedLead
+            mainLeadId: this.recordId,
+            leadIdsToMerge: leadIdsToMerge
         })
         .then(result => {
             this.dispatchEvent(
@@ -95,7 +112,7 @@ export default class LeadMerge extends LightningElement {
                 })
             );
             // Reset
-            this.selectedLead = null;
+            this.selectedLeads = [];
             this.leads = [];
             this.searchKey = '';
         })

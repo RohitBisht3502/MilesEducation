@@ -25,15 +25,9 @@ global without sharing class Webservice_RunoWebhookService_v2 {
             'body'    => body
         });
 
-        // Load Metadata Config
         External_Service_Config__mdt cfg;
         try {
-            cfg = [
-                SELECT Api_Key__c, Api_Key_Header__c, Is_Active__c 
-                FROM External_Service_Config__mdt 
-                WHERE DeveloperName = 'Runo_Webhook' 
-                LIMIT 1
-            ];
+            cfg = [SELECT Api_Key__c, Api_Key_Header__c, Is_Active__c  FROM External_Service_Config__mdt  WHERE DeveloperName = 'Runo_Webhook'  LIMIT 1];
         } catch (Exception e) {
             logs.add(IntegrationLogUtil.buildLog('Runo Webhook', envelope, null, 'Config load error: '+e.getMessage(), 'Failed', 500));
             IntegrationLogUtil.insertLogs(logs);
@@ -41,47 +35,78 @@ global without sharing class Webservice_RunoWebhookService_v2 {
             return;
         }
 
-        String expectedHeader = cfg != null ? cfg.Api_Key_Header__c : null;
-        String expectedToken  = cfg != null ? cfg.Api_Key__c        : null;
-        String providedToken  = (headers != null && expectedHeader != null) ? headers.get(expectedHeader) : null;
-
-        // Optional security check
-        // (disabled for now as per your current code)
-
         Object parsed;
         try { parsed = JSON.deserializeUntyped(body); } 
         catch (Exception e) { parsed = null; }
 
         try {
-			CallReceiveWrapper wrapperObj 	= CallReceiveWrapper.parse(body);
-            Call_Log__c callLogObj 			= new Call_Log__c();  
-            wrapperObj.userPhone			= formatPhoneNo(wrapperObj.userPhone);
-            wrapperObj.phoneNumber			= formatPhoneNo(wrapperObj.phoneNumber);
-            if(wrapperObj.type == 'outgoing') {
-                Call_Log__c existingCallLogObj = [Select Id, Lead__c from Call_Log__c 
-                                          		  where User_Phone__c LIKE: ('%' + wrapperObj.userPhone) AND Phone_Number__c LIKE: ('%' + wrapperObj.phoneNumber)
-                                          		  AND Status__c = 'In Progress' ORDER BY CreatedDate DESC LIMIT 1];
-                callLogObj.Id	    = existingCallLogObj.Id;
-                callLogObj.Lead__c	= existingCallLogObj.Lead__c;
-                callLogObj 		    = populateCallLogRecord(callLogObj, wrapperObj);                
+            CallReceiveWrapper wrapperObj = CallReceiveWrapper.parse(body);
+            Call_Log__c callLogObj = new Call_Log__c();  
+            wrapperObj.userPhone = formatPhoneNo(wrapperObj.userPhone);
+            wrapperObj.phoneNumber = formatPhoneNo(wrapperObj.phoneNumber);
+
+            if (wrapperObj.type == 'outgoing') {
+
+                Call_Log__c baseLog;
+
+                List<Call_Log__c> inProgress = [
+                    SELECT Id, Lead__c, Untracked__c  FROM Call_Log__c WHERE User_Phone__c LIKE :('%' + wrapperObj.userPhone) 
+                    AND Phone_Number__c LIKE :('%' + wrapperObj.phoneNumber) 
+                    AND Status__c = 'In Progress' 
+                    ORDER BY CreatedDate DESC LIMIT 1];
+
+                if (!inProgress.isEmpty()) {
+                    baseLog = inProgress[0];
+                } else {
+                    List<Call_Log__c> untracked = [
+                        SELECT Id, Lead__c, Untracked__c  FROM Call_Log__c WHERE User_Phone__c LIKE :('%' + wrapperObj.userPhone)
+                        AND Phone_Number__c LIKE :('%' + wrapperObj.phoneNumber)
+                        AND Untracked__c = TRUE
+                        ORDER BY CreatedDate DESC
+                        LIMIT 1
+                    ];
+                    if (!untracked.isEmpty()) {
+                        baseLog = untracked[0];
+                    }
+                }
+
+                if (baseLog != null) {
+                    callLogObj.Id = baseLog.Id;
+                    callLogObj.Lead__c = baseLog.Lead__c;
+                    if (baseLog.Untracked__c) callLogObj.Untracked__c = true;
+                }
+
+                callLogObj = populateCallLogRecord(callLogObj, wrapperObj);
+
             } else {
-                List<Lead__c> existingLeads = [Select Id from Lead__c where Phone__c LIKE: ('%' + wrapperObj.phoneNumber) ORDER BY CreatedDate DESC LIMIT 1];
-                System.debug('existingLeads  >>> '+existingLeads);
-                if(!existingLeads.isEmpty()){
-                    callLogObj.Lead__c	= existingLeads[0].Id;
-                }else{
+
+                List<Lead__c> existingLeads = [
+                    SELECT Id  FROM Lead__c  WHERE Phone__c LIKE :('%' + wrapperObj.phoneNumber) ORDER BY CreatedDate DESC LIMIT 1];
+
+                if (!existingLeads.isEmpty()) {
+                    callLogObj.Lead__c = existingLeads[0].Id;
+                } else {
                     callLogObj.Untracked__c = true;
                 }
-                callLogObj 		        = populateCallLogRecord(callLogObj, wrapperObj);
-            }   
 
+                callLogObj = populateCallLogRecord(callLogObj, wrapperObj);
+            }
+
+            List<User> owners = [SELECT Id FROM User WHERE Phone LIKE :('%' + wrapperObj.userPhone) OR MobilePhone LIKE :('%' + wrapperObj.userPhone) LIMIT 1];
+            callLogObj.ownerId = owners[0].Id;
             upsert callLogObj;
-            System.debug(callLogObj);
-            System.debug(callLogObj.Lead__c);
-			
-            Integer dur = callLogObj.Duration_Seconds__c != null ? Integer.valueOf(callLogObj.Duration_Seconds__c) : null;
-            // Un-comment this if event publisher is required Type__c
-            RunoEventPublisher.publishCallCompleted(callLogObj.Call_Id__c, dur, callLogObj.Lead__c, callLogObj.Candidate__c, callLogObj.Phone_Number__c, callLogObj.Type__c, 'Completed');
+
+            Integer dur = callLogObj.Duration_Seconds__c != null  ? Integer.valueOf(callLogObj.Duration_Seconds__c): null;
+
+            RunoEventPublisher.publishCallCompleted(
+                callLogObj.Call_Id__c,
+                dur,
+                callLogObj.Lead__c,
+                callLogObj.Candidate__c,
+                callLogObj.Phone_Number__c,
+                callLogObj.Type__c,
+                'Completed'
+            );
             
             RunoEnquiryTaskService.handle(callLogObj);
 
@@ -97,28 +122,26 @@ global without sharing class Webservice_RunoWebhookService_v2 {
     }
     
     public static Call_Log__c populateCallLogRecord(Call_Log__c callLogObj, CallReceiveWrapper wrapperObj) {
-        callLogObj.Call_Id__c 			= wrapperObj.callId;
-        callLogObj.Process_Id__c 		= wrapperObj.processId;
-        callLogObj.User_Phone__c 		= wrapperObj.userPhone;
-        callLogObj.Phone_Number__c 		= wrapperObj.phoneNumber;
-        callLogObj.Customer_Id__c 		= wrapperObj.customerId;
-        callLogObj.Customer_Name__c 	= wrapperObj.name;
-        callLogObj.Called_By__c 		= wrapperObj.calledBy;
-        callLogObj.Caller_Id__c 		= wrapperObj.callerId;
-        callLogObj.Tag__c 				= wrapperObj.tag;
-        callLogObj.Type__c 				= wrapperObj.type;
-        callLogObj.Duration_Seconds__c 	= wrapperObj.duration;
-        callLogObj.Created_At__c 		= fromEpoch(wrapperObj.createdAt);
-        callLogObj.Start_Time__c 		= fromEpoch(wrapperObj.startTime);
-        callLogObj.Status__c 			= 'Completed';
+        callLogObj.Call_Id__c = wrapperObj.callId;
+        callLogObj.Process_Id__c = wrapperObj.processId;
+        callLogObj.User_Phone__c = wrapperObj.userPhone;
+        callLogObj.Phone_Number__c = wrapperObj.phoneNumber;
+        callLogObj.Customer_Id__c = wrapperObj.customerId;
+        callLogObj.Customer_Name__c = wrapperObj.name;
+        callLogObj.Called_By__c = wrapperObj.calledBy;
+        callLogObj.Caller_Id__c = wrapperObj.callerId;
+        callLogObj.Tag__c = wrapperObj.tag;
+        callLogObj.Type__c = wrapperObj.type;
+        callLogObj.Duration_Seconds__c = wrapperObj.duration;
+        callLogObj.Created_At__c = fromEpoch(wrapperObj.createdAt);
+        callLogObj.Start_Time__c = fromEpoch(wrapperObj.startTime);
+        callLogObj.Status__c = 'Completed';
         return callLogObj;
     }
-    
     
     private static Datetime fromEpoch(Long s) {
         return s == null ? null : Datetime.newInstance(1970, 1, 1, 0, 0, 0).addSeconds((Integer)s);
     }
-    
     
     private static String formatPhoneNo(String phoneNo) {
         if (String.isBlank(phoneNo)) return null;
@@ -127,7 +150,6 @@ global without sharing class Webservice_RunoWebhookService_v2 {
         if (phoneNo.length() > 10) phoneNo = phoneNo.right(10);
         return phoneNo;
     }
-    
 
     private static void send(RestResponse res, Integer code, Boolean ok, String msg) {
         Ack a = new Ack();
@@ -137,5 +159,4 @@ global without sharing class Webservice_RunoWebhookService_v2 {
         res.addHeader('Content-Type', 'application/json');
         res.responseBody = Blob.valueOf(JSON.serialize(a));
     }
-
 }

@@ -81,4 +81,178 @@ public without sharing class LeadTriggerHelperClass {
             }
         }
     }
+
+
+    public static void afterUpdateMergeLead(List<Lead__c> newList, Map<Id, Lead__c> oldMap) {
+        
+        // 1️⃣ Identify newly merged leads (main leads)
+        Set<Id> mergedLeadIds = new Set<Id>();
+        for (Lead__c ld : newList) {
+            Lead__c oldLd = oldMap.get(ld.Id);
+            if (oldLd != null && !oldLd.Is_Merged__c && ld.Is_Merged__c) {
+                mergedLeadIds.add(ld.Id);
+            }
+        }
+        
+        if (mergedLeadIds.isEmpty()) return;
+        
+        // 2️⃣ Query all related leads that are tagged to the merged leads
+        List<Lead__c> relatedLeads = [
+            SELECT Id, Stage__c, Lead__c
+            FROM Lead__c
+            WHERE Lead__c IN :mergedLeadIds
+        ];
+        
+        if (relatedLeads.isEmpty()) return;
+        
+        // 3️⃣ Create a map of main lead Id to its related leads
+        Map<Id, List<Lead__c>> mainLeadToRelatedLeadsMap = new Map<Id, List<Lead__c>>();
+        Set<Id> allRelatedLeadIds = new Set<Id>();
+        
+        for (Lead__c relatedLead : relatedLeads) {
+            allRelatedLeadIds.add(relatedLead.Id);
+            
+            if (!mainLeadToRelatedLeadsMap.containsKey(relatedLead.Lead__c)) {
+                mainLeadToRelatedLeadsMap.put(relatedLead.Lead__c, new List<Lead__c>());
+            }
+            mainLeadToRelatedLeadsMap.get(relatedLead.Lead__c).add(relatedLead);
+        }
+        
+        // 4️⃣ Query main leads with their current stage
+        Map<Id, Lead__c> mainLeadsMap = new Map<Id, Lead__c>(
+            [SELECT Id, Stage__c
+            FROM Lead__c
+            WHERE Id IN :mergedLeadIds]
+        );
+        
+        // 5️⃣ Stage ranking configuration
+        Map<String, Integer> stageRankMap = new Map<String, Integer>{
+            'M1' => 1, 'M2' => 2, 'M3' => 3, 'M3+' => 4, 'M3++' => 5,
+            'M4-' => 6, 'M4' => 7, 'M5' => 8, 'M6' => 9, 'M7' => 10
+        };
+        
+        // 6️⃣ Update stages for main leads (pick highest stage from all related leads)
+        List<Lead__c> mainLeadsToUpdate = new List<Lead__c>();
+        for (Id mainLeadId : mainLeadToRelatedLeadsMap.keySet()) {
+            Lead__c mainLead = mainLeadsMap.get(mainLeadId);
+            if (mainLead != null) {
+                String highestStage = mainLead.Stage__c;
+                
+                // Compare with all related leads to find highest stage
+                for (Lead__c relatedLead : mainLeadToRelatedLeadsMap.get(mainLeadId)) {
+                    highestStage = getHigherStage(highestStage, relatedLead.Stage__c, stageRankMap);
+                }
+                
+                // Only update if stage changed
+                if (highestStage != mainLead.Stage__c) {
+                    mainLead.Stage__c = highestStage;
+                    mainLeadsToUpdate.add(mainLead);
+                }
+            }
+        }
+        
+        // 7️⃣ Query and reparent all child records in bulk
+        List<SObject> childRecordsToUpdate = new List<SObject>();
+        
+        // Reparent Enquiries
+        childRecordsToUpdate.addAll(reparentChildRecords(
+            [SELECT Id, Lead__c FROM Enquiry__c WHERE Lead__c IN :allRelatedLeadIds],
+            'Lead__c',
+            relatedLeads
+        ));
+        
+        // Reparent Phone Numbers
+        childRecordsToUpdate.addAll(reparentChildRecords(
+            [SELECT Id, Lead__c FROM Phone_Number__c WHERE Lead__c IN :allRelatedLeadIds],
+            'Lead__c',
+            relatedLeads
+        ));
+        
+        // Reparent Call Logs
+        childRecordsToUpdate.addAll(reparentChildRecords(
+            [SELECT Id, Lead__c FROM Call_Log__c WHERE Lead__c IN :allRelatedLeadIds],
+            'Lead__c',
+            relatedLeads
+        ));
+        
+        // Reparent Webinar Members
+        childRecordsToUpdate.addAll(reparentChildRecords(
+            [SELECT Id, Lead__c FROM Webinar_Member__c WHERE Lead__c IN :allRelatedLeadIds],
+            'Lead__c',
+            relatedLeads
+        ));
+        
+        // Reparent Activity Logs
+        childRecordsToUpdate.addAll(reparentChildRecords(
+            [SELECT Id, Lead__c FROM Activity_Log__c WHERE Lead__c IN :allRelatedLeadIds],
+            'Lead__c',
+            relatedLeads
+        ));
+        
+        // Reparent Eligibility Folders
+        childRecordsToUpdate.addAll(reparentChildRecords(
+            [SELECT Id, Lead__c FROM Eligibility_Folder__c WHERE Lead__c IN :allRelatedLeadIds],
+            'Lead__c',
+            relatedLeads
+        ));
+        
+        // 8️⃣ Perform DML operations
+        if (!mainLeadsToUpdate.isEmpty()) {
+            update mainLeadsToUpdate;
+        }
+        
+        if (!childRecordsToUpdate.isEmpty()) {
+            update childRecordsToUpdate;
+        }
+    }
+
+    /**
+     * Reparents child records from related leads to their main leads
+     */
+    private static List<SObject> reparentChildRecords(
+        List<SObject> childRecords,
+        String parentFieldName,
+        List<Lead__c> relatedLeads
+    ) {
+        List<SObject> recordsToUpdate = new List<SObject>();
+        
+        // Create a map of related lead Id to main lead Id
+        Map<Id, Id> relatedToMainLeadMap = new Map<Id, Id>();
+        for (Lead__c relatedLead : relatedLeads) {
+            relatedToMainLeadMap.put(relatedLead.Id, relatedLead.Lead__c);
+        }
+        
+        for (SObject record : childRecords) {
+            Id currentParentId = (Id) record.get(parentFieldName);
+            
+            // If this child belongs to a related lead, reparent it to the main lead
+            if (relatedToMainLeadMap.containsKey(currentParentId)) {
+                Id mainLeadId = relatedToMainLeadMap.get(currentParentId);
+                record.put(parentFieldName, mainLeadId);
+                recordsToUpdate.add(record);
+            }
+        }
+        
+        return recordsToUpdate;
+    }
+
+    /**
+     * Returns the higher stage based on ranking
+     */
+    private static String getHigherStage(
+        String stage1, 
+        String stage2, 
+        Map<String, Integer> stageRankMap
+    ) {
+        if (stage1 == null) return stage2;
+        if (stage2 == null) return stage1;
+        
+        Integer rank1 = stageRankMap.get(stage1);
+        Integer rank2 = stageRankMap.get(stage2);
+        
+        if (rank1 == null) return stage2;
+        if (rank2 == null) return stage1;
+        
+        return rank1 >= rank2 ? stage1 : stage2;
+    }
 }

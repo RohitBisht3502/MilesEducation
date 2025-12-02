@@ -247,7 +247,7 @@ export default class RunoAllocationCall extends LightningElement {
         this.clearFeedbackTimers();
 
         try {
-            const response = await allocateLeadNow({ leadId: this.recordId });
+            const response = await allocateLeadNow({ recordId: this.recordId });
 
             const parsed =
                 typeof response === 'string' ? JSON.parse(response) : response || {};
@@ -369,7 +369,7 @@ export default class RunoAllocationCall extends LightningElement {
 
         try {
             await updateCallFeedback({
-                leadId: this.recordId,
+                recordId: this.recordId,
                 callId: this.lastCallId,
                 feedback: this.feedback?.trim(),
                 nextFollowUpDate: this.nextFollowUpDate,

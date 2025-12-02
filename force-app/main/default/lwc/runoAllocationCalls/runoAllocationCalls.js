@@ -353,9 +353,9 @@ autoSetFollowUp = true;
         this.callButtonDisabled = false;
     }
 
-    get isSaveDisabled() {
-        return this.savingFeedback || !this.showFeedback;
-    }
+    // get isSaveDisabled() {
+    //     return this.savingFeedback || !this.showFeedback;
+    // }
 
   showFeedbackSection() {
     this.showFeedback = true;
@@ -405,7 +405,7 @@ setAutoDate24() {
             
             await updateCallFeedback({
                 
-                leadId: this.recordId,
+                recordId: this.recordId,
                 callId: this.lastCallId,
                 feedback: this.feedback?.trim(),
                 nextFollowUpDate: this.nextFollowUpDate,

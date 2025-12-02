@@ -26,15 +26,68 @@
             </button>
         </div>
 
+        <!-- Selected Leads Section -->
+        <template if:true={hasSelectedLeads}>
+            <div style="margin-bottom: 24px; padding: 16px; background: #f9fafb; border-radius: 8px; border: 1px solid #e4e7ec;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <h3 style="font-size: 16px; font-weight: 600; margin: 0; color: #101828;">
+                        Selected Leads ({selectedLeadsCount})
+                    </h3>
+                </div>
+                
+                <template for:each={selectedLeads} for:item="lead">
+                    <div key={lead.Id} style={lead.cardStyle}>
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 15px; color: #101828; margin-bottom: 8px;">
+                                    {lead.Name}
+                                </div>
+                                
+                                <div style="display: flex; align-items: center; gap: 4px; color: #667085; font-size: 14px; margin-bottom: 4px;">
+                                    <svg style="width: 16px; height: 16px; flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                                        <path d="m2 7 10 6 10-6"></path>
+                                    </svg>
+                                    <span>{lead.Email__c}</span>
+                                </div>
+
+                                <div style="display: flex; align-items: center; gap: 4px; color: #667085; font-size: 14px;">
+                                    <svg style="width: 16px; height: 16px; flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="12" cy="7" r="4"></circle>
+                                    </svg>
+                                    <span>{lead.ownerName}</span>
+                                </div>
+                            </div>
+                            
+                            <button 
+                                data-id={lead.Id}
+                                onclick={handleRemoveLead}
+                                style="padding: 6px; background: transparent; border: none; cursor: pointer; color: #ef4444; transition: all 0.2s;">
+                                <svg style="width: 20px; height: 20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </template>
+
         <!-- Search Results -->
         <template if:true={leads.length}>
             <div style="margin-top: 20px;">
+                <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #101828;">
+                    Search Results
+                </h3>
+                
                 <template for:each={leads} for:item="lead">
                     <div key={lead.Id} 
                          data-id={lead.Id}
                          onclick={handleSelectLead}
-                         data-selected={lead.isSelected}
-                         style={lead.cardStyle}>
+                         style={lead.cardStyle}
+                         class="lead-card">
                         
                         <div style="font-weight: 600; font-size: 15px; color: #101828; margin-bottom: 8px;">
                             {lead.Name}
@@ -61,12 +114,12 @@
         </template>
 
         <!-- Merge Button -->
-        <template if:true={showMergeButton}>
+        <template if:true={hasSelectedLeads}>
             <div style="margin-top: 24px;">
                 <button 
                     onclick={handleMerge}
                     style="padding: 10px 24px; background: #125cb7; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s;">
-                    Merge Lead
+                    Merge {selectedLeadsCount} Lead(s)
                 </button>
             </div>
         </template>

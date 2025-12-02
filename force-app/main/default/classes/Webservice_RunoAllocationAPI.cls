@@ -141,8 +141,8 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
 
         IntegrationLogUtil.insertLogs(logs);
 
-        if (isSuccess && leadCForCallLog != null) {
-            createCallLog(leadCForCallLog, payload.assignedTo);
+        if (isSuccess) {
+            createCallLog(recordId, payload.assignedTo, customerPhone);
         }
 
         return resBody;
@@ -197,71 +197,97 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         return req;
     }
 
-    public static void createCallLog(Lead__c leadRecord, String userPhone) {
-        Id candidateId = Utility.candidateByPhone(leadRecord.Phone__c);
-
+    public static void createCallLog(Id recordId, String userPhone, String phone) {
         Call_Log__c callLog = new Call_Log__c(
-            Lead__c = leadRecord.Id,
             User_Phone__c = userPhone,
-            Phone_Number__c = leadRecord.Phone__c,
+            Phone_Number__c = phone,
             Status__c = 'In Progress'
         );
 
-        if (candidateId != null) {
-            callLog.Candidate__c = candidateId;
+        if (recordId != null && recordId.getSObjectType() == Lead__c.SObjectType) {
+            callLog.Lead__c = recordId;
+            Id candidateId = Utility.candidateByPhone(phone);
+            if (candidateId != null) {
+                callLog.Candidate__c = candidateId;
+            }
         }
 
         insert callLog;
     }
 
+
     @AuraEnabled
-    public static void updateCallFeedback(Id leadId,String callId,String feedback,Datetime nextFollowUpDate,String l1,String l2,String stage,String level) {
-        System.debug('UPDATE FB => Lead:' + leadId + ' Call:' + callId);
+    public static void updateCallFeedback(Id recordId,String callId,String feedback,Datetime nextFollowUpDate,String l1,String l2,String stage,String level) {
+        System.debug('UPDATE FB => RecordId:' + recordId + ' Call:' + callId);
 
         if (String.isBlank(feedback)) {
             return;
         }
 
-        Call_Log__c logRecord = findCallLog(leadId, callId);
+        SObjectType sType    = recordId != null ? recordId.getSObjectType() : null;
+        Boolean isLead       = (sType == Lead__c.SObjectType);
+        Boolean isCallLogRec = (sType == Call_Log__c.SObjectType);
+
+        Call_Log__c logRecord = findCallLog(recordId, callId);
 
         if (logRecord == null) {
-            throw new AuraHandledException('No Call Log found for this Lead.');
+            throw new AuraHandledException('No Call Log found for this record.');
         }
 
-        logRecord.Feedback__c = feedback;
+        logRecord.Feedback__c            = feedback;
         logRecord.Next_Follow_Up_Date__c = nextFollowUpDate;
-        logRecord.L1__c = l1;
-        logRecord.L2__c = l2;
-        logRecord.Stage__c = stage;
-       // logRecord.Course__c = level;
+        logRecord.L1__c                  = l1;
+        logRecord.L2__c                  = l2;
+        logRecord.Stage__c               = stage;
+
+        if (isCallLogRec) {
+            logRecord.Course__c = level;
+        }
 
         update logRecord;
 
-        if (leadId != null) {
+        Id leadIdToUpdate;
+
+        if (logRecord.Lead__c != null) {
+            leadIdToUpdate = logRecord.Lead__c;
+        } else if (isLead && recordId != null) {
+            leadIdToUpdate = recordId;
+        }
+
+        if (leadIdToUpdate != null) {
             Lead__c leadUpdate = new Lead__c(
-                Id = leadId,
+                Id = leadIdToUpdate,
                 Stage__c = stage,
-                // Course__c = level,
                 Next_Follow_Up_Date__c = nextFollowUpDate
             );
             update leadUpdate;
         }
     }
 
-    public static Call_Log__c findCallLog(Id leadId, String callId) {
+    public static Call_Log__c findCallLog(Id recordId, String callId) {
         Call_Log__c logRecord = null;
 
-        if (!String.isBlank(callId)) {
-            List<Call_Log__c> logsByCall = [SELECT Id FROM Call_Log__c WHERE Call_Id__c = :callId ORDER BY CreatedDate DESC LIMIT 1];
+        SObjectType sType = recordId != null ? recordId.getSObjectType() : null;
+        Boolean isLead    = (sType == Lead__c.SObjectType);
+        Boolean isCallLog = (sType == Call_Log__c.SObjectType);
 
+        // if (isCallLog) {
+        //     List<Call_Log__c> logsById = [ SELECT Id, Lead__c FROM Call_Log__c WHERE Id = :recordId LIMIT 1];
+        //     if (!logsById.isEmpty()) {
+        //         logRecord = logsById[0];
+        //     }
+        //     return logRecord;
+        // }
+
+        if (!String.isBlank(callId)) {
+            List<Call_Log__c> logsByCall = [ SELECT Id, Lead__c FROM Call_Log__c WHERE Call_Id__c = :callId ORDER BY CreatedDate DESC LIMIT 1];
             if (!logsByCall.isEmpty()) {
                 logRecord = logsByCall[0];
             }
         }
 
-        if (logRecord == null && leadId != null) {
-            List<Call_Log__c> logsByLead = [ SELECT Id FROM Call_Log__c WHERE Lead__c = :leadId ORDER BY CreatedDate DESC LIMIT 1 ];
-
+        if (logRecord == null && isLead && recordId != null) {
+            List<Call_Log__c> logsByLead = [SELECT Id, Lead__c FROM Call_Log__c WHERE Lead__c = :recordId ORDER BY CreatedDate DESC LIMIT 1 ];
             if (!logsByLead.isEmpty()) {
                 logRecord = logsByLead[0];
             }
@@ -269,6 +295,7 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
 
         return logRecord;
     }
+
 
     @AuraEnabled(cacheable=true)
     public static Map<String, List<String>> getStageLevelValues() {

@@ -47,5 +47,7 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         Map<Id, Lead__c> oldMapLead = getOldLeadMap();
 
         LeadTriggerHandler.createLeadActivityLogs(newLeads, oldMapLead, false);
+
+        LeadTriggerHelperClass.afterUpdateMergeLead((List<Lead__c>)newList, (Map<Id, Lead__c>)oldMap);  
     }
 }
