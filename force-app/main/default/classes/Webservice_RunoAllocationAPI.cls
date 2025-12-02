@@ -54,22 +54,50 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
     }
 
     @AuraEnabled
-    public static String allocateLeadNow(Id leadId) {
-        if (leadId == null) {
-            throw new AuraHandledException('Lead__c Id is required.');
+    public static String allocateLeadNow(Id recordId) {
+        if (recordId == null) {
+            throw new AuraHandledException('Record Id is required.');
         }
 
-        Lead__c leadRecord = [ SELECT Id, Name, Phone__c, Email__c FROM Lead__c WHERE Id = :leadId LIMIT 1 ];
+        Schema.SObjectType sType = recordId.getSObjectType();
 
-        if (String.isBlank(leadRecord.Name) ||
-            String.isBlank(leadRecord.Phone__c) ||
-            String.isBlank(leadRecord.Email__c)) {
-            throw new AuraHandledException('Lead__c must have Name, Phone__c, and Email__c.');
+        String customerName;
+        String customerPhone;
+        String customerEmail;
+        Lead__c leadCForCallLog;
+
+        if (sType == Lead__c.SObjectType) {
+            Lead__c leadRecord = [SELECT Id, Name, Phone__c, Email__c FROM Lead__c WHERE Id = :recordId LIMIT 1];
+            leadCForCallLog = leadRecord;
+            customerName  = leadRecord.Name;
+            customerPhone = leadRecord.Phone__c;
+            customerEmail = leadRecord.Email__c;
+        } else if (sType == Lead.SObjectType) {
+            Lead leadRecord = [SELECT Id, Name, Phone, Email FROM Lead WHERE Id = :recordId LIMIT 1];
+            customerName  = leadRecord.Name;
+            customerPhone = leadRecord.Phone;
+            customerEmail = leadRecord.Email;
+        } else if (sType == Account.SObjectType) {
+            Account acc = [SELECT Id, Name, Phone, Email__c FROM Account WHERE Id = :recordId LIMIT 1];
+            customerName  = acc.Name;
+            customerPhone = acc.Phone;
+            customerEmail = acc.Email__c;
+        } else if (sType == Call_Log__c.SObjectType) {
+            Call_Log__c cl = [SELECT Id, Customer_Name__c, Phone_Number__c FROM Call_Log__c WHERE Id = :recordId LIMIT 1];
+            customerName  = cl.Customer_Name__c;
+            customerPhone = cl.Phone_Number__c;
+            customerEmail = null;
+        } else {
+            throw new AuraHandledException('Unsupported object for Runo allocation.');
+        }
+
+        if (String.isBlank(customerName) || String.isBlank(customerPhone)) {
+            throw new AuraHandledException('Record must have Name and Phone.');
         }
 
         External_Service_Config__mdt cfg = getRunoConfig();
 
-        AllocationDTO payload = buildAllocationPayload(leadRecord);
+        AllocationDTO payload = buildAllocationPayload(customerName, customerPhone, customerEmail);
         String bodyJson = JSON.serialize(payload);
 
         HttpRequest req = buildHttpRequest(cfg, bodyJson);
@@ -113,20 +141,16 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
 
         IntegrationLogUtil.insertLogs(logs);
 
-        if (isSuccess) {
-            createCallLog(leadRecord, payload.assignedTo);
+        if (isSuccess && leadCForCallLog != null) {
+            createCallLog(leadCForCallLog, payload.assignedTo);
         }
 
         return resBody;
     }
 
     public static External_Service_Config__mdt getRunoConfig() {
-        External_Service_Config__mdt cfg = [
-            SELECT Endpoint_URL__c, Http_Method__c, Api_Key__c, Api_Key_Header__c, Is_Active__c
-            FROM External_Service_Config__mdt
-            WHERE DeveloperName = 'RunoAllocationAPI'
-            LIMIT 1
-        ];
+        External_Service_Config__mdt cfg = [ SELECT Endpoint_URL__c, Http_Method__c, Api_Key__c, Api_Key_Header__c, Is_Active__c 
+            FROM External_Service_Config__mdt WHERE DeveloperName = 'RunoAllocationAPI' LIMIT 1];
 
         if (cfg == null ||
             !cfg.Is_Active__c ||
@@ -138,12 +162,12 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         return cfg;
     }
 
-    public static AllocationDTO buildAllocationPayload(Lead__c leadRecord) {
+    public static AllocationDTO buildAllocationPayload(String name, String phone, String email) {
         AllocationDTO payload = new AllocationDTO();
         payload.customer = new CustomerDTO();
-        payload.customer.name = leadRecord.Name;
-        payload.customer.phoneNumber = leadRecord.Phone__c;
-        payload.customer.email = leadRecord.Email__c;
+        payload.customer.name = name;
+        payload.customer.phoneNumber = phone;
+        payload.customer.email = email;
         payload.processName = 'Salesforce Process';
         payload.assignedTo = '8123191110';
         payload.priority = 3;
@@ -191,16 +215,7 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
     }
 
     @AuraEnabled
-    public static void updateCallFeedback(
-        Id leadId,
-        String callId,
-        String feedback,
-        Datetime nextFollowUpDate,
-        String l1,
-        String l2,
-        String stage,
-        String level
-    ) {
+    public static void updateCallFeedback(Id leadId,String callId,String feedback,Datetime nextFollowUpDate,String l1,String l2,String stage,String level) {
         System.debug('UPDATE FB => Lead:' + leadId + ' Call:' + callId);
 
         if (String.isBlank(feedback)) {
@@ -218,7 +233,7 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         logRecord.L1__c = l1;
         logRecord.L2__c = l2;
         logRecord.Stage__c = stage;
-        logRecord.Course__c = level;
+       // logRecord.Course__c = level;
 
         update logRecord;
 
@@ -226,7 +241,7 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
             Lead__c leadUpdate = new Lead__c(
                 Id = leadId,
                 Stage__c = stage,
-                Course__c = level,
+                // Course__c = level,
                 Next_Follow_Up_Date__c = nextFollowUpDate
             );
             update leadUpdate;

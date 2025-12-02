@@ -9,7 +9,7 @@ public without sharing class CandidateTriggerHelperClass {
     }
     
     public static void handleBeforeUpdate(List<Lead> newLeads, Map<Id, Lead> oldMap) {
-        TriggerRoundRobinService.handleBeforeUpdate(newLeads, oldMap);
+       // TriggerRoundRobinService.handleBeforeUpdate(newLeads, oldMap);
     }
 
     public static void handleAfterInsert(List<Lead> newLeads) {
@@ -62,4 +62,125 @@ public without sharing class CandidateTriggerHelperClass {
     //         System.enqueueJob(new LeadZoomRegistrationJob(leadsForZoom));
     //     }
     // }
+	
+        // Method to handle after insert
+    public static void handleCandidateIdAfterInsert(List<Lead> newLeads) {
+        List<Lead> leadsToUpdate = new List<Lead>();
+        Map<String, String> cityCodeMap = getCityCodeMap();
+        
+        // Query the leads again to get the auto-number values
+        Map<Id, Lead> leadMap = new Map<Id, Lead>([
+            SELECT Id, City__c, Candidate_Id__c, Candidate_Running_Number__c 
+            FROM Lead 
+            WHERE Id IN :newLeads 
+            AND City__c != NULL
+        ]);
+        
+        for (Lead lead : leadMap.values()) {
+            // Only process if City is not blank and Candidate Id is not already set
+            if (String.isNotBlank(lead.City__c) && String.isBlank(lead.Candidate_Id__c)) {
+                String cityName = lead.City__c.trim();
+                String cityCode = cityCodeMap.get(cityName.toLowerCase());
+                String runningNumber = extractRunningNumber(lead.Candidate_Running_Number__c);
+                
+                Lead updatedLead = new Lead(Id = lead.Id);
+                if (String.isNotBlank(cityCode)) {
+                    updatedLead.Candidate_Id__c = cityCode + '-' + runningNumber;
+                } 
+                leadsToUpdate.add(updatedLead);
+                System.debug('Candidate Id After Insert :::::'+updatedLead.Candidate_ID__c);
+            }
+        }
+        
+        if (!leadsToUpdate.isEmpty()) {
+            update leadsToUpdate;
+        }
+    }
+    
+    // Method to handle before update
+    public static void handleCandidateIdBeforeUpdate(List<Lead> newLeads, Map<Id, Lead> oldLeadsMap) {
+        List<Lead> leadsToProcess = new List<Lead>();
+        
+        for (Lead newLead : newLeads) {
+            Lead oldLead = oldLeadsMap.get(newLead.Id);
+            
+            // Check conditions for update
+            Boolean wasCityBlank = String.isBlank(oldLead.City__c);
+            Boolean isCityNowNotBlank = String.isNotBlank(newLead.City__c);
+            Boolean isCandidateIdBlank = String.isBlank(newLead.Candidate_Id__c);
+            
+            // Process only when:
+            // - Old City was blank AND New City is not blank (user added City)
+            // - AND Candidate Id is blank (not previously generated)
+            if (wasCityBlank && isCityNowNotBlank && isCandidateIdBlank) {
+                leadsToProcess.add(newLead);
+            }
+        }
+        
+        if (!leadsToProcess.isEmpty()) {
+            generateCandidateIds(leadsToProcess);
+        }
+    }
+    
+    // Method to generate Candidate IDs (for before update only)
+    private static void generateCandidateIds(List<Lead> leads) {
+        // Get all city mappings from custom metadata
+        Map<String, String> cityCodeMap = getCityCodeMap();
+        
+        for (Lead lead : leads) {
+            if (String.isNotBlank(lead.City__c) && String.isBlank(lead.Candidate_Id__c)) {
+                String cityName = lead.City__c.trim();
+                String cityCode = cityCodeMap.get(cityName.toLowerCase());
+                String runningNumber = extractRunningNumber(lead.Candidate_Running_Number__c);
+                
+                System.debug('Candidate Running Number is :::::'+runningNumber);
+
+                
+                if (String.isNotBlank(cityCode)) {
+                    lead.Candidate_Id__c = cityCode + '-' + runningNumber;
+                } 
+                System.debug('Candidate Id Is :::::'+lead.Candidate_ID__c);
+            }
+        }
+    }
+    
+    // Method to extract running number from auto-number field
+    private static String extractRunningNumber(String candidateRunningNumber) {
+        if (String.isBlank(candidateRunningNumber)) {
+            return '100000'; // Default if auto-number not generated yet
+        }
+        
+        // Extract numbers from auto-number format "CRN-{000000}"
+        if (candidateRunningNumber.contains('CRN-')) {
+            return candidateRunningNumber.substringAfter('CRN-');
+        }
+        
+        return candidateRunningNumber;
+    }
+    
+    // Method to get city code mapping from custom metadata
+    private static Map<String, String> getCityCodeMap() {
+        Map<String, String> cityCodeMap = new Map<String, String>();
+        
+        try {
+            List<City_Master__mdt> cities = [
+                SELECT MasterLabel, City_Name__c, City_Code__c 
+                FROM City_Master__mdt 
+                WHERE City_Name__c != NULL 
+                AND City_Code__c != NULL
+            ];
+            
+            for (City_Master__mdt city : cities) {
+                // Use both MasterLabel and City_Name__c for flexibility
+                String cityName = String.isNotBlank(city.City_Name__c) ? 
+                                 city.City_Name__c : city.MasterLabel;
+                cityCodeMap.put(cityName.toLowerCase(), city.City_Code__c);
+            }
+        } catch (Exception e) {
+            System.debug('Error fetching city metadata: ' + e.getMessage());
+        }
+        System.debug('City Code for Selected City from Candidate is :::::'+cityCodeMap);
+        return cityCodeMap;
+    }
+
 }

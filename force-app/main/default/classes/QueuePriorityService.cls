@@ -143,7 +143,10 @@ public with sharing class QueuePriorityService {
                     roleMatch = rowRoles.contains(dtoRole);
                 }
 
-                if (!sourceMatch && !courseMatch && !roleMatch) {
+                // if (!sourceMatch && !courseMatch && !roleMatch) {
+                //     continue;
+                // }
+                if (!sourceMatch || !courseMatch || !roleMatch) {
                     continue;
                 }
 

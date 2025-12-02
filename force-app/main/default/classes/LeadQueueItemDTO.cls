@@ -1,7 +1,7 @@
 public without sharing class LeadQueueItemDTO {
 
     // I am using this DTO as the single source of truth for
-    // queue items coming from both Lead__c and Enquiry__c.
+    // queue items coming from both Lead__c and Call Logs.
     // I will also send this same object directly to my LWC.
 
     @AuraEnabled public Id id;
@@ -13,7 +13,7 @@ public without sharing class LeadQueueItemDTO {
     @AuraEnabled public String source;  
     @AuraEnabled public String displayStage;
     @AuraEnabled public Datetime createdDate;
-    @AuraEnabled public Boolean isEnquiry;
+    @AuraEnabled public Boolean iscallLog;
     @AuraEnabled public Integer priority;
     @AuraEnabled public String primaryTag;
     @AuraEnabled public String sourceTag;

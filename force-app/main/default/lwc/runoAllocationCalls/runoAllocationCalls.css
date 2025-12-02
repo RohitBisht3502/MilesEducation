@@ -1,14 +1,25 @@
 /* ===========================================
    GLOBAL WRAPPER + QUICK ACTION COLORS
    =========================================== */
-
 :host {
+    --slds-c-modal-sizing-width: 95vw !important;        
+    --slds-c-modal-sizing-max-width: 95vw !important; 
+    --slds-c-modal-sizing-height: 90vh !important;
+    --slds-c-modal-sizing-max-height: 90vh !important;
+
+  
+    
     --slds-c-modal-header-color-background: #1e3a5f;
     --slds-c-modal-header-text-color: #ffffff;
 
     --slds-c-modal-footer-color-background: #1e3a5f;
     --slds-c-modal-footer-text-color: #ffffff;
 }
+lightning-quick-action-panel {
+    width: 90% !important;
+    max-width: 90% !important;
+}
+
 
 .panel-wrapper {
     padding: 12px;

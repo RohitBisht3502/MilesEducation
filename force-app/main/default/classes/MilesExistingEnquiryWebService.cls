@@ -5,21 +5,26 @@
 public without sharing class MilesExistingEnquiryWebService {
 
     public static Task createFollowUpTask(Enquiry__c enquiryRecord, String subject) {
-        if (enquiryRecord == null) {
-            throw new AuraHandledException('Enquiry record cannot be null.');
+        return createFollowUpTask((SObject)enquiryRecord, subject, null);
+    }
+
+   public static Task createFollowUpTask(SObject whatRecord, String subject, Id ownerId) {
+        if (whatRecord == null && String.isBlank(subject) && ownerId == null) {
+        
         }
 
         Task t = new Task(
-            WhatId = enquiryRecord.Id,
-            Subject = String.isBlank(subject) ? 'Follow Up Call' : subject,
-            Priority = 'Normal',
-            Status = 'Open',
-            Type = 'Task Assigned To',
+            WhatId     = (whatRecord != null ? whatRecord.Id : null),
+            OwnerId    = (ownerId != null ? ownerId : UserInfo.getUserId()),
+            Subject    = String.isBlank(subject) ? 'Follow Up Call' : subject,
+            Priority   = 'Normal',
+            Status     = 'Open',
+            Type       = 'Task Assigned To',
             Description = 'Auto-created task for SPOC follow-up via Miles API.'
         );
         insert t;
 
-       // sendTaskAssignedNotification(t, 'Custom_Notification');
+        sendTaskAssignedNotification(t, 'Custom_Notification');
         return t;
     }
 

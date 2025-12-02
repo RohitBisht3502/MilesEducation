@@ -1,6 +1,7 @@
 /*
-    Author       : ROHIT SINGH BISHT
-    Description  : 
+    Author       : ROHIT SINGH BISHT / Dheeraj Kumar
+    Description  : Controller for Webinar Management with Live Attendee Sync
+    Fixed Issues : Webinar filtering & GM live sync metrics
 */
 public class WebinarController {
 
@@ -42,12 +43,20 @@ public class WebinarController {
 
     // -------------------------------------------------------------
     // MAIN METHOD → GET ACTIVE WEBINAR ATTENDEES FOR CURRENT USER
+    // MODIFIED: Added optional webinarId parameter
     // -------------------------------------------------------------
     @AuraEnabled(cacheable=true)
-    public static List<WebinarAttendeeDTO> getActiveWebinarAttendees() {
+    public static List<WebinarAttendeeDTO> getActiveWebinarAttendees(String webinarId) {
         try {
             validateUserAccess();
-            List<Webinar_Member__c> members = queryActiveWebinarMembers(UserInfo.getUserId());
+            List<Webinar_Member__c> members;
+            
+            if (String.isNotBlank(webinarId)) {
+                members = queryActiveWebinarMembers(UserInfo.getUserId(), webinarId);
+            } else {
+                members = queryActiveWebinarMembers(UserInfo.getUserId());
+            }
+            
             return transformToDTO(members);
 
         } catch (Exception e) {
@@ -57,10 +66,33 @@ public class WebinarController {
     }
 
     // -------------------------------------------------------------
+    // GET MANAGED USERS FOR GM
+    // -------------------------------------------------------------
+    @AuraEnabled(cacheable=true)
+    public static List<User> getManagedUsers() {
+        try {
+            Id currentUserId = UserInfo.getUserId();
+            
+            return [
+                SELECT Id, Name, Email, Phone, Title, IsActive
+                FROM User 
+                WHERE ManagerId = :currentUserId 
+                AND IsActive = true
+                ORDER BY Name
+                LIMIT :MAX_QUERY_LIMIT
+            ];
+        } catch (Exception e) {
+            logError('getManagedUsers failed', e);
+            throw new AuraHandledException(ERROR_PREFIX + e.getMessage());
+        }
+    }
+
+    // -------------------------------------------------------------
     // AUTHORIZED VERSION → GET FOR A SPECIFIC USER (SPOC / GM)
+    // MODIFIED: Added optional webinarId parameter
     // -------------------------------------------------------------
     @AuraEnabled
-    public static List<WebinarAttendeeDTO> getActiveWebinarAttendeesForUser(Id userId) {
+    public static List<WebinarAttendeeDTO> getActiveWebinarAttendeesForUser(Id userId, String webinarId) {
         if (userId == null) {
             throw new AuraHandledException('Invalid userId');
         }
@@ -69,11 +101,79 @@ public class WebinarController {
         }
 
         try {
-            List<Webinar_Member__c> members = queryActiveWebinarMembers(userId);
+            List<Webinar_Member__c> members;
+            
+            if (String.isNotBlank(webinarId)) {
+                members = queryActiveWebinarMembers(userId, webinarId);
+            } else {
+                members = queryActiveWebinarMembers(userId);
+            }
+            
             return transformToDTO(members);
 
         } catch (Exception e) {
             logError('getActiveWebinarAttendeesForUser failed', e);
+            throw new AuraHandledException(ERROR_PREFIX + e.getMessage());
+        }
+    }
+
+    // -------------------------------------------------------------
+    // GET WEBINAR DATA FOR SPECIFIC SPOC (GM VIEW)
+    // -------------------------------------------------------------
+    @AuraEnabled(cacheable=true)
+    public static List<WebinarAttendeeDTO> getWebinarDataForSpoc(Id spocId) {
+        try {
+            if (!isCurrentUserGMorAdmin()) {
+                throw new AuraHandledException('Insufficient permissions to view SPOC data.');
+            }
+            
+            validateUserAccess();
+            List<Webinar_Member__c> members = queryActiveWebinarMembers(spocId);
+            return transformToDTO(members);
+
+        } catch (Exception e) {
+            logError('getWebinarDataForSpoc failed', e);
+            throw new AuraHandledException(ERROR_PREFIX + e.getMessage());
+        }
+    }
+
+    // -------------------------------------------------------------
+    // NEW: SYNC LIVE WEBINAR ATTENDEES - RETURNS EMAIL LIST
+    // -------------------------------------------------------------
+    @AuraEnabled
+    public static LiveSyncResultDTO syncLiveWebinarAttendees(String webinarId) {
+        try {
+            if (String.isBlank(webinarId)) {
+                throw new AuraHandledException('Webinar ID is required');
+            }
+
+            // Call the webservice to get live attendees
+            String responseBody = Webservice_WebinarAttendee.getLiveWebinarAttendees(webinarId);
+            
+            // Parse JSON response
+            Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(responseBody);
+            
+            if (responseMap == null || !responseMap.containsKey('attendees')) {
+                throw new AuraHandledException('Invalid response from webinar service');
+            }
+
+            List<Object> attendeesList = (List<Object>) responseMap.get('attendees');
+            Set<String> liveAttendeeEmails = new Set<String>();
+            List<String> liveEmailsList = new List<String>();
+            
+            // Normalize emails to lowercase for comparison
+            for (Object emailObj : attendeesList) {
+                String email = String.valueOf(emailObj).toLowerCase().trim();
+                if (String.isNotBlank(email)) {
+                    liveAttendeeEmails.add(email);
+                    liveEmailsList.add(email);
+                }
+            }
+
+            return new LiveSyncResultDTO(0, liveAttendeeEmails.size(), liveEmailsList);
+
+        } catch (Exception e) {
+            logError('syncLiveWebinarAttendees failed', e);
             throw new AuraHandledException(ERROR_PREFIX + e.getMessage());
         }
     }
@@ -91,6 +191,7 @@ public class WebinarController {
                 Lead__r.Email__c,
                 Lead__r.Phone__c,
                 Lead__r.OwnerId,
+                Lead__r.Owner.Name,
                 Webinar__c,
                 Webinar__r.Name,
                 Webinar__r.Webinar_Id__c,
@@ -98,6 +199,21 @@ public class WebinarController {
                 CreatedDate
             FROM Webinar_Member__c
             WHERE Lead__r.OwnerId = :ownerId
+            AND Webinar__r.IsActive__c = TRUE
+            LIMIT :MAX_QUERY_LIMIT
+        ];
+    }
+
+    // OVERLOADED METHOD WITH WEBINAR FILTER
+    private static List<Webinar_Member__c> queryActiveWebinarMembers(Id ownerId, String webinarId) {
+        return [
+            SELECT 
+                Id, Status__c, Lead__c, Lead__r.Name, Lead__r.Email__c, Lead__r.Phone__c, 
+                Lead__r.OwnerId, Lead__r.Owner.Name, Webinar__c, Webinar__r.Name, 
+                Webinar__r.Webinar_Id__c, Webinar__r.IsActive__c, CreatedDate
+            FROM Webinar_Member__c
+            WHERE Lead__r.OwnerId = :ownerId
+            AND Webinar__r.Webinar_Id__c = :webinarId
             AND Webinar__r.IsActive__c = TRUE
             LIMIT :MAX_QUERY_LIMIT
         ];
@@ -169,6 +285,10 @@ public class WebinarController {
 
         @AuraEnabled public String status { get; private set; }
         @AuraEnabled public DateTime createdDate { get; private set; }
+        
+        // SPOC Information
+        @AuraEnabled public String spocName { get; private set; }
+        @AuraEnabled public Id spocId { get; private set; }
 
         public WebinarAttendeeDTO(Webinar_Member__c m) {
             this.webinarMemberId = m.Id;
@@ -184,6 +304,80 @@ public class WebinarController {
 
             this.status = m.Status__c;
             this.createdDate = m.CreatedDate;
+            
+            // SPOC info from Lead Owner
+            this.spocName = m.Lead__r.Owner.Name;
+            this.spocId = m.Lead__r.OwnerId;
+        }
+    }
+
+    // -------------------------------------------------------------
+    // LIVE SYNC RESULT DTO WITH EMAIL LIST
+    // -------------------------------------------------------------
+    public class LiveSyncResultDTO {
+        @AuraEnabled public Integer updatedCount { get; private set; }
+        @AuraEnabled public Integer liveAttendeesCount { get; private set; }
+        @AuraEnabled public List<String> liveEmails { get; private set; }
+
+        public LiveSyncResultDTO(Integer updated, Integer liveCount, List<String> emails) {
+            this.updatedCount = updated;
+            this.liveAttendeesCount = liveCount;
+            this.liveEmails = emails;
+        }
+    }
+
+    @AuraEnabled(cacheable=true)
+    public static List<SpocWrapper> getSpocOptions(String webinarId) {
+        try {
+            Set<Id> ownerIds = new Set<Id>();
+            List<SpocWrapper> spocOptions = new List<SpocWrapper>();
+            
+            // Query webinar members to get record owners
+            List<Webinar_Member__c> members = [
+                SELECT Id, OwnerId, Owner.Name 
+                FROM Webinar_Member__c 
+                WHERE Webinar__c = :webinarId 
+                AND OwnerId != null
+            ];
+            
+            // Collect unique owner IDs
+            for (Webinar_Member__c member : members) {
+                if (member.OwnerId != null) {
+                    ownerIds.add(member.OwnerId);
+                }
+            }
+            
+            // Query owner users (SPOCs)
+            if (!ownerIds.isEmpty()) {
+                List<User> ownerUsers = [
+                    SELECT Id, Name, IsActive 
+                    FROM User 
+                    WHERE Id IN :ownerIds 
+                    AND IsActive = true
+                    ORDER BY Name
+                ];
+                
+                for (User owner : ownerUsers) {
+                    spocOptions.add(new SpocWrapper(owner.Id, owner.Name));
+                }
+            }
+            
+            return spocOptions;
+        } catch (Exception e) {
+            throw new AuraHandledException('Error fetching SPOC options: ' + e.getMessage());
+        }
+    }
+
+    // Wrapper class for SPOC options
+    public class SpocWrapper {
+        @AuraEnabled
+        public String id { get; set; }
+        @AuraEnabled
+        public String name { get; set; }
+        
+        public SpocWrapper(String id, String name) {
+            this.id = id;
+            this.name = name;
         }
     }
 }

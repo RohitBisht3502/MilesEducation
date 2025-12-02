@@ -1,12 +1,80 @@
 /**
  * @File Name          : webinarAttendedLeads.css
- * @Description        : Salesforce-sized LWC Dashboard Styles
+ * @Description        : Salesforce-sized LWC Dashboard Styles with SPOC Table
  * @Author             : Dheeraj Kumar
- * @Last Modified On   : February 2025
+ * @Last Modified On   : November 2025
  **/
 
 :host {
     display: block;
+}
+
+/* ========================================
+   Webinar Selection Screen
+   ======================================== */
+
+.webinar-selection-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 70vh;
+    padding: 2rem 1rem;
+}
+
+.webinar-selection-card {
+    background: white;
+    border-radius: 0.5rem;
+    padding: 2.5rem 2rem;
+    max-width: 500px;
+    width: 100%;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.webinar-icon-wrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 4rem;
+    height: 4rem;
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border-radius: 50%;
+    margin: 0 auto 1.5rem;
+}
+
+.webinar-icon {
+    width: 2rem;
+    height: 2rem;
+    color: #0176d3;
+}
+
+.webinar-selection-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #080707;
+    margin: 0 0 0.5rem 0;
+    letter-spacing: -0.02em;
+}
+
+.webinar-selection-subtitle {
+    font-size: 0.9375rem;
+    color: #706e6b;
+    margin: 0 0 2rem 0;
+    line-height: 1.5;
+}
+
+.webinar-select-wrapper {
+    margin-top: 1.5rem;
+}
+
+.webinar-combobox {
+    text-align: left;
+}
+
+/* Override Lightning Combobox Styles */
+.webinar-select-wrapper lightning-combobox {
+    --slds-c-combobox-color-border: #c9c7c5;
+    --slds-c-combobox-color-border-hover: #0176d3;
 }
 
 /* ========================================
@@ -28,7 +96,7 @@
 }
 
 /* ========================================
-   Header
+   Header with Sync Button
    ======================================== */
 
 .dashboard-header {
@@ -36,6 +104,7 @@
     align-items: center;
     gap: 0.5rem;
     margin-bottom: 0.25rem;
+    position: relative;
 }
 
 .header-icon {
@@ -60,6 +129,59 @@
     color: white;
     margin: 0;
     letter-spacing: -0.01em;
+    flex: 1;
+}
+
+/* Sync Button */
+.sync-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.875rem;
+    background: #0176d3;
+    color: white;
+    border: none;
+    border-radius: 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    margin-left: auto;
+}
+
+.sync-btn:hover:not(:disabled) {
+    background: #014486;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
+}
+
+.sync-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.sync-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.sync-icon {
+    width: 1rem;
+    height: 1rem;
+    animation: none;
+}
+
+.sync-btn:disabled .sync-icon {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* ========================================
@@ -82,10 +204,6 @@
     border-top-color: #0176d3;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
 }
 
 .loading-text {
@@ -157,6 +275,47 @@
     color: #706e6b;
     text-transform: uppercase;
     letter-spacing: 0.025em;
+}
+
+/* ========================================
+   SPOC Table Section (GM Only)
+   ======================================== */
+
+.spoc-table-section {
+    background: white;
+    border-radius: 0.25rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+.spoc-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.spoc-avatar {
+    font-weight: 600;
+    color: #080707;
+    font-size: 0.875rem;
+}
+
+.registration-count {
+    font-weight: 600;
+    color: #0176d3;
+    font-size: 0.875rem;
+}
+
+.present-count {
+    font-weight: 600;
+    color: #2e844a;
+    font-size: 0.875rem;
+}
+
+.absent-count {
+    font-weight: 600;
+    color: #c23934;
+    font-size: 0.875rem;
 }
 
 /* ========================================
@@ -253,6 +412,56 @@
 .filter-icon {
     width: 0.875rem;
     height: 0.875rem;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 180px;
+}
+
+.filter-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #3e3e3c;
+    margin: 0;
+}
+
+.select-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.spoc-select {
+    width: 100%;
+    padding: 0.4375rem 2rem 0.4375rem 0.75rem;
+    border: 1px solid #c9c7c5;
+    border-radius: 0.25rem;
+    font-size: 0.8125rem;
+    color: #080707;
+    background: #ffffff;
+    appearance: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.spoc-select:focus {
+    outline: none;
+    border-color: #0176d3;
+    box-shadow: 0 0 3px rgba(1, 118, 211, 0.3);
+}
+
+.select-arrow {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0.875rem;
+    height: 0.875rem;
+    color: #706e6b;
+    pointer-events: none;
 }
 
 /* ========================================
@@ -484,6 +693,12 @@
     height: 0.875rem;
 }
 
+.no-action {
+    color: #c9c7c5;
+    font-size: 1rem;
+    font-weight: 300;
+}
+
 /* ========================================
    Empty State
    ======================================== */
@@ -523,11 +738,16 @@
 @media (min-width: 768px) {
     .filters-container {
         flex-direction: row;
-        align-items: center;
+        align-items: end;
+        gap: 1rem;
     }
     
     .search-wrapper {
-        max-width: 300px;
+        max-width: 250px;
+    }
+    
+    .filter-group {
+        min-width: 200px;
     }
 }
 
@@ -538,6 +758,29 @@
     
     .table-scroll {
         -webkit-overflow-scrolling: touch;
+    }
+}
+
+@media (max-width: 767px) {
+    .dashboard-header {
+        flex-wrap: wrap;
+    }
+    
+    .sync-btn {
+        width: 100%;
+        justify-content: center;
+        order: 3;
+        margin-left: 0;
+        margin-top: 0.5rem;
+    }
+    
+    .filters-container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-group {
+        min-width: auto;
     }
 }
 
@@ -573,83 +816,235 @@
 }
 
 
-.filter-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    min-width: 180px;
-}
+/* ========================================
+   Back Button Styles
+   ======================================== */
 
-.filter-label {
-    font-size: 0.75rem;
-    font-weight: 600;
+.back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.875rem;
+    background: #f3f2f2;
     color: #3e3e3c;
-    margin: 0;
-}
-
-.select-wrapper {
-    position: relative;
-    display: inline-block;
-    width: 100%;
-}
-
-.spoc-select {
-    width: 100%;
-    padding: 0.4375rem 2rem 0.4375rem 0.75rem;
     border: 1px solid #c9c7c5;
     border-radius: 0.25rem;
     font-size: 0.8125rem;
-    color: #080707;
-    background: #ffffff;
-    appearance: none;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    margin-left: auto;
+    order: 3;
 }
 
-.spoc-select:focus {
-    outline: none;
-    border-color: #0176d3;
-    box-shadow: 0 0 3px rgba(1, 118, 211, 0.3);
+.back-btn:hover {
+    background: #eae8e8;
+    border-color: #969492;
+    color: #080707;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.select-arrow {
-    position: absolute;
-    right: 0.75rem;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 0.875rem;
-    height: 0.875rem;
+.back-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.back-icon {
+    width: 1rem;
+    height: 1rem;
     color: #706e6b;
-    pointer-events: none;
+}
+
+.back-btn:hover .back-icon {
+    color: #080707;
 }
 
 /* ========================================
-   Responsive Design for Filters
+   Updated Header Layout for Back Button
    ======================================== */
 
-@media (min-width: 768px) {
-    .filters-container {
-        flex-direction: row;
-        align-items: end;
-        gap: 1rem;
+.dashboard-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+    position: relative;
+    flex-wrap: wrap;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+/* Sync button adjustment when back button is present */
+.header-right .sync-btn {
+    margin-left: 0;
+    order: 2;
+}
+
+.header-right .back-btn {
+    order: 1;
+}
+
+/* ========================================
+   Responsive Design for Back Button
+   ======================================== */
+
+@media (max-width: 767px) {
+    .dashboard-header {
+        gap: 0.375rem;
     }
     
-    .search-wrapper {
-        max-width: 250px;
+    .header-left {
+        width: 100%;
+        justify-content: center;
+        margin-bottom: 0.5rem;
     }
     
-    .filter-group {
-        min-width: 200px;
+    .header-right {
+        width: 100%;
+        justify-content: space-between;
+        gap: 0.375rem;
+    }
+    
+    .header-right .sync-btn,
+    .header-right .back-btn {
+        flex: 1;
+        min-width: auto;
+        justify-content: center;
+    }
+    
+    .header-right .sync-btn {
+        order: 1;
+    }
+    
+    .header-right .back-btn {
+        order: 2;
     }
 }
 
-@media (max-width: 767px) {
-    .filters-container {
+@media (max-width: 480px) {
+    .header-right {
         flex-direction: column;
-        align-items: stretch;
+        gap: 0.375rem;
     }
     
-    .filter-group {
-        min-width: auto;
+    .header-right .sync-btn,
+    .header-right .back-btn {
+        width: 100%;
     }
+}
+
+/* ========================================
+   Header Content Alignment
+   ======================================== */
+
+.header-content {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+/* Ensure proper spacing when both sync and back buttons are present */
+.dashboard-header:has(.back-btn) .sync-btn {
+    margin-left: 0;
+}
+
+/* ========================================
+   Icon Sizing Consistency
+   ======================================== */
+
+.back-icon,
+.sync-icon {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+}
+
+/* ========================================
+   Button Group Alignment
+   ======================================== */
+
+.button-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+/* Alternative layout if you prefer button group */
+.dashboard-header .button-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+
+/* Add these styles to your existing CSS file */
+
+/* Clickable numbers in SPOC table */
+.clickable-number {
+    background: transparent;
+    border: none;
+    color: #0176d3;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.clickable-number:hover {
+    background-color: #f3f3f3;
+    color: #014486;
+    transform: translateY(-1px);
+}
+
+.clickable-number:active {
+    transform: translateY(0);
+}
+
+.clickable-number--success {
+    color: #2e844a;
+}
+
+.clickable-number--success:hover {
+    background-color: #e8f5e9;
+    color: #1b5e20;
+}
+
+.clickable-number--error {
+    color: #c23934;
+}
+
+.clickable-number--error:hover {
+    background-color: #ffebee;
+    color: #b71c1c;
+}
+
+/* Attendance rate badge styling */
+.attendance-rate-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background-color: #f3f3f3;
+    color: #3e3e3c;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.875rem;
 }

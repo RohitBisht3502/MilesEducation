@@ -1,0 +1,29 @@
+<template>
+    <lightning-quick-action-panel header="Enable Eligibility Check">
+        <div class="slds-var-p-around_medium">
+            <p>
+                This will create the eligibility folder structure for this Lead
+                and enable document-based eligibility checks.
+            </p>
+            <p class="slds-m-top_small">
+                Do you want to proceed?
+            </p>
+        </div>
+
+        <div slot="footer">
+            <lightning-button
+                variant="neutral"
+                label="Cancel"
+                onclick={handleCancel}>
+            </lightning-button>
+
+            <lightning-button
+                class="slds-m-left_small"
+                variant="brand"
+                label="Confirm"
+                onclick={handleConfirm}
+                disabled={isProcessing}>
+            </lightning-button>
+        </div>
+    </lightning-quick-action-panel>
+</template>

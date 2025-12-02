@@ -1,4 +1,5 @@
 import { LightningElement, track, wire } from 'lwc';
+import { refreshApex } from '@salesforce/apex';
 import getUserLeads from '@salesforce/apex/LeadQueueManagementController.getUserLeads';
 import saveLeadFeedback from '@salesforce/apex/LeadQueueManagementController.saveLeadFeedbackAuto';
 
@@ -8,8 +9,13 @@ export default class LeadQueueManagement extends LightningElement {
 
     queueRunning = false;
     currentLeadId = null;
+    currentIsCallLog = false;
+
+    // Pause / Resume variables
+    pausedLeadId = null;
 
     countdown = 0;
+    remainingCountdown = 0;
     countdownTimerId = null;
     isWaiting = false;
 
@@ -22,7 +28,7 @@ export default class LeadQueueManagement extends LightningElement {
     wiredResult;
 
     // -------------------------------------------------------------------
-    // LOAD LEADS ON INIT
+    // LOAD LEADS
     // -------------------------------------------------------------------
     @wire(getUserLeads)
     wiredLeads(result) {
@@ -58,21 +64,79 @@ export default class LeadQueueManagement extends LightningElement {
     }
 
     // -------------------------------------------------------------------
-    // START AUTO QUEUE
+    // QUEUE CONTROL
     // -------------------------------------------------------------------
     handleStart() {
-        this.queueRunning = true;
-        this.pickNextLead();
+        debugger;
+        if (!this.queueRunning) {
+            this.queueRunning = true;
+            this.pickNextLead();
+        }
     }
 
-    // -------------------------------------------------------------------
-    // STOP QUEUE
-    // -------------------------------------------------------------------
     handleEnd() {
         this.queueRunning = false;
         this.clearCountdown();
         this.showModal = false;
         this.currentLeadId = null;
+        this.currentIsCallLog = false; 
+        this.remainingCountdown = 0;
+        this.pausedLeadId = null;
+    }
+
+    handlePause() {
+        if (!this.queueRunning) return;
+
+        this.queueRunning = false;
+        this.clearCountdown();
+        this.remainingCountdown = this.countdown;
+        this.pausedLeadId = this.currentLeadId;
+
+        console.log(
+            'Paused at countdown:',
+            this.remainingCountdown,
+            'Paused Lead ID:',
+            this.pausedLeadId
+        );
+    }
+
+    handleResume() {
+        if (this.queueRunning || this.leads.length === 0) return;
+
+        this.queueRunning = true;
+
+        // Resume paused lead first
+        if (this.pausedLeadId) {
+
+            const exists = this.leads.some(l => l.id === this.pausedLeadId);
+
+            if (exists) {
+                this.currentLeadId = this.pausedLeadId;
+                const row = this.leads.find(l => l.id === this.currentLeadId);
+                this.currentIsCallLog = row && row.iscallLog ? true : false;
+                this.pausedLeadId = null;
+
+                this.showModal = true;
+
+                setTimeout(() => {
+                    const cmp = this.template.querySelector('c-runo-allocation-calls');
+                    if (cmp && typeof cmp.startCall === 'function') {
+                        console.log('Resuming paused lead:', this.currentLeadId);
+                        cmp.startCall();
+                    }
+                }, 0);
+
+                return;
+            }
+
+            this.pausedLeadId = null;
+        }
+
+        if (this.remainingCountdown > 0) {
+            this.startCountdown(this.remainingCountdown);
+        } else {
+            this.pickNextLead();
+        }
     }
 
     closeModal() {
@@ -80,32 +144,22 @@ export default class LeadQueueManagement extends LightningElement {
     }
 
     // -------------------------------------------------------------------
-    // SAFE CHILD CALL STARTER WITH RETRY
+    // START CURRENT CALL
     // -------------------------------------------------------------------
-    startCurrentCall(retryCount = 0) {
-
-        // MAX 10 retries → 50ms each → 500ms max wait
-        if (retryCount > 10) {
-            console.error('Child call start failed after retries');
-            return;
-        }
-
+    startCurrentCall() {
         const cmp = this.template.querySelector('c-runo-allocation-calls');
-
         if (cmp && typeof cmp.startCall === 'function') {
-            console.log('Child found. Starting call...');
+            console.log('Starting call from parent...');
             cmp.startCall();
         } else {
-            console.warn(`Child not ready yet. Retrying (${retryCount})`);
-            setTimeout(() => this.startCurrentCall(retryCount + 1), 50);
+            console.error('startCall not found in child component.');
         }
     }
 
     // -------------------------------------------------------------------
-    // FEEDBACK RECEIVED FROM CHILD
+    // HANDLE FEEDBACK FROM CHILD (UPDATED WITH refreshApex)
     // -------------------------------------------------------------------
     async handleCallComplete(event) {
-
         const detail = event.detail;
 
         try {
@@ -123,34 +177,50 @@ export default class LeadQueueManagement extends LightningElement {
             console.error('Feedback save error:', e);
         }
 
-        // Remove completed lead from queue
         this.callsCompleted++;
+
+        if (this.pausedLeadId === detail.recordId) {
+            this.pausedLeadId = null;
+        }
+
+        // Remove from UI instantly
         this.leads = this.leads.filter(l => l.id !== detail.recordId);
+
+        // Refresh lead list from Apex
+        try {
+            await refreshApex(this.wiredResult);
+        } catch (e) {
+            console.error('Apex refresh failed:', e);
+        }
+
         this.remainingLeads = this.leads.length;
 
         this.showModal = false;
+        this.currentLeadId = null;
+        this.currentIsCallLog = false;
 
-        // Start countdown for next call
-        this.startCountdown(1);
+        // Continue countdown after refresh
+        this.remainingCountdown = 1;
+        this.startCountdown(this.remainingCountdown);
     }
 
     // -------------------------------------------------------------------
-    // COUNTDOWN FOR NEXT CALL
+    // COUNTDOWN
     // -------------------------------------------------------------------
     startCountdown(sec) {
-
         this.isWaiting = true;
         this.countdown = sec;
 
         this.clearCountdown();
 
         this.countdownTimerId = setInterval(() => {
-
             this.countdown--;
+            this.remainingCountdown = this.countdown;
 
             if (this.countdown <= 0) {
                 this.clearCountdown();
                 this.isWaiting = false;
+                this.remainingCountdown = 0;
 
                 this.pickNextLead();
             }
@@ -166,26 +236,36 @@ export default class LeadQueueManagement extends LightningElement {
     }
 
     // -------------------------------------------------------------------
-    // PICK NEXT LEAD AUTOMATICALLY
+    // PICK NEXT LEAD
     // -------------------------------------------------------------------
     pickNextLead() {
-      debugger;
-
         if (!this.queueRunning) return;
 
         if (this.leads.length === 0) {
             this.queueRunning = false;
             this.currentLeadId = null;
+            this.currentIsCallLog = false;
             return;
         }
 
-        // Pick first lead
-        this.currentLeadId = this.leads[0].id;
+        // If paused, do nothing (resume will handle it)
+        if (this.pausedLeadId) {
+            console.log('Not picking next lead because paused lead exists:', this.pausedLeadId);
+            return;
+        }
 
-        // Open child modal
-        this.showModal = true;
+        if (!this.showModal) {
+            this.currentLeadId = this.leads[0].id;
+            this.currentIsCallLog = this.leads[0].iscallLog ? true : false;
+            this.showModal = true;
+        }
 
-        // Wait for child to render
-        setTimeout(() => this.startCurrentCall(0), 150);
+        const handler = () => {
+            console.log('Child ready. Starting call...');
+            this.startCurrentCall();
+            this.template.removeEventListener('componentready', handler);
+        };
+
+        this.template.addEventListener('componentready', handler);
     }
 }

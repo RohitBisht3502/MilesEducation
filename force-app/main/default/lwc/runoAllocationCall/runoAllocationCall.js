@@ -31,6 +31,9 @@ export default class RunoAllocationCall extends LightningElement {
     fullMap = {};
     isL2Disabled = true;
 
+    // 🔥 NEW: auto-set next follow up date flag (like good LWC)
+    autoSetFollowUp = true;
+
     // Stage / Course
     stageValue = '';
     levelValue = '';
@@ -200,8 +203,20 @@ export default class RunoAllocationCall extends LightningElement {
         this.feedback = e.target.value;
     }
 
+    // 🔥 NEW: checkbox handler for "Auto set next follow up"
+    handleAutoSetChange(e) {
+        this.autoSetFollowUp = e.target.checked;
+
+        if (this.autoSetFollowUp) {
+            this.setAutoDate24();
+        }
+    }
+
+    // 🔥 UPDATED: only allow manual date change when autoSetFollowUp is false
     handleNextFollowUpDateChange(e) {
-        this.nextFollowUpDate = e.target.value;
+        if (!this.autoSetFollowUp) {
+            this.nextFollowUpDate = e.target.value;
+        }
     }
 
     close() {
@@ -298,24 +313,31 @@ export default class RunoAllocationCall extends LightningElement {
         return this.savingFeedback || !this.showFeedback;
     }
 
+    // 🔥 UPDATED: use autoSetFollowUp + setAutoDate24 (same as good LWC)
     showFeedbackSection() {
         this.showFeedback = true;
         this.disableCancel = false;
 
-        if (!this.nextFollowUpDate) {
-            const now = new Date();
-            const nextDay = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-
-            const yyyy = nextDay.getFullYear();
-            const mm = String(nextDay.getMonth() + 1).padStart(2, '0');
-            const dd = String(nextDay.getDate()).padStart(2, '0');
-            const hh = String(nextDay.getHours()).padStart(2, '0');
-            const min = String(nextDay.getMinutes()).padStart(2, '0');
-
-            this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+        if (this.autoSetFollowUp) {
+            this.setAutoDate24();
         }
     }
 
+    // 🔥 NEW: helper to set nextFollowUpDate = now + 24h in ISO format
+    setAutoDate24() {
+        const now = new Date();
+        const next = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+        const yyyy = next.getFullYear();
+        const mm = String(next.getMonth() + 1).padStart(2, '0');
+        const dd = String(next.getDate()).padStart(2, '0');
+        const hh = String(next.getHours()).padStart(2, '0');
+        const mi = String(next.getMinutes()).padStart(2, '0');
+        const ss = String(next.getSeconds()).padStart(2, '0');
+
+        // full ISO-like string without timezone offset
+        this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}.000Z`;
+    }
 
     // -------------- SAVE FEEDBACK ----------
 
@@ -332,7 +354,7 @@ export default class RunoAllocationCall extends LightningElement {
             return;
         }
 
-        if (!this.stageValue ) {
+        if (!this.stageValue) {
             this.dispatchEvent(
                 new ShowToastEvent({
                     title: 'Required',
@@ -374,28 +396,45 @@ export default class RunoAllocationCall extends LightningElement {
             this.showCallPopup = false;
             this.setElapsed(0);
 
+            // reset fields like good LWC
             this.feedback = '';
             this.l1Value = '';
             this.l2Value = '';
             this.updateCommentVisibility();
+            this.nextFollowUpDate = null;
+
             this.dispatchEvent(new CloseActionScreenEvent());
             setTimeout(() => window.location.reload(), 800);
-
-            // this.dispatchEvent(
-            //     new CustomEvent('nextlead', {
-            //         detail: { leadId: this.recordId }
-            //     })
-            // );
         } catch (e) {
+            let message = 'Failed to save feedback.';
+
+            try {
+                if (e && e.body) {
+                    if (e.body.pageErrors && e.body.pageErrors.length) {
+                        message = e.body.pageErrors[0].message;
+                    } else if (
+                        e.body.fieldErrors &&
+                        e.body.fieldErrors.Stage__c &&
+                        e.body.fieldErrors.Stage__c.length
+                    ) {
+                        message = e.body.fieldErrors.Stage__c[0].message;
+                    } else if (e.body.message) {
+                        message = e.body.message;
+                    }
+                } else if (e && e.message) {
+                    message = e.message;
+                }
+            } catch (err) {}
+
             this.dispatchEvent(
                 new ShowToastEvent({
                     title: 'Save Failed',
-                    message:
-                        e?.body?.message || e?.message || 'Failed to save feedback.',
+                    message: message,
                     variant: 'error'
                 })
             );
-        } finally {
+        }
+ finally {
             this.savingFeedback = false;
             this.disableCancel = false;
         }
@@ -408,7 +447,6 @@ export default class RunoAllocationCall extends LightningElement {
         }
         this.canEndCall = false;
     }
-    
 
     // -------------- TIMER ------------------
 
@@ -434,7 +472,6 @@ export default class RunoAllocationCall extends LightningElement {
         const ss = String(totalSec % 60).padStart(2, '0');
         this.elapsedLabel = `${mm}:${ss}`;
     }
-
 
     // -------------- EMP / EVENT ------------
 

@@ -1,0 +1,225 @@
+.center {
+    display: flex;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.section-bar {
+    height: 4px;
+    background-color: #800080;
+}
+
+.section-box {
+    margin-bottom: 1rem;
+    padding: 1rem 1.25rem;
+    background-color: #ffffff;
+    border: 1px solid #ddd;
+}
+
+.two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem 2rem;
+}
+
+.row {
+    margin: 0.1rem 0;
+}
+
+.label {
+    font-weight: 600;
+}
+
+.value {
+    margin-left: 4px;
+}
+
+/* === LEAD HEADER === */
+
+.lead-header {
+    padding: 1rem 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.lead-header .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 4rem;
+    row-gap: 0.35rem;
+    margin-bottom: 0.25rem;
+}
+
+.lead-header .row {
+    margin: 0.25rem 0;
+}
+
+.lead-header .label {
+    font-weight: 600;
+}
+
+.lead-header .value {
+    margin-left: 4px;
+}
+
+/* === CALL CARD (unchanged) === */
+
+.call-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.call-title {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.call-direction {
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.call-meta {
+    font-size: 0.75rem;
+    color: #555;
+}
+
+.call-time {
+    font-size: 0.8rem;
+    color: #555;
+}
+
+/* Icon colors by type */
+.call-icon {
+    --sds-c-icon-color-foreground-default: #6b7280;
+}
+
+.call-icon--outgoing {
+    --sds-c-icon-color-foreground-default: #1a73e8;
+}
+
+.call-icon--incoming {
+    --sds-c-icon-color-foreground-default: #16a34a;
+}
+
+.call-icon--missed {
+    --sds-c-icon-color-foreground-default: #dc2626;
+}
+
+.call-body {
+    background: #f7f9fc;
+    padding: 0.75rem;
+    border-radius: 6px;
+    margin: 0.75rem 0;
+}
+
+.call-body-header,
+.call-body-values {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+}
+
+.call-duration {
+    font-weight: 600;
+}
+
+.call-footer {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.pill-row {
+    display: flex;
+    gap: 0.35rem;
+}
+
+.pill {
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background-color: #eef2ff;
+    font-size: 0.75rem;
+}
+
+.pill-link {
+    background-color: #e0f2fe;
+    color: #0369a1;
+}
+
+.call-actor {
+    font-size: 0.8rem;
+}
+
+/* === LEVEL CHANGE CARD === */
+
+.level-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.level-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.level-title {
+    font-weight: 600;
+    margin-bottom: 0.15rem;
+}
+
+.level-meta {
+    font-size: 0.75rem;
+    color: #555;
+}
+
+.level-time {
+    font-size: 0.8rem;
+    color: #555;
+}
+
+.level-body {
+    background: #f7f9fc;
+    padding: 0.75rem;
+    border-radius: 6px;
+    margin: 0.25rem 0 0.5rem 0;
+}
+
+.level-body-header,
+.level-body-values {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+}
+
+.level-change {
+    font-weight: 600;
+}
+
+.level-comment {
+    color: #333;
+}
+
+.level-footer {
+    text-align: right;
+    font-size: 0.8rem;
+}
+
+.level-footer .label {
+    font-weight: 600;
+}
+
+/* === MISC === */
+
+.no-data {
+    padding: 1rem;
+    text-align: center;
+    font-style: italic;
+}
+
+.error {
+    padding: 1rem;
+    color: #c23934;
+    font-weight: 600;
+}

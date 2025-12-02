@@ -8,11 +8,13 @@ trigger CandidateTrigger on Lead (before insert, after insert, before update, af
     // ===== BEFORE UPDATE =====
     if (Trigger.isBefore && Trigger.isUpdate) {
         CandidateTriggerHelperClass.handleBeforeUpdate(Trigger.new, Trigger.oldMap);
+        CandidateTriggerHelperClass.handleCandidateIdBeforeUpdate(Trigger.new, Trigger.oldMap);
     }
 
     // ===== AFTER INSERT =====
     if (Trigger.isAfter && Trigger.isInsert) {
         CandidateTriggerHelperClass.handleAfterInsert(Trigger.new);
+        CandidateTriggerHelperClass.handleCandidateIdAfterInsert(Trigger.new);
     }
 
 }

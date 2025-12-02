@@ -5,7 +5,8 @@ import createMeetEvent from '@salesforce/apex/GoogleMeetService.createMeetEvent'
 import getCurrentUserInfo from '@salesforce/apex/UserController.getCurrentUserInfo';
 import getAvailableUsers from '@salesforce/apex/UserController.getAvailableUsers';
 
-const CONTACT_EMAIL_FIELD = 'Contact.Email';
+const LEAD_EMAIL_FIELD = 'Lead__c.Email__c';   // your custom email field
+const LEAD_NAME_FIELD  = 'Lead__c.Name'; 
 
 export default class ContactEventCreator extends LightningElement {
     @api recordId;
@@ -62,18 +63,22 @@ export default class ContactEventCreator extends LightningElement {
         this.loadAvailableUsers();
     }
 
-    @wire(getRecord, { recordId: '$recordId', fields: [CONTACT_EMAIL_FIELD] })
-    wiredContact({ error, data }) {
+    @wire(getRecord, { recordId: '$recordId', fields: [LEAD_EMAIL_FIELD, LEAD_NAME_FIELD] })
+    wiredLead({ error, data }) {
         if (data) {
-            this.contactEmail = getFieldValue(data, CONTACT_EMAIL_FIELD) || '';
-            // Auto-add contact email as first participant if it's different from current user
+            const email = getFieldValue(data, LEAD_EMAIL_FIELD) || '';
+            const name  = getFieldValue(data, LEAD_NAME_FIELD) || '';
+
+            this.contactEmail = email;   // you can keep the property name if you want
+            // Auto-add lead email as participant if it's different from current user
             if (this.contactEmail && this.contactEmail !== this.currentUserEmail) {
-                this.addParticipantWithData(this.contactEmail, 'Contact', false);
+                this.addParticipantWithData(this.contactEmail, name || 'Lead', false);
             }
         } else if (error) {
-            this.showToast('Error', 'Error loading contact information', 'error');
+            this.showToast('Error', 'Error loading lead information', 'error');
         }
     }
+
 
     // Load current user information
     async loadCurrentUserInfo() {
@@ -259,9 +264,8 @@ export default class ContactEventCreator extends LightningElement {
                 .filter(p => !p.isCurrentUser)
                 .map(p => p.email);
             
-            // Convert local datetime to UTC
-            const startUtc = this.convertToUtc(this.startDateTime);
-            const endUtc = this.convertToUtc(this.endDateTime);
+            const startUtc = this.startDateTime;
+            const endUtc = this.endDateTime;
 
             // Call Apex method
             const result = await createMeetEvent({

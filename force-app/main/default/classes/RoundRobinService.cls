@@ -56,6 +56,11 @@ public without sharing class RoundRobinService {
                     if (pick.cycleReset == true) rt.cycleStartedAt = System.now();
                 }
 
+                IF(isEligibility){
+                    System.debug('Updating Leads for Eligibility Criteria Assignment');
+                    update byKey.get(key);
+                }
+
                 poolUpdates.addAll(pool);
                 runtimeToPersist.add(rt);
             }

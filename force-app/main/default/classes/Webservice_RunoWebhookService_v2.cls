@@ -69,6 +69,8 @@ global without sharing class Webservice_RunoWebhookService_v2 {
                 System.debug('existingLeads  >>> '+existingLeads);
                 if(!existingLeads.isEmpty()){
                     callLogObj.Lead__c	= existingLeads[0].Id;
+                }else{
+                    callLogObj.Untracked__c = true;
                 }
                 callLogObj 		        = populateCallLogRecord(callLogObj, wrapperObj);
             }   
@@ -81,7 +83,7 @@ global without sharing class Webservice_RunoWebhookService_v2 {
             // Un-comment this if event publisher is required Type__c
             RunoEventPublisher.publishCallCompleted(callLogObj.Call_Id__c, dur, callLogObj.Lead__c, callLogObj.Candidate__c, callLogObj.Phone_Number__c, callLogObj.Type__c, 'Completed');
             
-            RunoEnquiryTaskService.handle(callLogObj.Type__c, callLogObj.Phone_Number__c, callLogObj.Customer_Name__c, null,callLogObj.User_Phone__c);
+            RunoEnquiryTaskService.handle(callLogObj);
 
             logs.add(IntegrationLogUtil.buildLog('Runo Webhook', envelope, JSON.serialize(parsed), null, 'Received', 200));
             IntegrationLogUtil.insertLogs(logs);

@@ -42,7 +42,7 @@ public without sharing class ZoomIntegrationService {
     }
 
     // ====== STEP 2: Register Lead for Webinar (no DML; append logs only) ======
-    public static String registerLeadForWebinar(Lead ld, String accessToken, List<Integration_Log__c> logs) {
+    public static String registerLeadForWebinar(Lead__c ld, String accessToken, List<Integration_Log__c> logs) {
         Http http = new Http();
         HttpRequest req = new HttpRequest();
         req.setEndpoint(REGISTER_URL + WEBINAR_ID + '/registrants');
@@ -51,10 +51,10 @@ public without sharing class ZoomIntegrationService {
         req.setHeader('Content-Type', 'application/json');
 
         Map<String, Object> registrant = new Map<String, Object>{
-            'first_name' => ld.FirstName,
-            'last_name'  => ld.LastName,
-            'email'      => ld.Email,
-            'phone'      => ld.Phone,
+            'first_name' => ld.Name.contains(' ') ? ld.Name.substringBefore(' ') : ld.Name,
+    		'last_name'  => ld.Name.contains(' ') ? ld.Name.substringAfter(' ') : '',
+            'email'      => ld.Email__c,
+            'phone'      => ld.Phone__c,
             'city'       => ld.City__c
         };
 

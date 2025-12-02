@@ -12,6 +12,12 @@ import { subscribe, unsubscribe, onError } from 'lightning/empApi';
 
 export default class RunoAllocationCalls extends LightningElement {
     @api recordId;
+    @api isCallLog; 
+
+    // ---------------------------------------------
+    // 🔥 ADDED: flag for renderedCallback
+    // ---------------------------------------------
+    hasRendered = false;
 
     // UI / state
     loading = false;
@@ -30,6 +36,9 @@ export default class RunoAllocationCalls extends LightningElement {
     l2Options = [];
     fullMap = {};
     isL2Disabled = true;
+   
+autoSetFollowUp = true;
+
 
     // Stage / Course
     stageValue = '';
@@ -137,6 +146,34 @@ export default class RunoAllocationCalls extends LightningElement {
         }
     }
 
+    // ---------------------------------------------
+    // 🔥 ADDED: renderedCallback to notify parent
+    // ---------------------------------------------
+    renderedCallback() {
+        if (!this.hasRendered) {
+            this.hasRendered = true;
+            try {
+                this.dispatchEvent(
+                    new CustomEvent('componentready', {
+                        bubbles: true,
+                        composed: true
+                    })
+                );
+            } catch (e) {
+                console.error('componentready dispatch failed', e);
+            }
+        }
+    }
+    handleAutoSetChange(e) {
+    this.autoSetFollowUp = e.target.checked;
+
+    if (this.autoSetFollowUp) {
+        this.setAutoDate24();
+    }
+}
+
+    // ---------------------------------------------
+
     // -------------- DATA LOAD --------------
     async loadPicklists() {
         try {
@@ -201,19 +238,24 @@ export default class RunoAllocationCalls extends LightningElement {
         this.feedback = e.target.value;
     }
 
-    handleNextFollowUpDateChange(e) {
+   handleNextFollowUpDateChange(e) {
+    if (!this.autoSetFollowUp) {
         this.nextFollowUpDate = e.target.value;
     }
+}
+
 
     close() {
         try {
             this.dispatchEvent(new CloseActionScreenEvent());
         } catch (err) {
-            // not always running in quick-action context - safe to ignore
             console.warn('CloseActionScreenEvent dispatch failed (ignored):', err);
         }
     }
 
+    // ----------------------------
+    // API call from PARENT
+    // ----------------------------
     @api
     startCall() {
         if (!this.recordId) {
@@ -241,7 +283,7 @@ export default class RunoAllocationCalls extends LightningElement {
         this.clearFeedbackTimers();
 
         try {
-            const response = await allocateLeadNow({ leadId: this.recordId });
+            const response = await allocateLeadNow({ recordId: this.recordId });
 
             let parsed = {};
             try {
@@ -294,7 +336,7 @@ export default class RunoAllocationCalls extends LightningElement {
         }
     }
 
-    // manual end call (after 30s no response)
+    // manual end call…
     handleEndCall() {
         if (!this.canEndCall && !this.isLive) {
             return;
@@ -315,27 +357,36 @@ export default class RunoAllocationCalls extends LightningElement {
         return this.savingFeedback || !this.showFeedback;
     }
 
-    showFeedbackSection() {
-        this.showFeedback = true;
-        this.disableCancel = false;
+  showFeedbackSection() {
+    this.showFeedback = true;
+    this.disableCancel = false;
 
-        if (!this.nextFollowUpDate) {
-            const now = new Date();
-            const nextDay = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-
-            const yyyy = nextDay.getFullYear();
-            const mm = String(nextDay.getMonth() + 1).padStart(2, '0');
-            const dd = String(nextDay.getDate()).padStart(2, '0');
-            const hh = String(nextDay.getHours()).padStart(2, '0');
-            const min = String(nextDay.getMinutes()).padStart(2, '0');
-
-            this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${min}`;
-        }
+    if (this.autoSetFollowUp) {
+        this.setAutoDate24();
     }
+}
+
+
+setAutoDate24() {
+    const now = new Date();
+    const next = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+    const yyyy = next.getUTCFullYear();
+    const mm = String(next.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(next.getUTCDate()).padStart(2, '0');
+    const hh = String(next.getUTCHours()).padStart(2, '0');
+    const mi = String(next.getUTCMinutes()).padStart(2, '0');
+    const ss = String(next.getUTCSeconds()).padStart(2, '0');
+
+    // Format as full ISO string without timezone offset
+    this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}.000Z`;
+}
+
+
+    
 
     // -------------- SAVE FEEDBACK ----------
     async saveFeedback() {
-        debugger;
         if (this.isCommentMandatory && !this.feedback?.trim()) {
             this.toast('Mandatory', 'Feedback comment is required.', 'warning');
             return;
@@ -347,9 +398,13 @@ export default class RunoAllocationCalls extends LightningElement {
         }
 
         this.savingFeedback = true;
+        console.log('Saving feedback, callId = ', this.lastCallId);
+
 
         try {
+            
             await updateCallFeedback({
+                
                 leadId: this.recordId,
                 callId: this.lastCallId,
                 feedback: this.feedback?.trim(),
@@ -380,35 +435,36 @@ export default class RunoAllocationCalls extends LightningElement {
             this.showCallPopup = false;
             this.setElapsed(0);
 
-            // reset fields after we captured eventDetail
+            // Reset fields AFTER building eventDetail
             this.feedback = '';
             this.l1Value = '';
             this.l2Value = '';
             this.updateCommentVisibility();
             this.nextFollowUpDate = null;
 
-            try {
-                this.dispatchEvent(
-                    new CustomEvent('callcomplete', {
-                        detail: eventDetail,
-                        bubbles: true,
-                        composed: true
-                    })
-                );
-            } catch (evErr) {
-                console.error('callcomplete dispatch failed (non-fatal):', evErr);
-            }
-
-        } catch (e) {
-            this.toast(
-                'Save Failed',
-                e?.body?.message || e?.message || 'Failed to save feedback.',
-                'error'
+            // ---------------------------------------------
+            // 🔥 callcomplete event (already exists)
+            // ---------------------------------------------
+            this.dispatchEvent(
+                new CustomEvent('callcomplete', {
+                    detail: eventDetail,
+                    bubbles: true,
+                    composed: true
+                })
             );
-            console.error('saveFeedback error', e);
-        } finally {
-            this.savingFeedback = false;
-        }
+
+       } catch (e) {
+    console.error('FEEDBACK SAVE ERROR RAW:', JSON.stringify(e));
+
+    const err =
+        e?.body?.message ||
+        e?.body?.exceptionMessage ||
+        e?.message ||
+        'Unknown error';
+
+    this.toast('Save Failed', err, 'error');
+}
+
     }
 
     clearFeedbackTimers() {
@@ -462,14 +518,10 @@ export default class RunoAllocationCalls extends LightningElement {
     onRunoEvent(msg) {
         const p = (msg && msg.data && msg.data.payload) || {};
 
-        const evtLeadId =
-            p.Lead_Id__c || p.LeadId__c || p.leadId || null;
-        const evtCallId =
-            p.Call_Id__c || p.CallId__c || p.callId || null;
+        const evtLeadId = p.Lead_Id__c || p.LeadId__c || p.leadId || null;
+        const evtCallId = p.Call_Id__c || p.CallId__c || p.callId || null;
 
-        if (evtLeadId && String(evtLeadId) !== String(this.recordId)) {
-            return;
-        }
+        if (evtLeadId && String(evtLeadId) !== String(this.recordId)) return;
 
         if (evtCallId) {
             this.lastCallId = String(evtCallId);

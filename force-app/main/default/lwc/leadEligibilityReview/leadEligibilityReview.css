@@ -1,0 +1,351 @@
+.ler-container {
+    padding: 0.5rem 0.9rem 1rem 0.9rem;
+    background-color: #f1f5f9;
+}
+
+/* PATH / STATUS BAR */
+.ler-path-wrapper {
+    padding: 0.5rem 1rem 0.75rem 1rem;
+    border-bottom: 1px solid #e5e7eb;
+    background: #0b2f6a0f;
+}
+
+.path-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+}
+
+.path-steps {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.path-step {
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    border: 1px solid #cbd5f5;
+    color: #64748b;
+    background-color: #e5edff;
+    white-space: nowrap;
+}
+
+.path-active {
+    background-color: #0b2f6a;
+    color: #ffffff;
+    border-color: #0b2f6a;
+}
+
+.path-completed {
+    background-color: #22c55e1a;
+    border-color: #22c55e;
+    color: #15803d;
+}
+
+.no-files-note {
+    margin: 0.5rem 0 0.75rem 0;
+    font-size: 0.8rem;
+    color: #6b7280;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    background-color: #eff6ff;
+    border: 1px dashed #93c5fd;
+}
+
+/* Root cards */
+.root-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.root-card {
+    background-color: #ffffff;
+    border-radius: 0.75rem;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+
+/* Hover effects for expansions */
+.row-hover {
+    transition: background-color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+    border-left: 2px solid transparent;
+}
+
+.row-hover:hover {
+    background-color: #eef2ff;
+    border-left-color: #0b2f6a;
+    box-shadow: 0 0 0 1px #c7d2fe;
+}
+
+/* Generic row */
+.row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.55rem 0.9rem;
+    cursor: pointer;
+}
+
+.row + .row {
+    border-top: 1px solid #e5e7eb;
+}
+
+.row-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.row-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.root-row {
+    background: linear-gradient(90deg, #0b2f6a0f, #0b2f6a05);
+    border-left: 3px solid #0b2f6a;
+}
+
+.level-2-row,
+.level-3-row,
+.level-4-row {
+    background-color: #ffffff;
+}
+
+/* Colored borders by hierarchy */
+.level-2-row {
+    border-left: 3px solid #f97316;
+}
+
+.level-3-row {
+    border-left: 3px solid #22c55e;
+}
+
+.level-4-row,
+.file-row {
+    border-left: 3px solid #0b2f6a;
+}
+
+/* Indentation */
+.level-2-indent {
+    padding-left: 1.5rem;
+}
+
+.level-3-indent {
+    padding-left: 3rem;
+}
+
+.level-4-indent {
+    padding-left: 4.5rem;
+}
+
+/* Titles */
+.title-block .title {
+    font-weight: 600;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.title-block .subtitle {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.folder-comment {
+    margin-top: 0.1rem;
+    font-size: 0.7rem;
+    color: #0b2f6a;
+    font-style: italic;
+}
+
+/* Status summary under subtitle */
+.status-summary {
+    margin-top: 0.1rem;
+    font-size: 0.7rem;
+    color: #4b5563;
+}
+
+/* Date */
+.date-text {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+/* Icons (Miles palette) */
+.folder-icon {
+    color: #0b2f6a;
+}
+
+.folder-icon-root {
+    color: #0b2f6a;
+}
+
+.folder-icon-degree {
+    color: #f97316;
+}
+
+.folder-icon-category {
+    color: #22c55e;
+}
+
+.file-icon {
+    color: #6b7280;
+}
+
+.chevron {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+}
+
+/* Status pills */
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.status-small {
+    font-size: 0.65rem;
+}
+
+.status-dot {
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 999px;
+    background-color: currentColor;
+}
+
+/* Folder status colors */
+.status-good {
+    background-color: #dcfce7;
+    color: #15803d;
+}
+
+.status-recheck {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.status-pending {
+    background-color: #e0f2fe;
+    color: #0369a1;
+}
+
+/* File special */
+.status-reupload {
+    background-color: #fee2e2;
+    color: #b91c1c;
+}
+
+/* File rows */
+.file-row {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    padding: 0.6rem 0.9rem;
+    border-top: 1px solid #e5e7eb;
+    transition: background-color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.file-row:hover {
+    background-color: #eef2ff;
+    border-color: #c4d7ff;
+    box-shadow: 0 0 0 1px #c7d2fe;
+}
+
+.file-left {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.file-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.file-name {
+    font-weight: 500;
+    color: #111827;
+}
+
+.file-subtitle {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.file-meta {
+    font-size: 0.7rem;
+    color: #6b7280;
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.05rem;
+}
+
+/* Inline "row" table across file row */
+.file-table {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.2rem 0.6rem;
+    margin-top: 0.25rem;
+}
+
+.file-table-cell {
+    display: flex;
+    flex-direction: column;
+}
+
+.file-field-label {
+    font-size: 0.65rem;
+    color: #6b7280;
+}
+
+.file-field-value {
+    font-size: 0.7rem;
+    color: #0b2f6a;
+    font-weight: 500;
+}
+
+.file-right {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+/* Modal header theme */
+.ler-modal-header {
+    background-color: #0b2f6a;
+    color: #ffffff;
+}
+
+
+/* Folder comment button */
+.folder-comment-btn {
+    margin-right: 0.5rem;
+}
+
+/* File comment */
+.file-comment {
+    margin-top: 0.15rem;
+    font-size: 0.7rem;
+    color: #0b2f6a;
+    font-style: italic;
+}

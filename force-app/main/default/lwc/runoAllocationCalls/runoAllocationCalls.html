@@ -1,11 +1,11 @@
 <template>
-  <lightning-quick-action-panel header="Allocate Lead to Runo" class="panel-wrapper">
+  <lightning-quick-action-panel header="Calling" class="panel-wrapper">
 
     <!-- LOADING STATE -->
     <template if:true={loading}>
       <div class="loading-state">
         <lightning-spinner alternative-text="Sending..." size="small"></lightning-spinner>
-        <div class="loading-text">Calling Runo Allocation API…</div>
+        <div class="loading-text">Calling {identity.name}…</div>
       </div>
     </template>
 
@@ -17,7 +17,7 @@
             <lightning-icon icon-name="utility:call" size="large"></lightning-icon>
           </div>
 
-          <div class="popup-text">Calling Runo...</div>
+          <div class="popup-text">Calling {identity.name}...</div>
 
           <div class="wave-loader">
             <span></span><span></span><span></span><span></span>
@@ -158,6 +158,7 @@
               </lightning-combobox>
 
               <!-- COURSE / LEVEL  -->
+              <template if:true={isCallLog}>
               <lightning-combobox
                 class="slds-m-top_small text-color"
                 name="course"
@@ -166,6 +167,7 @@
                 options={levelOptions}
                 onchange={handleLevelChange}>
               </lightning-combobox>
+              </template>
             
 
               <!-- COMMENT BOX (ALWAYS VISIBLE, MANDATORY BASED ON RULE) -->
@@ -186,14 +188,19 @@
               </lightning-textarea>
 
               <!-- DATE -->
-              <lightning-input
+            <div>
+
+            <!-- DATE -->
+            <lightning-input
                 class="slds-m-top_small text-color"
                 type="datetime-local"
                 label="Next Follow Up Date"
                 value={nextFollowUpDate}
-                onchange={handleNextFollowUpDateChange}>
-              </lightning-input>
+                onchange={handleNextFollowUpDateChange}
+                >
+            </lightning-input>
 
+            </div>
               <!-- BUTTONS -->
               <div class="button-group slds-m-top_small">
                 <lightning-button class="save-btn" variant="brand" label="Save Feedback" onclick={saveFeedback} disabled={isSaveDisabled}>
@@ -214,9 +221,9 @@
 
     <!-- FOOTER BUTTONS -->
     <div slot="footer" class="footer-actions">
-      <lightning-button variant="neutral" label="Close" onclick={close} disabled={disableCancel}></lightning-button>
+      <!-- <lightning-button variant="neutral" label="Close" onclick={close} disabled={disableCancel}></lightning-button>
 
-      <lightning-button class="call-btn" data-id="callBtn" variant="brand" label={callButtonLabel} onclick={callApi} disabled={callButtonDisabled}></lightning-button>
+      <lightning-button class="call-btn" data-id="callBtn" variant="brand" label={callButtonLabel} onclick={callApi} disabled={callButtonDisabled}></lightning-button> -->
     </div>
 
   </lightning-quick-action-panel>

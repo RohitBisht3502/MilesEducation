@@ -1,0 +1,51 @@
+public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHandler {
+
+    public LeadTriggerFrameworkHandler(List<Lead__c> newList,List<Lead__c> oldList,Map<Id, Lead__c> newMap,Map<Id, Lead__c> oldMap) {
+        super(
+            (List<SObject>)newList,
+            (List<SObject>)oldList,
+            (Map<Id, SObject>)newMap,
+            (Map<Id, SObject>)oldMap
+        );
+    }
+
+    private List<Lead__c> getNewLeads() {
+        return (List<Lead__c>)newList;
+    }
+
+    private Map<Id, Lead__c> getOldLeadMap() {
+        return (Map<Id, Lead__c>)oldMap;
+    }
+
+    public override void beforeInsert() {
+        LeadTriggerHelperClass.handleBeforeInsert(getNewLeads());
+        // If you want M1 owner logic on insert:
+        // LeadTriggerHelperClass.assignOwnerForM1(getNewLeads(), null, true);
+    }
+
+    public override void beforeUpdate() {
+        List<Lead__c> newLeads = getNewLeads();
+        Map<Id, Lead__c> oldMapLead = getOldLeadMap();
+
+        EnquiryStageService.validateStageTransitions(newLeads, oldMapLead);
+        LeadTriggerHelperClass.handleBeforeUpdate(newLeads, oldMapLead);
+        // If you want M1 owner logic on update:
+        // LeadTriggerHelperClass.assignOwnerForM1(newLeads, oldMapLead, false);
+    }
+
+    public override void afterInsert() {
+        List<Lead__c> newLeads = getNewLeads();
+
+        LeadTriggerHelperClass.handleAfterInsert(newLeads);
+        LeadTriggerHelperClass.handleAfterInsert1(newLeads);
+
+        LeadTriggerHandler.createLeadActivityLogs(newLeads, null, true);
+    }
+
+    public override void afterUpdate() {
+        List<Lead__c> newLeads = getNewLeads();
+        Map<Id, Lead__c> oldMapLead = getOldLeadMap();
+
+        LeadTriggerHandler.createLeadActivityLogs(newLeads, oldMapLead, false);
+    }
+}

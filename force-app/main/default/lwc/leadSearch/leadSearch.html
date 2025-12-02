@@ -1,0 +1,68 @@
+<template>
+    <lightning-card title="Search Lead by Phone">
+        <div class="slds-p-around_medium">
+            <lightning-input 
+                label="Phone Number"
+                value={phoneNumber}
+                onchange={handlePhoneChange}>
+            </lightning-input>
+
+            <lightning-button 
+                label="Search"
+                variant="brand"
+                class="slds-m-top_small"
+                onclick={handleSearch}>
+            </lightning-button>
+        </div>
+
+        <!-- SEARCH RESULTS TABLE -->
+        <template if:true={leadList}>
+            <table class="slds-table slds-table_bordered slds-table_cell-buffer slds-m-around_medium">
+                <thead>
+                    <tr>
+                        <th>Select</th>
+                        <th>Name</th>
+                        <th>Owner</th>
+                        <th>Phone</th>
+                        <th>City</th>
+                        <th>Course</th>
+                        <th>Email</th>
+                        <th>Stage</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <template for:each={leadList} for:item="lead">
+                        <tr key={lead.Id}>
+                            <td>
+                                <input type="radio"
+                                       name="leadSelect"
+                                       value={lead.Id}
+                                       onchange={handleLeadSelection}>
+                                </input>
+                            </td>
+                            <td>{lead.Name}</td>
+                            <td>{lead.OwnerId}</td>
+                            <td>{lead.Phone__c}</td>
+                            <td>{lead.City__c}</td>
+                            <td>{lead.Course__c}</td>
+                            <td>{lead.Email__c}</td>
+                            <td>{lead.Stage__c}</td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </template>
+
+        <!-- MERGE BUTTON -->
+        <template if:true={showMergeButton}>
+            <div class="slds-p-around_medium">
+                <lightning-button 
+                    label="Merge this Lead"
+                    variant="destructive"
+                    onclick={handleMergeLead}>
+                </lightning-button>
+            </div>
+        </template>
+    </lightning-card>
+</template>

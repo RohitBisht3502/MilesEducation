@@ -1,0 +1,195 @@
+<!-- Developer Name : Chirag Sharma 
+Created Date : 26/11/2025
+Last Modified by : Chirag Sharma
+Last Modified Date : 28/11/2025 -->
+
+<template>
+    <lightning-card title="Lead Activity Timeline" icon-name="standard:lead">
+        <!-- LOADER -->
+        <template if:true={loading}>
+            <div class="center">
+                <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+            </div>
+        </template>
+
+        <!-- LEAD HEADER -->
+        <template if:true={lead}>
+            <div class="section-bar"></div>
+            <div class="section-box lead-header">
+                <div class="two-col">
+                    <div class="row">
+                        <span class="label">Name:</span>
+                        <span class="value">{lead.name}</span>
+                    </div>
+                    <div class="row">
+                        <span class="label">Mobile:</span>
+                        <span class="value">{lead.phone}</span>
+                    </div>
+                </div>
+
+                <div class="two-col">
+                    <div class="row">
+                        <span class="label">Email:</span>
+                        <span class="value">{lead.email}</span>
+                    </div>
+                    <div class="row">
+                        <span class="label">City:</span>
+                        <span class="value">{lead.city}</span>
+                    </div>
+                </div>
+
+                <div class="two-col">
+                    <div class="row">
+                        <span class="label">Course:</span>
+                        <span class="value">{lead.course}</span>
+                    </div>
+                    <div class="row">
+                        <span class="label">Source:</span>
+                        <span class="value">{lead.source}</span>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <span class="label">Lead Created By:</span>
+                    <span class="value">{lead.createdByName}</span>
+                </div>
+            </div>
+
+            <!-- ACTIVITIES LIST -->
+            <template if:true={hasActivities}>
+                <template for:each={activities} for:item="act">
+                    <div key={act.id}>
+                        <div class="section-bar"></div>
+
+                        <div class="section-box">
+
+                            <!-- CALL ACTIVITY (unchanged) -->
+                            <template if:true={act.isCall}>
+                                <div class="call-header">
+                                    <div class="call-title">
+                                        <lightning-icon
+                                            icon-name="utility:call"
+                                            size="small"
+                                            class={act.callIconClass}>
+                                        </lightning-icon>
+
+                                        <div>
+                                            <div class="call-direction">{act.callTypeLabel}</div>
+                                            <div class="call-meta">
+                                                Called by •
+                                                <span class="value">{act.createdByText}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="call-time">
+                                        {act.formattedChangedDateTime}
+                                    </div>
+                                </div>
+
+                                <div class="call-body">
+                                    <div class="call-body-header">
+                                        <span>Call Duration</span>
+                                        <span>Comments</span>
+                                    </div>
+
+                                    <div class="call-body-values">
+                                        <span class="call-duration">
+                                            {act.formattedDuration}
+                                        </span>
+                                        <span class="call-comment">
+                                            {act.description}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="call-footer">
+                                    <div class="pill-row">
+                                        <template if:true={act.l1}>
+                                            <span class="pill">L1: {act.l1}</span>
+                                        </template>
+
+                                        <template if:true={act.l2}>
+                                            <span class="pill">L2: {act.l2}</span>
+                                        </template>
+
+                                        <template if:true={act.callRecordingUrl}>
+                                            <a href={act.callRecordingUrl}
+                                               target="_blank"
+                                               class="pill pill-link">
+                                                Recording
+                                            </a>
+                                        </template>
+                                    </div>
+
+                                    <div class="call-actor">
+                                        <span class="label">Action Performed By:</span>
+                                        <span class="value">{act.actionByName}</span>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- LEVEL CHANGE ACTIVITY – card style -->
+                            <template if:true={act.isLevelChange}>
+                                <div class="level-card">
+                                    <div class="level-header">
+                                        <div>
+                                            <!-- Subject -->
+                                            <div class="level-title">{act.name}</div>
+                                            <!-- Category line -->
+                                            <div class="level-meta">
+                                                Category • <span class="value">{act.activityType}</span>
+                                            </div>
+                                        </div>
+                                        <!-- Date/time on right -->
+                                        <div class="level-time">
+                                            {act.formattedChangedDateTime}
+                                        </div>
+                                    </div>
+
+                                    <div class="level-body">
+                                        <div class="level-body-header">
+                                            <span>Level Change</span>
+                                            <span>Comments</span>
+                                        </div>
+
+                                        <div class="level-body-values">
+                                            <!-- Left column: level movement -->
+                                            <span class="level-change">
+                                                <template if:true={act.isUpdated}>
+                                                    {act.previousLevel} &gt; {act.newLevel}
+                                                </template>
+                                                <template if:true={act.isCreated}>
+                                                    {act.newLevel}
+                                                </template>
+                                            </span>
+
+                                            <!-- Right column: description -->
+                                            <span class="level-comment">
+                                                {act.description}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div class="level-footer">
+                                        <span class="label">Action Performed By:</span>
+                                        <span class="value">{act.actionByName}</span>
+                                    </div>
+                                </div>
+                            </template>
+
+                        </div>
+                    </div>
+                </template>
+            </template>
+
+            <template if:false={hasActivities}>
+                <div class="no-data">No activity logs found for this lead.</div>
+            </template>
+        </template>
+
+        <template if:true={error}>
+            <div class="error">Error loading activity data.</div>
+        </template>
+    </lightning-card>
+</template>
