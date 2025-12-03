@@ -55,20 +55,32 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
 
     @AuraEnabled
     public static String allocateLeadNow(Id recordId) {
+        Schema.SObjectType sType;
+        String customerName;
+        String customerPhone;
+        String customerEmail;
+        External_Service_Config__mdt cfg;
+        AllocationDTO payload;
+        String bodyJson;
+        HttpRequest req;
+        Http http;
+        String resBody;
+        Integer statusCode;
+        Boolean isSuccess;
+        List<Integration_Log__c> logs = new List<Integration_Log__c>();
+
         if (recordId == null) {
             throw new AuraHandledException('Record Id is required.');
         }
 
-        Schema.SObjectType sType = recordId.getSObjectType();
-
-        String customerName;
-        String customerPhone;
-        String customerEmail;
-        Lead__c leadCForCallLog;
+        sType = recordId.getSObjectType();
+        customerName = null;
+        customerPhone = null;
+        customerEmail = null;
+        isSuccess = false;
 
         if (sType == Lead__c.SObjectType) {
             Lead__c leadRecord = [SELECT Id, Name, Phone__c, Email__c FROM Lead__c WHERE Id = :recordId LIMIT 1];
-            leadCForCallLog = leadRecord;
             customerName  = leadRecord.Name;
             customerPhone = leadRecord.Phone__c;
             customerEmail = leadRecord.Email__c;
@@ -95,18 +107,12 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
             throw new AuraHandledException('Record must have Name and Phone.');
         }
 
-        External_Service_Config__mdt cfg = getRunoConfig();
+        cfg = getRunoConfig();
+        payload = buildAllocationPayload(customerName, customerPhone, customerEmail);
+        bodyJson = JSON.serialize(payload);
 
-        AllocationDTO payload = buildAllocationPayload(customerName, customerPhone, customerEmail);
-        String bodyJson = JSON.serialize(payload);
-
-        HttpRequest req = buildHttpRequest(cfg, bodyJson);
-        Http http = new Http();
-
-        String resBody;
-        Integer statusCode;
-        Boolean isSuccess = false;
-        List<Integration_Log__c> logs = new List<Integration_Log__c>();
+        req = buildHttpRequest(cfg, bodyJson);
+        http = new Http();
 
         try {
             HttpResponse res = http.send(req);
@@ -149,8 +155,7 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
     }
 
     public static External_Service_Config__mdt getRunoConfig() {
-        External_Service_Config__mdt cfg = [ SELECT Endpoint_URL__c, Http_Method__c, Api_Key__c, Api_Key_Header__c, Is_Active__c 
-            FROM External_Service_Config__mdt WHERE DeveloperName = 'RunoAllocationAPI' LIMIT 1];
+        External_Service_Config__mdt cfg = [SELECT Endpoint_URL__c, Http_Method__c, Api_Key__c, Api_Key_Header__c, Is_Active__c FROM External_Service_Config__mdt WHERE DeveloperName = 'RunoAllocationAPI' LIMIT 1];
 
         if (cfg == null ||
             !cfg.Is_Active__c ||
@@ -178,8 +183,8 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
 
     public static HttpRequest buildHttpRequest(External_Service_Config__mdt cfg, String bodyJson) {
         HttpRequest req = new HttpRequest();
-
         String endpoint = cfg.Endpoint_URL__c;
+
         if (!endpoint.contains('isAutoDialLead=')) {
             endpoint += (endpoint.contains('?') ? '&' : '?') + 'isAutoDialLead=true';
         }
@@ -215,20 +220,26 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         insert callLog;
     }
 
-
     @AuraEnabled
-    public static void updateCallFeedback(Id recordId,String callId,String feedback,Datetime nextFollowUpDate,String l1,String l2,String stage,String level) {
+    public static void updateCallFeedback(Id recordId, String callId, String feedback, Datetime nextFollowUpDate, String l1, String l2, String stage, String level) {
+        SObjectType sType;
+        Boolean isLead;
+        Boolean isCallLogRec;
+        Call_Log__c logRecord;
+        Id leadIdToUpdate;
+
         System.debug('UPDATE FB => RecordId:' + recordId + ' Call:' + callId);
 
         if (String.isBlank(feedback)) {
             return;
         }
 
-        SObjectType sType    = recordId != null ? recordId.getSObjectType() : null;
-        Boolean isLead       = (sType == Lead__c.SObjectType);
-        Boolean isCallLogRec = (sType == Call_Log__c.SObjectType);
+        sType = recordId != null ? recordId.getSObjectType() : null;
+        isLead = (sType == Lead__c.SObjectType);
+        isCallLogRec = (sType == Call_Log__c.SObjectType);
+        leadIdToUpdate = null;
 
-        Call_Log__c logRecord = findCallLog(recordId, callId);
+        logRecord = findCallLog(recordId, callId);
 
         if (logRecord == null) {
             throw new AuraHandledException('No Call Log found for this record.');
@@ -245,8 +256,6 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         }
 
         update logRecord;
-
-        Id leadIdToUpdate;
 
         if (logRecord.Lead__c != null) {
             leadIdToUpdate = logRecord.Lead__c;
@@ -266,28 +275,33 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
 
     public static Call_Log__c findCallLog(Id recordId, String callId) {
         Call_Log__c logRecord = null;
-
-        SObjectType sType = recordId != null ? recordId.getSObjectType() : null;
+        SObjectType sType = (recordId != null) ? recordId.getSObjectType() : null;
         Boolean isLead    = (sType == Lead__c.SObjectType);
         Boolean isCallLog = (sType == Call_Log__c.SObjectType);
 
-        // if (isCallLog) {
-        //     List<Call_Log__c> logsById = [ SELECT Id, Lead__c FROM Call_Log__c WHERE Id = :recordId LIMIT 1];
-        //     if (!logsById.isEmpty()) {
-        //         logRecord = logsById[0];
-        //     }
-        //     return logRecord;
-        // }
+        if (isCallLog && String.isBlank(callId)) {
+            Call_Log__c recordCallLog = [SELECT Id, Lead__c, Phone_Number__c FROM Call_Log__c WHERE Id = :recordId AND Untracked__c = true ORDER BY CreatedDate DESC LIMIT 1 ];
+
+            recordCallLog.Untracked__c = false;
+            update recordCallLog;
+
+            List<Call_Log__c> logsById = [SELECT Id, Lead__c, Phone_Number__c FROM Call_Log__c WHERE Phone_Number__c = :recordCallLog.Phone_Number__c AND Status__c = 'In Progress' ORDER BY CreatedDate DESC LIMIT 1];
+
+            if (!logsById.isEmpty()) {
+                logRecord = logsById[0];
+            }
+            return logRecord;
+        }
 
         if (!String.isBlank(callId)) {
-            List<Call_Log__c> logsByCall = [ SELECT Id, Lead__c FROM Call_Log__c WHERE Call_Id__c = :callId ORDER BY CreatedDate DESC LIMIT 1];
+            List<Call_Log__c> logsByCall = [SELECT Id, Lead__c FROM Call_Log__c WHERE Call_Id__c = :callId ORDER BY CreatedDate DESC LIMIT 1 ];
             if (!logsByCall.isEmpty()) {
                 logRecord = logsByCall[0];
             }
         }
 
         if (logRecord == null && isLead && recordId != null) {
-            List<Call_Log__c> logsByLead = [SELECT Id, Lead__c FROM Call_Log__c WHERE Lead__c = :recordId ORDER BY CreatedDate DESC LIMIT 1 ];
+            List<Call_Log__c> logsByLead = [SELECT Id, Lead__c FROM Call_Log__c WHERE Lead__c = :recordId ORDER BY CreatedDate DESC LIMIT 1];
             if (!logsByLead.isEmpty()) {
                 logRecord = logsByLead[0];
             }
@@ -296,21 +310,22 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         return logRecord;
     }
 
-
     @AuraEnabled(cacheable=true)
     public static Map<String, List<String>> getStageLevelValues() {
         Map<String, List<String>> result = new Map<String, List<String>>();
-
         List<String> stageValues = new List<String>();
-        Schema.DescribeFieldResult stageField = Lead__c.Stage__c.getDescribe();
+        List<String> levelValues = new List<String>();
+        Schema.DescribeFieldResult stageField;
+        Schema.DescribeFieldResult levelField;
+
+        stageField = Lead__c.Stage__c.getDescribe();
         for (Schema.PicklistEntry pe : stageField.getPicklistValues()) {
             if (pe.isActive()) {
                 stageValues.add(pe.getLabel());
             }
         }
 
-        List<String> levelValues = new List<String>();
-        Schema.DescribeFieldResult levelField = Lead__c.Course__c.getDescribe();
+        levelField = Lead__c.Course__c.getDescribe();
         for (Schema.PicklistEntry pe : levelField.getPicklistValues()) {
             if (pe.isActive()) {
                 levelValues.add(pe.getLabel());

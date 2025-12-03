@@ -1,8 +1,3 @@
-<!-- Developer Name : Chirag Sharma 
-Created Date : 26/11/2025
-Last Modified by : Chirag Sharma
-Last Modified Date : 28/11/2025 -->
-
 <template>
     <lightning-card title="Lead Activity Timeline" icon-name="standard:lead">
         <!-- LOADER -->
@@ -63,7 +58,7 @@ Last Modified Date : 28/11/2025 -->
 
                         <div class="section-box">
 
-                            <!-- CALL ACTIVITY (unchanged) -->
+                            <!-- CALL ACTIVITY -->
                             <template if:true={act.isCall}>
                                 <div class="call-header">
                                     <div class="call-title">
@@ -129,19 +124,16 @@ Last Modified Date : 28/11/2025 -->
                                 </div>
                             </template>
 
-                            <!-- LEVEL CHANGE ACTIVITY – card style -->
+                            <!-- LEVEL CHANGE ACTIVITY -->
                             <template if:true={act.isLevelChange}>
                                 <div class="level-card">
                                     <div class="level-header">
                                         <div>
-                                            <!-- Subject -->
                                             <div class="level-title">{act.name}</div>
-                                            <!-- Category line -->
                                             <div class="level-meta">
                                                 Category • <span class="value">{act.activityType}</span>
                                             </div>
                                         </div>
-                                        <!-- Date/time on right -->
                                         <div class="level-time">
                                             {act.formattedChangedDateTime}
                                         </div>
@@ -154,7 +146,6 @@ Last Modified Date : 28/11/2025 -->
                                         </div>
 
                                         <div class="level-body-values">
-                                            <!-- Left column: level movement -->
                                             <span class="level-change">
                                                 <template if:true={act.isUpdated}>
                                                     {act.previousLevel} &gt; {act.newLevel}
@@ -164,7 +155,6 @@ Last Modified Date : 28/11/2025 -->
                                                 </template>
                                             </span>
 
-                                            <!-- Right column: description -->
                                             <span class="level-comment">
                                                 {act.description}
                                             </span>
@@ -172,6 +162,41 @@ Last Modified Date : 28/11/2025 -->
                                     </div>
 
                                     <div class="level-footer">
+                                        <span class="label">Action Performed By:</span>
+                                        <span class="value">{act.actionByName}</span>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- MERGE LEAD ACTIVITY -->
+                            <template if:true={act.isMergeLead}>
+                                <div class="merge-card">
+                                    <div class="merge-header">
+                                        <div class="merge-title-section">
+                                            <lightning-icon
+                                                icon-name="utility:merge"
+                                                size="small"
+                                                class="merge-icon">
+                                            </lightning-icon>
+                                            <div>
+                                                <div class="merge-title">{act.name}</div>
+                                                <div class="merge-meta">
+                                                    Category • <span class="value">{act.activityType}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="merge-time">
+                                            {act.formattedChangedDateTime}
+                                        </div>
+                                    </div>
+
+                                    <div class="merge-body">
+                                        <div class="merge-description">
+                                            {act.description}
+                                        </div>
+                                    </div>
+
+                                    <div class="merge-footer">
                                         <span class="label">Action Performed By:</span>
                                         <span class="value">{act.actionByName}</span>
                                     </div>

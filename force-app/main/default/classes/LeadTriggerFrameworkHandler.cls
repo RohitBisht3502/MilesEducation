@@ -49,5 +49,8 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         LeadTriggerHandler.createLeadActivityLogs(newLeads, oldMapLead, false);
 
         LeadTriggerHelperClass.afterUpdateMergeLead((List<Lead__c>)newList, (Map<Id, Lead__c>)oldMap);  
+
+        // 3. Create activity logs for Merged Leads (AFTER merge logic completes)
+        LeadTriggerHandler.createMergeLeadActivityLogs(newLeads, oldMapLead);
     }
 }
