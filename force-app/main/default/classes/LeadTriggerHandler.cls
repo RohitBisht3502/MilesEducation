@@ -63,9 +63,9 @@ public without sharing class LeadTriggerHandler {
         }
     }
 
-    /**
-     * Creates activity logs for Merged Leads
-     * Call this AFTER the merge logic completes
+   /**
+     * Creates activity logs for BOTH main lead and merged leads
+     * Call this AFTER the merge approval is processed and Is_Merged__c is set
      */
     public static void createMergeLeadActivityLogs(
         List<Lead__c> newList,
@@ -89,57 +89,99 @@ public without sharing class LeadTriggerHandler {
             return;
         }
         
-        // Query related leads to get merge details
-        List<Lead__c> relatedLeads = [
-            SELECT Id, Name, Lead__c, Stage__c
-            FROM Lead__c
-            WHERE Lead__c IN :newlyMergedLeadIds
+        // Query merged leads with their main lead reference
+        List<Lead__c> mergedLeads = [
+            SELECT Id, Name, Lead__c, Stage__c, LastModifiedById
+            FROM Lead__c 
+            WHERE Id IN :newlyMergedLeadIds
         ];
         
-        // Create a map: Main Lead Id → List of merged lead names
-        Map<Id, List<String>> mainLeadToMergedNamesMap = new Map<Id, List<String>>();
+        // Group merged leads by their main lead
+        Map<Id, List<Lead__c>> mainLeadToMergedLeadsMap = new Map<Id, List<Lead__c>>();
+        Set<Id> mainLeadIds = new Set<Id>();
         
-        for (Lead__c relatedLead : relatedLeads) {
-            if (!mainLeadToMergedNamesMap.containsKey(relatedLead.Lead__c)) {
-                mainLeadToMergedNamesMap.put(relatedLead.Lead__c, new List<String>());
+        for (Lead__c mergedLead : mergedLeads) {
+            if (mergedLead.Lead__c != null) {
+                mainLeadIds.add(mergedLead.Lead__c);
+                
+                if (!mainLeadToMergedLeadsMap.containsKey(mergedLead.Lead__c)) {
+                    mainLeadToMergedLeadsMap.put(mergedLead.Lead__c, new List<Lead__c>());
+                }
+                mainLeadToMergedLeadsMap.get(mergedLead.Lead__c).add(mergedLead);
             }
-            mainLeadToMergedNamesMap.get(relatedLead.Lead__c).add(relatedLead.Name);
         }
         
-        // Create activity logs for each merged lead
-        for (Id mainLeadId : newlyMergedLeadIds) {
-            Lead__c mainLead = newList[0]; // Get from newList
-            for (Lead__c ld : newList) {
-                if (ld.Id == mainLeadId) {
-                    mainLead = ld;
-                    break;
-                }
-            }
+        // Query main leads to get their details
+        Map<Id, Lead__c> mainLeadsMap = new Map<Id, Lead__c>([
+            SELECT Id, Name, LastModifiedById
+            FROM Lead__c
+            WHERE Id IN :mainLeadIds
+        ]);
+        
+        // =============================================================
+        // CREATE ACTIVITY LOGS
+        // =============================================================
+        
+        for (Id mainLeadId : mainLeadToMergedLeadsMap.keySet()) {
+            List<Lead__c> associatedMergedLeads = mainLeadToMergedLeadsMap.get(mainLeadId);
+            Lead__c mainLead = mainLeadsMap.get(mainLeadId);
             
-            List<String> mergedLeadNames = mainLeadToMergedNamesMap.get(mainLeadId);
-            if (mergedLeadNames == null || mergedLeadNames.isEmpty()) {
+            if (mainLead == null || associatedMergedLeads.isEmpty()) {
                 continue;
             }
             
-            Activity_Log__c log = new Activity_Log__c();
-            log.Lead__c                = mainLeadId;
-            log.Logging_Id__c          = mainLeadId;
-            log.Activity_Type__c       = 'Lead Merge';
-            log.Name                   = 'Lead Merged';
-            log.Changed_Date_Time__c   = System.now();
-            log.Action_Performed_By__c = mainLead.LastModifiedById;
-            log.Created_By__c          = mainLead.LastModifiedById;
-            
-            // Build description with merged lead names
-            String mergedNames = String.join(mergedLeadNames, ', ');
+            // Collect merged lead names
+            List<String> mergedLeadNames = new List<String>();
+            for (Lead__c ml : associatedMergedLeads) {
+                mergedLeadNames.add(ml.Name);
+            }
+            String mergedNamesStr = String.join(mergedLeadNames, ', ');
             Integer mergeCount = mergedLeadNames.size();
-            log.Description__c = mergeCount + ' lead(s) merged into this lead: ' + mergedNames;
             
-            logsToInsert.add(log);
+            // -------------------------------------------------------
+            // 1️⃣ ACTIVITY LOG FOR MAIN LEAD (the one being merged INTO)
+            // -------------------------------------------------------
+            Activity_Log__c mainLeadLog = new Activity_Log__c();
+            mainLeadLog.Lead__c                = mainLeadId;
+            mainLeadLog.Logging_Id__c          = mainLeadId;
+            mainLeadLog.Activity_Type__c       = 'Lead Merge';
+            mainLeadLog.Name                   = 'Lead Merge - Main';
+            mainLeadLog.Changed_Date_Time__c   = System.now();
+            mainLeadLog.Action_Performed_By__c = mainLead.LastModifiedById;
+            mainLeadLog.Created_By__c          = mainLead.LastModifiedById;
+            mainLeadLog.Description__c         = mergeCount + ' lead(s) merged into this lead: ' + mergedNamesStr;
+            
+            logsToInsert.add(mainLeadLog);
+            
+            // -------------------------------------------------------
+            // 2️⃣ ACTIVITY LOGS FOR EACH MERGED LEAD (the ones being merged FROM)
+            // -------------------------------------------------------
+            for (Lead__c mergedLead : associatedMergedLeads) {
+                Activity_Log__c mergedLeadLog = new Activity_Log__c();
+                mergedLeadLog.Lead__c                = mergedLead.Id;
+                mergedLeadLog.Logging_Id__c          = mergedLead.Id;
+                mergedLeadLog.Activity_Type__c       = 'Lead Merge';
+                mergedLeadLog.Name                   = 'Lead Merge - Merged';
+                mergedLeadLog.Changed_Date_Time__c   = System.now();
+                mergedLeadLog.Action_Performed_By__c = mergedLead.LastModifiedById;
+                mergedLeadLog.Created_By__c          = mergedLead.LastModifiedById;
+                mergedLeadLog.Description__c         = 'This lead was merged into: ' + mainLead.Name + ' (ID: ' + mainLeadId + ')';
+                
+                logsToInsert.add(mergedLeadLog);
+            }
         }
         
+        // Insert all activity logs
         if (!logsToInsert.isEmpty()) {
             insert logsToInsert;
+        }
+    }
+
+    public static void blockProtectedLeadDeletion(List<Lead__c> oldLeads) {
+        for (Lead__c l : oldLeads) {
+            if (l.Do_Not_Delete__c == true) {
+                l.addError('❌ This custom Lead record is protected and cannot be deleted.');
+            }
         }
     }
 }

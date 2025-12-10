@@ -84,23 +84,43 @@ public without sharing class LeadTriggerHelperClass {
 
 
     public static void afterUpdateMergeLead(List<Lead__c> newList, Map<Id, Lead__c> oldMap) {
+    
+        // 1️⃣ Identify leads where status changed to 'Approved'
+        Set<Id> approvedLeadIds = new Set<Id>();
+        Set<Id> rejectedLeadIds = new Set<Id>();
         
-        // 1️⃣ Identify newly merged leads (main leads)
-        Set<Id> mergedLeadIds = new Set<Id>();
         for (Lead__c ld : newList) {
             Lead__c oldLd = oldMap.get(ld.Id);
-            if (oldLd != null && !oldLd.Is_Merged__c && ld.Is_Merged__c) {
-                mergedLeadIds.add(ld.Id);
+            if (oldLd != null && oldLd.Status__c != ld.Status__c) {
+                if (ld.Status__c == 'Approved') {
+                    approvedLeadIds.add(ld.Id);
+                } else if (ld.Status__c == 'Rejected') {
+                    rejectedLeadIds.add(ld.Id);
+                }
             }
         }
         
-        if (mergedLeadIds.isEmpty()) return;
+        // Handle Approved Merges
+        if (!approvedLeadIds.isEmpty()) {
+            processMergeApproval(approvedLeadIds);
+        }
         
-        // 2️⃣ Query all related leads that are tagged to the merged leads
+        // Handle Rejected Merges
+        if (!rejectedLeadIds.isEmpty()) {
+            processMergeRejection(rejectedLeadIds);
+        }
+    }
+
+    /**
+     * Process approved merge requests
+     */
+    private static void processMergeApproval(Set<Id> approvedLeadIds) {
+        
+        // 2️⃣ Query all related leads that are tagged to the approved leads
         List<Lead__c> relatedLeads = [
             SELECT Id, Stage__c, Lead__c
             FROM Lead__c
-            WHERE Lead__c IN :mergedLeadIds
+            WHERE Lead__c IN :approvedLeadIds
         ];
         
         if (relatedLeads.isEmpty()) return;
@@ -122,7 +142,7 @@ public without sharing class LeadTriggerHelperClass {
         Map<Id, Lead__c> mainLeadsMap = new Map<Id, Lead__c>(
             [SELECT Id, Stage__c
             FROM Lead__c
-            WHERE Id IN :mergedLeadIds]
+            WHERE Id IN :approvedLeadIds]
         );
         
         // 5️⃣ Stage ranking configuration
@@ -133,6 +153,8 @@ public without sharing class LeadTriggerHelperClass {
         
         // 6️⃣ Update stages for main leads (pick highest stage from all related leads)
         List<Lead__c> mainLeadsToUpdate = new List<Lead__c>();
+        List<Lead__c> relatedLeadsToUpdate = new List<Lead__c>();
+        
         for (Id mainLeadId : mainLeadToRelatedLeadsMap.keySet()) {
             Lead__c mainLead = mainLeadsMap.get(mainLeadId);
             if (mainLead != null) {
@@ -141,9 +163,13 @@ public without sharing class LeadTriggerHelperClass {
                 // Compare with all related leads to find highest stage
                 for (Lead__c relatedLead : mainLeadToRelatedLeadsMap.get(mainLeadId)) {
                     highestStage = getHigherStage(highestStage, relatedLead.Stage__c, stageRankMap);
+                    
+                    // Mark related lead as merged
+                    relatedLead.Is_Merged__c = true;
+                    relatedLeadsToUpdate.add(relatedLead);
                 }
                 
-                // Only update if stage changed
+                // Update stage only if it changed
                 if (highestStage != mainLead.Stage__c) {
                     mainLead.Stage__c = highestStage;
                     mainLeadsToUpdate.add(mainLead);
@@ -201,9 +227,36 @@ public without sharing class LeadTriggerHelperClass {
             update mainLeadsToUpdate;
         }
         
+        if (!relatedLeadsToUpdate.isEmpty()) {
+            update relatedLeadsToUpdate;
+        }
+        
         if (!childRecordsToUpdate.isEmpty()) {
             update childRecordsToUpdate;
         }
+    }
+
+    /**
+     * Process rejected merge requests - remove related lead references
+     */
+    private static void processMergeRejection(Set<Id> rejectedLeadIds) {
+        
+        // Query all related leads that were tagged to the rejected main leads
+        List<Lead__c> relatedLeads = [
+            SELECT Id, Lead__c
+            FROM Lead__c
+            WHERE Lead__c IN :rejectedLeadIds
+        ];
+        
+        if (relatedLeads.isEmpty()) return;
+        
+        // Remove the relationship by setting Lead__c to null
+        for (Lead__c relatedLead : relatedLeads) {
+            relatedLead.Lead__c = null;
+        }
+        
+        // Update the related leads to remove the relationship
+        update relatedLeads;
     }
 
     /**
@@ -254,5 +307,13 @@ public without sharing class LeadTriggerHelperClass {
         if (rank2 == null) return stage1;
         
         return rank1 >= rank2 ? stage1 : stage2;
+    }
+
+    public static void blockProtectedLeadDeletion(List<Lead__c> oldLeads) {
+        for (Lead__c l : oldLeads) {
+            if (l.Do_Not_Delete__c == true) {
+                l.addError('❌ This custom Lead record is protected and cannot be deleted.');
+            }
+        }
     }
 }

@@ -1,3 +1,7 @@
+/*
+    Author       : ROHIT SINGH BISHT
+    Description  : 
+*/
 public without sharing class RoundRobinHelper {
     public class BucketRef { public String objectApiName; public String cityUpper; public String sourceUpper; public String courseUpper; public String typeValue; }
 
@@ -32,7 +36,7 @@ public without sharing class RoundRobinHelper {
     public static List<Round_Robin_Pool__c> q(String obj, String city, String src,String courseUpper,String typeValue, Boolean ignoreSource) {
         if (ignoreSource) {
             return [
-                SELECT Id, Name, Object_Api_Name__c, City__c, Lead_Source__c,
+                SELECT Id, Name, Object_Api_Name__c, City__c, Bucket__c,
                        Sales_Rep__c, Sequence__c, Max_Weight__c, Assigned_Weight__c,
                        Max_Leads__c, Total_Assigned__c, Maximum_Weightage__c,
                        Current_Assigned_Weight__c, Active__c, Course__c,
@@ -47,7 +51,7 @@ public without sharing class RoundRobinHelper {
             ];
         } else {
             return [
-                SELECT Id, Name, Object_Api_Name__c, City__c, Lead_Source__c,
+                SELECT Id, Name, Object_Api_Name__c, City__c, Bucket__c,
                        Sales_Rep__c, Sequence__c, Max_Weight__c, Assigned_Weight__c,
                        Max_Leads__c, Total_Assigned__c, Maximum_Weightage__c,
                        Current_Assigned_Weight__c, Active__c, Course__c,
@@ -58,7 +62,7 @@ public without sharing class RoundRobinHelper {
                   AND City__c            = :city
                   AND Course__c          = :courseUpper
                   AND Type__c            = :typeValue
-                  AND Lead_Source__c     = :src
+                  AND Bucket__c          = :src
                 FOR UPDATE
             ];
         }
@@ -77,33 +81,6 @@ public without sharing class RoundRobinHelper {
 
     public class PickResult { public Round_Robin_Pool__c member; public Boolean cycleReset; }
 
-    // public static PickResult pickNext(List<Round_Robin_Pool__c> pool, Id lastOwnerId) {
-    //     PickResult r = new PickResult(); r.cycleReset = false;
-    //     Round_Robin_Pool__c m = findEligible(pool, lastOwnerId, true);
-    //     if (m != null) { r.member = m; return r; }
-    //     m = findEligible(pool, lastOwnerId, false);
-    //     if (m != null) { r.member = m; return r; }
-    //     resetCycle(pool); r.cycleReset = true;
-    //     m = (pool, lastOwnerId, true);
-    //     if (m == findEligiblenull) m = findEligible(pool, lastOwnerId, false);
-    //     r.member = m;
-    //     return r;
-    // }
-
-    // public static PickResult pickNext(List<Round_Robin_Pool__c> pool) { return pickNext(pool, null); }
-
-    // private static Round_Robin_Pool__c findEligible(List<Round_Robin_Pool__c> pool, Id lastOwnerId, Boolean avoidSame) {
-    //     for (Round_Robin_Pool__c p : pool) {
-    //         Integer weight = (Integer)(p.Assigned_Weight__c == null ? 0 : p.Assigned_Weight__c.intValue());
-    //         Integer used   = (Integer)(p.Current_Assigned_Weight__c == null ? 0 : p.Current_Assigned_Weight__c.intValue());
-    //         if (weight <= 0) continue;
-    //         if (p.Max_Leads__c != null && p.Total_Assigned__c != null && p.Total_Assigned__c >= p.Max_Leads__c) continue;
-    //         if (used >= weight) continue;
-    //         if (avoidSame && lastOwnerId != null && p.Sales_Rep__c == lastOwnerId) continue;
-    //         return p;
-    //     }
-    //     return null;
-    // }
     public static PickResult pickNext(List<Round_Robin_Pool__c> pool, Id lastOwnerId) {
         System.debug('>>> pickNext START | pool size=' + (pool != null ? pool.size() : 0) + ' | lastOwnerId=' + lastOwnerId);
 

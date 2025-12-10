@@ -163,7 +163,8 @@ global without sharing class MilesWebService {
                         Course__c                = inputData.course,
                         Register_for_Webinar__c  = inputData.register_for_webinar,
                         Interested_Webinar_ID__c = inputData.interested_webinar_id,
-                        Source__c                = inputData.coming_from
+                        Source__c                = inputData.coming_from,
+                        Candidate__c             = candidate.Id
                     );
                     insert newLead2;
 

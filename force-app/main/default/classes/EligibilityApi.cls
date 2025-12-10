@@ -10,6 +10,7 @@ global without sharing class EligibilityApi {
         public String file_type;
         public String file_path;
         public String file_UUID;
+        public String file_name;
     }
 
     global class FilesWrapper {
@@ -30,7 +31,7 @@ global without sharing class EligibilityApi {
         ApiResponse res = new ApiResponse();
         try {
             RestRequest req = RestContext.request;
-            String body = req.requestBody != null ? req.requestBody.toString() : null;
+            String body = (req.requestBody != null) ? req.requestBody.toString() : null;
             System.debug('EligibilityApi.upsertQualification body: ' + body);
 
             if (String.isBlank(body)) {
@@ -48,45 +49,27 @@ global without sharing class EligibilityApi {
                 return res;
             }
 
-            EligibilityFileService.NewQualificationRequest input =
-                new EligibilityFileService.NewQualificationRequest();
+            // Group incoming files by parsed qualification (type + title) from file_path
+            Map<String, EligibilityFileService.NewQualificationRequest> grouped = new Map<String, EligibilityFileService.NewQualificationRequest>();
 
-            input.salesforceId           = raw.sf_id;
-            input.qualificationType      = raw.qualification_type;
-            input.qualificationTitle     = raw.qualification_title;
-            input.qualificationMonthYear = raw.qualification_date;
-            input.certificateFiles       = new List<EligibilityFileService.IncomingFile>();
-            input.marksheetFiles         = new List<EligibilityFileService.IncomingFile>();
+            if (raw.files != null) {
+                processIncomingFiles(raw.sf_id, raw.files.certificates, 'Certificate', grouped);
+                processIncomingFiles(raw.sf_id, raw.files.mark_sheets, 'Marksheet', grouped);
+            }
 
-            if (raw.files != null && raw.files.certificates != null) {
-                for (FileItem fi : raw.files.certificates) {
-                    if (fi == null || String.isBlank(fi.file_path) || String.isBlank(fi.file_UUID)) continue;
-                    EligibilityFileService.IncomingFile f = new EligibilityFileService.IncomingFile();
-                    f.uuid      = fi.file_UUID;
-                    f.path      = fi.file_path;
-                    f.format    = fi.file_type;
-                    f.fileType  = 'Certificate';
-                    input.certificateFiles.add(f);
+            for (EligibilityFileService.NewQualificationRequest nq : grouped.values()) {
+                EligibilityFileService.SimpleResponse svcRes =
+                    EligibilityFileService.handleNewQualification(JSON.serialize(nq));
+
+                if (!svcRes.success) {
+                    res.success = false;
+                    res.message = svcRes.message;
+                    return res;
                 }
             }
 
-            if (raw.files != null && raw.files.mark_sheets != null) {
-                for (FileItem fi : raw.files.mark_sheets) {
-                    if (fi == null || String.isBlank(fi.file_path) || String.isBlank(fi.file_UUID)) continue;
-                    EligibilityFileService.IncomingFile f = new EligibilityFileService.IncomingFile();
-                    f.uuid      = fi.file_UUID;
-                    f.path      = fi.file_path;
-                    f.format    = fi.file_type;
-                    f.fileType  = 'Marksheet';
-                    input.marksheetFiles.add(f);
-                }
-            }
-
-            EligibilityFileService.ApiResponse svcRes =
-                EligibilityFileService.handleNewQualification(input);
-
-            res.success = svcRes.success;
-            res.message = svcRes.message;
+            res.success = true;
+            res.message = 'Qualification files synced successfully.';
 
         } catch (Exception e) {
             System.debug('EligibilityApi.upsertQualification ERROR: ' + e.getMessage());
@@ -94,5 +77,51 @@ global without sharing class EligibilityApi {
             res.message = 'Error processing request: ' + e.getMessage();
         }
         return res;
+    }
+
+    private static void processIncomingFiles(
+        String salesforceId,
+        List<FileItem> items,
+        String logicalType,
+        Map<String, EligibilityFileService.NewQualificationRequest> grouped
+    ) {
+        if (items == null || items.isEmpty()) return;
+
+        for (FileItem fi : items) {
+            if (fi == null || String.isBlank(fi.file_path) || String.isBlank(fi.file_UUID)) continue;
+
+            EligibilityPathParser.ParsedPath parsed = EligibilityPathParser.parse(fi.file_path);
+            if (parsed == null || String.isBlank(parsed.qualificationType) || String.isBlank(parsed.qualificationTitle)) {
+                continue;
+            }
+
+            String key = parsed.qualificationType + '||' + parsed.qualificationTitle;
+            EligibilityFileService.NewQualificationRequest nq = grouped.get(key);
+            if (nq == null) {
+                nq = new EligibilityFileService.NewQualificationRequest();
+                nq.salesforceId = salesforceId;
+                nq.qualificationType = parsed.qualificationType;
+                nq.qualificationTitle = parsed.qualificationTitle;
+                nq.qualificationMonthYear = null;
+                nq.certificateFiles = new List<EligibilityFileService.IncomingFile>();
+                nq.marksheetFiles = new List<EligibilityFileService.IncomingFile>();
+                grouped.put(key, nq);
+            }
+
+            EligibilityFileService.IncomingFile f = new EligibilityFileService.IncomingFile();
+            f.uuid = fi.file_UUID;
+            f.path = fi.file_path;
+            f.format = fi.file_type;
+            f.fileType = logicalType;
+            f.fileName = !String.isBlank(fi.file_name)
+                ? fi.file_name
+                : (parsed.fileName != null ? parsed.fileName : null);
+
+            if (logicalType == 'Certificate') {
+                nq.certificateFiles.add(f);
+            } else {
+                nq.marksheetFiles.add(f);
+            }
+        }
     }
 }

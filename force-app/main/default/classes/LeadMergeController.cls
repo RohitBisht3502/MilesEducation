@@ -1,27 +1,93 @@
 public without sharing class LeadMergeController {
 
+    // @AuraEnabled(cacheable=true)
+    // public static List<Lead__c> searchLeads1(String searchKey, Id currentLeadId, List<Id> selectedLeadIds) {
+    //     if (String.isBlank(searchKey)) return new List<Lead__c>();
+
+    //     String key = '%' + searchKey + '%';
+
+    //     // Exclude the current lead and already selected leads from search results
+    //     Set<Id> excludeIds = new Set<Id>{currentLeadId};
+    //     if (selectedLeadIds != null && !selectedLeadIds.isEmpty()) {
+    //         excludeIds.addAll(selectedLeadIds);
+    //     }
+
+    //     return [
+    //         SELECT Id, Name, Phone__c, Email__c, OwnerId, Owner.Name
+    //         FROM Lead__c
+    //         WHERE (Phone__c LIKE :key
+    //            OR Name LIKE :key
+    //            OR Email__c LIKE :key)
+    //         AND Id NOT IN :excludeIds
+    //         LIMIT 50
+    //     ];
+    // }
+
+
     @AuraEnabled(cacheable=true)
     public static List<Lead__c> searchLeads(String searchKey, Id currentLeadId, List<Id> selectedLeadIds) {
+
         if (String.isBlank(searchKey)) return new List<Lead__c>();
 
         String key = '%' + searchKey + '%';
 
-        // Exclude the current lead and already selected leads from search results
-        Set<Id> excludeIds = new Set<Id>{currentLeadId};
-        if (selectedLeadIds != null && !selectedLeadIds.isEmpty()) {
-            excludeIds.addAll(selectedLeadIds);
+        // Exclude current lead + selected leads
+        Set<Id> excludeIds = new Set<Id>();
+        if (currentLeadId != null) excludeIds.add(currentLeadId);
+        if (selectedLeadIds != null) excludeIds.addAll(selectedLeadIds);
+
+        // -------------------------
+        // 1️⃣ FIRST TRY DIRECT SEARCH ON LEAD__c (Name, Phone, Email)
+        // -------------------------
+        List<Lead__c> results = [
+            SELECT Id, Name, Email__c, Phone__c, Course__c, Owner.Name
+            FROM Lead__c
+            WHERE (Name LIKE :key
+                OR Phone__c LIKE :key
+                OR Email__c LIKE :key)
+            AND Id NOT IN :excludeIds
+            AND (Is_Merged__c = false OR Is_Merged__c = null)
+            LIMIT 10
+        ];
+
+        if (!results.isEmpty()) return results;
+
+        // -------------------------
+        // 2️⃣ IF NO RESULTS → SEARCH Candidate_ID__c ON STANDARD LEAD
+        // -------------------------
+        List<Lead> standardLeads = [
+            SELECT Id, Candidate_ID__c
+            FROM Lead
+            WHERE Candidate_ID__c LIKE :key
+            LIMIT 10
+        ];
+
+        if (standardLeads.isEmpty()) {
+            return results; // still empty
         }
 
-        return [
-            SELECT Id, Name, Phone__c, Email__c, OwnerId, Owner.Name
+        // Map standard Lead → custom Lead__c lookup field (Candidate__c)
+        Set<Id> stdLeadIds = new Set<Id>();
+        for (Lead ld : standardLeads) {
+            stdLeadIds.add(ld.Id);
+        }
+
+        // -------------------------
+        // 3️⃣ GET CUSTOM LEADS LINKED TO THESE STANDARD LEADS
+        // -------------------------
+        results = [
+            SELECT Id, Name, Email__c, Phone__c, Course__c, Owner.Name
             FROM Lead__c
-            WHERE (Phone__c LIKE :key
-               OR Name LIKE :key
-               OR Email__c LIKE :key)
+            WHERE Candidate__c IN :stdLeadIds
             AND Id NOT IN :excludeIds
-            LIMIT 50
+            AND (Is_Merged__c = false OR Is_Merged__c = null)
+            LIMIT 10
         ];
+
+        return results;
     }
+
+     // ===== APEX CONTROLLER METHOD =====
 
     @AuraEnabled
     public static String submitMergeForApproval(Id mainLeadId, List<Id> leadIdsToMerge) {
@@ -32,7 +98,7 @@ public without sharing class LeadMergeController {
 
         // Query main lead
         Lead__c mainLead = [
-            SELECT Id, OwnerId
+            SELECT Id, OwnerId, Status__c
             FROM Lead__c 
             WHERE Id = :mainLeadId 
             LIMIT 1
@@ -50,6 +116,10 @@ public without sharing class LeadMergeController {
             lead.Lead__c = mainLeadId;
         }
         update leadsToMerge;
+
+        // Set status to Pending
+        mainLead.Status__c = 'Pending';
+        update mainLead;
 
         // Query all owner IDs
         Set<Id> ownerIds = new Set<Id>{mainLead.OwnerId};

@@ -18,16 +18,10 @@ public without sharing class EligibilityQuickActionController {
         if (recordId == null) {
             throw new AuraHandledException('Record Id is required.');
         }
-
-        // Assuming this is Lead Id
-        List<Lead__c> lead = [
-            SELECT Id, OwnerId, City__c, Course__c, Source__c
-            FROM Lead__c
-            WHERE Id = :recordId
-            LIMIT 1
-        ];
         String eligibility = 'Eligibility Criteria';
-        RoundRobinService.assignForLeads(lead, eligibility);
+        List<Lead__c> lead = [SELECT Id, OwnerId,Phone__c, City__c, Course__c, Source__c,Source_Bucket__c,GP_User__c FROM Lead__c WHERE Id = :recordId LIMIT 1];
+
+        RoundRobinAssigner.assignLeadsWithStickyAndRoundRobin(lead, eligibility);
 
         EligibilityFolderService.createFoldersForLead(recordId);
     }

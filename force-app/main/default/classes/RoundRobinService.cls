@@ -17,7 +17,7 @@ public without sharing class RoundRobinService {
             Map<String, List<Lead__c>> byKey = new Map<String, List<Lead__c>>();
             for (Lead__c l : leads) {
                 String city   = RoundRobinHelper.normCity((String) l.get('City__c'));
-                String source = isEligibility ? '(ANY)' : RoundRobinHelper.normSource(l.Source__c);
+                String source = isEligibility ? '(ANY)' : RoundRobinHelper.normSource(l.Source_Bucket__c);
                 String course = RoundRobinHelper.normCourse((String) l.get('Course__c'));
                 String key    = RoundRobinHelper.keyOf('Lead', city, source,course,normType);
                 if (!byKey.containsKey(key)) byKey.put(key, new List<Lead__c>());
