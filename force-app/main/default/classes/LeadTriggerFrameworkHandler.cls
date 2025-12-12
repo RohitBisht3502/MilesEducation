@@ -43,6 +43,8 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         LeadTriggerHelperClass.handleAfterInsert(newLeads);
         LeadTriggerHelperClass.handleAfterInsert1(newLeads);
 
+        // LeadTriggerHelperClass.registerLeadForUpcomingWebinars(getNewLeads());
+        LeadTriggerHelperClass.afterInsertAutoRegisterWebinar(newLeads);
         LeadTriggerHandler.createLeadActivityLogs(newLeads, null, true);
     }
 
@@ -54,6 +56,8 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
 
         LeadTriggerHelperClass.afterUpdateMergeLead((List<Lead__c>)newList, (Map<Id, Lead__c>)oldMap);  
 
+        // Auto-register only when Is_ReEnquiry__c flips to true 
+        LeadTriggerHelperClass.afterUpdateAutoRegisterWebinar((Map<Id, Lead__c>)newMap, oldMapLead);
         // 3. Create activity logs for Merged Leads (AFTER merge logic completes)
         LeadTriggerHandler.createMergeLeadActivityLogs(newLeads, oldMapLead);
     }

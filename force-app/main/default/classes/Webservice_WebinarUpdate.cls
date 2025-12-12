@@ -7,7 +7,8 @@ global without sharing class Webservice_WebinarUpdate {
     global class WebinarUpdateRequest {
         public String webinarId;
         public Datetime startDateTime;
-        public Datetime endDateTime;
+        public Integer duration;
+        public String status;
     }
 
     global class WebinarUpdateResponse {
@@ -41,20 +42,23 @@ global without sharing class Webservice_WebinarUpdate {
             return resp;
         }
 
-        if (input.startDateTime == null && input.endDateTime == null) {
-            resp.success = false;
-            resp.message = 'Provide at least startDateTime or endDateTime';
-            return resp;
-        }
+        // if (input.startDateTime == null && input.duration == null) {
+        //     resp.success = false;
+        //     resp.message = 'Provide at least startDateTime or duration';
+        //     return resp;
+        // }
 
         try {
-            Webinar__c wb = [SELECT Id,Webinar_Id__c, Start_Date_Time__c, End_Date_Time__c  FROM Webinar__c WHERE Webinar_Id__c = :input.webinarId LIMIT 1];
+            Webinar__c wb = [SELECT Id,Webinar_Id__c, Start_Date_Time__c, Duration__c, Status__c  FROM Webinar__c WHERE Webinar_Id__c = :input.webinarId LIMIT 1];
 
             if (input.startDateTime != null) {
                 wb.Start_Date_Time__c = input.startDateTime;
             }
-            if (input.endDateTime != null) {
-                wb.End_Date_Time__c = input.endDateTime;
+            if (input.duration != null) {
+                wb.Duration__c = input.duration;
+            }
+            if (input.status != null) {
+                wb.Status__c = input.status;
             }
 
             update wb;

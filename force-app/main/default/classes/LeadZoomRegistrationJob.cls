@@ -1,166 +1,342 @@
 /*
     Author       : ROHIT SINGH BISHT
-    Description  : 
+    Description  :
 */
-public without sharing class LeadZoomRegistrationJob implements Queueable, Database.AllowsCallouts{
+public without sharing class LeadZoomRegistrationJob implements Queueable, Database.AllowsCallouts {
 
-    private final Set<Id> leadIds;
-    private final Id fixedWebinarId; 
+    private final Set<Id> leadIds;              // Can contain Lead__c + Enquiry__c ids
+    private final Id fixedWebinarId;            // Single webinar path
+    private final Set<Id> autoWebinarIds;       // ✅ NEW: multi-webinar path (Auto Register)
 
     public LeadZoomRegistrationJob(Set<Id> leadIds) {
-        this.leadIds       = (leadIds == null) ? new Set<Id>() : new Set<Id>(leadIds);
-        this.fixedWebinarId = null;
+        this.leadIds         = (leadIds == null) ? new Set<Id>() : new Set<Id>(leadIds);
+        this.fixedWebinarId  = null;
+        this.autoWebinarIds  = null;
     }
 
-    public LeadZoomRegistrationJob(Id leadId, Id webinarId) {
+    public LeadZoomRegistrationJob(Id recordId, Id webinarId) {
         this.leadIds = new Set<Id>();
-        if (leadId != null) this.leadIds.add(leadId);
+        if (recordId != null) this.leadIds.add(recordId);
         this.fixedWebinarId = webinarId;
+        this.autoWebinarIds = null;
+    }
+
+    // ✅ NEW ctor: register these records into these webinars
+    public LeadZoomRegistrationJob(Set<Id> recordIds, Set<Id> webinarIds) {
+        this.leadIds        = (recordIds == null) ? new Set<Id>() : new Set<Id>(recordIds);
+        this.fixedWebinarId = null;
+        this.autoWebinarIds = (webinarIds == null) ? new Set<Id>() : new Set<Id>(webinarIds);
     }
 
     public void execute(QueueableContext qc) {
-        System.debug('🚀 [LeadZoomRegistrationJob] Started | Leads=' + leadIds + ' | fixedWebinarId=' + fixedWebinarId);
+        System.debug('🚀 [LeadZoomRegistrationJob] Started | recordIds=' + leadIds + ' | fixedWebinarId=' + fixedWebinarId + ' | autoWebinarIds=' + autoWebinarIds);
 
         List<Integration_Log__c> logs = new List<Integration_Log__c>();
-        Map<Id, String> leadIdToMeetingDetails = new Map<Id, String>(); 
 
-        // Guardrails
         if (leadIds == null || leadIds.isEmpty()) {
-            logs.add(IntegrationLogUtil.buildLog( 'Zoom Webinar Registration Job', 'LeadIds=null/empty, fixedWebinarId=' + String.valueOf(fixedWebinarId), null, 'Empty leadIds', 'FAILED', 400 ));
-
+            logs.add(IntegrationLogUtil.buildLog(
+                'Zoom Webinar Registration Job',
+                'recordIds=null/empty, fixedWebinarId=' + String.valueOf(fixedWebinarId),
+                null,
+                'Empty recordIds',
+                'FAILED',
+                400
+            ));
             if (!logs.isEmpty()) IntegrationLogUtil.insertLogs(logs);
             return;
         }
 
-        List<Lead__c> leads = [ SELECT Id, Name, Email__c, Phone__c, City__c, Stage__c, Owner.Name, Interested_Webinar_Id__c FROM Lead__c WHERE Id IN :leadIds ];
+        // Split ids by type
+        Set<Id> leadOnlyIds    = new Set<Id>();
+        Set<Id> enquiryOnlyIds = new Set<Id>();
 
-        if (leads.isEmpty()) {
-            logs.add(IntegrationLogUtil.buildLog( 'Zoom Webinar Registration Job', 'LeadIds=' + JSON.serialize(leadIds), 'No leads found', null, 'NO_OP', 204 ));
+        for (Id rid : leadIds) {
+            if (rid == null) continue;
+            Schema.SObjectType t = rid.getSObjectType();
+            if (t == Lead__c.SObjectType) leadOnlyIds.add(rid);
+            else if (t == Enquiry__c.SObjectType) enquiryOnlyIds.add(rid);
+        }
 
+        List<Lead__c> leads = leadOnlyIds.isEmpty()
+            ? new List<Lead__c>()
+            : [
+                SELECT Id, Name, Email__c, Phone__c, City__c, Stage__c, OwnerId, Interested_Webinar_Id__c
+                FROM Lead__c
+                WHERE Id IN :leadOnlyIds
+            ];
+
+        List<Enquiry__c> enquiries = enquiryOnlyIds.isEmpty()
+            ? new List<Enquiry__c>()
+            : [
+                SELECT Id, Name, Email__c, Phone_Number__c, City__c, Stage__c, OwnerId, Interested_Webinar_Id__c
+                FROM Enquiry__c
+                WHERE Id IN :enquiryOnlyIds
+            ];
+
+        if (leads.isEmpty() && enquiries.isEmpty()) {
+            logs.add(IntegrationLogUtil.buildLog(
+                'Zoom Webinar Registration Job',
+                'RecordIds=' + JSON.serialize(leadIds),
+                'No records found',
+                null,
+                'NO_OP',
+                204
+            ));
             if (!logs.isEmpty()) IntegrationLogUtil.insertLogs(logs);
             return;
         }
 
-        // 2) Call Zoom (token -> register for each lead)
+        // ✅ Build record -> Webinar__c pairs
+        Map<Id, Set<Id>> recordToWebinars = new Map<Id, Set<Id>>();
+
+        // A) Multi-webinar (Auto Register) path
+        if (autoWebinarIds != null && !autoWebinarIds.isEmpty()) {
+            for (Id rid : leadIds) {
+                recordToWebinars.put(rid, new Set<Id>(autoWebinarIds));
+            }
+        }
+        // B) Single webinar path
+        else if (fixedWebinarId != null) {
+            for (Id rid : leadIds) {
+                recordToWebinars.put(rid, new Set<Id>{ fixedWebinarId });
+            }
+        }
+
+        // If neither passed, we fall back to Interested_Webinar_Id__c logic (existing behavior)
+        // We'll resolve Webinar__c Ids using Webinar_Id__c later for those.
+        // For that, we need record -> zoomWebinarExternalId.
+        Map<Id, String> recordIdToZoomWebinarExternal = new Map<Id, String>();
+
+        // Call Zoom once (token)
+        Map<String, String> pairKeyToMeetingDetails = new Map<String, String>(); // key(record|webinarId) -> zoom response
         try {
-            System.debug('🔐 Generating Zoom Access Token…');
             String token = ZoomIntegrationService.generateZoomAccessToken(logs);
-            System.debug('✅ Token generated.');
 
+            // ✅ If we already have Webinar__c Ids (auto or fixed), we need Webinar__c.Webinar_Id__c to call Zoom.
+            Map<Id, Webinar__c> webinarMap = new Map<Id, Webinar__c>();
+            Set<Id> neededWebinarIds = new Set<Id>();
+            for (Set<Id> ws : recordToWebinars.values()) neededWebinarIds.addAll(ws);
+
+            if (!neededWebinarIds.isEmpty()) {
+                for (Webinar__c w : [
+                    SELECT Id, Webinar_Id__c
+                    FROM Webinar__c
+                    WHERE Id IN :neededWebinarIds
+                ]) {
+                    webinarMap.put(w.Id, w);
+                }
+            }
+
+            // ===== Leads =====
             for (Lead__c ld : leads) {
-                // Keep (or tweak) your skip rule
-                // if (String.isBlank(ld.City__c)) {
-                //     logs.add(IntegrationLogUtil.buildLog( 'Zoom Webinar Registration Job', 'LeadId=' + ld.Id,'Skipped: City__c is blank', null, 'SKIPPED', 200 ));
 
-                //     continue;
-                // }
+                // If recordToWebinars has entries => auto/fixed path
+                if (recordToWebinars.containsKey(ld.Id)) {
+                    for (Id wId : recordToWebinars.get(ld.Id)) {
+                        Webinar__c w = webinarMap.get(wId);
+                        String zoomWebinarId = (w != null && String.isNotBlank(w.Webinar_Id__c)) ? w.Webinar_Id__c.trim() : null;
 
-                try {
-                    String zoomResponse = ZoomIntegrationService.registerLeadForWebinar(ld, token, logs);
-                    leadIdToMeetingDetails.put(ld.Id, zoomResponse);
+                        if (String.isBlank(zoomWebinarId)) {
+                            logs.add(IntegrationLogUtil.buildLog('Webinar Resolve', 'LeadId=' + ld.Id + ', WebinarId=' + wId, null, 'Webinar__c.Webinar_Id__c is blank', 'SKIPPED', 200));
+                            continue;
+                        }
 
-                    logs.add(IntegrationLogUtil.buildLog( 'Zoom Webinar Registration Job',  'LeadId=' + ld.Id + ', fixedWebinarId=' + String.valueOf(fixedWebinarId), 'Registered Successfully', null, 'SUCCESS', 200 ));
+                        String resp = ZoomIntegrationService.registerLeadForWebinar(ld, zoomWebinarId, token, logs);
+                        pairKeyToMeetingDetails.put(key(ld.Id, wId), resp);
+                    }
+                }
+                // Else: fallback to Interested_Webinar_Id__c (existing behavior)
+                else {
+                    if (String.isBlank(ld.Interested_Webinar_Id__c)) continue;
+                    recordIdToZoomWebinarExternal.put(ld.Id, ld.Interested_Webinar_Id__c.trim());
+                }
+            }
 
-                } catch (Exception innerEx) {
-                    logs.add(IntegrationLogUtil.buildLog( 'Zoom Webinar Registration Job', 'LeadId=' + ld.Id + ', fixedWebinarId=' + String.valueOf(fixedWebinarId), null, innerEx.getMessage(), 'FAILED', null  ));
+            // ===== Enquiries =====
+            for (Enquiry__c eq : enquiries) {
+
+                if (recordToWebinars.containsKey(eq.Id)) {
+                    for (Id wId : recordToWebinars.get(eq.Id)) {
+                        Webinar__c w = webinarMap.get(wId);
+                        String zoomWebinarId = (w != null && String.isNotBlank(w.Webinar_Id__c)) ? w.Webinar_Id__c.trim() : null;
+
+                        if (String.isBlank(zoomWebinarId)) {
+                            logs.add(IntegrationLogUtil.buildLog('Webinar Resolve', 'EnquiryId=' + eq.Id + ', WebinarId=' + wId, null, 'Webinar__c.Webinar_Id__c is blank', 'SKIPPED', 200));
+                            continue;
+                        }
+
+                        String resp = ZoomIntegrationService.registerEnquiryForWebinar(eq, zoomWebinarId, token, logs);
+                        pairKeyToMeetingDetails.put(key(eq.Id, wId), resp);
+                    }
+                } else {
+                    if (String.isBlank(eq.Interested_Webinar_Id__c)) continue;
+                    recordIdToZoomWebinarExternal.put(eq.Id, eq.Interested_Webinar_Id__c.trim());
+                }
+            }
+
+            // ===== Existing behavior: resolve Interested_Webinar_Id__c -> Webinar__c.Id, then call zoom once per record =====
+            if (!recordIdToZoomWebinarExternal.isEmpty()) {
+                Set<String> externalIds = new Set<String>();
+                externalIds.addAll(recordIdToZoomWebinarExternal.values());
+
+                Map<String, Webinar__c> webinarByExternal = new Map<String, Webinar__c>();
+                for (Webinar__c w : [
+                    SELECT Id, Webinar_Id__c
+                    FROM Webinar__c
+                    WHERE Webinar_Id__c IN :externalIds
+                ]) {
+                    if (String.isNotBlank(w.Webinar_Id__c)) webinarByExternal.put(w.Webinar_Id__c.trim(), w);
+                }
+
+                // Lead
+                for (Lead__c ld : leads) {
+                    String ext = recordIdToZoomWebinarExternal.get(ld.Id);
+                    if (String.isBlank(ext)) continue;
+
+                    Webinar__c w = webinarByExternal.get(ext);
+                    if (w == null) continue;
+
+                    String resp = ZoomIntegrationService.registerLeadForWebinar(ld, ext, token, logs);
+                    pairKeyToMeetingDetails.put(key(ld.Id, w.Id), resp);
+                }
+
+                // Enquiry
+                for (Enquiry__c eq : enquiries) {
+                    String ext = recordIdToZoomWebinarExternal.get(eq.Id);
+                    if (String.isBlank(ext)) continue;
+
+                    Webinar__c w = webinarByExternal.get(ext);
+                    if (w == null) continue;
+
+                    String resp = ZoomIntegrationService.registerEnquiryForWebinar(eq, ext, token, logs);
+                    pairKeyToMeetingDetails.put(key(eq.Id, w.Id), resp);
                 }
             }
 
         } catch (Exception ex) {
-            logs.add(IntegrationLogUtil.buildLog( 'Zoom Integration Job Error', 'LeadIds=' + JSON.serialize(leadIds) + ', fixedWebinarId=' + String.valueOf(fixedWebinarId), null, ex.getMessage(), 'FAILED', null ));
+            logs.add(IntegrationLogUtil.buildLog(
+                'Zoom Integration Job Error',
+                'RecordIds=' + JSON.serialize(leadIds),
+                null,
+                ex.getMessage(),
+                'FAILED',
+                null
+            ));
         }
 
-        if (!leadIdToMeetingDetails.isEmpty()) {
-            Map<Id, Id> leadToWebinar = new Map<Id, Id>();
-
-            if (fixedWebinarId != null) {
-                for (Id lId : leadIdToMeetingDetails.keySet()) {
-                    leadToWebinar.put(lId, fixedWebinarId);
-                }
-            } else {
-                Set<String> wantedWebinarIds = new Set<String>();
-                for (Lead__c ld : leads) {
-                    if (String.isNotBlank(ld.Interested_Webinar_Id__c) && leadIdToMeetingDetails.containsKey(ld.Id)) {
-                        wantedWebinarIds.add(ld.Interested_Webinar_Id__c.trim());
-                    }
-                }
-
-                if (!wantedWebinarIds.isEmpty()) {
-                    Map<String, Id> webinarByExternal = new Map<String, Id>();
-                    for (Webinar__c w : [
-                        SELECT Id, Webinar_Id__c
-                        FROM Webinar__c
-                        WHERE Webinar_Id__c IN :wantedWebinarIds
-                    ]) {
-                        if (String.isNotBlank(w.Webinar_Id__c)) {
-                            webinarByExternal.put(w.Webinar_Id__c.trim(), w.Id);
-                        }
-                    }
-
-                    for (Lead__c ld : leads) {
-                        if (String.isNotBlank(ld.Interested_Webinar_Id__c) && leadIdToMeetingDetails.containsKey(ld.Id)) {
-                            Id resolved = webinarByExternal.get(ld.Interested_Webinar_Id__c.trim());
-                            if (resolved != null) {
-                                leadToWebinar.put(ld.Id, resolved);
-                            } else {
-                                logs.add(IntegrationLogUtil.buildLog( 'Webinar Resolve', 'LeadId=' + ld.Id + ', Interested_Webinar_Id__c=' + ld.Interested_Webinar_Id__c, null, 'No Webinar__c found for the given Interested_Webinar_Id__c', 'SKIPPED', 200 ));
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (!leadToWebinar.isEmpty()) {
-                upsertMembers(leadIdToMeetingDetails, leadToWebinar, logs);
-            } else {
-                System.debug('ℹ️ No (Lead, Webinar) pairs resolved — skipping Webinar_Member__c upsert.');
-            }
+        // ✅ Upsert Webinar_Member__c per pair
+        if (!pairKeyToMeetingDetails.isEmpty()) {
+            upsertMembersByPairs(pairKeyToMeetingDetails, logs);
         }
 
-        if (!logs.isEmpty()) {
-            IntegrationLogUtil.insertLogs(logs);
-        }
+        if (!logs.isEmpty()) IntegrationLogUtil.insertLogs(logs);
         System.debug('🏁 [LeadZoomRegistrationJob] Finished.');
     }
 
-    public static void upsertMembers( Map<Id, String> leadIdToMeetingDetails, Map<Id, Id> leadToWebinar, List<Integration_Log__c> logs) {
-        Set<Id> pairLeads   = new Set<Id>(leadToWebinar.keySet());
-        Set<Id> pairWebinars = new Set<Id>();
-        pairWebinars.addAll(leadToWebinar.values());
+    // ✅ NEW helper: upsert using (recordId|webinarId) keys
+    private static void upsertMembersByPairs(Map<String, String> pairKeyToMeetingDetails, List<Integration_Log__c> logs) {
 
-        Map<String, Webinar_Member__c> existingByPair = new Map<String, Webinar_Member__c>();
-        for (Webinar_Member__c wm : [ SELECT Id, Lead__c, Webinar__c, Meeting_Details__c FROM Webinar_Member__c WHERE Lead__c IN :pairLeads AND Webinar__c IN :pairWebinars ]) {
-            existingByPair.put(key(wm.Lead__c, wm.Webinar__c), wm);
+        Set<Id> recordIds  = new Set<Id>();
+        Set<Id> webinarIds = new Set<Id>();
+
+        for (String k : pairKeyToMeetingDetails.keySet()) {
+            List<String> parts = k.split('\\|');
+            if (parts.size() != 2) continue;
+            recordIds.add((Id)parts[0]);
+            webinarIds.add((Id)parts[1]);
         }
+
+        // Split record ids
+        Set<Id> leadOnlyIds   = new Set<Id>();
+        Set<Id> enquiryOnlyIds = new Set<Id>();
+        for (Id rid : recordIds) {
+            if (rid.getSObjectType() == Lead__c.SObjectType) leadOnlyIds.add(rid);
+            else if (rid.getSObjectType() == Enquiry__c.SObjectType) enquiryOnlyIds.add(rid);
+        }
+
+        // Existing members
+        Map<String, Webinar_Member__c> existingByPair = new Map<String, Webinar_Member__c>();
+        for (Webinar_Member__c wm : [
+            SELECT Id, Lead__c, Enquiry__c, Webinar__c, Meeting_Details__c,Registrant_Id__c,
+                   Lead_Owner_at_Registration__c, Lead_Stage_at_Registration__c
+            FROM Webinar_Member__c
+            WHERE Webinar__c IN :webinarIds
+            AND (
+                (Lead__c IN :leadOnlyIds)
+                OR
+                (Enquiry__c IN :enquiryOnlyIds)
+            )
+        ]) {
+            Id rid = (wm.Lead__c != null) ? wm.Lead__c : wm.Enquiry__c;
+            existingByPair.put(key(rid, wm.Webinar__c), wm);
+        }
+
+        Map<Id, Lead__c> leadMap = leadOnlyIds.isEmpty()
+            ? new Map<Id, Lead__c>()
+            : new Map<Id, Lead__c>([
+                SELECT Id, Stage__c, OwnerId
+                FROM Lead__c
+                WHERE Id IN :leadOnlyIds
+            ]);
+
+        Map<Id, Enquiry__c> enquiryMap = enquiryOnlyIds.isEmpty()
+            ? new Map<Id, Enquiry__c>()
+            : new Map<Id, Enquiry__c>([
+                SELECT Id, Stage__c, OwnerId
+                FROM Enquiry__c
+                WHERE Id IN :enquiryOnlyIds
+            ]);
 
         List<Webinar_Member__c> toInsert = new List<Webinar_Member__c>();
         List<Webinar_Member__c> toUpdate = new List<Webinar_Member__c>();
-        
-        Map<Id, Lead__c> leadMap = new Map<Id, Lead__c>([SELECT Id, Stage__c, OwnerId FROM Lead__c WHERE Id IN :pairLeads]);
 
+        for (String k : pairKeyToMeetingDetails.keySet()) {
+            List<String> parts = k.split('\\|');
+            if (parts.size() != 2) continue;
 
-        for (Id lId : leadToWebinar.keySet()) {
-            Id wId = leadToWebinar.get(lId);
-            String details = leadIdToMeetingDetails.get(lId);
-            if (details == null) continue; 
-            
-            Lead__c ld = leadMap.get(lId); // Correct per-lead data
+            Id rid = (Id)parts[0];
+            Id wid = (Id)parts[1];
 
-            String k = key(lId, wId);
+            String details = pairKeyToMeetingDetails.get(k);
+            if (String.isBlank(details)) continue;
+
+            Boolean isLead = (rid.getSObjectType() == Lead__c.SObjectType);
+            Id ownerId;
+            String stageVal;
+
+            if (isLead) {
+                Lead__c ld = leadMap.get(rid);
+                if (ld != null) { ownerId = ld.OwnerId; stageVal = ld.Stage__c; }
+            } else {
+                Enquiry__c eq = enquiryMap.get(rid);
+                if (eq != null) { ownerId = eq.OwnerId; stageVal = eq.Stage__c; }
+            }
+
             Webinar_Member__c existing = existingByPair.get(k);
 
             if (existing == null) {
-                toInsert.add(new Webinar_Member__c(
-                    Lead__c = lId,
-                    Webinar__c = wId,
-                    Meeting_Details__c = details,
-                    Lead_Owner_at_Registration__c = ld.OwnerId,
-            		Lead_Stage_at_Registration__c = ld.Stage__c
-                ));
+                Webinar_Member__c wm = new Webinar_Member__c();
+                wm.Webinar__c = wid;
+                wm.Meeting_Details__c = details;
+                wm.Registrant_Id__c = extractRegistrantId(details);
+
+                if (isLead) wm.Lead__c = rid;
+                else wm.Enquiry__c = rid;
+
+                wm.Lead_Owner_at_Registration__c = ownerId;
+                wm.Lead_Stage_at_Registration__c = stageVal;
+
+                toInsert.add(wm);
             } else {
                 existing.Meeting_Details__c = details;
-                existing.Lead_Owner_at_Registration__c = ld.OwnerId;
-        		existing.Lead_Stage_at_Registration__c = ld.Stage__c;
+                existing.Registrant_Id__c = extractRegistrantId(details);
+
+                if (isLead) { existing.Lead__c = rid; existing.Enquiry__c = null; }
+                else { existing.Enquiry__c = rid; existing.Lead__c = null; }
+
+                existing.Lead_Owner_at_Registration__c = ownerId;
+                existing.Lead_Stage_at_Registration__c = stageVal;
+
                 toUpdate.add(existing);
             }
         }
@@ -169,14 +345,42 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
             if (!toInsert.isEmpty()) insert toInsert;
             if (!toUpdate.isEmpty()) update toUpdate;
 
-            logs.add(IntegrationLogUtil.buildLog( 'Webinar Member Upsert', 'Pairs=' + leadToWebinar.size(), 'Inserted=' + toInsert.size() + ', Updated=' + toUpdate.size(),  null, 'SUCCESS', 200));
-
-        } catch (Exception eWM) {
-            logs.add(IntegrationLogUtil.buildLog( 'Webinar Member Upsert', 'Pairs=' + leadToWebinar.size(), null, eWM.getMessage(), 'FAILED', null ));
+            logs.add(IntegrationLogUtil.buildLog(
+                'Webinar Member Upsert',
+                'Pairs=' + pairKeyToMeetingDetails.size(),
+                'Inserted=' + toInsert.size() + ', Updated=' + toUpdate.size(),
+                null,
+                'SUCCESS',
+                200
+            ));
+        } catch (Exception e) {
+            logs.add(IntegrationLogUtil.buildLog(
+                'Webinar Member Upsert',
+                'Pairs=' + pairKeyToMeetingDetails.size(),
+                null,
+                e.getMessage(),
+                'FAILED',
+                null
+            ));
         }
     }
 
-    private static String key(Id leadId, Id webinarId) {
-        return String.valueOf(leadId) + '|' + String.valueOf(webinarId);
+    private static String key(Id recordId, Id webinarId) {
+        return String.valueOf(recordId) + '|' + String.valueOf(webinarId);
     }
+
+    private static String extractRegistrantId(String details) {
+    if (String.isBlank(details)) return null;
+    try {
+        Object raw = JSON.deserializeUntyped(details);
+        if (raw instanceof Map<String, Object>) {
+            Object v = ((Map<String, Object>)raw).get('registrant_id');
+            return (v == null) ? null : String.valueOf(v);
+        }
+    } catch (Exception e) {
+        System.debug('⚠️ extractRegistrantId failed. details=' + details + ' | err=' + e.getMessage());
+    }
+    return null;
+}
+
 }

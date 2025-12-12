@@ -1,3 +1,4 @@
+// file: force-app/main/default/lwc/leadEligibilityReview/leadEligibilityReview.js
 import { LightningElement, api, track, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { refreshApex } from '@salesforce/apex';
@@ -7,6 +8,8 @@ import saveFileApex from '@salesforce/apex/EligibilityReviewController.saveFile'
 import getFileFieldPicklists from '@salesforce/apex/EligibilityReviewController.getFileFieldPicklists';
 import getLeadEligibilityStatus from '@salesforce/apex/EligibilityReviewController.getLeadEligibilityStatus';
 import saveFolderCommentApex from '@salesforce/apex/EligibilityReviewController.saveFolderComment';
+import updateFolderStatusApex from '@salesforce/apex/EligibilityReviewController.updateFolderStatus';
+import getDownloadUrlApex from '@salesforce/apex/EligibilityReviewController.getDownloadUrl';
 
 export default class LeadEligibilityReview extends LightningElement {
     @api recordId;
@@ -34,6 +37,12 @@ export default class LeadEligibilityReview extends LightningElement {
         { label: 'Reupload Required', value: 'Reupload_Required' },
         { label: 'Recheck', value: 'Recheck' },
         { label: 'Rejected', value: 'Rejected' }
+    ];
+
+    folderStatusOptions = [
+        { label: 'Pending Review', value: 'Pending Review' },
+        { label: 'All Good', value: 'All Good' },
+        { label: 'Recheck', value: 'Recheck' }
     ];
 
     connectedCallback() {
@@ -75,6 +84,7 @@ export default class LeadEligibilityReview extends LightningElement {
             const u = data.universityValues || [];
             const g = data.gradeValues || [];
             const r = data.rankValues || [];
+
             this.universityOptions = u.map(v => ({ label: v, value: v }));
             this.gradeOptions = g.map(v => ({ label: v, value: v }));
             this.rankOptions = r.map(v => ({ label: v, value: v }));
@@ -85,29 +95,23 @@ export default class LeadEligibilityReview extends LightningElement {
     }
 
     initYearOptions() {
-        const currentYear = new Date().getFullYear();
+        const now = new Date().getFullYear();
+        const start = now - 50;
         const years = [];
-        for (let y = currentYear; y >= currentYear - 50; y--) {
-            const s = String(y);
-            years.push({ label: s, value: s });
+        for (let y = now; y >= start; y--) {
+            years.push({ label: String(y), value: String(y) });
         }
         this.yearOptions = years;
     }
 
     get hasData() {
-        return this.folderTree && this.folderTree.length > 0;
+        return !!this.folderTree && this.folderTree.length > 0;
     }
 
     get hasAnyFile() {
-        return this.totalFilesOverall > 0;
+        return this.computeTotalFiles(this.folderTree) > 0;
     }
 
-    get showCommentField() {
-        const s = this.editFile?.status;
-        return s === 'Recheck' || s === 'Rejected' || s === 'Reupload_Required';
-    }
-
-    // PATH ITEMS FOR GP_Lead_Status__c
     get pathItems() {
         const labels = [
             'New lead',
@@ -138,7 +142,7 @@ export default class LeadEligibilityReview extends LightningElement {
             if (stepOrder < currentOrder) {
                 cls += ' path-completed';
             } else if (stepOrder === currentOrder) {
-                cls += ' path-active';
+                cls += ' path-current';
             }
             return {
                 label,
@@ -148,7 +152,6 @@ export default class LeadEligibilityReview extends LightningElement {
         });
     }
 
-    // ----- DECORATION / FLAGS -----
     decorateTree(nodes, level) {
         if (!nodes) return [];
         return nodes.map(node => this.decorateNode(node, level));
@@ -159,12 +162,15 @@ export default class LeadEligibilityReview extends LightningElement {
 
         decorated.level = level;
         decorated.expanded = false;
+        decorated.allowFolderEdit = decorated.folderType === 'Degree';
 
         if (level === 1) {
             if (decorated.qualificationType === 'UG' || decorated.name === 'UG') {
                 decorated.subtitle = 'Undergraduate Degree';
             } else if (decorated.qualificationType === 'PG' || decorated.name === 'PG') {
                 decorated.subtitle = 'Postgraduate Degree';
+            } else if (decorated.name === 'Certificates') {
+                decorated.subtitle = 'Additional Certificates';
             } else {
                 decorated.subtitle = decorated.folderType === 'Certificates'
                     ? 'Additional Certificates'
@@ -173,11 +179,11 @@ export default class LeadEligibilityReview extends LightningElement {
         } else if (level === 2) {
             decorated.subtitle = decorated.degreeTitle || decorated.folderType || '';
         } else if (level === 3) {
-            decorated.subtitle = decorated.folderType || '';
+        decorated.subtitle = decorated.folderType || '';
         }
 
         decorated.displayDate = decorated.monthYear || decorated.createdDate || '';
-        decorated.comments = decorated.comments || null;
+        decorated.comments = decorated.folderType === 'Degree' ? (decorated.comments || null) : null;
 
         // Children first (so we can aggregate their counts)
         if (decorated.children && decorated.children.length) {
@@ -236,12 +242,12 @@ export default class LeadEligibilityReview extends LightningElement {
             counts.Rejected;
 
         decorated.totalFiles = totalFiles;
-        decorated.showStatus = totalFiles > 0;
 
-        // Status pill class (based on folder status)
+        // Folder status display (only for degree level)
+        decorated.showStatus = decorated.folderType === 'Degree' && !!decorated.status;
         decorated.statusClass = this.statusClassForFolder(decorated.status);
 
-        // Status summary string
+        // Build a human-readable summary for top-level folders
         const summaryParts = [];
         if (counts.Verified > 0) summaryParts.push(`Verified: ${counts.Verified}`);
         if (counts.Recheck > 0) summaryParts.push(`Recheck: ${counts.Recheck}`);
@@ -253,6 +259,44 @@ export default class LeadEligibilityReview extends LightningElement {
 
         return decorated;
     }
+
+
+    iconNameForFile(raw) {
+        if (!raw) {
+            return 'doctype:attachment';
+        }
+
+        let ext = String(raw).toLowerCase();
+
+        // If it's a full filename, extract extension
+        const dotIndex = ext.lastIndexOf('.');
+        if (dotIndex !== -1 && dotIndex < ext.length - 1) {
+            ext = ext.substring(dotIndex + 1);
+        }
+
+        if (ext === 'pdf') {
+            return 'doctype:pdf';
+        }
+
+        if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'svg', 'webp'].includes(ext)) {
+            return 'doctype:image';
+        }
+
+        if (['doc', 'docx'].includes(ext)) {
+            return 'doctype:word';
+        }
+
+        if (['xls', 'xlsx', 'csv'].includes(ext)) {
+            return 'doctype:excel';
+        }
+
+        if (['ppt', 'pptx'].includes(ext)) {
+            return 'doctype:ppt';
+        }
+
+        return 'doctype:attachment';
+    }
+
 
     filterNodesWithFiles(nodes) {
         if (!nodes) return [];
@@ -276,144 +320,126 @@ export default class LeadEligibilityReview extends LightningElement {
         let sum = 0;
         nodes.forEach(n => {
             sum += n.totalFiles || 0;
+            if (n.children && n.children.length) {
+                sum += this.computeTotalFiles(n.children);
+            }
         });
         return sum;
     }
 
-    statusClassForFolder(status) {
-        const base = 'status-pill ';
-        switch (status) {
-            case 'All Good':
-                return base + 'status-good';
-            case 'Recheck':
-                return base + 'status-recheck';
-            default:
-                return base + 'status-pending';
-        }
-    }
-
     statusClassForFile(status) {
-        const base = 'status-pill status-small ';
-        switch (status) {
-            case 'Verified':
-                return base + 'status-good';
-            case 'Recheck':
-                return base + 'status-recheck';
-            case 'Reupload_Required':
-            case 'Rejected':
-                return base + 'status-reupload';
-            default:
-                return base + 'status-pending';
-        }
+        let base = 'status-pill file-status';
+        if (status === 'Verified') return base + ' status-verified';
+        if (status === 'Recheck' || status === 'Reupload_Required') return base + ' status-recheck';
+        if (status === 'Rejected') return base + ' status-rejected';
+        return base + ' status-submitted';
     }
 
-    iconNameForFile(formatOrName) {
-        if (!formatOrName) {
-            return 'doctype:attachment';
-        }
-
-        let val = String(formatOrName).toLowerCase();
-
-        if (val.includes('.')) {
-            const parts = val.split('.');
-            val = parts[parts.length - 1];
-        }
-
-        if (val === 'pdf') {
-            return 'doctype:pdf';
-        }
-        if (val === 'png' || val === 'jpg' || val === 'jpeg' || val === 'gif' || val === 'bmp') {
-            return 'doctype:image';
-        }
-        if (val === 'xls' || val === 'xlsx' || val === 'csv') {
-            return 'doctype:excel';
-        }
-        if (val === 'doc' || val === 'docx') {
-            return 'doctype:word';
-        }
-        return 'doctype:attachment';
+    statusClassForFolder(status) {
+        let base = 'status-pill folder-status';
+        if (status === 'All Good') return base + ' status-verified';
+        if (status === 'Recheck') return base + ' status-recheck';
+        if (status === 'Pending Review') return base + ' status-pending';
+        return base;
     }
 
-    // ----- EXPAND / COLLAPSE -----
+    // ----- FOLDER EXPAND/COLLAPSE -----
     handleToggleFolder(event) {
         const folderId = event.currentTarget.dataset.id;
-        if (!folderId) return;
-        this.folderTree = this.toggleInNodes(this.folderTree, folderId);
+        const updated = this.toggleInTree(this.folderTree, folderId);
+        this.folderTree = [...updated];
     }
 
-    toggleInNodes(nodes, folderId) {
-        return nodes.map(n => this.toggleInNode(n, folderId));
+    toggleInTree(nodes, folderId) {
+        if (!nodes) return [];
+        return nodes.map(n => {
+            const clone = { ...n };
+            if (clone.id === folderId) {
+                clone.expanded = !clone.expanded;
+            }
+            if (clone.children && clone.children.length) {
+                clone.children = this.toggleInTree(clone.children, folderId);
+            }
+            return clone;
+        });
     }
 
-    toggleInNode(node, folderId) {
-        const updated = { ...node };
-        if (updated.id === folderId) {
-            updated.expanded = !updated.expanded;
-        }
-        if (updated.children && updated.children.length) {
-            updated.children = updated.children.map(child => this.toggleInNode(child, folderId));
-        }
-        return updated;
-    }
-
-    // ----- FILE VIEW & EDIT -----
-    handleViewFile(event) {
-        const fileId = event.currentTarget.dataset.id;
-        const file = this.findFileById(fileId);
-        if (file && file.storageKey) {
-            window.open(file.storageKey, '_blank');
-        } else {
-            this.showToast('Info', 'File link not available.', 'info');
-        }
-    }
-
+    // ----- FILE EDIT -----
     handleEditFile(event) {
         const fileId = event.currentTarget.dataset.id;
-        const file = this.findFileById(fileId);
+        const file = this.findFileById(fileId, this.folderTree);
         if (!file) {
             this.showToast('Error', 'File not found.', 'error');
             return;
         }
-        this.editFile = {
-            ...file,
-            id: file.id || file.Id
-        };
+        this.editFile = { ...file };
         this.isModalOpen = true;
-        // eslint-disable-next-line no-console
-        console.log('Edit file opened:', JSON.stringify(this.editFile));
     }
 
-    findFileById(fileId) {
-        if (!this.folderTree) return null;
-
-        const search = (nodes) => {
-            for (let n of nodes) {
-                if (n.files) {
-                    const found = n.files.find(f => f.id === fileId || f.Id === fileId);
-                    if (found) return found;
-                }
-                if (n.children) {
-                    const inChild = search(n.children);
-                    if (inChild) return inChild;
-                }
+    findFileById(fileId, nodes) {
+        if (!nodes) return null;
+        for (let n of nodes) {
+            if (n.files) {
+                const found = n.files.find(f => f.id === fileId || f.Id === fileId);
+                if (found) return found;
             }
-            return null;
-        };
-
-        return search(this.folderTree);
+            if (n.children) {
+                const child = this.findFileById(fileId, n.children);
+                if (child) return child;
+            }
+        }
+        return null;
     }
 
-    // ----- FOLDER COMMENT -----
+    async handleViewFile(event) {
+        const fileId = event.currentTarget.dataset.id;
+        if (!fileId) return;
+        try {
+            const url = await getDownloadUrlApex({ fileId });
+            if (url) {
+                window.open(url, '_blank');
+            } else {
+                this.showToast('Error', 'Download link unavailable.', 'error');
+            }
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('handleViewFile error', e);
+            this.showToast(
+                'Error',
+                (e && e.body && e.body.message) || e.message || 'Unable to fetch download link.',
+                'error'
+            );
+        }
+    }
+
+    // ----- FOLDER COMMENT / STATUS -----
     handleFolderCommentClick(event) {
         const folderId = event.currentTarget.dataset.id;
         const folder = this.findFolderById(folderId, this.folderTree);
+
+        if (!folder || !folder.allowFolderEdit) {
+            this.showToast('Error', 'This folder cannot be edited.', 'error');
+            return;
+        }
+
         this.activeFolder = {
             id: folderId,
             name: folder ? folder.name : '',
-            comment: folder ? folder.comments : ''
+            comment: folder ? folder.comments : '',
+            status: folder ? folder.status : null
         };
         this.folderCommentText = this.activeFolder.comment || '';
         this.isFolderModalOpen = true;
+    }
+
+    handleFolderStatusChange(event) {
+        if (!this.activeFolder) {
+            this.activeFolder = {};
+        }
+        this.activeFolder = {
+            ...this.activeFolder,
+            status: event.detail.value
+        };
     }
 
     findFolderById(folderId, nodes) {
@@ -443,25 +469,29 @@ export default class LeadEligibilityReview extends LightningElement {
             this.showToast('Error', 'Folder not found.', 'error');
             return;
         }
+
+        const statusToSend = this.activeFolder.status || null;
+
         try {
-            const res = await saveFolderCommentApex({
+            const res = await updateFolderStatusApex({
                 folderId: this.activeFolder.id,
+                status: statusToSend,
                 comment: this.folderCommentText
             });
 
             if (res && res.success) {
-                this.showToast('Success', 'Comment saved successfully.', 'success');
+                this.showToast('Success', 'Folder updated successfully.', 'success');
                 this.closeFolderModal();
                 await this.refreshTree();
             } else {
-                this.showToast('Error', (res && res.message) || 'Error saving comment.', 'error');
+                this.showToast('Error', (res && res.message) || 'Error updating folder.', 'error');
             }
         } catch (e) {
             // eslint-disable-next-line no-console
             console.error('Unexpected error in saveFolderComment:', e);
             this.showToast(
                 'Error',
-                (e && e.body && e.body.message) || e.message || 'Unexpected error while saving comment.',
+                (e && e.body && e.body.message) || e.message || 'Unexpected error while saving folder details.',
                 'error'
             );
         }
@@ -502,29 +532,21 @@ export default class LeadEligibilityReview extends LightningElement {
             }
         }
 
+        const payload = {
+            fileId: fileId,
+            status: this.editFile.status,
+            comment: this.editFile.comment
+        };
+
+        // eslint-disable-next-line no-console
+        console.log('Save payload:', JSON.stringify(payload));
+
         try {
-            const payload = {
-                fileId: fileId,
-                status: this.editFile.status,
-                comment: this.editFile.comment
-            };
-
-            // eslint-disable-next-line no-console
-            console.log('Save payload:', JSON.stringify(payload));
-
             const result = await saveFileApex({ inputJson: JSON.stringify(payload) });
-
-            // eslint-disable-next-line no-console
-            console.log('Save result:', JSON.stringify(result));
-
             if (result && result.success) {
                 this.showToast('Success', 'File updated successfully.', 'success');
-                this.isModalOpen = false;
-                this.editFile = {};
+                this.closeModal();
                 await this.refreshTree();
-                if (this.wiredLeadStatusResult) {
-                    await refreshApex(this.wiredLeadStatusResult);
-                }
             } else {
                 this.showToast('Error', result ? result.message : 'Error saving file.', 'error');
             }
@@ -543,6 +565,9 @@ export default class LeadEligibilityReview extends LightningElement {
         try {
             if (this.wiredTreeResult) {
                 await refreshApex(this.wiredTreeResult);
+            }
+            if (this.wiredLeadStatusResult) {
+                await refreshApex(this.wiredLeadStatusResult);
             }
         } catch (e) {
             // eslint-disable-next-line no-console

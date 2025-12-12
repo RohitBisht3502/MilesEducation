@@ -1,24 +1,37 @@
 <template>
     <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1 class="main-title">Tag Lead</h1>
-            <p class="subtitle">Search or create leads</p>
+        <!-- Header with Call Details -->
+        <div class="header-section">
+            <div class="call-details-inline">
+                <div class="user-avatar">
+                    <lightning-icon icon-name="standard:avatar" size="medium"></lightning-icon>
+                </div>
+                <div class="user-info">
+                    <h1 class="customer-name">{customerName}</h1>
+                    <div class="contact-details">
+                        <span class="contact-item">
+                            <lightning-icon icon-name="utility:call" size="xx-small"></lightning-icon>
+                            {phoneNumber}
+                        </span>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- Search View -->
-        <template if:true={showSearch}>
-            <div class="card search-card">
-                <div class="card-header">
-                    <lightning-icon icon-name="utility:search" size="small" class="header-icon"></lightning-icon>
-                    <h2 class="card-title">Search Lead</h2>
-                </div>
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- Search Section -->
+            <div class="search-section">
+                <h2 class="section-title">
+                    <lightning-icon icon-name="utility:search" size="x-small" class="title-icon"></lightning-icon>
+                    Search Contact
+                </h2>
                 
                 <div class="search-box">
                     <input 
                         type="text"
                         class="custom-input"
-                        placeholder="Search by name or phone"
+                        placeholder="Search by name, phone or candidate ID"
                         value={searchKeyword}
                         oninput={handleSearchInput}
                         onkeypress={handleSearchKeyPress}
@@ -27,32 +40,40 @@
                         class="search-button"
                         onclick={handleSearchClick}
                         disabled={isLoading}>
+                        <lightning-icon icon-name="utility:search" size="x-small"></lightning-icon>
                         Search
                     </button>
                 </div>
+            </div>
 
-                <!-- Spinner -->
-                <template if:true={isLoading}>
-                    <div class="spinner-container">
-                        <lightning-spinner size="small" alternative-text="Searching..."></lightning-spinner>
-                    </div>
-                </template>
+            <!-- Spinner -->
+            <template if:true={isLoading}>
+                <div class="spinner-container">
+                    <lightning-spinner size="small" alternative-text="Loading..."></lightning-spinner>
+                </div>
+            </template>
 
-                <!-- Lead Results -->
-                <template if:true={showLeadResults}>
-                    <div class="result-container">
-                        <template for:each={leads} for:item="lead">
+            <!-- Lead Results -->
+            <template if:true={showLeadResults}>
+                <div class="results-section">
+                    <template for:each={leadItems} for:item="lead">
+                        <div key={lead.Id} class="lead-wrapper">
                             <div 
-                                key={lead.Id}
                                 data-id={lead.Id}
-                                class={lead.selectedClass}
+                                class={lead.cssClass}
                                 onclick={selectLead}>
                                 
                                 <div class="lead-info">
                                     <div class="lead-name">{lead.Name}</div>
-                                    <div class="lead-email">
-                                        <lightning-icon icon-name="utility:email" size="xx-small"></lightning-icon>
-                                        {lead.Email__c}
+                                    <div class="lead-details-row">
+                                        <span class="lead-detail">
+                                            <lightning-icon icon-name="utility:email" size="xx-small"></lightning-icon>
+                                            {lead.Email__c}
+                                        </span>
+                                        <span class="lead-detail">
+                                            <lightning-icon icon-name="utility:user" size="xx-small"></lightning-icon>
+                                            Owner: {lead.OwnerName}
+                                        </span>
                                     </div>
                                 </div>
                                 
@@ -60,108 +81,240 @@
                                     <lightning-icon icon-name="utility:check" size="small" class="check-icon"></lightning-icon>
                                 </template>
                             </div>
-                        </template>
-                    </div>
 
-                    <!-- Tag Button - Shows after lead selection -->
-                    <template if:true={showTagButton}>
-                        <div class="tag-button-container">
-                            <button 
-                                class="custom-button primary"
-                                onclick={handleTagLead}
-                                disabled={isLoading}>
-                                {tagButtonLabel}
-                            </button>
+                            <!-- Tag Form - Shows below selected lead -->
+                            <template if:true={lead.showTagForm}>
+                                <div class="tag-form-section">
+                                    <div class="tag-form-container">
+                                        <!-- Two Column Layout -->
+                                        <div class="form-row">
+                                            <div class="form-field">
+                                                <label class="form-label">
+                                                    L1 <span class="required-asterisk">*</span>
+                                                </label>
+                                                <select 
+                                                    class="custom-input"
+                                                    value={tagData.l1}
+                                                    onchange={handleL1Change}>
+                                                    <option value="">-- Select L1 --</option>
+                                                    <template for:each={l1Options} for:item="option">
+                                                        <option key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </option>
+                                                    </template>
+                                                </select>
+                                            </div>
+
+                                            <div class="form-field">
+                                                <label class="form-label">
+                                                    L2 <span class="required-asterisk">*</span>
+                                                </label>
+                                                <select 
+                                                    class="custom-input"
+                                                    value={tagData.l2}
+                                                    onchange={handleL2Change}
+                                                    disabled={isL2Disabled}>
+                                                    <option value="">-- Select L2 --</option>
+                                                    <template for:each={dependentL2Options} for:item="option">
+                                                        <option key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </option>
+                                                    </template>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div class="form-row">
+                                            <div class="form-field">
+                                                <label class="form-label">Next Follow Up Date</label>
+                                                <input 
+                                                    type="datetime-local"
+                                                    class="custom-input"
+                                                    value={tagData.nextFollowUpDate}
+                                                    min={minDateTime}
+                                                    onchange={handleTagFollowUpDateChange}
+                                                />
+                                            </div>
+
+                                            <div class="form-field">
+                                                <label class="form-label">Feedback</label>
+                                                <input 
+                                                    type="text"
+                                                    class="custom-input"
+                                                    placeholder="Enter feedback"
+                                                    value={tagData.feedback}
+                                                    onchange={handleTagFeedbackChange}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <button 
+                                            class="custom-button primary tag-button-inline"
+                                            onclick={handleTagLead}
+                                            disabled={isLoading}>
+                                            {tagButtonLabel}
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
                         </div>
                     </template>
-                </template>
-            </div>
-        </template>
+                </div>
+            </template>
 
-        <!-- Not Found Message -->
-        <template if:true={showNotFound}>
-            <div class="card not-found-card">
-                <div class="not-found-content">
+            <!-- Not Found Message -->
+            <template if:true={showNotFound}>
+                <div class="not-found-section">
                     <lightning-icon icon-name="utility:info" size="medium" class="info-icon"></lightning-icon>
                     <h3 class="not-found-title">No leads found</h3>
                     <p class="not-found-message">
                         We couldn't find any leads matching "{searchKeyword}"
                     </p>
-                    <button 
-                        class="custom-button primary"
-                        onclick={handleCreateNew}>
+                </div>
+            </template>
+
+            <!-- Create Form -->
+            <template if:true={showCreateForm}>
+                <div class="form-section">
+                    <h2 class="section-title">
+                        <lightning-icon icon-name="utility:adduser" size="x-small" class="title-icon"></lightning-icon>
                         Create New Lead
-                    </button>
+                    </h2>
+
+                    <div class="form-container">
+                        <!-- Two Column Layout -->
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label class="form-label">
+                                    Name <span class="required-asterisk">*</span>
+                                </label>
+                                <input 
+                                    type="text"
+                                    class="custom-input"
+                                    placeholder="Enter full name"
+                                    value={formData.name}
+                                    onchange={handleNameChange}
+                                />
+                            </div>
+
+                            <div class="form-field">
+                                <label class="form-label">
+                                    Course <span class="required-asterisk">*</span>
+                                </label>
+                                <select 
+                                    class="custom-input"
+                                    value={formData.course}
+                                    onchange={handleCourseChange}>
+                                    <option value="">-- Select Course --</option>
+                                    <template for:each={courseOptions} for:item="option">
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    </template>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label class="form-label">Email</label>
+                                <input 
+                                    type="email"
+                                    class="custom-input"
+                                    placeholder="Enter email address"
+                                    value={formData.email}
+                                    onchange={handleEmailChange}
+                                />
+                            </div>
+
+                            <div class="form-field">
+                                <label class="form-label">Next Follow Up Date</label>
+                                <input 
+                                    type="datetime-local"
+                                    class="custom-input"
+                                    value={formData.nextFollowUpDate}
+                                    min={minDateTime}
+                                    onchange={handleCreateFollowUpDateChange}
+                                />
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label class="form-label">
+                                    L1 <span class="required-asterisk">*</span>
+                                </label>
+                                <select 
+                                    class="custom-input"
+                                    value={formData.l1}
+                                    onchange={handleCreateL1Change}>
+                                    <option value="">-- Select L1 --</option>
+                                    <template for:each={l1Options} for:item="option">
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    </template>
+                                </select>
+                            </div>
+
+                            <div class="form-field">
+                                <label class="form-label">
+                                    L2 <span class="required-asterisk">*</span>
+                                </label>
+                                <select 
+                                    class="custom-input"
+                                    value={formData.l2}
+                                    onchange={handleCreateL2Change}
+                                    disabled={isCreateL2Disabled}>
+                                    <option value="">-- Select L2 --</option>
+                                    <template for:each={createDependentL2Options} for:item="option">
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    </template>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-field">
+                            <label class="form-label">Feedback</label>
+                            <input 
+                                type="text"
+                                class="custom-input"
+                                placeholder="Enter feedback"
+                                value={formData.feedback}
+                                onchange={handleCreateFeedbackChange}
+                            />
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </template>
+            </template>
+        </div>
 
-        <!-- Create Form -->
-        <template if:true={showCreateForm}>
-            <div class="card create-card">
-                <div class="card-header">
-                    <lightning-icon icon-name="utility:adduser" size="small" class="header-icon"></lightning-icon>
-                    <h2 class="card-title">Create New Lead</h2>
-                </div>
+        <!-- Fixed Footer with Action Buttons -->
+        <div class="footer-actions">
+            <template if:true={showNotFound}>
+                <button 
+                    class="custom-button primary"
+                    onclick={handleCreateNew}>
+                    Create New Lead
+                </button>
+            </template>
 
-                <div class="form-container">
-                    <div class="form-field">
-                        <label class="form-label">
-                            Name <span class="required-asterisk">*</span>
-                        </label>
-                        <input 
-                            type="text"
-                            class="custom-input"
-                            placeholder="Enter full name"
-                            value={formData.name}
-                            onchange={handleNameChange}
-                        />
-                    </div>
-
-                    <div class="form-field">
-                        <label class="form-label">
-                            Course <span class="required-asterisk">*</span>
-                        </label>
-                        <select 
-                            class="custom-input"
-                            value={formData.course}
-                            onchange={handleCourseChange}>
-                            <option value="">-- Select Course --</option>
-                            <template for:each={courseOptions} for:item="option">
-                                <option key={option.value} value={option.value}>
-                                    {option.label}
-                                </option>
-                            </template>
-                        </select>
-                    </div>
-
-                    <div class="form-field">
-                        <label class="form-label">Email</label>
-                        <input 
-                            type="email"
-                            class="custom-input"
-                            placeholder="Enter email address"
-                            value={formData.email}
-                            onchange={handleEmailChange}
-                        />
-                    </div>
-
-                    <div class="action-buttons">
-                        <button 
-                            class="custom-button primary"
-                            onclick={handleSubmit}
-                            disabled={isLoading}>
-                            {submitButtonLabel}
-                        </button>
-                        <button 
-                            class="custom-button secondary"
-                            onclick={handleCancel}
-                            disabled={isLoading}>
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </template>
+            <template if:true={showCreateForm}>
+                <button 
+                    class="custom-button primary"
+                    onclick={handleSubmit}
+                    disabled={isLoading}>
+                    {submitButtonLabel}
+                </button>
+                <button 
+                    class="custom-button secondary"
+                    onclick={handleCancel}
+                    disabled={isLoading}>
+                    Cancel
+                </button>
+            </template>
+        </div>
     </div>
 </template>

@@ -237,7 +237,7 @@ export default class WebinarCallModal extends LightningElement {
         this.clearTimers();
 
         try {
-            const response = await allocateLeadNow({ leadId: this.leadId });
+            const response = await allocateLeadNow({ recordId: this.leadId });
             const parsed = typeof response === 'string' ? JSON.parse(response) : response || {};
 
             this.lastCallId = parsed?.callId || this.lastCallId;
@@ -313,7 +313,7 @@ export default class WebinarCallModal extends LightningElement {
 
         try {
             await updateCallFeedback({
-                leadId: this.leadId,
+                recordId: this.leadId,
                 callId: this.lastCallId,
                 feedback: this.feedback?.trim(),
                 nextFollowUpDate: this.nextFollowUpDate,

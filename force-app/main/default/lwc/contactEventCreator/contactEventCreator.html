@@ -28,6 +28,43 @@
                         </lightning-textarea>
                     </div>
 
+                    <!-- Meeting Type / Offline Type / Duration -->
+                    <div class="form-group">
+                        <lightning-combobox
+                            label="Meeting Type"
+                            value={meetingType}
+                            options={meetingTypeOptions}
+                            onchange={handleMeetingTypeChange}
+                            required
+                            variant="label-stacked"
+                            class="custom-combobox">
+                        </lightning-combobox>
+                    </div>
+
+                    <template if:true={showOfflineType}>
+                        <div class="form-group">
+                            <lightning-combobox
+                                label="Type of Offline Gmeet"
+                                value={offlineType}
+                                options={offlineTypeOptions}
+                                onchange={handleOfflineTypeChange}
+                                variant="label-stacked"
+                                class="custom-combobox">
+                            </lightning-combobox>
+                        </div>
+                    </template>
+
+                    <div class="form-group">
+                        <lightning-combobox
+                            label="Duration"
+                            value={duration}
+                            options={durationOptions}
+                            onchange={handleDurationChange}
+                            variant="label-stacked"
+                            class="custom-combobox">
+                        </lightning-combobox>
+                    </div>
+
                     <!-- Date/Time Section -->
                     <div class="datetime-section">
                         <h3 class="section-title">Meeting Time</h3>
@@ -85,7 +122,7 @@
                                 </div>
                                 <div class="slds-media__body">
                                     <div class="slds-text-heading_small">Organizer</div>
-                                    <div class="slds-text-body_regular user-email">{currentUserEmail}</div>
+                                    <div class="slds-text-body_regular user-email">{organizerEmail}</div>
                                 </div>
                             </div>
                         </div>

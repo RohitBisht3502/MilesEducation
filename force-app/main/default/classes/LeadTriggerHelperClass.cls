@@ -42,6 +42,33 @@ public without sharing class LeadTriggerHelperClass {
         }
     }
 
+    public static void afterInsertAutoRegisterWebinar(List<Lead__c> newList) {
+        if (newList == null || newList.isEmpty()) return;
+
+        Set<Id> leadIds = new Set<Id>();
+        for (Lead__c l : newList) if (l != null && l.Id != null) leadIds.add(l.Id);
+
+        WebinarAutoRegisterDispatcher.dispatchForLeads(leadIds);
+    }
+
+    public static void afterUpdateAutoRegisterWebinar(Map<Id, Lead__c> newMap, Map<Id, Lead__c> oldMap) {
+        if (newMap == null || newMap.isEmpty() || oldMap == null) return;
+
+        Set<Id> leadIdsToAutoRegister = new Set<Id>();
+
+        for (Id lid : newMap.keySet()) {
+            Lead__c n = newMap.get(lid);
+            Lead__c o = oldMap.get(lid);
+            if (n == null || o == null) continue;
+
+            if (o.Is_ReEnquiry__c != n.Is_ReEnquiry__c && n.Is_ReEnquiry__c == true) {
+                leadIdsToAutoRegister.add(lid);
+            }
+        }
+
+        WebinarAutoRegisterDispatcher.dispatchForLeads(leadIdsToAutoRegister);
+    }
+
     
     
     private static final Id M1_OWNER_ID = '005C1000005HJRZIA4';
@@ -316,4 +343,5 @@ public without sharing class LeadTriggerHelperClass {
             }
         }
     }
+
 }

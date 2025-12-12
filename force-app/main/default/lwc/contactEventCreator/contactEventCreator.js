@@ -1,12 +1,27 @@
 import { LightningElement, api, wire, track } from 'lwc';
 import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
-import createMeetEvent from '@salesforce/apex/GoogleMeetService.createMeetEvent';
+
+import { getObjectInfo, getPicklistValues } from 'lightning/uiObjectInfoApi';
+import EVENT_OBJECT from '@salesforce/schema/Event';
+import MEETING_TYPE_FIELD from '@salesforce/schema/Event.Meeting_type__c';
+
+import createMeetingWithEvent from '@salesforce/apex/GoogleMeetService.createMeetingWithEvent';
 import getCurrentUserInfo from '@salesforce/apex/UserController.getCurrentUserInfo';
 import getAvailableUsers from '@salesforce/apex/UserController.getAvailableUsers';
+import { CloseActionScreenEvent } from 'lightning/actions';
+const LEAD_EMAIL_FIELD = 'Lead__c.Email__c';
+const LEAD_NAME_FIELD  = 'Lead__c.Name';
 
-const LEAD_EMAIL_FIELD = 'Lead__c.Email__c';   // your custom email field
-const LEAD_NAME_FIELD  = 'Lead__c.Name'; 
+const ORG_MEETING_EMAIL = 'meetings@mileseducation.com';
+
+const OFFLINE_TYPE_OPTIONS = [
+    { label: 'Enquiry',     value: 'Enquiry' },
+    { label: 'Enrollment',  value: 'Enrollment' },
+    { label: 'Service',     value: 'Service' },
+    { label: 'Escalation',  value: 'Escalation' },
+    { label: 'Onboarding',  value: 'Onboarding' }
+];
 
 export default class ContactEventCreator extends LightningElement {
     @api recordId;
@@ -17,6 +32,12 @@ export default class ContactEventCreator extends LightningElement {
     startDateTime = '';
     endDateTime = '';
     timezone = 'Asia/Kolkata';
+
+    // Meeting type / offline type / duration
+    @track meetingType = '';
+    @track offlineType = '';
+    duration = '45'; // default 45 minutes
+
     selectedUser = '';
     customEmail = '';
     
@@ -25,9 +46,14 @@ export default class ContactEventCreator extends LightningElement {
     contactEmail = '';
     currentUserEmail = '';
     currentUserName = '';
+    organizerEmail = ORG_MEETING_EMAIL;
     @track availableUsers = [];
     @track participantOptions = [];
-    
+
+    // picklist options
+    @track meetingTypeOptions = [];
+    @track offlineTypeOptions = OFFLINE_TYPE_OPTIONS;
+
     // State
     isLoading = false;
     showSuccess = false;
@@ -45,7 +71,44 @@ export default class ContactEventCreator extends LightningElement {
         { label: 'Australia/Sydney', value: 'Australia/Sydney' }
     ];
 
-    // Getters
+    // ===== Event picklist wiring =====
+    @wire(getObjectInfo, { objectApiName: EVENT_OBJECT })
+    objectInfo;
+
+    get recordTypeId() {
+        return this.objectInfo && this.objectInfo.data
+            ? this.objectInfo.data.defaultRecordTypeId
+            : null;
+    }
+
+    @wire(getPicklistValues, {
+        recordTypeId: '$recordTypeId',
+        fieldApiName: MEETING_TYPE_FIELD
+    })
+    wiredMeetingTypeValues({ data, error }) {
+        if (data && data.values && data.values.length) {
+            this.meetingTypeOptions = data.values.map(v => ({
+                label: v.label,
+                value: v.value
+            }));
+            if (!this.meetingType) {
+                const def = data.defaultValue && data.defaultValue.value
+                    ? data.defaultValue.value
+                    : null;
+                this.meetingType = def || this.meetingTypeOptions[0].value;
+            }
+        } else {
+            this.meetingTypeOptions = [
+                { label: 'Online', value: 'Online' },
+                { label: 'Offline', value: 'Offline' }
+            ];
+            if (!this.meetingType) {
+                this.meetingType = 'Online';
+            }
+        }
+    }
+
+    // ===== derived getters =====
     get hasParticipants() {
         return this.participants.length > 0;
     }
@@ -58,6 +121,20 @@ export default class ContactEventCreator extends LightningElement {
         return !this.customEmail;
     }
 
+    get showOfflineType() {
+        return this.meetingType === 'Offline';
+    }
+
+    get durationOptions() {
+        const isOffline = this.meetingType === 'Offline';
+        const values = isOffline ? [30, 45, 60, 90] : [30, 45, 60];
+        return values.map(v => ({
+            label: `${v} minutes`,
+            value: String(v)
+        }));
+    }
+
+    // ===== lifecycle =====
     connectedCallback() {
         this.loadCurrentUserInfo();
         this.loadAvailableUsers();
@@ -69,8 +146,8 @@ export default class ContactEventCreator extends LightningElement {
             const email = getFieldValue(data, LEAD_EMAIL_FIELD) || '';
             const name  = getFieldValue(data, LEAD_NAME_FIELD) || '';
 
-            this.contactEmail = email;   // you can keep the property name if you want
-            // Auto-add lead email as participant if it's different from current user
+            this.contactEmail = email;
+
             if (this.contactEmail && this.contactEmail !== this.currentUserEmail) {
                 this.addParticipantWithData(this.contactEmail, name || 'Lead', false);
             }
@@ -79,23 +156,19 @@ export default class ContactEventCreator extends LightningElement {
         }
     }
 
-
-    // Load current user information
+    // ===== data loading =====
     async loadCurrentUserInfo() {
         try {
             const userInfo = await getCurrentUserInfo();
             this.currentUserEmail = userInfo.Email;
             this.currentUserName = userInfo.Name;
-            
-            // Auto-add current user as first participant
+
             this.addParticipantWithData(this.currentUserEmail, this.currentUserName, true);
-            
         } catch (error) {
             console.error('Error loading user info:', error);
         }
     }
 
-    // Load available users for dropdown
     async loadAvailableUsers() {
         try {
             this.availableUsers = await getAvailableUsers();
@@ -105,14 +178,12 @@ export default class ContactEventCreator extends LightningElement {
         }
     }
 
-    // Prepare dropdown options from available users
     prepareParticipantOptions() {
-        // Filter out current user and already added participants
         const existingParticipantEmails = new Set(this.participants.map(p => p.email));
-        
+
         this.participantOptions = this.availableUsers
             .filter(user => 
-                user.Email !== this.currentUserEmail && 
+                user.Email !== this.currentUserEmail &&
                 !existingParticipantEmails.has(user.Email)
             )
             .map(user => ({
@@ -122,7 +193,7 @@ export default class ContactEventCreator extends LightningElement {
             }));
     }
 
-    // Input handlers
+    // ===== input handlers =====
     handleSubjectChange(event) {
         this.subject = event.target.value;
         this.clearError();
@@ -135,6 +206,7 @@ export default class ContactEventCreator extends LightningElement {
     handleStartDateTimeChange(event) {
         this.startDateTime = event.target.value;
         this.clearError();
+        this.updateEndDateTimeFromDuration();
     }
 
     handleEndDateTimeChange(event) {
@@ -144,6 +216,31 @@ export default class ContactEventCreator extends LightningElement {
 
     handleTimezoneChange(event) {
         this.timezone = event.detail.value;
+    }
+
+    handleMeetingTypeChange(event) {
+        this.meetingType = event.detail.value;
+        this.clearError();
+
+        if (this.meetingType !== 'Offline') {
+            this.offlineType = '';
+        }
+
+        if (!this.durationOptions.find(o => o.value === this.duration)) {
+            this.duration = '45';
+        }
+        this.updateEndDateTimeFromDuration();
+    }
+
+    handleOfflineTypeChange(event) {
+        this.offlineType = event.detail.value;
+        this.clearError();
+    }
+
+    handleDurationChange(event) {
+        this.duration = event.detail.value;
+        this.clearError();
+        this.updateEndDateTimeFromDuration();
     }
 
     handleUserSelection(event) {
@@ -156,11 +253,10 @@ export default class ContactEventCreator extends LightningElement {
         this.clearError();
     }
 
-    // Participant management
+    // ===== participants =====
     addParticipantWithData(email, name = '', isCurrentUser = false) {
         if (!email) return;
 
-        // Check for duplicates
         if (this.participants.some(p => p.email === email)) {
             this.showToast('Info', 'This email is already in the participants list', 'info');
             return;
@@ -176,18 +272,15 @@ export default class ContactEventCreator extends LightningElement {
             }
         ];
 
-        // Refresh participant options to remove added user
         this.prepareParticipantOptions();
     }
 
-    // Add selected user from dropdown
     addSelectedUser() {
         if (!this.selectedUser) {
             this.error = 'Please select a user from the dropdown';
             return;
         }
 
-        // Find the selected user
         const selectedUserObj = this.availableUsers.find(user => user.Email === this.selectedUser);
         
         if (selectedUserObj) {
@@ -197,21 +290,18 @@ export default class ContactEventCreator extends LightningElement {
         }
     }
 
-    // Add custom email
     addCustomEmail() {
         if (!this.customEmail) {
             this.error = 'Please enter an email address';
             return;
         }
 
-        // Basic email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(this.customEmail)) {
             this.error = 'Please enter a valid email address';
             return;
         }
 
-        // Check if custom email matches any existing user
         const existingUser = this.availableUsers.find(user => user.Email === this.customEmail);
         
         if (existingUser) {
@@ -219,7 +309,6 @@ export default class ContactEventCreator extends LightningElement {
             return;
         }
 
-        // Add custom email
         this.addParticipantWithData(this.customEmail, '', false);
         this.customEmail = '';
         this.showToast('Success', 'Custom email added to participants', 'success');
@@ -229,27 +318,47 @@ export default class ContactEventCreator extends LightningElement {
     removeParticipant(event) {
         const index = event.target.dataset.index;
         const participant = this.participants[index];
-        
-        // Don't allow removing current user
+
         if (participant.isCurrentUser) {
             this.showToast('Info', 'You cannot remove yourself as the organizer', 'info');
             return;
         }
 
         this.participants = this.participants.filter((_, i) => i != index);
-        // Refresh participant options as removed user is now available again
         this.prepareParticipantOptions();
     }
 
     clearAllParticipants() {
-        // Keep current user and contact if they exist
         this.participants = this.participants.filter(p => p.isCurrentUser || p.email === this.contactEmail);
         this.prepareParticipantOptions();
     }
 
-    // Main function to create meeting
+    // ===== time calc: start + duration => end =====
+    updateEndDateTimeFromDuration() {
+        if (!this.startDateTime || !this.duration) return;
+
+        try {
+            const start = new Date(this.startDateTime);
+            const mins = parseInt(this.duration, 10);
+            if (isNaN(mins)) return;
+
+            const end = new Date(start.getTime() + mins * 60000);
+
+            const year = end.getFullYear();
+            const month = String(end.getMonth() + 1).padStart(2, '0');
+            const day = String(end.getDate()).padStart(2, '0');
+            const hours = String(end.getHours()).padStart(2, '0');
+            const minutes = String(end.getMinutes()).padStart(2, '0');
+
+            this.endDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+        } catch (e) {
+            // ignore
+        }
+    }
+
+    // ===== main save =====
+    // ===== main save =====
     async createMeeting() {
-        // Validation
         if (!this.validateForm()) {
             return;
         }
@@ -259,28 +368,42 @@ export default class ContactEventCreator extends LightningElement {
         this.showSuccess = false;
 
         try {
-            // Prepare attendee emails (excluding current user from attendees if they're the organizer)
-            const attendeeEmails = this.participants
-                .filter(p => !p.isCurrentUser)
-                .map(p => p.email);
-            
-            const startUtc = this.startDateTime;
-            const endUtc = this.endDateTime;
+            const emailsSet = new Set();
 
-            // Call Apex method
-            const result = await createMeetEvent({
+            this.participants.forEach(p => {
+                if (p.email) {
+                    emailsSet.add(p.email);
+                }
+            });
+
+            // always include org email
+            emailsSet.add(ORG_MEETING_EMAIL);
+
+            const attendeeEmails = Array.from(emailsSet);
+
+            // 🔹 Convert to proper ISO strings for Apex Datetime params
+            const startIso = new Date(this.startDateTime).toISOString();
+            const endIso   = new Date(this.endDateTime).toISOString();
+
+            const result = await createMeetingWithEvent({
+                recordId: this.recordId,
                 subject: this.subject,
                 description: this.description,
-                startUtc: startUtc,
-                endUtc: endUtc,
+                startUtc: startIso,
+                endUtc: endIso,
                 timeZoneId: this.timezone,
-                attendeeEmails: attendeeEmails
+                attendeeEmails: attendeeEmails,
+                meetingType: this.meetingType,
+                offlineType: this.showOfflineType ? this.offlineType : null,
+                durationMinutes: parseInt(this.duration, 10)
             });
 
             this.meetingResult = result;
             this.showSuccess = true;
             this.showToast('Success', 'Meeting created successfully!', 'success');
             this.clearForm();
+            this.dispatchEvent(new CloseActionScreenEvent());
+            setTimeout(() => window.location.reload(), 800);
 
         } catch (error) {
             this.error = this.extractErrorMessage(error);
@@ -290,10 +413,19 @@ export default class ContactEventCreator extends LightningElement {
         }
     }
 
-    // Utility methods
+
+    // ===== validation / utils =====
     validateForm() {
         if (!this.subject) {
             this.error = 'Please enter a meeting subject';
+            return false;
+        }
+        if (!this.meetingType) {
+            this.error = 'Please select a Meeting Type';
+            return false;
+        }
+        if (this.showOfflineType && !this.offlineType) {
+            this.error = 'Please select Type of Offline Gmeet';
             return false;
         }
         if (!this.startDateTime) {
@@ -304,28 +436,34 @@ export default class ContactEventCreator extends LightningElement {
             this.error = 'Please select end date/time';
             return false;
         }
+        if (!this.duration) {
+            this.error = 'Please select meeting duration';
+            return false;
+        }
         if (this.participants.length === 0) {
             this.error = 'Please add at least one participant';
             return false;
         }
 
-        // Validate date logic
         const start = new Date(this.startDateTime);
         const end = new Date(this.endDateTime);
-        
+        const now = new Date();
+
+        if (start < now) {
+            this.error = 'Start date/time cannot be in the past';
+            return false;
+        }
+        if (end < now) {
+            this.error = 'End date/time cannot be in the past';
+            return false;
+        }
+
         if (end <= start) {
             this.error = 'End date/time must be after start date/time';
             return false;
         }
 
         return true;
-    }
-
-    convertToUtc(localDateTimeString) {
-        if (!localDateTimeString) return null;
-        
-        const localDate = new Date(localDateTimeString);
-        return new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000);
     }
 
     extractErrorMessage(error) {
@@ -356,7 +494,8 @@ export default class ContactEventCreator extends LightningElement {
         this.endDateTime = '';
         this.selectedUser = '';
         this.customEmail = '';
-        // Keep current user and contact
+        this.duration = '45';
+
         this.participants = this.participants.filter(p => p.isCurrentUser || p.email === this.contactEmail);
         this.prepareParticipantOptions();
     }

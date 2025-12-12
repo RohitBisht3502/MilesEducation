@@ -19,17 +19,17 @@ public class WebinarController {
     }
 
     @AuraEnabled
-    public static Id createWebinarMember(Id leadId, Id webinarId) {
-        if (leadId == null || webinarId == null) {
-            throw new AuraHandledException('Lead and Webinar are required.');
+    public static Id createWebinarMember(Id recordId, Id webinarId) {
+        if (recordId == null || webinarId == null) {
+            throw new AuraHandledException('Record and Webinar are required.');
         }
 
-        List<Webinar_Member__c> wmList = [Select id,Lead__c,Webinar__c from Webinar_Member__c where Lead__c = :leadId and Webinar__c = :webinarId limit 1];
+        List<Webinar_Member__c> wmList = [SELECT Id, Lead__c, Enquiry__c, Webinar__c FROM Webinar_Member__c WHERE Webinar__c = :webinarId AND (Lead__c = :recordId OR Enquiry__c = :recordId) LIMIT 1];
         if (!wmList.isEmpty()) {
-            throw new AuraHandledException('This lead is already registered for this webinar.');
+            throw new AuraHandledException('This record is already registered for this webinar.');
         }
-        
-        return System.enqueueJob(new LeadZoomRegistrationJob(leadId, webinarId));
+
+        return System.enqueueJob(new LeadZoomRegistrationJob(recordId, webinarId));
     }
 
     public class WebinarDTO {

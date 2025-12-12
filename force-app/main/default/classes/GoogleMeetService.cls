@@ -3,56 +3,28 @@
     Description  : 
 */
 public without sharing class GoogleMeetService {
-    private static final String NC = 'GMeet_Scheduler'; // <-- your Named Credential
+    private static final String NC = 'GMeet_Scheduler';
     private static final String ORG_MEETING_EMAIL = 'meetings@mileseducation.com';
 
     public class CreateResult {
-        @AuraEnabled public String eventId;          // Google event id
+        @AuraEnabled public String eventId;
         @AuraEnabled public String meetUrl;
         @AuraEnabled public String htmlLink;
         @AuraEnabled public String rawJson;
-        @AuraEnabled public Id     salesforceEventId; // SF Event Id
+        @AuraEnabled public Id     salesforceEventId;
+        @AuraEnabled public String conferenceId;
     }
 
-    // ====== PUBLIC: existing API (kept for backward compatibility) ======
     @AuraEnabled(cacheable=false)
-    public static CreateResult createMeetEvent(
-        String subject,
-        String description,
-        Datetime startUtc,
-        Datetime endUtc,
-        String timeZoneId,            // e.g. "Asia/Kolkata"
-        List<String> attendeeEmails   // e.g. {'a@gmail.com','b@gmail.com'}
-    ) {
-        return createMeetEventInternal(
-            'primary',
-            subject,
-            description,
-            startUtc,
-            endUtc,
-            timeZoneId,
-            attendeeEmails
-        );
+    public static CreateResult createMeetEvent(String subject, String description, Datetime startUtc, Datetime endUtc, String timeZoneId, List<String> attendeeEmails) {
+        return createMeetEventInternal('primary', subject, description, startUtc, endUtc, timeZoneId, attendeeEmails);
     }
 
-    // ====== NEW: create Google Meet + Salesforce Event record ======
     @AuraEnabled(cacheable=false)
-    public static CreateResult createMeetingWithEvent(
-        Id recordId,                 // Lead__c id (used as WhatId)
-        String subject,
-        String description,
-        Datetime startUtc,
-        Datetime endUtc,
-        String timeZoneId,
-        List<String> attendeeEmails,
-        String meetingType,          // Event.Meeting_type__c
-        String offlineType,          // Event.Type_of_Offline_gmeet__c (only for Offline)
-        Integer durationMinutes
-    ) {
+    public static CreateResult createMeetingWithEvent(Id recordId, String subject, String description, Datetime startUtc, Datetime endUtc, String timeZoneId, List<String> attendeeEmails, String meetingType, String offlineType, Integer durationMinutes) {
         if (String.isBlank(timeZoneId)) timeZoneId = 'Asia/Kolkata';
         if (attendeeEmails == null) attendeeEmails = new List<String>();
 
-        // ensure org mail is always present
         Boolean hasOrg = false;
         for (String e : attendeeEmails) {
             if (!String.isBlank(e) && e.trim().toLowerCase() == ORG_MEETING_EMAIL.toLowerCase()) {
@@ -64,18 +36,8 @@ public without sharing class GoogleMeetService {
             attendeeEmails.add(ORG_MEETING_EMAIL);
         }
 
-        // Create Google Calendar event in org calendar (meetings@mileseducation.com)
-        CreateResult result = createMeetEventInternal(
-            ORG_MEETING_EMAIL,
-            subject,
-            description,
-            startUtc,
-            endUtc,
-            timeZoneId,
-            attendeeEmails
-        );
+        CreateResult result = createMeetEventInternal(ORG_MEETING_EMAIL, subject, description, startUtc, endUtc, timeZoneId, attendeeEmails );
 
-        // Create Salesforce Event record and store meeting details
         Event ev = new Event();
         ev.Subject       = subject;
         ev.Description   = description;
@@ -86,7 +48,6 @@ public without sharing class GoogleMeetService {
             ev.Location = result.meetUrl;
         }
 
-        // relate Event to the custom Lead__c via WhatId
         if (recordId != null) {
             ev.WhatId = recordId;
         }
@@ -97,15 +58,17 @@ public without sharing class GoogleMeetService {
         if (!String.isBlank(meetingType) && fMap.containsKey('Meeting_type__c')) {
             ev.put('Meeting_type__c', meetingType);
         }
-        if (!String.isBlank(offlineType)
-            && !String.isBlank(meetingType)
-            && meetingType == 'Offline'
-            && fMap.containsKey('Type_of_Offline_gmeet__c')) {
+        if (!String.isBlank(offlineType) && !String.isBlank(meetingType) && meetingType == 'Offline' && fMap.containsKey('Type_of_Offline_gmeet__c')) {
             ev.put('Type_of_Offline_gmeet__c', offlineType);
         }
         if (durationMinutes != null && fMap.containsKey('Duration__c')) {
             ev.put('Duration__c', durationMinutes);
         }
+
+        if (fMap.containsKey('ConferenceId__c') && !String.isBlank(result.conferenceId)) {
+            ev.put('ConferenceId__c', result.conferenceId);
+        }
+
 
         insert ev;
         result.salesforceEventId = ev.Id;
@@ -113,20 +76,10 @@ public without sharing class GoogleMeetService {
         return result;
     }
 
-    // ====== PRIVATE: shared Google callout logic ======
-    private static CreateResult createMeetEventInternal(
-        String calendarId,
-        String subject,
-        String description,
-        Datetime startUtc,
-        Datetime endUtc,
-        String timeZoneId,
-        List<String> attendeeEmails
-    ) {
+    private static CreateResult createMeetEventInternal(String calendarId, String subject, String description, Datetime startUtc, Datetime endUtc, String timeZoneId, List<String> attendeeEmails) {
         if (String.isBlank(timeZoneId)) timeZoneId = 'Asia/Kolkata';
         if (String.isBlank(calendarId)) calendarId = 'primary';
 
-        // Build payload
         Map<String, Object> body = new Map<String, Object>();
         body.put('summary', subject);
         if (!String.isBlank(description)) body.put('description', description);
@@ -150,7 +103,6 @@ public without sharing class GoogleMeetService {
             if (!attendees.isEmpty()) body.put('attendees', attendees);
         }
 
-        // Ask Google to create a Meet link
         body.put('conferenceData', new Map<String,Object>{
             'createRequest' => new Map<String,Object>{
                 'requestId' => String.valueOf(Crypto.getRandomLong()),
@@ -158,7 +110,6 @@ public without sharing class GoogleMeetService {
             }
         });
 
-        // Call Google Calendar API using specific calendarId
         String encodedCalId = EncodingUtil.urlEncode(calendarId, 'UTF-8');
         HttpRequest req = new HttpRequest();
         req.setEndpoint(
@@ -168,21 +119,40 @@ public without sharing class GoogleMeetService {
         );
         req.setMethod('POST');
         req.setHeader('Content-Type', 'application/json');
-        req.setBody(JSON.serialize(body));
+
+        String requestPayload = JSON.serialize(body);
+        req.setBody(requestPayload);
 
         Http http = new Http();
-        HTTPResponse res = http.send(req);
-
-        if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
-            throw new AuraHandledException('Google error: ' + res.getStatus() + ' — ' + res.getBody());
+        HttpResponse res;
+        try {
+            res = http.send(req);
+        } catch (Exception e) {
+            IntegrationLogUtil.insertLog('GoogleMeetService', requestPayload, null, 'Callout error: ' + e.getMessage(), 'Failed',  null );
+            throw new AuraHandledException('Google Meet callout failed: ' + e.getMessage());
         }
 
-        Map<String, Object> m = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
-        String meetUrl;
+        Integer code = res.getStatusCode();
+        String responseBody = res.getBody();
+        String truncatedResponse = (responseBody != null && responseBody.length() > 3000)
+            ? responseBody.substring(0, 3000)
+            : responseBody;
 
-        // Prefer conferenceData.entryPoints[ type='video' ].uri
+        if (code < 200 || code >= 300) {
+            IntegrationLogUtil.insertLog( 'GoogleMeetService', requestPayload, truncatedResponse,'Non-2xx response: ' + res.getStatus(),'Failed', code);
+            throw new AuraHandledException('Google error: ' + res.getStatus() + ' — ' + responseBody);
+        }
+
+        Map<String, Object> m = (Map<String, Object>) JSON.deserializeUntyped(responseBody);
+        String meetUrl;
+        String conferenceId;
+        
         if (m.containsKey('conferenceData')) {
             Map<String,Object> cd = (Map<String,Object>) m.get('conferenceData');
+            if (cd != null && cd.containsKey('conferenceId')) {
+                conferenceId = (String) cd.get('conferenceId');
+            }
+
             if (cd != null && cd.containsKey('entryPoints')) {
                 List<Object> eps = (List<Object>) cd.get('entryPoints');
                 for (Object o : eps) {
@@ -194,37 +164,32 @@ public without sharing class GoogleMeetService {
                 }
             }
         }
-        // Fallback for older responses
         if (String.isBlank(meetUrl) && m.containsKey('hangoutLink')) {
             meetUrl = (String) m.get('hangoutLink');
         }
+
+        IntegrationLogUtil.insertLog('GoogleMeetService', requestPayload, truncatedResponse, 'Success', 'Success', code );
 
         CreateResult out = new CreateResult();
         out.eventId  = (String) m.get('id');
         out.htmlLink = (String) m.get('htmlLink');
         out.meetUrl  = meetUrl;
-        out.rawJson  = res.getBody();
+        out.rawJson  = responseBody;
+        out.conferenceId = conferenceId;
         return out;
     }
 
-    // Convenience: create a Meet for an Opportunity and (if field exists) store link in Meeting_Link__c
     @AuraEnabled
-    public static CreateResult createMeetForOpportunity(Id opportunityId, Datetime startUtc, Datetime endUtc, String attendeesCsv) {
+    public static CreateResult createMeetForOpportunity( Id opportunityId, Datetime startUtc, Datetime endUtc, String attendeesCsv ) {
         Opportunity opp = [SELECT Id, Name FROM Opportunity WHERE Id = :opportunityId LIMIT 1];
         List<String> emails = new List<String>();
         if (!String.isBlank(attendeesCsv)) {
-            for (String s : attendeesCsv.split('[,;\\s]+')) if (String.isNotBlank(s)) emails.add(s.trim());
+            for (String s : attendeesCsv.split('[,;\\s]+')) {
+                if (String.isNotBlank(s)) emails.add(s.trim());
+            }
         }
-        CreateResult r = createMeetEvent(
-            'Meeting: ' + opp.Name,
-            'Auto-created from Salesforce',
-            startUtc,
-            endUtc,
-            'Asia/Kolkata',
-            emails
-        );
+        CreateResult r = createMeetEvent( 'Meeting: ' + opp.Name, 'Auto-created from Salesforce', startUtc, endUtc, 'Asia/Kolkata', emails);
 
-        // Save to Meeting_Link__c if that custom field exists
         Schema.DescribeSObjectResult d = Opportunity.SObjectType.getDescribe();
         if (d.fields.getMap().containsKey('Meeting_Link__c')) {
             opp.put('Meeting_Link__c', r.meetUrl);

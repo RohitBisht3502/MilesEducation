@@ -1,15 +1,12 @@
 public without sharing class ZoomIntegrationService {
 
-    // ====== ZOOM CONFIGURATION ======
-    private static final String TOKEN_URL   = 'https://zoom.us/oauth/token';
+    private static final String TOKEN_URL    = 'https://zoom.us/oauth/token';
     private static final String REGISTER_URL = 'https://api.zoom.us/v2/webinars/';
-    private static final String WEBINAR_ID   = '98977181346'; // for now manual
 
     private static final String CLIENT_ID     = 'VR_eUey6TBaTGU7hRx01jA';
     private static final String CLIENT_SECRET = 'szw5yQDVHOIH3DmBniKBmHFX7H2j9ekT';
     private static final String ACCOUNT_ID    = 'zvrNCCaRTca0xHc7r9JEEA';
 
-    // ====== STEP 1: Generate Zoom Access Token (no DML; append logs only) ======
     public static String generateZoomAccessToken(List<Integration_Log__c> logs) {
         Http http = new Http();
         HttpRequest req = new HttpRequest();
@@ -23,39 +20,51 @@ public without sharing class ZoomIntegrationService {
         try {
             res = http.send(req);
         } catch (Exception ex) {
-            logs.add(IntegrationLogUtil.buildLog('Zoom Token API Call',req.getBody(),null,ex.getMessage(),'FAILED',null));
+            logs.add(IntegrationLogUtil.buildLog('Zoom Token API Call', req.getBody(), null, ex.getMessage(), 'FAILED', null));
             throw ex;
         }
 
         System.debug('🔑 [ZoomIntegrationService] Token API Response: ' + res.getBody());
-
-        logs.add(IntegrationLogUtil.buildLog('Zoom Token Generation', req.getBody(), res.getBody(), null, res.getStatus(), res.getStatusCode() ));
+        logs.add(IntegrationLogUtil.buildLog('Zoom Token Generation', req.getBody(), res.getBody(), null, res.getStatus(), res.getStatusCode()));
 
         if (res.getStatusCode() != 200) {
             throw new CalloutException('Zoom Token Generation Failed: ' + res.getBody());
         }
 
         Map<String, Object> tokenData = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
-        String accessToken = (String) tokenData.get('access_token');
-        System.debug('✅ [ZoomIntegrationService] Access Token: ' + accessToken);
-        return accessToken;
+        return (String) tokenData.get('access_token');
     }
 
-    // ====== STEP 2: Register Lead for Webinar (no DML; append logs only) ======
-    public static String registerLeadForWebinar(Lead__c ld, String accessToken, List<Integration_Log__c> logs) {
+    // ✅ Lead registration (dynamic webinar id)
+    public static String registerLeadForWebinar(Lead__c ld, String zoomWebinarId, String accessToken, List<Integration_Log__c> logs) {
+        return registerGeneric(ld.Name, ld.Email__c, ld.Phone__c, ld.City__c, zoomWebinarId, accessToken, logs );
+    }
+
+    // ✅ Enquiry registration (dynamic webinar id)
+    public static String registerEnquiryForWebinar(Enquiry__c eq, String zoomWebinarId, String accessToken, List<Integration_Log__c> logs) {
+        return registerGeneric(eq.Name, eq.Email__c, eq.Phone_Number__c, eq.City__c, zoomWebinarId, accessToken, logs );
+    }
+
+    // Shared core to keep changes minimal
+    private static String registerGeneric(String fullName, String email, String phone, String city, String zoomWebinarId, String accessToken, List<Integration_Log__c> logs) {
+        if (String.isBlank(zoomWebinarId)) {
+            throw new CalloutException('Zoom Webinar Id is required.');
+        }
+
         Http http = new Http();
         HttpRequest req = new HttpRequest();
-        req.setEndpoint(REGISTER_URL + WEBINAR_ID + '/registrants');
+        req.setEndpoint(REGISTER_URL + zoomWebinarId + '/registrants');
         req.setMethod('POST');
         req.setHeader('Authorization', 'Bearer ' + accessToken);
         req.setHeader('Content-Type', 'application/json');
 
+        String safeName = String.isBlank(fullName) ? 'Guest' : fullName;
         Map<String, Object> registrant = new Map<String, Object>{
-            'first_name' => ld.Name.contains(' ') ? ld.Name.substringBefore(' ') : ld.Name,
-    		'last_name'  => ld.Name.contains(' ') ? ld.Name.substringAfter(' ') : '',
-            'email'      => ld.Email__c,
-            'phone'      => ld.Phone__c,
-            'city'       => ld.City__c
+            'first_name' => safeName.contains(' ') ? safeName.substringBefore(' ') : safeName,
+            'last_name'  => safeName.contains(' ') ? safeName.substringAfter(' ') : '',
+            'email'      => email,
+            'phone'      => phone,
+            'city'       => city
         };
 
         String payload = JSON.serialize(registrant);
@@ -66,13 +75,12 @@ public without sharing class ZoomIntegrationService {
         try {
             res = http.send(req);
         } catch (Exception ex) {
-            logs.add(IntegrationLogUtil.buildLog('Zoom Webinar Registration Call', payload, null, ex.getMessage(), 'FAILED',null ));
+            logs.add(IntegrationLogUtil.buildLog('Zoom Webinar Registration Call', payload, null, ex.getMessage(), 'FAILED', null));
             throw ex;
         }
 
         System.debug('📩 [ZoomIntegrationService] Registration Response: ' + res.getBody());
-
-        logs.add(IntegrationLogUtil.buildLog( 'Zoom Webinar Registration', payload, res.getBody(), null, res.getStatus(), res.getStatusCode() ));
+        logs.add(IntegrationLogUtil.buildLog('Zoom Webinar Registration', payload, res.getBody(), null, res.getStatus(), res.getStatusCode()));
 
         if (res.getStatusCode() != 201 && res.getStatusCode() != 200) {
             throw new CalloutException('Zoom Webinar Registration Failed: ' + res.getBody());

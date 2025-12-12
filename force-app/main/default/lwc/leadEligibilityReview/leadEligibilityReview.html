@@ -1,3 +1,4 @@
+<!-- file: force-app/main/default/lwc/leadEligibilityReview/leadEligibilityReview.html -->
 <template>
     <lightning-card title="Eligibility File Verification" icon-name="custom:custom63">
         <!-- TOP PATH FOR GP LEAD STATUS (READ ONLY) -->
@@ -64,14 +65,16 @@
                                 </div>
 
                                 <div class="row-right">
-                                    <lightning-button-icon
-                                        icon-name="utility:edit"
-                                        alternative-text="Add Comment"
-                                        title="Add Comment"
-                                        class="folder-comment-btn"
-                                        data-id={root.id}
-                                        onclick={handleFolderCommentClick}>
-                                    </lightning-button-icon>
+                                    <template if:true={root.allowFolderEdit}>
+                                        <lightning-button-icon
+                                            icon-name="utility:edit"
+                                            alternative-text="Edit Folder"
+                                            title="Edit Folder"
+                                            class="folder-comment-btn"
+                                            data-id={root.id}
+                                            onclick={handleFolderCommentClick}>
+                                        </lightning-button-icon>
+                                    </template>
 
                                     <template if:true={root.displayDate}>
                                         <span class="date-text">{root.displayDate}</span>
@@ -129,15 +132,18 @@
                                                         </template>
                                                     </div>
                                                 </div>
+
                                                 <div class="row-right">
-                                                    <lightning-button-icon
-                                                        icon-name="utility:edit"
-                                                        alternative-text="Add Comment"
-                                                        title="Add Comment"
-                                                        class="folder-comment-btn"
-                                                        data-id={deg.id}
-                                                        onclick={handleFolderCommentClick}>
-                                                    </lightning-button-icon>
+                                                    <template if:true={deg.allowFolderEdit}>
+                                                        <lightning-button-icon
+                                                            icon-name="utility:edit"
+                                                            alternative-text="Edit Folder"
+                                                            title="Edit Folder"
+                                                            class="folder-comment-btn"
+                                                            data-id={deg.id}
+                                                            onclick={handleFolderCommentClick}>
+                                                        </lightning-button-icon>
+                                                    </template>
 
                                                     <template if:true={deg.displayDate}>
                                                         <span class="date-text">{deg.displayDate}</span>
@@ -151,14 +157,11 @@
                                                 </div>
                                             </div>
 
-                                            <!-- DEGREE CONTENT -->
+                                            <!-- Level 3: Certificates / Marksheets folders under degree -->
                                             <template if:true={deg.expanded}>
-
-                                                <!-- Level 3: Category folders (Marksheet / Certificates) -->
                                                 <template if:true={deg.children}>
                                                     <template for:each={deg.children} for:item="cat">
                                                         <div key={cat.id} class="row-wrapper">
-                                                            <!-- CATEGORY ROW -->
                                                             <div class="row level-3-row row-hover" onclick={handleToggleFolder} data-id={cat.id}>
                                                                 <div class="row-left level-3-indent">
                                                                     <div class="chevron">
@@ -196,15 +199,18 @@
                                                                         </template>
                                                                     </div>
                                                                 </div>
+
                                                                 <div class="row-right">
-                                                                    <lightning-button-icon
-                                                                        icon-name="utility:edit"
-                                                                        alternative-text="Add Comment"
-                                                                        title="Add Comment"
-                                                                        class="folder-comment-btn"
-                                                                        data-id={cat.id}
-                                                                        onclick={handleFolderCommentClick}>
-                                                                    </lightning-button-icon>
+                                                                    <template if:true={cat.allowFolderEdit}>
+                                                                        <lightning-button-icon
+                                                                            icon-name="utility:edit"
+                                                                            alternative-text="Edit Folder"
+                                                                            title="Edit Folder"
+                                                                            class="folder-comment-btn"
+                                                                            data-id={cat.id}
+                                                                            onclick={handleFolderCommentClick}>
+                                                                        </lightning-button-icon>
+                                                                    </template>
 
                                                                     <template if:true={cat.displayDate}>
                                                                         <span class="date-text">{cat.displayDate}</span>
@@ -222,101 +228,54 @@
                                                             <template if:true={cat.expanded}>
                                                                 <template if:true={cat.files}>
                                                                     <template for:each={cat.files} for:item="file">
-                                                                        <div key={file.id} class="file-row level-4-row row-hover">
-                                                                            <div class="file-left level-4-indent">
+                                                                        <div key={file.id} class="row file-row row-hover">
+                                                                            <div class="row-left level-4-indent">
                                                                                 <lightning-icon icon-name={file.iconName}
                                                                                                 size="small"
                                                                                                 class="file-icon">
                                                                                 </lightning-icon>
-                                                                                <div class="file-text">
-                                                                                    <div class="file-name">{file.name}</div>
-                                                                                    <div class="file-subtitle">
-                                                                                        <template if:true={file.description}>
-                                                                                            <span>{file.description}</span>
-                                                                                        </template>
+                                                                                <div class="title-block">
+                                                                                    <div class="title file-name">
+                                                                                        {file.name}
                                                                                     </div>
-                                                                                    <div class="file-meta">
-                                                                                        <template if:true={file.size}>
-                                                                                            <span>{file.size}</span>
+                                                                                    <div class="subtitle">
+                                                                                        {file.fileType} · {file.fileFormat}
+                                                                                        <template if:true={file.percentage}>
+                                                                                            · {file.percentage}% 
                                                                                         </template>
-                                                                                        <template if:true={file.uploadedOn}>
-                                                                                            <span>Modified: {file.uploadedOn}</span>
-                                                                                        </template>
-                                                                                        <template if:true={file.uploadedBy}>
-                                                                                            <span>By: {file.uploadedBy}</span>
+                                                                                        <template if:true={file.yearOfGraduation}>
+                                                                                            · {file.yearOfGraduation}
                                                                                         </template>
                                                                                     </div>
 
                                                                                     <template if:true={file.comment}>
-                                                                                        <div class="file-comment">
-                                                                                            Comment: {file.comment}
-                                                                                        </div>
+                                                                                        <div class="file-comment">Comment: {file.comment}</div>
                                                                                     </template>
-
-                                                                                    <!-- INLINE "ROW" TABLE OF FILE DATA -->
-                                                                                    <div class="file-table">
-                                                                                        <div class="file-table-cell">
-                                                                                            <span class="file-field-label">Percentage</span>
-                                                                                            <span class="file-field-value">
-                                                                                                <template if:true={file.percentage}>{file.percentage}</template>
-                                                                                                <template if:false={file.percentage}>-</template>
-                                                                                            </span>
-                                                                                        </div>
-                                                                                        <div class="file-table-cell">
-                                                                                            <span class="file-field-label">Year</span>
-                                                                                            <span class="file-field-value">
-                                                                                                <template if:true={file.yearOfGraduation}>{file.yearOfGraduation}</template>
-                                                                                                <template if:false={file.yearOfGraduation}>-</template>
-                                                                                            </span>
-                                                                                        </div>
-                                                                                        <div class="file-table-cell">
-                                                                                            <span class="file-field-label">Grade</span>
-                                                                                            <span class="file-field-value">
-                                                                                                <template if:true={file.grade}>{file.grade}</template>
-                                                                                                <template if:false={file.grade}>-</template>
-                                                                                            </span>
-                                                                                        </div>
-                                                                                        <div class="file-table-cell">
-                                                                                            <span class="file-field-label">Rank / Div</span>
-                                                                                            <span class="file-field-value">
-                                                                                                <template if:true={file.rankDivision}>{file.rankDivision}</template>
-                                                                                                <template if:false={file.rankDivision}>-</template>
-                                                                                            </span>
-                                                                                        </div>
-                                                                                        <div class="file-table-cell">
-                                                                                            <span class="file-field-label">University</span>
-                                                                                            <span class="file-field-value">
-                                                                                                <template if:true={file.university}>{file.university}</template>
-                                                                                                <template if:false={file.university}>-</template>
-                                                                                            </span>
-                                                                                        </div>
-                                                                                    </div>
                                                                                 </div>
                                                                             </div>
 
-                                                                            <div class="file-right">
+                                                                            <div class="row-right">
+                                                                                <lightning-button
+                                                                                    variant="base"
+                                                                                    label="View"
+                                                                                    class="file-link"
+                                                                                    data-id={file.id}
+                                                                                    onclick={handleViewFile}>
+                                                                                </lightning-button>
+
                                                                                 <span class={file.statusClass}>
                                                                                     <span class="status-dot"></span>
                                                                                     {file.status}
                                                                                 </span>
 
-                                                                                <lightning-button
-                                                                                    variant="neutral"
-                                                                                    label="View"
-                                                                                    title="View File"
-                                                                                    class="slds-m-left_small"
-                                                                                    data-id={file.id}
-                                                                                    onclick={handleViewFile}>
-                                                                                </lightning-button>
-
-                                                                                <lightning-button
-                                                                                    variant="brand-outline"
-                                                                                    label="Edit"
+                                                                                <lightning-button-icon
+                                                                                    icon-name="utility:edit"
+                                                                                    alternative-text="Edit File"
                                                                                     title="Edit File"
-                                                                                    class="slds-m-left_small"
+                                                                                    class="file-edit-btn"
                                                                                     data-id={file.id}
                                                                                     onclick={handleEditFile}>
-                                                                                </lightning-button>
+                                                                                </lightning-button-icon>
                                                                             </div>
                                                                         </div>
                                                                     </template>
@@ -325,220 +284,33 @@
                                                         </div>
                                                     </template>
                                                 </template>
-
-                                                <!-- Files directly under degree (rare but supported) -->
-                                                <template if:true={deg.files}>
-                                                    <template for:each={deg.files} for:item="dfile">
-                                                        <div key={dfile.id} class="file-row level-3-row row-hover">
-                                                            <div class="file-left level-3-indent">
-                                                                <lightning-icon icon-name={dfile.iconName}
-                                                                                size="small"
-                                                                                class="file-icon">
-                                                                </lightning-icon>
-                                                                <div class="file-text">
-                                                                    <div class="file-name">{dfile.name}</div>
-                                                                    <div class="file-subtitle">
-                                                                        <template if:true={dfile.description}>
-                                                                            <span>{dfile.description}</span>
-                                                                        </template>
-                                                                    </div>
-                                                                    <div class="file-meta">
-                                                                        <template if:true={dfile.size}>
-                                                                            <span>{dfile.size}</span>
-                                                                        </template>
-                                                                        <template if:true={dfile.uploadedOn}>
-                                                                            <span>Modified: {dfile.uploadedOn}</span>
-                                                                        </template>
-                                                                        <template if:true={dfile.uploadedBy}>
-                                                                            <span>By: {dfile.uploadedBy}</span>
-                                                                        </template>
-                                                                    </div>
-
-                                                                    <template if:true={dfile.comment}>
-                                                                        <div class="file-comment">
-                                                                            Comment: {dfile.comment}
-                                                                        </div>
-                                                                    </template>
-
-                                                                    <div class="file-table">
-                                                                        <div class="file-table-cell">
-                                                                            <span class="file-field-label">Percentage</span>
-                                                                            <span class="file-field-value">
-                                                                                <template if:true={dfile.percentage}>{dfile.percentage}</template>
-                                                                                <template if:false={dfile.percentage}>-</template>
-                                                                            </span>
-                                                                        </div>
-                                                                        <div class="file-table-cell">
-                                                                            <span class="file-field-label">Year</span>
-                                                                            <span class="file-field-value">
-                                                                                <template if:true={dfile.yearOfGraduation}>{dfile.yearOfGraduation}</template>
-                                                                                <template if:false={dfile.yearOfGraduation}>-</template>
-                                                                            </span>
-                                                                        </div>
-                                                                        <div class="file-table-cell">
-                                                                            <span class="file-field-label">Grade</span>
-                                                                            <span class="file-field-value">
-                                                                                <template if:true={dfile.grade}>{dfile.grade}</template>
-                                                                                <template if:false={dfile.grade}>-</template>
-                                                                            </span>
-                                                                        </div>
-                                                                        <div class="file-table-cell">
-                                                                            <span class="file-field-label">Rank / Div</span>
-                                                                            <span class="file-field-value">
-                                                                                <template if:true={dfile.rankDivision}>{dfile.rankDivision}</template>
-                                                                                <template if:false={dfile.rankDivision}>-</template>
-                                                                            </span>
-                                                                        </div>
-                                                                        <div class="file-table-cell">
-                                                                            <span class="file-field-label">University</span>
-                                                                            <span class="file-field-value">
-                                                                                <template if:true={dfile.university}>{dfile.university}</template>
-                                                                                <template if:false={dfile.university}>-</template>
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="file-right">
-                                                                <span class={dfile.statusClass}>
-                                                                    <span class="status-dot"></span>
-                                                                    {dfile.status}
-                                                                </span>
-                                                                <lightning-button
-                                                                    variant="neutral"
-                                                                    label="View"
-                                                                    class="slds-m-left_small"
-                                                                    data-id={dfile.id}
-                                                                    onclick={handleViewFile}>
-                                                                </lightning-button>
-                                                                <lightning-button
-                                                                    variant="brand-outline"
-                                                                    label="Edit"
-                                                                    class="slds-m-left_small"
-                                                                    data-id={dfile.id}
-                                                                    onclick={handleEditFile}>
-                                                                </lightning-button>
-                                                            </div>
-                                                        </div>
-                                                    </template>
-                                                </template>
-
                                             </template>
                                         </div>
                                     </template>
                                 </template>
-
-                                <!-- Files directly under root (if any) -->
-                                <template if:true={root.files}>
-                                    <template for:each={root.files} for:item="rfile">
-                                        <div key={rfile.id} class="file-row level-2-row row-hover">
-                                            <div class="file-left level-2-indent">
-                                                <lightning-icon icon-name={rfile.iconName}
-                                                                size="small"
-                                                                class="file-icon">
-                                                </lightning-icon>
-                                                <div class="file-text">
-                                                    <div class="file-name">{rfile.name}</div>
-                                                    <div class="file-subtitle">
-                                                        <template if:true={rfile.description}>
-                                                            <span>{rfile.description}</span>
-                                                        </template>
-                                                    </div>
-                                                    <div class="file-meta">
-                                                        <template if:true={rfile.size}>
-                                                            <span>{rfile.size}</span>
-                                                        </template>
-                                                        <template if:true={rfile.uploadedOn}>
-                                                            <span>Modified: {rfile.uploadedOn}</span>
-                                                        </template>
-                                                        <template if:true={rfile.uploadedBy}>
-                                                            <span>By: {rfile.uploadedBy}</span>
-                                                        </template>
-                                                    </div>
-
-                                                    <template if:true={rfile.comment}>
-                                                        <div class="file-comment">
-                                                            Comment: {rfile.comment}
-                                                        </div>
-                                                    </template>
-
-                                                    <div class="file-table">
-                                                        <div class="file-table-cell">
-                                                            <span class="file-field-label">Percentage</span>
-                                                            <span class="file-field-value">
-                                                                <template if:true={rfile.percentage}>{rfile.percentage}</template>
-                                                                <template if:false={rfile.percentage}>-</template>
-                                                            </span>
-                                                        </div>
-                                                        <div class="file-table-cell">
-                                                            <span class="file-field-label">Year</span>
-                                                            <span class="file-field-value">
-                                                                <template if:true={rfile.yearOfGraduation}>{rfile.yearOfGraduation}</template>
-                                                                <template if:false={rfile.yearOfGraduation}>-</template>
-                                                            </span>
-                                                        </div>
-                                                        <div class="file-table-cell">
-                                                            <span class="file-field-label">Grade</span>
-                                                            <span class="file-field-value">
-                                                                <template if:true={rfile.grade}>{rfile.grade}</template>
-                                                                <template if:false={rfile.grade}>-</template>
-                                                            </span>
-                                                        </div>
-                                                        <div class="file-table-cell">
-                                                            <span class="file-field-label">Rank / Div</span>
-                                                            <span class="file-field-value">
-                                                                <template if:true={rfile.rankDivision}>{rfile.rankDivision}</template>
-                                                                <template if:false={rfile.rankDivision}>-</template>
-                                                            </span>
-                                                        </div>
-                                                        <div class="file-table-cell">
-                                                            <span class="file-field-label">University</span>
-                                                            <span class="file-field-value">
-                                                                <template if:true={rfile.university}>{rfile.university}</template>
-                                                                <template if:false={rfile.university}>-</template>
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="file-right">
-                                                <span class={rfile.statusClass}>
-                                                    <span class="status-dot"></span>
-                                                    {rfile.status}
-                                                </span>
-                                                <lightning-button
-                                                    variant="neutral"
-                                                    label="View"
-                                                    class="slds-m-left_small"
-                                                    data-id={rfile.id}
-                                                    onclick={handleViewFile}>
-                                                </lightning-button>
-                                                <lightning-button
-                                                    variant="brand-outline"
-                                                    label="Edit"
-                                                    class="slds-m-left_small"
-                                                    data-id={rfile.id}
-                                                    onclick={handleEditFile}>
-                                                </lightning-button>
-                                            </div>
-                                        </div>
-                                    </template>
-                                </template>
-
                             </template>
                         </article>
                     </template>
                 </div>
+
+                <!-- <div class="footer-summary">
+                    <div>Total files: {totalFilesOverall}</div>
+                </div> -->
             </template>
 
             <template if:false={hasData}>
-                <div class="slds-p-around_medium slds-text-color_weak">
-                    No eligibility folders found for this Lead.
+                <div class="loading-or-empty">
+                    <template if:true={isLoading}>
+                        <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+                    </template>
+                    <template if:false={isLoading}>
+                        <p>No data available.</p>
+                    </template>
                 </div>
             </template>
         </div>
 
-        <!-- EDIT FILE MODAL -->
+        <!-- FILE EDIT MODAL -->
         <template if:true={isModalOpen}>
             <section role="dialog" tabindex="-1" aria-modal="true" class="slds-modal slds-fade-in-open">
                 <div class="slds-modal__container">
@@ -548,52 +320,49 @@
                         </h2>
                     </header>
                     <div class="slds-modal__content slds-p-around_medium">
-                        <lightning-input
-                            type="text"
-                            label="File Name"
-                            value={editFile.name}
-                            disabled>
-                        </lightning-input>
-
                         <lightning-combobox
-                            class="slds-m-top_small"
-                            label="Status"
                             name="status"
+                            label="Status"
                             value={editFile.status}
                             options={statusOptions}
                             onchange={handleFieldChange}>
                         </lightning-combobox>
 
-                        <template if:true={showCommentField}>
-                            <lightning-textarea
-                                class="slds-m-top_small"
-                                name="comment"
-                                label="Comment"
-                                value={editFile.comment}
-                                onchange={handleFieldChange}>
-                            </lightning-textarea>
-                        </template>
+                        <lightning-textarea
+                            name="comment"
+                            label="Comment"
+                            value={editFile.comment}
+                            onchange={handleFieldChange}>
+                        </lightning-textarea>
                     </div>
-
                     <footer class="slds-modal__footer">
                         <lightning-button variant="neutral" label="Cancel" onclick={closeModal}></lightning-button>
-                        <lightning-button variant="brand" class="slds-m-left_small" label="Save" onclick={saveFile}></lightning-button>
+                        <lightning-button variant="brand" class="ler-btn-left_small" label="Save" onclick={saveFile}></lightning-button>
                     </footer>
                 </div>
             </section>
             <div class="slds-backdrop slds-backdrop_open"></div>
         </template>
 
-        <!-- FOLDER COMMENT MODAL -->
+        <!-- FOLDER COMMENT / STATUS MODAL -->
         <template if:true={isFolderModalOpen}>
             <section role="dialog" tabindex="-1" aria-modal="true" class="slds-modal slds-fade-in-open">
                 <div class="slds-modal__container">
                     <header class="slds-modal__header ler-modal-header">
                         <h2 class="slds-text-heading_medium">
-                            Folder Comment – {activeFolder.name}
+                            Folder Review – {activeFolder.name}
                         </h2>
                     </header>
                     <div class="slds-modal__content slds-p-around_medium">
+                        <lightning-combobox
+                            name="folderStatus"
+                            label="Folder Status"
+                            value={activeFolder.status}
+                            placeholder="Select Status"
+                            options={folderStatusOptions}
+                            onchange={handleFolderStatusChange}>
+                        </lightning-combobox>
+
                         <lightning-textarea
                             name="folderComment"
                             label="Comment"
@@ -603,7 +372,7 @@
                     </div>
                     <footer class="slds-modal__footer">
                         <lightning-button variant="neutral" label="Cancel" onclick={closeFolderModal}></lightning-button>
-                        <lightning-button variant="brand" class="slds-m-left_small" label="Save" onclick={saveFolderComment}></lightning-button>
+                        <lightning-button variant="brand" class="ler-btn-left_small" label="Save" onclick={saveFolderComment}></lightning-button>
                     </footer>
                 </div>
             </section>

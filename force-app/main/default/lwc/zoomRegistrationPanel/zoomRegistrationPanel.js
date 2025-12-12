@@ -71,7 +71,7 @@ export default class WebinarRegisterPanel extends LightningElement {
     this.saving = true;
     try {
       await createWebinarMember({
-        leadId: this.recordId,
+        recordId: this.recordId,
         webinarId: this.selectedWebinar.id
       });
 
