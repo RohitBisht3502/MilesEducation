@@ -9,6 +9,14 @@ global without sharing class MilesWebService {
 
     private static final String EXPECTED_SECURITY_CODE = 'MY_SECURE_CODE_123';
 
+    // Email association outcomes
+    private enum EmailDecision {
+        SAME_LEAD,          // Email exists with SAME Lead
+        DIFFERENT_LEAD,     // Email exists with DIFFERENT Lead
+        CREATED_AND_ASSOCIATED, // Email not exist -> created & associated
+        ASSOCIATED_TO_LEAD  // Email existed but unlinked -> now linked (safe case)
+    }
+
     @HttpPost
     global static String doPost() {
         RestRequest req = RestContext.request;
@@ -27,11 +35,13 @@ global without sharing class MilesWebService {
             }
 
             /* ------------ BODY CHECK ------------- */
-            String requestBody = req.requestBody != null ? req.requestBody.toString() : '';
+            String requestBody = (req.requestBody != null) ? req.requestBody.toString() : '';
             if (String.isBlank(requestBody)) {
                 res.statusCode = 400;
                 return 'Request body is empty';
             }
+
+            System.debug('MilesWebService RequestBody => ' + requestBody);
 
             IntegrationLogUtil.insertLogs(new List<Integration_Log__c>{
                 IntegrationLogUtil.buildLog('Enquiry', requestBody, null, null, 'SUCCESS', null)
@@ -71,21 +81,30 @@ global without sharing class MilesWebService {
                      FLOW IMPLEMENTATION (Candidate = Lead)
                ===================================================== */
 
-            /* 1. CHECK CANDIDATE (BY PHONE) */
+            /* 1) CHECK CANDIDATE (Lead) BY PHONE (Priority) */
             Lead candidate;
-            List<Lead> candidateList = [SELECT Id, Phone FROM Lead WHERE Phone = :inputData.phone LIMIT 1];
+            List<Lead> candidateList = [SELECT Id, Phone, Email FROM Lead WHERE Phone = :inputData.phone LIMIT 1];
             if (!candidateList.isEmpty()) {
                 candidate = candidateList[0];
             }
 
             Lead__c leadToReturn;
 
-            /* ------------------- NO CANDIDATE ------------------- */
+            /* =====================================================
+               CASE A: CANDIDATE NOT EXIST
+               Diagram: Not Exist -> Create Phone Number -> Create Candidate -> Create Lead (course/phone)
+               ===================================================== */
             if (candidate == null) {
 
-                // (a) Create Candidate (Lead)
+                // (A1) Create Phone_Number__c first (first create phone record)
+                Phone_Number__c phoneRec = new Phone_Number__c(
+                    Name     = inputData.phone,
+                    Phone__c = inputData.phone
+                );
+                insert phoneRec;
+
+                // (A2) Create Candidate (Lead)
                 candidate = new Lead(
-                   // FirstName                = inputData.first_name,
                     LastName                 = inputData.first_name,
                     Company                  = 'Test Company',
                     Phone                    = inputData.phone,
@@ -96,15 +115,11 @@ global without sharing class MilesWebService {
                 );
                 insert candidate;
 
-                // (b) Create Phone_Number__c mapped with Candidate
-                Phone_Number__c phoneRec = new Phone_Number__c(
-                    Name         = inputData.phone,
-                    Phone__c     = inputData.phone,
-                    Candidate__c = candidate.Id
-                );
-                insert phoneRec;
+                // tag phone record with candidate
+                phoneRec.Candidate__c = candidate.Id;
+                update phoneRec;
 
-                // (c) Create Lead__c with course + phone
+                // (A3) Create Lead__c with course/phone
                 Lead__c newLead = new Lead__c(
                     Name                     = inputData.first_name,
                     Phone__c                 = inputData.phone,
@@ -118,58 +133,79 @@ global without sharing class MilesWebService {
                 );
                 insert newLead;
 
-                // (d) Tag phone record with this Lead__c
+                // tag phone record with lead
                 phoneRec.Lead__c = newLead.Id;
                 update phoneRec;
 
-                // (e) Link Enquiry
+                // link enquiry
                 enquiry.Candidate__c = candidate.Id;
                 enquiry.Lead__c      = newLead.Id;
                 update enquiry;
 
                 leadToReturn = newLead;
 
+                // Email association (diagram: check email associated)
+                EmailDecision ed = handleEmailAssociation(inputData.email, leadToReturn.Id, candidate.Id, enquiry.Id);
+
             } else {
-                /* ------------------- CANDIDATE EXISTS ------------------- */
+
+                /* =====================================================
+                   CASE B: CANDIDATE EXISTS
+                   Diagram: Candidate Exists -> Check Lead with Phone + Source
+                   ===================================================== */
 
                 enquiry.Candidate__c = candidate.Id;
                 update enquiry;
 
-                // 2. Check Lead__c with same Phone + Course
+                // 2) Check Lead__c with Phone + Source (as per NEW diagram)
                 Lead__c existingLeadC;
-                List<Lead__c> leadCs = [SELECT Id, Stage__c FROM Lead__c WHERE Phone__c = :inputData.phone AND Course__c  = :inputData.course LIMIT 1 ];
-                if (!leadCs.isEmpty()) {
-                    existingLeadC = leadCs[0];
-                }
+                List<Lead__c> leadCs = [SELECT Id, Stage__c, Is_ReEnquiry__c FROM Lead__c WHERE Phone__c = :inputData.phone AND Source__c  = :inputData.coming_from LIMIT 1 ];
+                if (!leadCs.isEmpty()) existingLeadC = leadCs[0];
 
+                /* ------------------- B1: LEAD EXISTS (Phone + Source) ------------------- */
                 if (existingLeadC != null) {
-                    // (2A) Lead exists → mark as ReEnquiry
-                    existingLeadC.Is_ReEnquiry__c = true;
-                    update existingLeadC;
 
                     enquiry.Lead__c = existingLeadC.Id;
-                    // safely set enquiry as ReEnquiry if field exists
-                    enquiry.put('Is_ReEnquiry__c', true);
                     update enquiry;
 
+                    // Diagram: Check Email Associated
+                    EmailDecision ed = handleEmailAssociation(inputData.email, existingLeadC.Id, candidate.Id, enquiry.Id);
+
+                    if (ed == EmailDecision.SAME_LEAD) {
+                        markReEnquiry(existingLeadC, enquiry);
+                    } else if (ed == EmailDecision.CREATED_AND_ASSOCIATED || ed == EmailDecision.ASSOCIATED_TO_LEAD) {
+                        markReEnquiry(existingLeadC, enquiry);
+                    } else if (ed == EmailDecision.DIFFERENT_LEAD) {
+                        System.debug('Email is with different Lead. Not associating. No re-enquiry marking as per flow.');
+                    }
+
                     leadToReturn = existingLeadC;
+
                 } else {
-                    // (2B) No Lead__c for this phone+course → Create new
+
+                    /* ------------------- B2: LEAD NOT EXIST (Phone + Source) ------------------- */
+                    // Not Exist -> Create New Lead with course and tag phone number also
+
                     Lead__c newLead2 = new Lead__c(
                         Name                     = inputData.first_name,
                         Phone__c                 = inputData.phone,
                         Email__c                 = inputData.email,
                         Stage__c                 = 'M3',
                         Course__c                = inputData.course,
+                        Source__c                = inputData.coming_from,
                         Register_for_Webinar__c  = inputData.register_for_webinar,
                         Interested_Webinar_ID__c = inputData.interested_webinar_id,
-                        Source__c                = inputData.coming_from,
                         Candidate__c             = candidate.Id
                     );
                     insert newLead2;
 
-                    // Tag phone number also
-                    List<Phone_Number__c> phoneList = [SELECT Id, Candidate__c, Lead__c FROM Phone_Number__c WHERE Phone__c = :inputData.phone LIMIT 1 ];
+                    // Tag phone number also (reuse existing if found)
+                    List<Phone_Number__c> phoneList = [
+                        SELECT Id, Candidate__c, Lead__c
+                        FROM Phone_Number__c
+                        WHERE Phone__c = :inputData.phone
+                        LIMIT 1
+                    ];
 
                     if (phoneList.isEmpty()) {
                         Phone_Number__c newPhone = new Phone_Number__c(
@@ -181,6 +217,7 @@ global without sharing class MilesWebService {
                         insert newPhone;
                     } else {
                         Phone_Number__c ph = phoneList[0];
+                        if (ph.Candidate__c == null) ph.Candidate__c = candidate.Id;
                         ph.Lead__c = newLead2.Id;
                         update ph;
                     }
@@ -189,6 +226,14 @@ global without sharing class MilesWebService {
                     update enquiry;
 
                     leadToReturn = newLead2;
+
+                    // Check Email Associated
+                    EmailDecision ed = handleEmailAssociation(inputData.email, newLead2.Id, candidate.Id, enquiry.Id);
+
+                    if (ed == EmailDecision.DIFFERENT_LEAD) {
+                        System.debug('Email exists with different Lead. Not associating (as per flow).');
+                    }
+                    
                 }
             }
 
@@ -202,8 +247,85 @@ global without sharing class MilesWebService {
             );
 
         } catch (Exception ex) {
-            res.statusCode = 500;
+            System.debug('MilesWebService Error => ' + ex.getMessage() + ' :: ' + ex.getStackTraceString());
+            RestContext.response.statusCode = 500;
+
+            IntegrationLogUtil.insertLogs(new List<Integration_Log__c>{
+                IntegrationLogUtil.buildLog('Enquiry', null, null, 'Error: ' + ex.getMessage(), 'FAILED', null)
+            });
+
             return JSON.serialize(new ApiResponse(false, 'Error: ' + ex.getMessage(), null));
+        }
+    }
+
+    private static EmailDecision handleEmailAssociation(String email, Id leadId, Id candidateId, Id enquiryId) {
+
+        if (String.isBlank(email) || leadId == null) {
+            System.debug('Email association skipped: blank email or leadId is null');
+            return null;
+        }
+
+        List<Email__c> emailList = [SELECT Id, Lead__c, Candidate__c FROM Email__c WHERE Email__c = :email LIMIT 1 ];
+
+        // Email exists
+        if (!emailList.isEmpty()) {
+            Email__c existingEmail = emailList[0];
+
+            // With Different Lead -> Don't associate
+            if (existingEmail.Lead__c != null && existingEmail.Lead__c != leadId) {
+                System.debug('Email__c found linked to DIFFERENT Lead. Not associating.');
+                return EmailDecision.DIFFERENT_LEAD;
+            }
+
+            // With Same Lead
+            if (existingEmail.Lead__c == leadId) {
+                System.debug('Email__c found linked to SAME Lead.');
+                return EmailDecision.SAME_LEAD;
+            }
+
+            // Email exists but Lead__c is null -> safe to associate
+            existingEmail.Lead__c      = leadId;
+            if (existingEmail.Candidate__c == null) existingEmail.Candidate__c = candidateId;
+            // if (existingEmail.Enquiry__c == null)   existingEmail.Enquiry__c   = enquiryId;
+            update existingEmail;
+
+            System.debug('Email__c existed but was unlinked. Now associated.');
+            return EmailDecision.ASSOCIATED_TO_LEAD;
+        }
+
+        // Email Not Exist in SF -> Create email and associate
+        Email__c newEmail = new Email__c(
+            Email__c         = email,
+            Lead__c          = leadId,
+            Candidate__c     = candidateId
+            // Enquiry__c       = enquiryId
+        );
+        insert newEmail;
+
+        System.debug('Email__c created and associated.');
+        return EmailDecision.CREATED_AND_ASSOCIATED;
+    }
+
+    /* =====================================================
+        RE-ENQUIRY MARKING 
+    ===================================================== */
+    private static void markReEnquiry(Lead__c leadRec, Enquiry__c enquiryRec) {
+        try {
+            if (leadRec != null) {
+                leadRec.Is_ReEnquiry__c = true;
+                update leadRec;
+            }
+
+            if (enquiryRec != null) {
+                // safe set (in case field is not present)
+                enquiryRec.put('Is_ReEnquiry__c', true);
+                update enquiryRec;
+            }
+
+            System.debug('Marked Lead__c and Enquiry__c as ReEnquiry.');
+
+        } catch (Exception e) {
+            System.debug('ReEnquiry marking failed: ' + e.getMessage());
         }
     }
 

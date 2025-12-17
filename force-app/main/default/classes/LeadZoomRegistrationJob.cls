@@ -6,7 +6,7 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
 
     private final Set<Id> leadIds;              // Can contain Lead__c + Enquiry__c ids
     private final Id fixedWebinarId;            // Single webinar path
-    private final Set<Id> autoWebinarIds;       // ✅ NEW: multi-webinar path (Auto Register)
+    private final Set<Id> autoWebinarIds;       // ✅: multi-webinar path (Auto Register)
 
     public LeadZoomRegistrationJob(Set<Id> leadIds) {
         this.leadIds         = (leadIds == null) ? new Set<Id>() : new Set<Id>(leadIds);
@@ -60,18 +60,12 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
         List<Lead__c> leads = leadOnlyIds.isEmpty()
             ? new List<Lead__c>()
             : [
-                SELECT Id, Name, Email__c, Phone__c, City__c, Stage__c, OwnerId, Interested_Webinar_Id__c
-                FROM Lead__c
-                WHERE Id IN :leadOnlyIds
-            ];
+                SELECT Id, Name, Email__c, Phone__c, City__c, Stage__c, OwnerId, Interested_Webinar_Id__c FROM Lead__c WHERE Id IN :leadOnlyIds ];
 
         List<Enquiry__c> enquiries = enquiryOnlyIds.isEmpty()
             ? new List<Enquiry__c>()
             : [
-                SELECT Id, Name, Email__c, Phone_Number__c, City__c, Stage__c, OwnerId, Interested_Webinar_Id__c
-                FROM Enquiry__c
-                WHERE Id IN :enquiryOnlyIds
-            ];
+                SELECT Id, Name, Email__c, Phone_Number__c, City__c, Stage__c, OwnerId, Interested_Webinar_Id__c FROM Enquiry__c WHERE Id IN :enquiryOnlyIds ];
 
         if (leads.isEmpty() && enquiries.isEmpty()) {
             logs.add(IntegrationLogUtil.buildLog(
@@ -102,9 +96,6 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
             }
         }
 
-        // If neither passed, we fall back to Interested_Webinar_Id__c logic (existing behavior)
-        // We'll resolve Webinar__c Ids using Webinar_Id__c later for those.
-        // For that, we need record -> zoomWebinarExternalId.
         Map<Id, String> recordIdToZoomWebinarExternal = new Map<Id, String>();
 
         // Call Zoom once (token)
@@ -118,11 +109,7 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
             for (Set<Id> ws : recordToWebinars.values()) neededWebinarIds.addAll(ws);
 
             if (!neededWebinarIds.isEmpty()) {
-                for (Webinar__c w : [
-                    SELECT Id, Webinar_Id__c
-                    FROM Webinar__c
-                    WHERE Id IN :neededWebinarIds
-                ]) {
+                for (Webinar__c w : [SELECT Id, Webinar_Id__c FROM Webinar__c WHERE Id IN :neededWebinarIds ]) {
                     webinarMap.put(w.Id, w);
                 }
             }
@@ -180,11 +167,7 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
                 externalIds.addAll(recordIdToZoomWebinarExternal.values());
 
                 Map<String, Webinar__c> webinarByExternal = new Map<String, Webinar__c>();
-                for (Webinar__c w : [
-                    SELECT Id, Webinar_Id__c
-                    FROM Webinar__c
-                    WHERE Webinar_Id__c IN :externalIds
-                ]) {
+                for (Webinar__c w : [SELECT Id, Webinar_Id__c FROM Webinar__c WHERE Webinar_Id__c IN :externalIds]) {
                     if (String.isNotBlank(w.Webinar_Id__c)) webinarByExternal.put(w.Webinar_Id__c.trim(), w);
                 }
 
@@ -257,35 +240,19 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
         // Existing members
         Map<String, Webinar_Member__c> existingByPair = new Map<String, Webinar_Member__c>();
         for (Webinar_Member__c wm : [
-            SELECT Id, Lead__c, Enquiry__c, Webinar__c, Meeting_Details__c,Registrant_Id__c,
-                   Lead_Owner_at_Registration__c, Lead_Stage_at_Registration__c
-            FROM Webinar_Member__c
-            WHERE Webinar__c IN :webinarIds
-            AND (
-                (Lead__c IN :leadOnlyIds)
-                OR
-                (Enquiry__c IN :enquiryOnlyIds)
-            )
-        ]) {
+            SELECT Id, Lead__c, Enquiry__c, Webinar__c, Meeting_Details__c,Registrant_Id__c,Lead_Owner_at_Registration__c, Lead_Stage_at_Registration__c
+            FROM Webinar_Member__c WHERE Webinar__c IN :webinarIds AND ( (Lead__c IN :leadOnlyIds) OR (Enquiry__c IN :enquiryOnlyIds)) ]) {
             Id rid = (wm.Lead__c != null) ? wm.Lead__c : wm.Enquiry__c;
             existingByPair.put(key(rid, wm.Webinar__c), wm);
         }
 
         Map<Id, Lead__c> leadMap = leadOnlyIds.isEmpty()
             ? new Map<Id, Lead__c>()
-            : new Map<Id, Lead__c>([
-                SELECT Id, Stage__c, OwnerId
-                FROM Lead__c
-                WHERE Id IN :leadOnlyIds
-            ]);
+            : new Map<Id, Lead__c>([SELECT Id, Stage__c, OwnerId FROM Lead__c WHERE Id IN :leadOnlyIds ]);
 
         Map<Id, Enquiry__c> enquiryMap = enquiryOnlyIds.isEmpty()
             ? new Map<Id, Enquiry__c>()
-            : new Map<Id, Enquiry__c>([
-                SELECT Id, Stage__c, OwnerId
-                FROM Enquiry__c
-                WHERE Id IN :enquiryOnlyIds
-            ]);
+            : new Map<Id, Enquiry__c>([SELECT Id, Stage__c, OwnerId FROM Enquiry__c WHERE Id IN :enquiryOnlyIds]);
 
         List<Webinar_Member__c> toInsert = new List<Webinar_Member__c>();
         List<Webinar_Member__c> toUpdate = new List<Webinar_Member__c>();

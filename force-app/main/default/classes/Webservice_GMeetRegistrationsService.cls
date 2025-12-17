@@ -24,8 +24,22 @@ public without sharing class Webservice_GMeetRegistrationsService {
         String method = String.isBlank(cfg.Http_Method__c) ? 'POST' : cfg.Http_Method__c.trim().toUpperCase();
         if (method != 'POST') method = 'POST';
 
-        List<Event> events = [SELECT Id, ConferenceId__c,StartDateTime, EndDateTime, Location, Meeting_type__c FROM Event WHERE Id IN :eventIds];
+        List<Event> events = [SELECT Id,WhatId, ConferenceId__c,Event_Id__c,StartDateTime, EndDateTime, Location, Meeting_type__c FROM Event WHERE Id IN :eventIds];
         if (events.isEmpty()) return;
+
+        Set<Id> leadIds = new Set<Id>();
+        for (Event e : events) {
+            if (e.WhatId != null && e.WhatId.getSObjectType() == Lead__c.SObjectType) {
+                leadIds.add(e.WhatId);
+            }
+        }
+
+        Map<Id, Lead__c> leadMap = new Map<Id, Lead__c>();
+        if (!leadIds.isEmpty()) {
+            for (Lead__c ld : [SELECT Id, Candidate__c FROM Lead__c WHERE Id IN :leadIds]) {
+                leadMap.put(ld.Id, ld);
+            }
+        }
 
         Http http = new Http();
 
@@ -41,12 +55,21 @@ public without sharing class Webservice_GMeetRegistrationsService {
             String startTimeStr = ev.StartDateTime.format('yyyy-MM-dd\'T\'HH:mm:ssZ');
             String endTimeStr   = ev.EndDateTime.format('yyyy-MM-dd\'T\'HH:mm:ssZ');
 
+            Id sfIdToSend = ev.Id;
+            if (ev.WhatId != null && ev.WhatId.getSObjectType() == Lead__c.SObjectType) {
+                Lead__c ld = leadMap.get(ev.WhatId);
+                if (ld != null && ld.Candidate__c != null) {
+                    sfIdToSend = ld.Candidate__c;
+                }
+            }
+
             Map<String, Object> payload = new Map<String, Object>{
-                'meeting_id'   => ev.ConferenceId__c,
-                'sf_id'        => ev.Id,
-                'meeting_type' => ev.Meeting_type__c,
-                'start_time'   => startTimeStr,
-                'end_time'     => endTimeStr
+                'event_id'        => ev.Event_Id__c,
+                'conference_id'   => ev.ConferenceId__c,
+                'sf_id'           => sfIdToSend,
+                'meeting_type'    => ev.Meeting_type__c,
+                'start_time'      => startTimeStr,
+                'end_time'        => endTimeStr
             };
 
             String reqBody = JSON.serialize(payload);

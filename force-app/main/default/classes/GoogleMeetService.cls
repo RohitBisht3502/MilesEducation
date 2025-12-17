@@ -69,6 +69,11 @@ public without sharing class GoogleMeetService {
             ev.put('ConferenceId__c', result.conferenceId);
         }
 
+        if (fMap.containsKey('Event_Id__c') && !String.isBlank(result.eventId)) {
+            ev.put('Event_Id__c', result.eventId);
+        }
+
+
 
         insert ev;
         result.salesforceEventId = ev.Id;
