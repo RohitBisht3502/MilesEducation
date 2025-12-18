@@ -148,28 +148,48 @@ public class WebinarController {
             }
 
             // Call the webservice to get live attendees
-            String responseBody = Webservice_WebinarAttendee.getLiveWebinarAttendees(webinarId);
-            
+            String responseBody = Callout_WebinarAttendee.getLiveWebinarAttendees(webinarId);
+           
             // Parse JSON response
             Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(responseBody);
             
-            if (responseMap == null || !responseMap.containsKey('attendees')) {
+            if (responseMap == null) {
                 throw new AuraHandledException('Invalid response from webinar service');
             }
 
-            List<Object> attendeesList = (List<Object>) responseMap.get('attendees');
             Set<String> liveAttendeeEmails = new Set<String>();
             List<String> liveEmailsList = new List<String>();
-            
-            // Normalize emails to lowercase for comparison
-            for (Object emailObj : attendeesList) {
-                String email = String.valueOf(emailObj).toLowerCase().trim();
-                if (String.isNotBlank(email)) {
-                    liveAttendeeEmails.add(email);
-                    liveEmailsList.add(email);
+
+            // New response format:
+            // { "registrants": [ { "participant_email": "...", "registrant_id": "..." }, ... ] }
+            if (responseMap.containsKey('registrants') && responseMap.get('registrants') instanceof List<Object>) {
+                List<Object> registrants = (List<Object>)responseMap.get('registrants');
+                for (Object registrantObj : registrants) {
+                    if (!(registrantObj instanceof Map<String, Object>)) continue;
+                    Map<String, Object> registrant = (Map<String, Object>)registrantObj;
+                    String email = (String)registrant.get('participant_email');
+                    email = String.isBlank(email) ? null : email.toLowerCase().trim();
+                    if (String.isNotBlank(email)) {
+                        liveAttendeeEmails.add(email);
+                        liveEmailsList.add(email);
+                    }
                 }
             }
-
+            // Backward compatible older format:
+            // { "attendees": [ "a@b.com", ... ] }
+            else if (responseMap.containsKey('attendees') && responseMap.get('attendees') instanceof List<Object>) {
+                List<Object> attendeesList = (List<Object>) responseMap.get('attendees');
+                for (Object emailObj : attendeesList) {
+                    String email = String.valueOf(emailObj).toLowerCase().trim();
+                    if (String.isNotBlank(email)) {
+                        liveAttendeeEmails.add(email);
+                        liveEmailsList.add(email);
+                    }
+                }
+            } else {
+                throw new AuraHandledException('Invalid response from webinar service');
+            }
+            
             return new LiveSyncResultDTO(0, liveAttendeeEmails.size(), liveEmailsList);
 
         } catch (Exception e) {
@@ -185,7 +205,7 @@ public class WebinarController {
         return [
             SELECT 
                 Id,
-                Status__c,
+                Attendance_Status__c,
                 Lead__c,
                 Lead__r.Name,
                 Lead__r.Email__c,
@@ -208,7 +228,7 @@ public class WebinarController {
     private static List<Webinar_Member__c> queryActiveWebinarMembers(Id ownerId, String webinarId) {
         return [
             SELECT 
-                Id, Status__c, Lead__c, Lead__r.Name, Lead__r.Email__c, Lead__r.Phone__c, 
+                Id, Attendance_Status__c, Lead__c, Lead__r.Name, Lead__r.Email__c, Lead__r.Phone__c, 
                 Lead__r.OwnerId, Lead__r.Owner.Name, Webinar__c, Webinar__r.Name, 
                 Webinar__r.Webinar_Id__c, Webinar__r.IsActive__c, CreatedDate
             FROM Webinar_Member__c
@@ -302,7 +322,7 @@ public class WebinarController {
             this.email = m.Lead__r.Email__c;
             this.phone = m.Lead__r.Phone__c;
 
-            this.status = m.Status__c;
+            this.status = m.Attendance_Status__c;
             this.createdDate = m.CreatedDate;
             
             // SPOC info from Lead Owner

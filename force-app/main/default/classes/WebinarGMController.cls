@@ -57,7 +57,7 @@ public with sharing class WebinarGMController {
         List<Webinar_Member__c> members = [
             SELECT 
                 Id,
-                Status__c,
+                Attendance_Status__c,
                 CreatedDate,
                 Lead__r.OwnerId,
                 Lead__r.Owner.Name,
@@ -86,7 +86,7 @@ public with sharing class WebinarGMController {
             sp.totalRegistrations++;
 
             // Attended
-            if (m.Status__c == 'Present') {
+            if (m.Attendance_Status__c == 'Present') {
                 sp.attendedCount++;
             }
 

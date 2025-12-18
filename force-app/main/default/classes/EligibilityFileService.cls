@@ -10,7 +10,7 @@ public without sharing class EligibilityFileService {
     }
 
     public class NewQualificationRequest {
-        public String salesforceId;           // Lead__c.Id
+        public String salesforceId;           // Lead.Id
         public String qualificationType;      // UG / PG / Certification
         public String qualificationTitle;     // B.Com, CA-Inter
         public String qualificationMonthYear; // e.g. "June 2024"
@@ -175,10 +175,10 @@ public without sharing class EligibilityFileService {
         if (incoming == null) incoming = new List<IncomingFile>();
 
         List<Eligibility_File__c> existing = [
-            SELECT Id, Lead__c, Folder__c, File_UUID__c, Status__c,
+            SELECT Id, Candidate__c, Folder__c, File_UUID__c, Status__c,
                    Storage_Key__c, File_Format__c, File_Type__c
             FROM Eligibility_File__c
-            WHERE Lead__c = :leadId
+            WHERE Candidate__c = :leadId
               AND Folder__c = :folderId
         ];
 
@@ -211,7 +211,7 @@ public without sharing class EligibilityFileService {
                 toUpsert.add(upd);
             } else {
                 Eligibility_File__c nf = new Eligibility_File__c();
-                nf.Lead__c = leadId;
+                nf.Candidate__c = leadId;
                 nf.Folder__c = folderId;
                 nf.Name = fileName;
                 nf.File_UUID__c = inf.uuid;
@@ -239,9 +239,9 @@ public without sharing class EligibilityFileService {
             return;
         }
 
-        Lead__c l = [
+        Lead l = [
             SELECT Id, OwnerId, GP_User__c
-            FROM Lead__c
+            FROM Lead
             WHERE Id = :leadId
             LIMIT 1
         ];
@@ -253,7 +253,7 @@ public without sharing class EligibilityFileService {
 
         Task t = new Task();
         t.OwnerId  = ownerForTask;
-        t.WhatId   = l.Id;
+        t.WhoId    = l.Id;
         t.Subject  = 'Upload eligibility documents - ' +
                      (String.isNotBlank(req.qualificationTitle)
                         ? req.qualificationTitle

@@ -8,7 +8,8 @@ import { refreshApex } from '@salesforce/apex';
 
 export default class RoundRobinManagmentSystem extends LightningElement {
   @track cities = [];
-  @track leadSources = [];
+  @track buckets = [];
+
   @track selectedCity = '';
   @track selectedSources = [];
   @track columns = [];
@@ -289,8 +290,9 @@ export default class RoundRobinManagmentSystem extends LightningElement {
   };
 
   get selectedSourcesDisplay() {
-    return this.selectedSources.length ? this.selectedSources.join(', ') : '— Select —';
-  }
+  return this.selectedSources.length ? this.selectedSources.join(', ') : '— Select Bucket —';
+}
+
 
   onCellKeydown = e => {
     if (e.key === 'Enter') {

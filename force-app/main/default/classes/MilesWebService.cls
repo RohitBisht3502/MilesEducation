@@ -83,7 +83,7 @@ global without sharing class MilesWebService {
 
             /* 1) CHECK CANDIDATE (Lead) BY PHONE (Priority) */
             Lead candidate;
-            List<Lead> candidateList = [SELECT Id, Phone, Email FROM Lead WHERE Phone = :inputData.phone LIMIT 1];
+            List<Lead> candidateList = [SELECT Id,OwnerId, Phone, Email FROM Lead WHERE Phone = :inputData.phone LIMIT 1];
             if (!candidateList.isEmpty()) {
                 candidate = candidateList[0];
             }
@@ -159,7 +159,7 @@ global without sharing class MilesWebService {
 
                 // 2) Check Lead__c with Phone + Source (as per NEW diagram)
                 Lead__c existingLeadC;
-                List<Lead__c> leadCs = [SELECT Id, Stage__c, Is_ReEnquiry__c FROM Lead__c WHERE Phone__c = :inputData.phone AND Source__c  = :inputData.coming_from LIMIT 1 ];
+                List<Lead__c> leadCs = [SELECT Id, Stage__c, Is_ReEnquiry__c,OwnerId FROM Lead__c WHERE Phone__c = :inputData.phone AND Source__c  = :inputData.coming_from LIMIT 1 ];
                 if (!leadCs.isEmpty()) existingLeadC = leadCs[0];
 
                 /* ------------------- B1: LEAD EXISTS (Phone + Source) ------------------- */
@@ -239,7 +239,7 @@ global without sharing class MilesWebService {
 
             /* ------------------- CREATE FOLLOW-UP TASK ------------------- */
             String taskSubject = 'Follow Up Call';
-            Task t = MilesExistingEnquiryWebService.createFollowUpTask(enquiry, taskSubject);
+           // Task t = MilesExistingEnquiryWebService.createFollowUpTask(enquiry, taskSubject);
 
             res.statusCode = 201;
             return JSON.serialize(
@@ -358,4 +358,5 @@ global without sharing class MilesWebService {
             this.recordId = recordId;
         }
     }
+
 }

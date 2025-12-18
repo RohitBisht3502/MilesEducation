@@ -1,10 +1,9 @@
 /*
     Author       : ROHIT SINGH BISHT
-    Description  : To create logs
+    Description  : To create logs - Integration Logs
 */
 public without sharing class IntegrationLogUtil {
 
-    // Use a safe picklist value
     public static Integration_Log__c buildLog(
         String integrationType,
         String requestPayload,
@@ -14,19 +13,7 @@ public without sharing class IntegrationLogUtil {
         Integer statusCode
     ) {
         Integration_Log__c log = new Integration_Log__c();
-
-        // Ensure integrationType is valid for restricted picklist
-        List<Schema.PicklistEntry> picklistEntries = Integration_Log__c.Integration_Type__c.getDescribe().getPicklistValues();
-        List<String> allowedValues = new List<String>();
-
-        for (Schema.PicklistEntry pe : picklistEntries) {
-            allowedValues.add(pe.getValue());
-        }
-
-        if (!allowedValues.contains(integrationType)) {
-            integrationType = allowedValues.isEmpty() ? null : allowedValues[0];
-        }
-
+        log.Integration_Type__c = integrationType;
         log.Integration_Type__c = integrationType;
         log.Request_Payload__c  = requestPayload;
         log.Response_Payload__c = responsePayload;

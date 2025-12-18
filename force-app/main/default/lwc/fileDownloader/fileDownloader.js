@@ -2,7 +2,7 @@ import { LightningElement, api, track, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { getRecord } from 'lightning/uiRecordApi';
 import appendUrlsCtx from '@salesforce/apex/AWSFileUploaderService.appendUrlsCtx';
-import getDownloadLinks from '@salesforce/apex/Webservice_AWSFileDownloader.getDownloadLinks';
+import getDownloadLinks from '@salesforce/apex/Callout_AWSFileDownloader.getDownloadLinks';
 
 export default class FileDownloader extends LightningElement {
   @api recordId;

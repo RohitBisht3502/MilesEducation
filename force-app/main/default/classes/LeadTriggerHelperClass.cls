@@ -289,11 +289,7 @@ public without sharing class LeadTriggerHelperClass {
     /**
      * Reparents child records from related leads to their main leads
      */
-    private static List<SObject> reparentChildRecords(
-        List<SObject> childRecords,
-        String parentFieldName,
-        List<Lead__c> relatedLeads
-    ) {
+    private static List<SObject> reparentChildRecords( List<SObject> childRecords, String parentFieldName, List<Lead__c> relatedLeads ) {
         List<SObject> recordsToUpdate = new List<SObject>();
         
         // Create a map of related lead Id to main lead Id
@@ -319,11 +315,7 @@ public without sharing class LeadTriggerHelperClass {
     /**
      * Returns the higher stage based on ranking
      */
-    private static String getHigherStage(
-        String stage1, 
-        String stage2, 
-        Map<String, Integer> stageRankMap
-    ) {
+    private static String getHigherStage(String stage1, String stage2, Map<String, Integer> stageRankMap) {
         if (stage1 == null) return stage2;
         if (stage2 == null) return stage1;
         

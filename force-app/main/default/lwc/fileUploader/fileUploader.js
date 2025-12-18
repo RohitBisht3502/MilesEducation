@@ -2,7 +2,7 @@ import { LightningElement, api, track, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { getRecord } from 'lightning/uiRecordApi';
 import appendUrls from '@salesforce/apex/AWSFileUploaderService.appendUrls';
-import getPresignedUrlApex from '@salesforce/apex/Webservice_AWSFileUploader.getPresignedUrl';
+import getPresignedUrlApex from '@salesforce/apex/Callout_AWSFileUploader.getPresignedUrl';
 
 export default class FileUploader extends LightningElement {
   @api recordId;

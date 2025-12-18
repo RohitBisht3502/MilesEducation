@@ -6,14 +6,14 @@ public without sharing class EligibilityResponseService {
         if (fileId == null) return;
 
         Eligibility_File__c file = [
-            SELECT Id, Lead__c, Folder__c, File_UUID__c, Storage_Key__c, File_Format__c,
+            SELECT Id, Candidate__c, Folder__c, File_UUID__c, Storage_Key__c, File_Format__c,
                    Status__c, Comment__c, Name, File_Type__c
             FROM Eligibility_File__c
             WHERE Id = :fileId
             LIMIT 1
         ];
 
-        if (file.Lead__c == null || file.Folder__c == null) return;
+        if (file.Candidate__c == null || file.Folder__c == null) return;
 
         // Get category + degree folders
         Eligibility_Folder__c categoryFolder = [
@@ -36,7 +36,7 @@ public without sharing class EligibilityResponseService {
         if (degreeFolder == null) return;
 
         EligibilityDatalakeClient.EligibilityResponsePayload payload = new EligibilityDatalakeClient.EligibilityResponsePayload();
-        payload.sf_id = String.valueOf(file.Lead__c);
+        payload.sf_id = String.valueOf(file.Candidate__c);
         payload.qualification_title = String.isNotBlank(degreeFolder.Degree_Title__c) ? degreeFolder.Degree_Title__c : degreeFolder.Name;
         payload.qualification_comment = degreeFolder.Comments__c;
         payload.qualification_status = degreeFolder.Status__c;
@@ -60,12 +60,12 @@ public without sharing class EligibilityResponseService {
         if (folderId == null) return;
 
         Eligibility_Folder__c degreeFolder = [
-            SELECT Id, Lead__c, Name, Degree_Title__c, Status__c, Comments__c
+            SELECT Id, Candidate__c, Name, Degree_Title__c, Status__c, Comments__c
             FROM Eligibility_Folder__c
             WHERE Id = :folderId
             LIMIT 1
         ];
-        if (degreeFolder.Lead__c == null) return;
+        if (degreeFolder.Candidate__c == null) return;
 
         // Collect category folders and their files
         Map<String, Id> categoryIds = new Map<String, Id>();
@@ -78,10 +78,10 @@ public without sharing class EligibilityResponseService {
         }
 
         List<Eligibility_File__c> files = [
-            SELECT Id, Lead__c, Folder__c, File_UUID__c, Storage_Key__c, File_Format__c,
+            SELECT Id, Candidate__c, Folder__c, File_UUID__c, Storage_Key__c, File_Format__c,
                    Status__c, Comment__c, Name, File_Type__c
             FROM Eligibility_File__c
-            WHERE Lead__c = :degreeFolder.Lead__c
+            WHERE Candidate__c = :degreeFolder.Candidate__c
               AND Folder__c IN :categoryIds.values()
         ];
 
@@ -99,7 +99,7 @@ public without sharing class EligibilityResponseService {
         }
 
         EligibilityDatalakeClient.EligibilityResponsePayload payload = new EligibilityDatalakeClient.EligibilityResponsePayload();
-        payload.sf_id = String.valueOf(degreeFolder.Lead__c);
+        payload.sf_id = String.valueOf(degreeFolder.Candidate__c);
         payload.qualification_title = String.isNotBlank(degreeFolder.Degree_Title__c) ? degreeFolder.Degree_Title__c : degreeFolder.Name;
         payload.qualification_comment = degreeFolder.Comments__c;
         payload.qualification_status = degreeFolder.Status__c;

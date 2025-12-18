@@ -2,7 +2,7 @@
     Author       : ROHIT SINGH BISHT
     Description  : get Live Attendance of Webinars 
 */
-public without sharing class Webservice_WebinarAttendee {
+public without sharing class Callout_WebinarAttendee {
     
     @AuraEnabled(cacheable=false)
     public static String getLiveWebinarAttendees(String webinarId) {

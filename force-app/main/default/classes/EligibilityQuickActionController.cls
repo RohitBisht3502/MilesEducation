@@ -19,9 +19,9 @@ public without sharing class EligibilityQuickActionController {
             throw new AuraHandledException('Record Id is required.');
         }
         String eligibility = 'Eligibility Criteria';
-        List<Lead__c> lead = [SELECT Id, OwnerId,Phone__c, City__c, Course__c, Source__c,Source_Bucket__c,GP_User__c FROM Lead__c WHERE Id = :recordId LIMIT 1];
+        //List<Lead> lead = [SELECT Id, OwnerId, Phone__c, City__c, Course__c, Source__c, Source_Bucket__c, GP_User__c FROM Lead WHERE Id = :recordId LIMIT 1];
 
-        RoundRobinAssigner.assignLeadsWithStickyAndRoundRobin(lead, eligibility);
+        //RoundRobinAssigner.assignLeadsWithStickyAndRoundRobin(lead, eligibility);
 
         EligibilityFolderService.createFoldersForLead(recordId);
     }

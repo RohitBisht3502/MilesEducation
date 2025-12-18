@@ -61,7 +61,7 @@ public without sharing class EligibilityReviewController {
                    Degree_Title__c, Level__c, Month_Year__c, Parent_Folder__c,
                    Comments__c, CreatedDate
             FROM Eligibility_Folder__c
-            WHERE Lead__c = :leadId
+            WHERE Candidate__c = :leadId
             ORDER BY Level__c, Name
         ];
 
@@ -70,7 +70,7 @@ public without sharing class EligibilityReviewController {
                    Percentage__c, Year_of_Graduation__c, Grade__c, Rank_Division__c,
                    University__c, Comment__c, Folder__c, CreatedDate
             FROM Eligibility_File__c
-            WHERE Lead__c = :leadId
+            WHERE Candidate__c = :leadId
         ];
 
         Map<Id, FolderNode> folderMap = new Map<Id, FolderNode>();
@@ -141,9 +141,9 @@ public without sharing class EligibilityReviewController {
     @AuraEnabled(cacheable=true)
     public static String getLeadEligibilityStatus(Id leadId) {
         if (leadId == null) return null;
-        Lead__c l = [
+        Lead l = [
             SELECT Id, GP_Lead_Status__c
-            FROM Lead__c
+            FROM Lead
             WHERE Id = :leadId
             LIMIT 1
         ];
@@ -211,7 +211,7 @@ public without sharing class EligibilityReviewController {
         }
 
         Eligibility_File__c file = [
-            SELECT Id, Folder__c, Lead__c, Name, Status__c, File_Type__c
+            SELECT Id, Folder__c, Candidate__c, Name, Status__c, File_Type__c
             FROM Eligibility_File__c
             WHERE Id = :input.fileId
             LIMIT 1
@@ -231,17 +231,17 @@ public without sharing class EligibilityReviewController {
         EligibilityFolderService.recalcFromFiles(new Set<Id>{ file.Id });
 
         // Task on file status change (except Verified)
-        if (file.Lead__c != null && oldStatus != newStatus && newStatus != 'Verified') {
-            Lead__c l = [
+        if (file.Candidate__c != null && oldStatus != newStatus && newStatus != 'Verified') {
+            Lead l = [
                 SELECT Id, OwnerId
-                FROM Lead__c
-                WHERE Id = :file.Lead__c
+                FROM Lead
+                WHERE Id = :file.Candidate__c
                 LIMIT 1
             ];
             if (l.OwnerId != null) {
                 Task t = new Task();
                 t.OwnerId = l.OwnerId;
-                t.WhatId = l.Id;
+                t.WhoId = l.Id;
                 t.Subject = 'Eligibility file status updated - ' + (String.isNotBlank(file.Name) ? file.Name : 'Document');
                 t.Status = 'Not Started';
                 t.Priority = 'High';
@@ -289,7 +289,7 @@ public without sharing class EligibilityReviewController {
         }
 
         Eligibility_Folder__c oldFolder = [
-            SELECT Id, Lead__c, Name, Status__c, Comments__c, Folder_Type__c
+            SELECT Id, Candidate__c, Name, Status__c, Comments__c, Folder_Type__c
             FROM Eligibility_Folder__c
             WHERE Id = :folderId
             LIMIT 1
@@ -313,7 +313,7 @@ public without sharing class EligibilityReviewController {
         // Build "new" snapshot for service
         Eligibility_Folder__c newFolder = new Eligibility_Folder__c(
             Id = oldFolder.Id,
-            Lead__c = oldFolder.Lead__c,
+            Candidate__c = oldFolder.Candidate__c,
             Name = oldFolder.Name,
             Status__c = finalStatus,
             Comments__c = finalComment

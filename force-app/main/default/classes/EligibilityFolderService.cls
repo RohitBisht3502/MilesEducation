@@ -9,7 +9,7 @@ public without sharing class EligibilityFolderService {
         Integer existing = [
             SELECT COUNT()
             FROM Eligibility_Folder__c
-            WHERE Lead__c = :leadId
+            WHERE Candidate__c = :leadId
         ];
 
         if (existing > 0) {
@@ -31,7 +31,7 @@ public without sharing class EligibilityFolderService {
         for (Eligibility_Folder_Template__c tpl : templates) {
             Eligibility_Folder__c f = new Eligibility_Folder__c();
             f.Name                  = tpl.Name;
-            f.Lead__c               = leadId;
+            f.Candidate__c          = leadId;
             f.Level__c              = tpl.Level__c;
             f.Folder_Type__c        = tpl.Folder_Type__c;
             f.Qualification_Type__c = tpl.Qualification_Type__c;
@@ -80,7 +80,7 @@ public without sharing class EligibilityFolderService {
         List<Eligibility_Folder__c> degList = [
             SELECT Id, Status__c, Parent_Folder__c, Month_Year__c
             FROM Eligibility_Folder__c
-            WHERE Lead__c = :leadId
+            WHERE Candidate__c = :leadId
               AND Qualification_Type__c = :qualificationType
               AND Degree_Title__c = :degreeTitle
               AND Folder_Type__c = 'Degree'
@@ -116,7 +116,7 @@ public without sharing class EligibilityFolderService {
         List<Eligibility_Folder__c> cs = [
             SELECT Id, Parent_Folder__c
             FROM Eligibility_Folder__c
-            WHERE Lead__c = :leadId
+            WHERE Candidate__c = :leadId
               AND Qualification_Type__c = :qualificationType
               AND Degree_Title__c = :degreeTitle
               AND Folder_Type__c = :folderType
@@ -135,7 +135,7 @@ public without sharing class EligibilityFolderService {
         List<Eligibility_Folder__c> existingType = [
             SELECT Id
             FROM Eligibility_Folder__c
-            WHERE Lead__c = :leadId
+            WHERE Candidate__c = :leadId
               AND Folder_Type__c = 'QualificationType'
               AND Qualification_Type__c = :qualificationType
             LIMIT 1
@@ -143,7 +143,7 @@ public without sharing class EligibilityFolderService {
         if (existingType.isEmpty()) {
             typeFolder = new Eligibility_Folder__c(
                 Name                  = qualificationType,
-                Lead__c               = leadId,
+                Candidate__c          = leadId,
                 Level__c              = '1',
                 Folder_Type__c        = 'QualificationType',
                 Qualification_Type__c = qualificationType
@@ -156,7 +156,7 @@ public without sharing class EligibilityFolderService {
         // Level 2 – Degree folder
         Eligibility_Folder__c degreeFolder = new Eligibility_Folder__c(
             Name                  = degreeTitle,
-            Lead__c               = leadId,
+            Candidate__c          = leadId,
             Level__c              = '2',
             Folder_Type__c        = 'Degree',
             Qualification_Type__c = qualificationType,
@@ -169,7 +169,7 @@ public without sharing class EligibilityFolderService {
         // Level 3 – Certificates / Marksheets under degree
         Eligibility_Folder__c certFolder = new Eligibility_Folder__c(
             Name                  = 'Certificates',
-            Lead__c               = leadId,
+            Candidate__c          = leadId,
             Level__c              = '3',
             Folder_Type__c        = 'Certificates',
             Qualification_Type__c = qualificationType,
@@ -178,7 +178,7 @@ public without sharing class EligibilityFolderService {
         );
         Eligibility_Folder__c marksFolder = new Eligibility_Folder__c(
             Name                  = 'Marksheets',
-            Lead__c               = leadId,
+            Candidate__c          = leadId,
             Level__c              = '3',
             Folder_Type__c        = 'Marksheets',
             Qualification_Type__c = qualificationType,
@@ -197,7 +197,7 @@ public without sharing class EligibilityFolderService {
         List<Eligibility_Folder__c> folders = [
             SELECT Id, Status__c
             FROM Eligibility_Folder__c
-            WHERE Lead__c = :leadId
+            WHERE Candidate__c = :leadId
         ];
         if (folders.isEmpty()) return;
 
@@ -227,30 +227,30 @@ public without sharing class EligibilityFolderService {
         Eligibility_Folder__c newRec
     ) {
         if (oldRec == null || newRec == null) return;
-        if (newRec.Lead__c == null) return;
+        if (newRec.Candidate__c == null) return;
 
         // Only degree (eligibility title) folders allow status/comment updates
         if (oldRec.Folder_Type__c != 'Degree') {
             return;
         }
 
-        Set<Id> leadIds = new Set<Id>{ newRec.Lead__c };
+        Set<Id> leadIds = new Set<Id>{ newRec.Candidate__c };
         List<Task> tasks = new List<Task>();
 
         Boolean statusChanged  = oldRec.Status__c   != newRec.Status__c;
         Boolean commentChanged = oldRec.Comments__c != newRec.Comments__c;
 
         if (statusChanged || commentChanged) {
-            Lead__c l = [
+            Lead l = [
                 SELECT Id, OwnerId
-                FROM Lead__c
-                WHERE Id = :newRec.Lead__c
+                FROM Lead
+                WHERE Id = :newRec.Candidate__c
                 LIMIT 1
             ];
             if (l.OwnerId != null) {
                 Task t = new Task();
                 t.OwnerId = l.OwnerId;
-                t.WhatId  = l.Id;
+                t.WhoId   = l.Id;
                 t.ActivityDate = System.today();
 
                 if (statusChanged) {
@@ -297,12 +297,12 @@ public without sharing class EligibilityFolderService {
 
         Set<Id> leadIds = new Set<Id>();
         for (Eligibility_File__c f : [
-            SELECT Lead__c
+            SELECT Candidate__c
             FROM Eligibility_File__c
             WHERE Id IN :fileIds
-              AND Lead__c != null
+              AND Candidate__c != null
         ]) {
-            leadIds.add(f.Lead__c);
+            leadIds.add(f.Candidate__c);
         }
 
         if (!leadIds.isEmpty()) {
@@ -319,12 +319,12 @@ public without sharing class EligibilityFolderService {
 
         Set<Id> leadIds = new Set<Id>();
         for (Eligibility_Folder__c f : [
-            SELECT Lead__c
+            SELECT Candidate__c
             FROM Eligibility_Folder__c
             WHERE Id IN :folderIds
-              AND Lead__c != null
+              AND Candidate__c != null
         ]) {
-            leadIds.add(f.Lead__c);
+            leadIds.add(f.Candidate__c);
         }
 
         if (!leadIds.isEmpty()) {
@@ -351,23 +351,23 @@ public without sharing class EligibilityFolderService {
 
         Map<Id, List<Eligibility_File__c>> filesByLead = new Map<Id, List<Eligibility_File__c>>();
         for (Eligibility_File__c f : [
-            SELECT Id, Lead__c, Status__c
+            SELECT Id, Candidate__c, Status__c
             FROM Eligibility_File__c
-            WHERE Lead__c IN :leadIds
+            WHERE Candidate__c IN :leadIds
         ]) {
-            if (!filesByLead.containsKey(f.Lead__c)) {
-                filesByLead.put(f.Lead__c, new List<Eligibility_File__c>());
+            if (!filesByLead.containsKey(f.Candidate__c)) {
+                filesByLead.put(f.Candidate__c, new List<Eligibility_File__c>());
             }
-            filesByLead.get(f.Lead__c).add(f);
+            filesByLead.get(f.Candidate__c).add(f);
         }
 
-        Map<Id, Lead__c> existingLeads = new Map<Id, Lead__c>([
+        Map<Id, Lead> existingLeads = new Map<Id, Lead>([
             SELECT Id, GP_Lead_Status__c
-            FROM Lead__c
+            FROM Lead
             WHERE Id IN :leadIds
         ]);
 
-        List<Lead__c> updates = new List<Lead__c>();
+        List<Lead> updates = new List<Lead>();
 
         for (Id lid : leadIds) {
             List<Eligibility_File__c> flist = filesByLead.get(lid);
@@ -401,10 +401,10 @@ public without sharing class EligibilityFolderService {
                 newStatus = 'Verification';
             }
 
-            Lead__c existing = existingLeads.get(lid);
+            Lead existing = existingLeads.get(lid);
             if (existing == null || existing.GP_Lead_Status__c == newStatus) continue;
 
-            updates.add(new Lead__c(
+            updates.add(new Lead(
                 Id = lid,
                 GP_Lead_Status__c = newStatus
             ));
@@ -420,9 +420,9 @@ public without sharing class EligibilityFolderService {
     private static void generateEligibilityCodeForLead(Id leadId) {
         if (leadId == null) return;
 
-        Lead__c l = [
+        Lead l = [
             SELECT Id, City__c, Eligibility_Code__c, CreatedDate
-            FROM Lead__c
+            FROM Lead
             WHERE Id = :leadId
             LIMIT 1
         ];
@@ -441,7 +441,7 @@ public without sharing class EligibilityFolderService {
 
         Integer countToday = [
             SELECT COUNT()
-            FROM Lead__c
+            FROM Lead
             WHERE Eligibility_Code__c != null
               AND CreatedDate = TODAY
         ];
@@ -453,7 +453,7 @@ public without sharing class EligibilityFolderService {
                       String.valueOf(today.month()) + '/' +
                       String.valueOf(seq);
 
-        update new Lead__c(
+        update new Lead(
             Id = l.Id,
             Eligibility_Code__c = code
         );

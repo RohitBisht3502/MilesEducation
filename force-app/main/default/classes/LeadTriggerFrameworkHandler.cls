@@ -60,6 +60,8 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         LeadTriggerHelperClass.afterUpdateAutoRegisterWebinar((Map<Id, Lead__c>)newMap, oldMapLead);
         // 3. Create activity logs for Merged Leads (AFTER merge logic completes)
         LeadTriggerHandler.createMergeLeadActivityLogs(newLeads, oldMapLead);
+        // sync owner to ()
+        LeadSyncOwnerChange.syncOnOwnerChange(oldMapLead, (Map<Id, Lead__c>)newMap);
     }
 
     public override void beforeDelete() {
