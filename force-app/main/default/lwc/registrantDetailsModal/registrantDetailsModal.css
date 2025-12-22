@@ -1,0 +1,197 @@
+/* ================= ROOT THEME ================= */
+:host {
+    --ice-blue: #e6f4ff;
+    --glacier-blue: #b3ddff;
+    --mountain-blue: #2f80ed;
+    --deep-blue: #1b4f9c;
+    --ice-grey: #f4f6f9;
+    --text-dark: #1f2933;
+    --text-muted: #6b7280;
+}
+
+/* ================= GLOBAL CARD ================= */
+lightning-card {
+    border-radius: 16px;
+    overflow: hidden;
+    background: linear-gradient(
+        135deg,
+        var(--ice-blue),
+        var(--ice-grey)
+    );
+}
+
+/* ================= CENTER SPINNER ================= */
+.centered {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 180px;
+}
+
+/* ================= ERROR ================= */
+.error-box {
+    background: linear-gradient(135deg, #ffe5e5, #fff5f5);
+    color: #b91c1c;
+    padding: 12px 16px;
+    border-radius: 10px;
+    margin: 12px;
+    font-weight: 600;
+    animation: fadeIn 0.4s ease-in;
+}
+
+/* ================= SUMMARY CARD ================= */
+.summary-card {
+    background: linear-gradient(
+        135deg,
+        #ffffff,
+        var(--ice-grey)
+    );
+    border-radius: 16px;
+    padding: 18px;
+    margin: 16px;
+    box-shadow: 0 10px 25px rgba(47, 128, 237, 0.15);
+    animation: slideUp 0.5s ease;
+}
+
+.summary-col {
+    padding: 10px 14px;
+}
+
+/* ================= INFO ROW ================= */
+.info-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 14px;
+    color: var(--text-dark);
+    transition: transform 0.3s ease, color 0.3s ease;
+}
+
+.info-row span {
+    font-weight: 600;
+    color: var(--deep-blue);
+}
+
+.info-row:hover {
+    transform: translateX(4px);
+    color: var(--mountain-blue);
+}
+
+/* ================= META TEXT ================= */
+.meta-text {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
+/* ================= SECTION TITLE ================= */
+.section-title {
+    margin: 20px 16px 10px;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--deep-blue);
+    border-left: 4px solid var(--mountain-blue);
+    padding-left: 10px;
+}
+
+/* ================= POLL CARD ================= */
+.poll-card {
+    background: linear-gradient(
+        135deg,
+        #ffffff,
+        #f0f7ff
+    );
+    border-radius: 14px;
+    margin: 12px 16px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.poll-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px rgba(47, 128, 237, 0.25);
+}
+
+/* ================= POLL HEADER ================= */
+.poll-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    cursor: pointer;
+}
+
+.poll-question {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-dark);
+}
+
+/* ================= POLL BODY ================= */
+.poll-body {
+    padding: 12px 18px 16px;
+    font-size: 13px;
+    color: var(--text-dark);
+    border-top: 1px solid #e5e7eb;
+    animation: expandFade 0.35s ease;
+}
+
+.poll-body p {
+    margin: 6px 0;
+}
+
+/* ================= PAGINATION ================= */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+}
+
+.page-indicator {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--deep-blue);
+}
+
+/* ================= FOOTER ================= */
+.footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px 16px;
+    background: linear-gradient(
+        135deg,
+        var(--ice-grey),
+        #ffffff
+    );
+}
+
+/* ================= ANIMATIONS ================= */
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes expandFade {
+    from {
+        opacity: 0;
+        transform: scaleY(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scaleY(1);
+    }
+}

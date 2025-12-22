@@ -1,0 +1,125 @@
+<template>
+    <lightning-card title="Registrant Details" icon-name="standard:event">
+
+        <!-- Spinner -->
+        <template if:true={isLoading}>
+            <div class="centered">
+                <lightning-spinner alternative-text="Loading"></lightning-spinner>
+            </div>
+        </template>
+
+        <!-- Error -->
+        <template if:true={error}>
+            <div class="error-box">
+                {error}
+            </div>
+        </template>
+
+        <template if:true={data}>
+
+            <!-- 🔹 SUMMARY SECTION -->
+            <div class="summary-card">
+                <div class="slds-grid slds-wrap">
+
+                    <div class="slds-col slds-size_1-of-2 summary-col">
+                        <p class="info-row">
+                            <lightning-icon icon-name="utility:id" size="x-small"></lightning-icon>
+                            <span>Registrant:</span> {data.registrantId}
+                        </p>
+
+                        <p class="info-row">
+                            <lightning-icon icon-name="standard:lead" size="x-small"></lightning-icon>
+                            <span>Candidate:</span> {data.candidateId}
+                        </p>
+
+                        <p class="info-row">
+                            <lightning-icon icon-name="utility:email" size="x-small"></lightning-icon>
+                            <span>Email:</span> {data.email}
+                        </p>
+                    </div>
+
+                    <div class="slds-col slds-size_1-of-2 summary-col">
+                        <p class="info-row">
+                            <lightning-icon icon-name="standard:event" size="x-small"></lightning-icon>
+                            <span>Webinar:</span>
+                            <span>{data.webinarId}</span>
+                        </p>
+
+                        <p class="info-row">
+                            <lightning-icon icon-name="utility:clock" size="x-small"></lightning-icon>
+                            <span>Duration:</span>
+                            <span>{data.duration}</span>
+                        </p>
+
+                        <p class="meta-text"><b>Joined:</b> {data.joinedAt}</p>
+                        <p class="meta-text"><b>Left:</b> {data.leftAt}</p>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- 🔹 POLL RESPONSES -->
+            <template if:true={pagedPolls.length}>
+
+                <div class="section-title">
+                    Poll Responses
+                </div>
+
+                <template for:each={pagedPolls} for:item="poll" for:index="index">
+                    <div key={poll.key} class="poll-card">
+
+                        <div class="poll-header">
+                            <lightning-button-icon
+                                icon-name={poll.iconName}
+                                alternative-text="Toggle"
+                                data-index={index}
+                                onclick={toggleCard}>
+                            </lightning-button-icon>
+
+                            <span class="poll-question">{poll.question}</span>
+                        </div>
+
+                        <template if:true={poll.isOpen}>
+                            <div class="poll-body">
+                                <p><b>Answer:</b> {poll.answer}</p>
+                                <p><b>Type:</b> {poll.pollType}</p>
+                                <p><b>Date:</b> {poll.date_time}</p>
+                            </div>
+                        </template>
+
+                    </div>
+                </template>
+
+                <!-- 🔹 PAGINATION -->
+                <div class="pagination">
+                    <lightning-button
+                        label="Previous"
+                        onclick={prevPage}
+                        disabled={isFirstPage}>
+                    </lightning-button>
+
+                    <span class="page-indicator">
+                        Page {currentPage} of {totalPages}
+                    </span>
+
+                    <lightning-button
+                        label="Next"
+                        onclick={nextPage}
+                        disabled={isLastPage}>
+                    </lightning-button>
+                </div>
+
+            </template>
+
+        </template>
+
+        <div slot="footer" class="footer">
+            <lightning-button
+                label="Close"
+                variant="brand"
+                onclick={closeModal}>
+            </lightning-button>
+        </div>
+
+    </lightning-card>
+</template>

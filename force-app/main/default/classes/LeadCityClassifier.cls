@@ -90,10 +90,7 @@ public without sharing class LeadCityClassifier {
             if (leadIds == null || leadIds.isEmpty()) return;
 
             List<Lead__c> leads = [
-                SELECT Id, Email__c, Phone__c,  City__c 
-                FROM Lead__c 
-                WHERE Id IN :leadIds
-            ];
+                SELECT Id, Email__c, Phone__c,  City__c  FROM Lead__c  WHERE Id IN :leadIds];
 
             List<Integration_Log__c> logs = new List<Integration_Log__c>();
             List<Lead__c> leadsToUpdate = new List<Lead__c>();

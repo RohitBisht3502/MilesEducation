@@ -290,7 +290,7 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
                 if (isLead) wm.Lead__c = rid;
                 else wm.Enquiry__c = rid;
 
-                wm.Lead_Owner_at_Registration__c = ownerId;
+                wm.Lead_Owner_at_Registration__c = UserInfo.getUserId();
                 wm.Lead_Stage_at_Registration__c = stageVal;
 
                 toInsert.add(wm);
@@ -301,7 +301,7 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
                 if (isLead) { existing.Lead__c = rid; existing.Enquiry__c = null; }
                 else { existing.Enquiry__c = rid; existing.Lead__c = null; }
 
-                existing.Lead_Owner_at_Registration__c = ownerId;
+                existing.Lead_Owner_at_Registration__c = UserInfo.getUserId();
                 existing.Lead_Stage_at_Registration__c = stageVal;
 
                 toUpdate.add(existing);
