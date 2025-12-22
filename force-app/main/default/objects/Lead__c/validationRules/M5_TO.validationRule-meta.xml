@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>M5_TO</fullName>
+    <active>false</active>
+    <errorConditionFormula>AND(
+    ISPICKVAL(PRIORVALUE(Stage__c), &quot;M5&quot;),
+    NOT(ISPICKVAL(Stage__c, &quot;M5&quot;)),
+    NOT(
+        OR(
+            ISPICKVAL(Stage__c,&quot;M6&quot;),
+            ISPICKVAL(Stage__c,&quot;M4&quot;),
+            ISPICKVAL(Stage__c,&quot;M4-&quot;),
+            ISPICKVAL(Stage__c,&quot;M7&quot;)
+        )
+    )
+)</errorConditionFormula>
+    <errorMessage>Invalid next stage from M5. Allowed: M6, M4, M4-, M7.</errorMessage>
+</ValidationRule>

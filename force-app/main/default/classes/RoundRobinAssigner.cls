@@ -3,70 +3,102 @@
     Description  : 
 */
 public without sharing class RoundRobinAssigner {
-    public static void assignLeadsWithStickyAndRoundRobin(List<Lead__c> leads, String type) {
-        if (leads == null || leads.isEmpty()) return;
 
-        String normType = String.isBlank(type) ? 'Round Robin' : type.trim();
-        Boolean isEligibility = normType != null && normType.equalsIgnoreCase('Eligibility Criteria');
+    public static void assignWithStickyAndRoundRobin(List<SObject> records, String objectApiName, String type) {
+        if (records == null || records.isEmpty()) {
+            System.debug(LoggingLevel.INFO, 'RoundRobinAssigner.assignWithStickyAndRoundRobin: no records');
+            return;
+        }
+
+        RoundRobinConfigProvider.Config cfg = RoundRobinConfigProvider.getConfig(objectApiName, type);
+        if (cfg == null) {
+            System.debug(LoggingLevel.WARN, 'RoundRobinAssigner.assignWithStickyAndRoundRobin: config not found for object=' + objectApiName + ', type=' + type);
+            return;
+        }
+        System.debug(LoggingLevel.INFO, 'RoundRobinAssigner.assignWithStickyAndRoundRobin: start, records=' + records.size() + ', object=' + objectApiName);
+
+        String phoneField  = cfg.phoneField;
+        String sourceField = cfg.sourceField;
 
         Set<String> phones  = new Set<String>();
         Set<String> sources = new Set<String>();
 
-        for (Lead__c l : leads) {
-            if (!String.isBlank(l.Phone__c)) phones.add(l.Phone__c.trim());
-            if (!String.isBlank(l.Source_Bucket__c)) sources.add(l.Source_Bucket__c.trim());
+        if (cfg.enableSticky) {
+            for (SObject s : records) {
+                String phone = (phoneField != null) ? String.valueOf(s.get(phoneField)) : null;
+                String src   = (sourceField != null) ? String.valueOf(s.get(sourceField)) : null;
+
+                if (!String.isBlank(phone)) phones.add(phone.trim());
+                if (!String.isBlank(src)) sources.add(src.trim());
+            }
         }
 
         Map<String, Id> phoneSourceToUser = new Map<String, Id>();
         Datetime cutoff = System.now().addSeconds(-30);
 
-        if (!phones.isEmpty() && !sources.isEmpty()) {
-            List<Lead__c> existingLeads = [
-                SELECT Id, OwnerId, GP_User__c, Phone__c, Source_Bucket__c FROM Lead__c WHERE Phone__c IN :phones AND Source_Bucket__c IN :sources AND CreatedDate <= :cutoff ];
+        if (cfg.enableSticky && !phones.isEmpty() && (cfg.ignoreSource || !sources.isEmpty())) {
+            String soql =
+                'SELECT Id,' + cfg.stickyUserField + ',' + phoneField +
+                (cfg.ignoreSource ? '' : (',' + sourceField)) +
+                ' FROM ' + objectApiName +
+                ' WHERE ' + phoneField + ' IN :phones' +
+                (cfg.ignoreSource ? '' : (' AND ' + sourceField + ' IN :sources')) +
+                ' AND CreatedDate <= :cutoff';
 
-            for (Lead__c ex : existingLeads) {
-                if (String.isBlank(ex.Phone__c) || String.isBlank(ex.Source_Bucket__c)) continue;
-                String key = ex.Phone__c.trim() + '|' + ex.Source_Bucket__c.trim();
+            List<SObject> existing = Database.query(soql);
+
+            for (SObject ex : existing) {
+                String phone = (phoneField != null) ? String.valueOf(ex.get(phoneField)) : null;
+                String src   = cfg.ignoreSource ? '(ANY)' : String.valueOf(ex.get(sourceField));
+
+                if (String.isBlank(phone)) continue;
+                if (!cfg.ignoreSource && String.isBlank(src)) continue;
+
+                String key = phone.trim() + '|' + (cfg.ignoreSource ? '(ANY)' : src.trim());
                 if (!phoneSourceToUser.containsKey(key)) {
-                    Id userId = isEligibility ? ex.GP_User__c : ex.OwnerId;
+                    Id userId = (Id) ex.get(cfg.stickyUserField);
                     if (userId != null) phoneSourceToUser.put(key, userId);
                 }
             }
         }
 
-        List<Lead__c> leadsForRoundRobin = new List<Lead__c>();
-        List<Lead__c> stickyEligibilityLeadsToUpdate = new List<Lead__c>();
+        List<SObject> forRoundRobin = new List<SObject>();
+        Integer stickyAssigned = 0;
 
-        for (Lead__c l : leads) {
-            String phone  = l.Phone__c;
-            String source = l.Source_Bucket__c;
+        for (SObject s : records) {
             Boolean assigned = false;
 
-            if (!String.isBlank(phone) && !String.isBlank(source)) {
-                String key = phone.trim() + '|' + source.trim();
-                Id existingUser = phoneSourceToUser.get(key);
-                if (existingUser != null) {
-                    if (isEligibility) {
-                        l.GP_User__c = existingUser;
-                        stickyEligibilityLeadsToUpdate.add(l);
-                    } else {
-                        l.OwnerId = existingUser;
+            if (cfg.enableSticky) {
+                String phone = (phoneField != null) ? String.valueOf(s.get(phoneField)) : null;
+                String src   = cfg.ignoreSource ? '(ANY)' : (sourceField != null ? String.valueOf(s.get(sourceField)) : null);
+
+                if (!String.isBlank(phone) && (cfg.ignoreSource || !String.isBlank(src))) {
+                    String key = phone.trim() + '|' + (cfg.ignoreSource ? '(ANY)' : src.trim());
+                    Id stickyUser = phoneSourceToUser.get(key);
+                    if (stickyUser != null) {
+                        setAssignee(s, cfg.assignToField, stickyUser);
+                        assigned = true;
+                        stickyAssigned++;
                     }
-                    assigned = true;
                 }
             }
 
-            if (!assigned) {
-                leadsForRoundRobin.add(l);
-            }
+            if (!assigned) forRoundRobin.add(s);
         }
 
-        if (isEligibility && !stickyEligibilityLeadsToUpdate.isEmpty()) {
-            update stickyEligibilityLeadsToUpdate;
+        if (!forRoundRobin.isEmpty()) {
+            RoundRobinService.assignForRecords(forRoundRobin, cfg);
         }
+        System.debug(LoggingLevel.INFO, 'RoundRobinAssigner.assignWithStickyAndRoundRobin: done, stickyAssigned=' + stickyAssigned + ', roundRobinQueued=' + forRoundRobin.size());
+    }
 
-        if (!leadsForRoundRobin.isEmpty()) {
-            RoundRobinService.assignForLeads(leadsForRoundRobin, normType);
+    private static void setAssignee(SObject s, String assignToField, Id userId) {
+        if (String.isBlank(assignToField) || userId == null) return;
+
+        if (assignToField == 'OwnerId') {
+            s.put('OwnerId', userId);
+        } else {
+            s.put(assignToField, userId);
         }
     }
 }

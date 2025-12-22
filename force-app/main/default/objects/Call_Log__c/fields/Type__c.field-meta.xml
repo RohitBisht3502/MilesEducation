@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Type__c</fullName>
+    <label>Type</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>incoming</fullName>
+                <default>false</default>
+                <label>incoming</label>
+            </value>
+            <value>
+                <fullName>outgoing</fullName>
+                <default>false</default>
+                <label>outgoing</label>
+            </value>
+            <value>
+                <fullName>missed</fullName>
+                <default>false</default>
+                <label>missed</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

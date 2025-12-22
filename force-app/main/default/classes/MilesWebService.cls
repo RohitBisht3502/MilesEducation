@@ -109,6 +109,7 @@ global without sharing class MilesWebService {
                     Company                  = 'Test Company',
                     Phone                    = inputData.phone,
                     Email                    = inputData.email,
+                    Course__c                = inputData.course,
                     Coming_From__c           = inputData.coming_from,
                     Register_for_Webinar__c  = inputData.register_for_webinar,
                     Interested_Webinar_ID__c = inputData.interested_webinar_id

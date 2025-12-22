@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Lead_Stage_at_Registration__c</fullName>
+    <description>This field will populate lead stage when Lead register for webinar.</description>
+    <externalId>false</externalId>
+    <label>Lead Stage at Registration</label>
+    <length>255</length>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

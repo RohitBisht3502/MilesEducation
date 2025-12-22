@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>RunoAllocationAPI</label>
+    <protected>false</protected>
+    <values>
+        <field>Api_Key_Header__c</field>
+        <value xsi:type="xsd:string">Auth-Key</value>
+    </values>
+    <values>
+        <field>Api_Key__c</field>
+        <value xsi:type="xsd:string">MTl5ZG5tcHhqOTE3MjE2NTQ=</value>
+    </values>
+    <values>
+        <field>Endpoint_URL__c</field>
+        <value xsi:type="xsd:string">https://api.runo.in/v1/crm/allocation?isAutoDialLead=true</value>
+    </values>
+    <values>
+        <field>Http_Method__c</field>
+        <value xsi:type="xsd:string">POST</value>
+    </values>
+    <values>
+        <field>Is_Active__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+</CustomMetadata>

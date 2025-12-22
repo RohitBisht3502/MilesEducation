@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Folder_Type__c</fullName>
+    <label>Folder Type</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>QualificationType</fullName>
+                <default>false</default>
+                <label>QualificationType</label>
+            </value>
+            <value>
+                <fullName>Degree</fullName>
+                <default>false</default>
+                <label>Degree</label>
+            </value>
+            <value>
+                <fullName>Certificates</fullName>
+                <default>false</default>
+                <label>Certificates</label>
+            </value>
+            <value>
+                <fullName>Marksheets</fullName>
+                <default>false</default>
+                <label>Marksheets</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

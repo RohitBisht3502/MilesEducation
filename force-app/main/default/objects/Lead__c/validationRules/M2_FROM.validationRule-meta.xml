@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>M2_FROM</fullName>
+    <active>false</active>
+    <errorConditionFormula>AND(
+    ISPICKVAL(Stage__c, &quot;M2&quot;),
+    NOT(ISPICKVAL(PRIORVALUE(Stage__c), &quot;M2&quot;)),
+    NOT(
+        OR(
+            ISPICKVAL(PRIORVALUE(Stage__c),&quot;M1&quot;),
+            ISPICKVAL(PRIORVALUE(Stage__c),&quot;M3&quot;),
+            ISPICKVAL(PRIORVALUE(Stage__c),&quot;M3+&quot;),
+            ISPICKVAL(PRIORVALUE(Stage__c),&quot;M3++&quot;)
+        )
+    )
+)</errorConditionFormula>
+    <errorMessage>Invalid transition to M2. Allowed previous stages: M1, M3, M3+, M3++.</errorMessage>
+</ValidationRule>

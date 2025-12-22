@@ -62,6 +62,8 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         LeadTriggerHandler.createMergeLeadActivityLogs(newLeads, oldMapLead);
         // sync owner to ()
         LeadSyncOwnerChange.syncOnOwnerChange(oldMapLead, (Map<Id, Lead__c>)newMap);
+        // sync city on candidate 
+        LeadTriggerHelperClass.syncParentCityOnChildCityChange(newLeads, oldMapLead);
     }
 
     public override void beforeDelete() {

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>M4_FROM</fullName>
+    <active>false</active>
+    <errorConditionFormula>AND(
+    ISPICKVAL(Stage__c, &quot;M4&quot;),
+    NOT(ISPICKVAL(PRIORVALUE(Stage__c), &quot;M4&quot;)),
+    NOT(
+        OR(
+            ISPICKVAL(PRIORVALUE(Stage__c),&quot;M4-&quot;),
+            ISPICKVAL(PRIORVALUE(Stage__c),&quot;M5&quot;),
+            ISPICKVAL(PRIORVALUE(Stage__c),&quot;M6&quot;)
+        )
+    )
+)</errorConditionFormula>
+    <errorMessage>Invalid transition to M4. Allowed previous: M4-, M5, M6.</errorMessage>
+</ValidationRule>

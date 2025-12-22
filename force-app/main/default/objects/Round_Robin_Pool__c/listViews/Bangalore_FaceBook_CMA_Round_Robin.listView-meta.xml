@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Bangalore_FaceBook_CMA_Round_Robin</fullName>
+    <booleanFilter>1 AND 2 AND 3 AND 4</booleanFilter>
+    <columns>NAME</columns>
+    <columns>Sales_Rep__c</columns>
+    <columns>Sequence__c</columns>
+    <columns>Maximum_Weightage__c</columns>
+    <columns>Total_Assigned__c</columns>
+    <columns>Assigned_Weight__c</columns>
+    <columns>Current_Assigned_Weight__c</columns>
+    <columns>Max_Leads__c</columns>
+    <columns>City__c</columns>
+    <columns>Lead_Source__c</columns>
+    <columns>Course__c</columns>
+    <columns>Type__c</columns>
+    <columns>Bucket__c</columns>
+    <filterScope>Everything</filterScope>
+    <filters>
+        <field>Lead_Source__c</field>
+        <operation>equals</operation>
+        <value>Facebook</value>
+    </filters>
+    <filters>
+        <field>City__c</field>
+        <operation>equals</operation>
+        <value>Bangalore</value>
+    </filters>
+    <filters>
+        <field>Type__c</field>
+        <operation>equals</operation>
+        <value>Round Robin</value>
+    </filters>
+    <filters>
+        <field>Course__c</field>
+        <operation>equals</operation>
+        <value>CMA</value>
+    </filters>
+    <label>Bangalore - FaceBook - CMA - Round Robin</label>
+</ListView>

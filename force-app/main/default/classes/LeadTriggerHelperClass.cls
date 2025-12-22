@@ -4,7 +4,7 @@
 */
 public without sharing class LeadTriggerHelperClass {
     
-    public static void handleBeforeInsert(List<Lead__c> newLeads) {
+    public static void handleBeforeInsert(List<Lead__c> newLeads) { 
         TriggerRoundRobinService.handleBeforeInsert(newLeads);
     }
     
@@ -335,5 +335,44 @@ public without sharing class LeadTriggerHelperClass {
             }
         }
     }
+    
+    /*
+     * Sync city from Lead to Candidate : Author => Rohit Singh Bisht
+    */
+    public static void syncParentCityOnChildCityChange(List<Lead__c> newLeads, Map<Id, Lead__c> oldMapLead) {
+        if (newLeads == null || newLeads.isEmpty() || oldMapLead == null) return;
+    
+        Set<Id> parentIds = new Set<Id>();
+        Map<Id, String> parentIdToCity = new Map<Id, String>();
+    
+        for (Lead__c n : newLeads) {
+            Lead__c o = oldMapLead.get(n.Id);
+            if (o == null) continue;
+    
+            if (n.Candidate__c != null && n.City__c != o.City__c && !String.isBlank(n.City__c)) {
+                parentIds.add(n.Candidate__c);
+                parentIdToCity.put(n.Candidate__c, n.City__c);
+            }
+        }
+    
+        if (parentIds.isEmpty()) return;
+    
+        List<Lead> parentsToUpdate = new List<Lead>();
+    
+        for (Lead p : [SELECT Id, City__c FROM Lead WHERE Id IN :parentIds ]) {
+            if (!parentIdToCity.containsKey(p.Id)) continue;
+    
+            String newCity = parentIdToCity.get(p.Id);
+            if (p.City__c != newCity) {
+                p.City__c = newCity;
+                parentsToUpdate.add(p);
+            }
+        }
+    
+        if (!parentsToUpdate.isEmpty()) {
+            update parentsToUpdate;
+        }
+    }
+
 
 }

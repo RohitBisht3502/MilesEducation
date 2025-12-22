@@ -1,15 +1,9 @@
-/**
-* @File Name : EligibilityQuickActionController.cls
-* @Description :
-* @Author :
-* @Last Modified By :
-* @Last Modified On : November 27, 2025
-* @Modification Log :
-*==============================================================================
-* Ver | Date | Author | Modification
-*==============================================================================
-* 1.0 | November 27, 2025 |   | Initial Version
-**/
+/*
+    Author             : MANJEET KUNDU
+    Description        : 
+    Last Modified      : MANJEET KUNDU
+    Last Modified Date : 
+*/
 
 public without sharing class EligibilityQuickActionController {
 
@@ -19,9 +13,11 @@ public without sharing class EligibilityQuickActionController {
             throw new AuraHandledException('Record Id is required.');
         }
         String eligibility = 'Eligibility Criteria';
-        //List<Lead> lead = [SELECT Id, OwnerId, Phone__c, City__c, Course__c, Source__c, Source_Bucket__c, GP_User__c FROM Lead WHERE Id = :recordId LIMIT 1];
+        List<Lead> leads = [SELECT Id, OwnerId, Phone, City__c, Course__c, Source_Bucket__c, GP_User__c FROM Lead WHERE Id = :recordId LIMIT 1];
 
-        //RoundRobinAssigner.assignLeadsWithStickyAndRoundRobin(lead, eligibility);
+        if (leads.isEmpty()) return;
+
+        RoundRobinAssigner.assignWithStickyAndRoundRobin((List<SObject>) leads,'Lead', eligibility);
 
         EligibilityFolderService.createFoldersForLead(recordId);
     }

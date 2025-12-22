@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Bucket_3</fullName>
+    <columns>NAME</columns>
+    <columns>Queue_Priority__c</columns>
+    <columns>Primary_tag__c</columns>
+    <columns>Source_Tag__c</columns>
+    <columns>Levels__c</columns>
+    <columns>Role_tag__c</columns>
+    <columns>Course_Tag__c</columns>
+    <columns>Sequence_Tag__c</columns>
+    <filterScope>Everything</filterScope>
+    <filters>
+        <field>Source_Tag__c</field>
+        <operation>equals</operation>
+        <value>Bucket 3</value>
+    </filters>
+    <label>Bucket 3</label>
+</ListView>

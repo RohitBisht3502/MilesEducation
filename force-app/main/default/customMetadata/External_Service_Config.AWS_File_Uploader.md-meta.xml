@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>AWS File Uploader</label>
+    <protected>false</protected>
+    <values>
+        <field>Api_Key_Header__c</field>
+        <value xsi:type="xsd:string">x-api-key</value>
+    </values>
+    <values>
+        <field>Api_Key__c</field>
+        <value xsi:type="xsd:string">gAkgs8n3PQ8QnanrfsueA5KpXNOlpwJw6WtjD2hR</value>
+    </values>
+    <values>
+        <field>Endpoint_URL__c</field>
+        <value xsi:type="xsd:string">https://gvqz37ay7d.execute-api.ap-south-1.amazonaws.com/miles360/generate-presigned-url-for-document-upload</value>
+    </values>
+    <values>
+        <field>Http_Method__c</field>
+        <value xsi:type="xsd:string">GET</value>
+    </values>
+    <values>
+        <field>Is_Active__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+</CustomMetadata>

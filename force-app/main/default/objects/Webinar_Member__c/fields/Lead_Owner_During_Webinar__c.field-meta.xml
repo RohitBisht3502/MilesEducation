@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Lead_Owner_During_Webinar__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description>This field will populate Lead Owner at the time of webinar or during the webinar.</description>
+    <label>Lead Owner During Webinar</label>
+    <referenceTo>User</referenceTo>
+    <relationshipName>Webinar_Members1</relationshipName>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Lookup</type>
+</CustomField>

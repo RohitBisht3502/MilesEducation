@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Untracked_Enq</fullName>
+    <columns>NAME</columns>
+    <columns>Coming_From__c</columns>
+    <columns>Course__c</columns>
+    <columns>Primary_tag__c</columns>
+    <columns>Source_Bucket__c</columns>
+    <columns>Stage__c</columns>
+    <columns>City__c</columns>
+    <filterScope>Everything</filterScope>
+    <filters>
+        <field>Stage__c</field>
+        <operation>equals</operation>
+        <value>Untracked</value>
+    </filters>
+    <label>Untracked Enq</label>
+</ListView>
