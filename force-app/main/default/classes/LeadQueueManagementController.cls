@@ -17,13 +17,14 @@ public class LeadQueueManagementController {
              WHERE OwnerId = :UserInfo.getUserId()
              AND Is_DND__c = FALSE
              AND Is_Spam__c = FALSE
+             AND Is_Merged__c = FALSE
              AND (Next_Follow_Up_Date__c = NULL OR Next_Follow_Up_Date__c <= :Datetime.now())
              ORDER BY CreatedDate DESC LIMIT 200 ];
 
         List<Call_Log__c> enquiries = [
             SELECT Id, Customer_Name__c, Phone_Number__c,CreatedDate
             FROM Call_Log__c
-            WHERE Untracked__c = TRUE
+            WHERE (Untracked__c = TRUE)
             AND OwnerId = :UserInfo.getUserId()
             ORDER BY CreatedDate DESC LIMIT 200];
 
@@ -119,6 +120,8 @@ public class LeadQueueManagementController {
 
     @AuraEnabled
     public static void saveLeadFeedbackAuto(Id leadId, String callId, String feedback, Datetime nextFollowUpDate, String l1, String l2, String stage, String level) {
+        System.debug('leadId  >>>'+leadId);
+        System.debug('callId  >>>'+callId);
         if (leadId == null || String.isBlank(callId)) {
             throw new AuraHandledException('Lead Id and Call Id are required.');
         }

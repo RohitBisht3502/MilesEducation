@@ -75,6 +75,12 @@ autoSetFollowUp = true;
     savingFeedback = false;
     feedback = '';
     nextFollowUpDate = null;
+    notifyMe = false; 
+
+handleNotifyChange(event) {
+    this.notifyMe = event.target.checked;
+}
+
 
     lastCallId = null;
 
@@ -396,6 +402,14 @@ setAutoDate24() {
             this.toast('Required', 'Stage and Course are required.', 'warning');
             return;
         }
+         if (!this.l1Value) {
+            this.toast('Required', 'L1 is required.', 'warning');
+            return;
+        }
+         if (!this.l2Value) {
+            this.toast('Required', 'l2 is required.', 'warning');
+            return;
+        }
 
         this.savingFeedback = true;
         console.log('Saving feedback, callId = ', this.lastCallId);
@@ -403,7 +417,7 @@ setAutoDate24() {
 
         try {
             
-            await updateCallFeedback({
+            const payload ={
                 
                 recordId: this.recordId,
                 callId: this.lastCallId,
@@ -412,7 +426,11 @@ setAutoDate24() {
                 l1: this.l1Value,
                 l2: this.l2Value,
                 stage: this.stageValue,
-                level: this.levelValue
+                level: this.levelValue,
+                notifyMe: this.notifyMe
+            };
+             await updateCallFeedback({
+                jsonBody: JSON.stringify(payload)
             });
 
             this.toast('Saved', 'Feedback saved successfully.', 'success');
@@ -516,16 +534,23 @@ setAutoDate24() {
     }
 
     onRunoEvent(msg) {
+        debugger;
         const p = (msg && msg.data && msg.data.payload) || {};
 
         const evtLeadId = p.Lead_Id__c || p.LeadId__c || p.leadId || null;
         const evtCallId = p.Call_Id__c || p.CallId__c || p.callId || null;
-
-        if (evtLeadId && String(evtLeadId) !== String(this.recordId)) return;
-
-        if (evtCallId) {
-            this.lastCallId = String(evtCallId);
+        // added by rohit for also work for call logs
+        if (this.isCallLog) {
+            if (this.lastCallId && evtCallId && String(evtCallId) !== String(this.lastCallId)) return;
+        } else {
+            if (evtLeadId && String(evtLeadId) !== String(this.recordId)) return;
         }
+
+        // if (evtLeadId && String(evtLeadId) !== String(this.recordId)) return;
+
+        // if (evtCallId) {
+        //     this.lastCallId = String(evtCallId);
+        // }
 
         const s = Number(
             p.Duration_Seconds__c ||

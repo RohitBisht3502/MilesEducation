@@ -89,6 +89,10 @@ global without sharing class Webservice_RunoWebhookService_v2 {
                     callLogObj.Untracked__c = true;
                 }
 
+                if ('missed'.equalsIgnoreCase(wrapperObj.type)) {
+                    callLogObj.Untracked__c = true;
+                }
+
                 callLogObj = populateCallLogRecord(callLogObj, wrapperObj);
             }
 

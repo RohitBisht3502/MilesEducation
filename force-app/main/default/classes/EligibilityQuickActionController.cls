@@ -18,6 +18,7 @@ public without sharing class EligibilityQuickActionController {
         if (leads.isEmpty()) return;
 
         RoundRobinAssigner.assignWithStickyAndRoundRobin((List<SObject>) leads,'Lead', eligibility);
+        update leads;
 
         EligibilityFolderService.createFoldersForLead(recordId);
     }

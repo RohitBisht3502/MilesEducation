@@ -82,7 +82,7 @@ global without sharing class Webhook_GMeetRecordingsInboundService {
                                 if (f == null) continue;
                                 if (String.isBlank(videoPath) && f.file_type == 'video/mp4') {
                                     videoPath = f.file_path;
-                                } else if (String.isBlank(notesPath) && f.file_type == 'application/pdf') {
+                                } else if (String.isBlank(notesPath) && f.file_type == 'application/json') {
                                     notesPath = f.file_path;
                                 }
                             }

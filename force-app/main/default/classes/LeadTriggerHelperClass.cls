@@ -373,6 +373,49 @@ public without sharing class LeadTriggerHelperClass {
             update parentsToUpdate;
         }
     }
+    
+    /*
+     * Update Candidate Highest engagment M bucket : Author => Rohit Singh Bisht
+    */
+    public static void updateHighestLevelOnCandidateWhenStageChanges(List<Lead__c> newLeads, Map<Id, Lead__c> oldMapLead) {
+        System.debug('updateHighestLevelOnCandidateWhenStageChanges => start');
+
+        if (newLeads == null || newLeads.isEmpty()) {
+            System.debug('updateHighestLevelOnCandidateWhenStageChanges => newLeads empty, exit');
+            return;
+        }
+        if (oldMapLead == null || oldMapLead.isEmpty()) {
+            System.debug('updateHighestLevelOnCandidateWhenStageChanges => oldMapLead empty, exit');
+            return;
+        }
+
+        Set<Id> candidateIds = new Set<Id>();
+
+        for (Lead__c n : newLeads) {
+            Lead__c o = oldMapLead.get(n.Id);
+            if (o == null) continue;
+
+            if (n.Candidate__c != null && n.Stage__c != o.Stage__c) {
+                candidateIds.add(n.Candidate__c);
+            }
+
+            if (o.Candidate__c != null && n.Candidate__c != o.Candidate__c) {
+                candidateIds.add(o.Candidate__c);
+            }
+        }
+
+        System.debug('updateHighestLevelOnCandidateWhenStageChanges => candidateIds size: ' + candidateIds.size() + ' ids: ' + candidateIds);
+
+        if (!candidateIds.isEmpty()) {
+            System.debug('updateHighestLevelOnCandidateWhenStageChanges => calling CandidateHighestLevelUpdater');
+            CandidateHighestLevelUpdater.updationOfHighestLevelOnCandidate(candidateIds);
+        } else {
+            System.debug('updateHighestLevelOnCandidateWhenStageChanges => no candidateIds to process');
+        }
+
+        System.debug('updateHighestLevelOnCandidateWhenStageChanges => end');
+    }
+    
 
 
 }

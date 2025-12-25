@@ -1,7 +1,7 @@
 import { LightningElement, track, wire } from 'lwc';
 import { refreshApex } from '@salesforce/apex';
 import getUserLeads from '@salesforce/apex/LeadQueueManagementController.getUserLeads';
-import saveLeadFeedback from '@salesforce/apex/LeadQueueManagementController.saveLeadFeedbackAuto';
+//import saveLeadFeedback from '@salesforce/apex/LeadQueueManagementController.saveLeadFeedbackAuto';
 
 export default class LeadQueueManagement extends LightningElement {
 
@@ -162,20 +162,20 @@ export default class LeadQueueManagement extends LightningElement {
     async handleCallComplete(event) {
         const detail = event.detail;
 
-        try {
-            await saveLeadFeedback({
-                leadId: detail.recordId,
-                callId: detail.callId,
-                feedback: detail.feedback,
-                nextFollowUpDate: detail.nextFollowUpDate,
-                l1: detail.l1,
-                l2: detail.l2,
-                stage: detail.stage,
-                level: detail.level
-            });
-        } catch (e) {
-            console.error('Feedback save error:', e);
-        }
+        // try {
+        //     await saveLeadFeedback({
+        //         leadId: detail.recordId,
+        //         callId: detail.callId,
+        //         feedback: detail.feedback,
+        //         nextFollowUpDate: detail.nextFollowUpDate,
+        //         l1: detail.l1,
+        //         l2: detail.l2,
+        //         stage: detail.stage,
+        //         level: detail.level
+        //     });
+        // } catch (e) {
+        //     console.error('Feedback save error:', e);
+        // }
 
         this.callsCompleted++;
 

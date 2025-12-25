@@ -1,20 +1,19 @@
 /*
-    Author             : ROHIT SINGH BISHT
-    Description        : 
-    Last Modified      : ROHIT SINGH BISHT
-    Last Modified Date : 1 DEC 2025
+Author             : ROHIT SINGH BISHT
+Description        :
+Last Modified      : ROHIT SINGH BISHT
+Last Modified Date : 1 DEC 2025
 */
 @RestResource(urlMapping='/milessite/*')
 global without sharing class MilesWebService {
 
     private static final String EXPECTED_SECURITY_CODE = 'MY_SECURE_CODE_123';
 
-    // Email association outcomes
     private enum EmailDecision {
-        SAME_LEAD,          // Email exists with SAME Lead
-        DIFFERENT_LEAD,     // Email exists with DIFFERENT Lead
+        SAME_LEAD,              // Email exists with SAME Lead
+        DIFFERENT_LEAD,         // Email exists with DIFFERENT Lead
         CREATED_AND_ASSOCIATED, // Email not exist -> created & associated
-        ASSOCIATED_TO_LEAD  // Email existed but unlinked -> now linked (safe case)
+        ASSOCIATED_TO_LEAD      // Email existed but unlinked -> now linked (safe case)
     }
 
     @HttpPost
@@ -26,10 +25,16 @@ global without sharing class MilesWebService {
             /* ------------ SECURITY CHECK ------------- */
             String securityCode = req.headers.get('securityCode');
             if (String.isBlank(securityCode)) {
+                IntegrationLogUtil.insertLogs(new List<Integration_Log__c>{
+                    IntegrationLogUtil.buildLog('Enquiry', null, null, 'Missing required header: securityCode', 'FAILED', null)
+                });
                 res.statusCode = 400;
                 return 'Missing required header: securityCode';
             }
             if (securityCode != EXPECTED_SECURITY_CODE) {
+                IntegrationLogUtil.insertLogs(new List<Integration_Log__c>{
+                    IntegrationLogUtil.buildLog('Enquiry', null, null, 'Unauthorized: Invalid security code. Provided=' + securityCode, 'FAILED', null)
+                });                
                 res.statusCode = 401;
                 return 'Unauthorized: Invalid security code';
             }
@@ -37,6 +42,9 @@ global without sharing class MilesWebService {
             /* ------------ BODY CHECK ------------- */
             String requestBody = (req.requestBody != null) ? req.requestBody.toString() : '';
             if (String.isBlank(requestBody)) {
+                IntegrationLogUtil.insertLogs(new List<Integration_Log__c>{
+                    IntegrationLogUtil.buildLog('Enquiry', null, null, 'Request body is empty', 'FAILED', null)
+                });                
                 res.statusCode = 400;
                 return 'Request body is empty';
             }
@@ -49,7 +57,24 @@ global without sharing class MilesWebService {
 
             EnquiryWrapper inputData = (EnquiryWrapper) JSON.deserialize(requestBody, EnquiryWrapper.class);
 
+            // ================= DUMMY DEFAULT VALUES =================
+            if (String.isBlank(inputData.city)) inputData.city = 'Mumbai';
+            if (String.isBlank(inputData.course)) inputData.course = 'CMA';
+            if (inputData.city_id == null) inputData.city_id = 8;
+            if (inputData.smsAllow == null) inputData.smsAllow = 1;
+            if (String.isBlank(inputData.coming_from)) inputData.coming_from = 'Facebook';
+            if (inputData.whatsappAllow == null) inputData.whatsappAllow = 1;
+            if (inputData.whatsapp_opt_in == null) inputData.whatsapp_opt_in = true;
+            if (String.isBlank(inputData.highestEducation)) inputData.highestEducation = 'Graduate';
+            if (String.isBlank(inputData.country_of_residence)) inputData.country_of_residence = 'India';
+            if (inputData.register_for_webinar == null) inputData.register_for_webinar = false;
+            if (String.isBlank(inputData.interested_webinar_id)) inputData.interested_webinar_id = 'ROMAN';
+            // ========================================================
+
             if (String.isBlank(inputData.first_name) || String.isBlank(inputData.phone)) {
+                IntegrationLogUtil.insertLogs(new List<Integration_Log__c>{
+                    IntegrationLogUtil.buildLog('Enquiry', requestBody, null, 'Missing required fields: first_name or phone', 'FAILED', null)
+                });                
                 res.statusCode = 400;
                 return 'Missing required fields: first_name or phone';
             }
@@ -73,40 +98,54 @@ global without sharing class MilesWebService {
                 Country_of_Residence__c  = inputData.country_of_residence,
                 Register_for_Webinar__c  = inputData.register_for_webinar,
                 Interested_Webinar_ID__c = inputData.interested_webinar_id,
-                Stage__c                 = 'Tracked'
+                Stage__c                 = 'Untracked' // Default value Untracked.
             );
             insert enquiry;
 
-            /* =====================================================
-                     FLOW IMPLEMENTATION (Candidate = Lead)
-               ===================================================== */
+            // Step 1: Check Phone number exist or not (Phone_Number__c)
+            Phone_Number__c phoneExisting;
+            Id studentAccountId;
+            Id candidateIdFromPhone;
 
-            /* 1) CHECK CANDIDATE (Lead) BY PHONE (Priority) */
-            Lead candidate;
-            List<Lead> candidateList = [SELECT Id,OwnerId, Phone, Email FROM Lead WHERE Phone = :inputData.phone LIMIT 1];
-            if (!candidateList.isEmpty()) {
-                candidate = candidateList[0];
+            List<Phone_Number__c> phoneExistingList = [SELECT Id, Phone__c, Candidate__c, Student__c, Lead__c FROM Phone_Number__c WHERE Phone__c = :inputData.phone LIMIT 1];
+            if (!phoneExistingList.isEmpty()) {
+                phoneExisting       = phoneExistingList[0];
+                studentAccountId    = phoneExisting.Student__c;
+                candidateIdFromPhone = phoneExisting.Candidate__c;
             }
+
+            Boolean phoneExists = (phoneExisting != null);
+            // check Account exist or not 
+            Boolean isConvertedStudent = (studentAccountId != null);
+            // check candidate exist or not 
+            Lead candidate;
+            if (!isConvertedStudent && candidateIdFromPhone != null) {
+                List<Lead> candById = [SELECT Id, OwnerId, Phone, Email FROM Lead WHERE Id = :candidateIdFromPhone LIMIT 1];
+                if (!candById.isEmpty()) candidate = candById[0];
+            }
+
+            // Decide: Candidate should be created:
+            Boolean shouldCreateCandidate = (!isConvertedStudent && candidate == null);
+
+            // update enquiry 
+            Id enquiryCandidateId;
+            Id enquiryStudentId;
+            Id enquiryLeadId;
+
+            enquiryStudentId = (studentAccountId != null ? studentAccountId : null);
 
             Lead__c leadToReturn;
 
             /* =====================================================
-               CASE A: CANDIDATE NOT EXIST
-               Diagram: Not Exist -> Create Phone Number -> Create Candidate -> Create Lead (course/phone)
+               CASE 0: PHONE NOT EXIST 
+               Not Exist -> Create Candidate -> Create Lead -> Create Phone Number -> Email Associations
                ===================================================== */
-            if (candidate == null) {
+            if (!phoneExists) {
 
-                // (A1) Create Phone_Number__c first (first create phone record)
-                Phone_Number__c phoneRec = new Phone_Number__c(
-                    Name     = inputData.phone,
-                    Phone__c = inputData.phone
-                );
-                insert phoneRec;
-
-                // (A2) Create Candidate (Lead)
+                // Create Candidate (Lead)
                 candidate = new Lead(
                     LastName                 = inputData.first_name,
-                    Company                  = 'Test Company',
+                    Company                  = 'Miles Education',
                     Phone                    = inputData.phone,
                     Email                    = inputData.email,
                     Course__c                = inputData.course,
@@ -116,11 +155,7 @@ global without sharing class MilesWebService {
                 );
                 insert candidate;
 
-                // tag phone record with candidate
-                phoneRec.Candidate__c = candidate.Id;
-                update phoneRec;
-
-                // (A3) Create Lead__c with course/phone
+                // Create Lead__c
                 Lead__c newLead = new Lead__c(
                     Name                     = inputData.first_name,
                     Phone__c                 = inputData.phone,
@@ -134,58 +169,80 @@ global without sharing class MilesWebService {
                 );
                 insert newLead;
 
-                // tag phone record with lead
-                phoneRec.Lead__c = newLead.Id;
-                update phoneRec;
+                // Create Phone_Number__c (tag phone)
+                Phone_Number__c phoneRec = new Phone_Number__c(
+                    Name        = inputData.phone,
+                    Phone__c    = inputData.phone,
+                    Candidate__c= candidate.Id,
+                    Lead__c     = newLead.Id
+                );
+                insert phoneRec;
 
-                // link enquiry
-                enquiry.Candidate__c = candidate.Id;
-                enquiry.Lead__c      = newLead.Id;
-                update enquiry;
+                enquiryCandidateId = candidate.Id;
+                enquiryLeadId      = newLead.Id;
+                leadToReturn       = newLead;
 
-                leadToReturn = newLead;
-
-                // Email association (diagram: check email associated)
-                EmailDecision ed = handleEmailAssociation(inputData.email, leadToReturn.Id, candidate.Id, enquiry.Id);
+                // Email Associations
+                EmailDecision ed = handleEmailAssociation(inputData.email, leadToReturn.Id, candidate.Id, enquiry.Id,studentAccountId);
 
             } else {
 
                 /* =====================================================
-                   CASE B: CANDIDATE EXISTS
-                   Diagram: Candidate Exists -> Check Lead with Phone + Source
+                   CASE 1: PHONE EXIST (Diagram Right Branch)
+                   -> Check Account exist or not (Student__c on phone)
                    ===================================================== */
 
-                enquiry.Candidate__c = candidate.Id;
-                update enquiry;
+                // If account NOT exist => check candidate exist; else skip candidate check
+                if (!isConvertedStudent && shouldCreateCandidate) {
+                    // Candidate Not Exist -> Create Candidate
+                    candidate = new Lead(
+                        LastName                 = inputData.first_name,
+                        Company                  = 'Miles Education',
+                        Phone                    = inputData.phone,
+                        Email                    = inputData.email,
+                        Course__c                = inputData.course,
+                        Coming_From__c           = inputData.coming_from,
+                        Register_for_Webinar__c  = inputData.register_for_webinar,
+                        Interested_Webinar_ID__c = inputData.interested_webinar_id
+                    );
+                    insert candidate;
+                }
 
-                // 2) Check Lead__c with Phone + Source (as per NEW diagram)
+                // For enquiry linking
+                enquiryCandidateId = (candidate != null ? candidate.Id : null);
+
+                /* =====================================================
+                   Next: Check Lead exist with same course
+                   - If converted student: search by Student__c + Course
+                   - Else: search by Candidate__c + Course
+                   ===================================================== */
                 Lead__c existingLeadC;
-                List<Lead__c> leadCs = [SELECT Id, Stage__c, Is_ReEnquiry__c,OwnerId FROM Lead__c WHERE Phone__c = :inputData.phone AND Source__c  = :inputData.coming_from LIMIT 1 ];
+                List<Lead__c> leadCs = [SELECT Id, Stage__c, Is_ReEnquiry__c, OwnerId FROM Lead__c WHERE Candidate__c = :candidate.Id AND Course__c = :inputData.course LIMIT 1];
                 if (!leadCs.isEmpty()) existingLeadC = leadCs[0];
 
-                /* ------------------- B1: LEAD EXISTS (Phone + Source) ------------------- */
+                /* ------------------- LEAD EXISTS (same course) ------------------- */
                 if (existingLeadC != null) {
 
-                    enquiry.Lead__c = existingLeadC.Id;
-                    update enquiry;
+                    enquiryLeadId = existingLeadC.Id;
+                    leadToReturn  = existingLeadC;
 
-                    // Diagram: Check Email Associated
-                    EmailDecision ed = handleEmailAssociation(inputData.email, existingLeadC.Id, candidate.Id, enquiry.Id);
+                    // Email Associations
+                    EmailDecision ed = handleEmailAssociation(inputData.email, existingLeadC.Id, enquiryCandidateId, enquiry.Id,studentAccountId);
 
-                    if (ed == EmailDecision.SAME_LEAD) {
-                        markReEnquiry(existingLeadC, enquiry);
-                    } else if (ed == EmailDecision.CREATED_AND_ASSOCIATED || ed == EmailDecision.ASSOCIATED_TO_LEAD) {
+                    // If Email is same/unlinked/created -> mark re-enquiry (as in your current logic)
+                    if (ed == EmailDecision.SAME_LEAD ||
+                        ed == EmailDecision.CREATED_AND_ASSOCIATED ||
+                        ed == EmailDecision.ASSOCIATED_TO_LEAD) {
+
                         markReEnquiry(existingLeadC, enquiry);
                     } else if (ed == EmailDecision.DIFFERENT_LEAD) {
                         System.debug('Email is with different Lead. Not associating. No re-enquiry marking as per flow.');
                     }
 
-                    leadToReturn = existingLeadC;
-
                 } else {
 
-                    /* ------------------- B2: LEAD NOT EXIST (Phone + Source) ------------------- */
-                    // Not Exist -> Create New Lead with course and tag phone number also
+                    /* ------------------- LEAD NOT EXIST (same course) ------------------- */
+                    // Create lead with that course + tag the phone number + email associations
 
                     Lead__c newLead2 = new Lead__c(
                         Name                     = inputData.first_name,
@@ -196,51 +253,45 @@ global without sharing class MilesWebService {
                         Source__c                = inputData.coming_from,
                         Register_for_Webinar__c  = inputData.register_for_webinar,
                         Interested_Webinar_ID__c = inputData.interested_webinar_id,
-                        Candidate__c             = candidate.Id
+                        Candidate__c             = (enquiryCandidateId != null ? enquiryCandidateId : null)
+                       // Student__c               = (studentAccountId != null ? studentAccountId : null)
                     );
                     insert newLead2;
 
-                    // Tag phone number also (reuse existing if found)
-                    List<Phone_Number__c> phoneList = [
-                        SELECT Id, Candidate__c, Lead__c
-                        FROM Phone_Number__c
-                        WHERE Phone__c = :inputData.phone
-                        LIMIT 1
-                    ];
-
-                    if (phoneList.isEmpty()) {
-                        Phone_Number__c newPhone = new Phone_Number__c(
-                            Name         = inputData.phone,
-                            Phone__c     = inputData.phone,
-                            Candidate__c = candidate.Id,
-                            Lead__c      = newLead2.Id
-                        );
-                        insert newPhone;
-                    } else {
-                        Phone_Number__c ph = phoneList[0];
-                        if (ph.Candidate__c == null) ph.Candidate__c = candidate.Id;
-                        ph.Lead__c = newLead2.Id;
-                        update ph;
+                    // Tag the phone number (existing phone record)
+                    if (phoneExisting != null) {
+                        Boolean phoneChanged = false;
+                        if (phoneExisting.Candidate__c == null && enquiryCandidateId != null) {
+                            phoneExisting.Candidate__c = enquiryCandidateId;
+                            phoneChanged = true;
+                        }
+                        if (phoneExisting.Lead__c == null) {
+                            phoneExisting.Lead__c = newLead2.Id;
+                            phoneChanged = true;
+                        }
+                        if (phoneChanged) update phoneExisting;
                     }
 
-                    enquiry.Lead__c = newLead2.Id;
-                    update enquiry;
+                    enquiryLeadId = newLead2.Id;
+                    leadToReturn  = newLead2;
 
-                    leadToReturn = newLead2;
-
-                    // Check Email Associated
-                    EmailDecision ed = handleEmailAssociation(inputData.email, newLead2.Id, candidate.Id, enquiry.Id);
+                    // Email Associations
+                    EmailDecision ed = handleEmailAssociation(inputData.email, newLead2.Id, enquiryCandidateId, enquiry.Id,studentAccountId);
 
                     if (ed == EmailDecision.DIFFERENT_LEAD) {
                         System.debug('Email exists with different Lead. Not associating (as per flow).');
                     }
-                    
                 }
             }
 
+            enquiry.Candidate__c = enquiryCandidateId;
+            enquiry.Student__c   = (studentAccountId != null ? studentAccountId : null);
+            enquiry.Lead__c      = enquiryLeadId;
+            update enquiry;
+
             /* ------------------- CREATE FOLLOW-UP TASK ------------------- */
             String taskSubject = 'Follow Up Call';
-           // Task t = MilesExistingEnquiryWebService.createFollowUpTask(enquiry, taskSubject);
+            // Task t = MilesExistingEnquiryWebService.createFollowUpTask(enquiry, taskSubject);
 
             res.statusCode = 201;
             return JSON.serialize(
@@ -259,7 +310,7 @@ global without sharing class MilesWebService {
         }
     }
 
-    private static EmailDecision handleEmailAssociation(String email, Id leadId, Id candidateId, Id enquiryId) {
+    private static EmailDecision handleEmailAssociation(String email, Id leadId, Id candidateId, Id enquiryId,Id studentAccountId) {
 
         if (String.isBlank(email) || leadId == null) {
             System.debug('Email association skipped: blank email or leadId is null');
@@ -298,8 +349,8 @@ global without sharing class MilesWebService {
         Email__c newEmail = new Email__c(
             Email__c         = email,
             Lead__c          = leadId,
-            Candidate__c     = candidateId
-            // Enquiry__c       = enquiryId
+            Candidate__c     = candidateId,
+            Student__c       = (studentAccountId != null ? studentAccountId : null)
         );
         insert newEmail;
 
@@ -308,11 +359,16 @@ global without sharing class MilesWebService {
     }
 
     /* =====================================================
-        RE-ENQUIRY MARKING 
-    ===================================================== */
+        RE-ENQUIRY MARKING
+        ===================================================== */
     private static void markReEnquiry(Lead__c leadRec, Enquiry__c enquiryRec) {
         try {
             if (leadRec != null) {
+                if (leadRec.Stage__c == 'M1' || leadRec.Stage__c == 'M2' || leadRec.Stage__c == 'M3') {
+                    leadRec.Stage__c = 'M3+';
+                } else if (leadRec.Stage__c == 'M4' || leadRec.Stage__c == 'M4-') {
+                    leadRec.Stage__c = 'M5';
+                }
                 leadRec.Is_ReEnquiry__c = true;
                 update leadRec;
             }
@@ -359,5 +415,4 @@ global without sharing class MilesWebService {
             this.recordId = recordId;
         }
     }
-
 }

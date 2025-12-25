@@ -64,6 +64,8 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         LeadSyncOwnerChange.syncOnOwnerChange(oldMapLead, (Map<Id, Lead__c>)newMap);
         // sync city on candidate 
         LeadTriggerHelperClass.syncParentCityOnChildCityChange(newLeads, oldMapLead);
+        // Update highest level on candidate 
+        LeadTriggerHelperClass.updateHighestLevelOnCandidateWhenStageChanges(newLeads, oldMapLead);
     }
 
     public override void beforeDelete() {

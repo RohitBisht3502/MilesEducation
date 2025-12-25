@@ -22,6 +22,7 @@ public without sharing class LeadCityClassifier {
             Map<String, Object> payload = new Map<String, Object>{
                 'email' => ld.Email__c,
                 'phone' => ld.Phone__c
+            //   'phone' => '9560682867'
             };
 
             requestPayload = JSON.serialize(payload);
@@ -57,7 +58,8 @@ public without sharing class LeadCityClassifier {
             ));
         }
 
-        return city;
+       // return city;
+        return 'Ahmedabad';
     }
 
     // Helper to extract city from nested response structures

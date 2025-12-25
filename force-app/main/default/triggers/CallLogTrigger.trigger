@@ -1,5 +1,5 @@
 trigger CallLogTrigger on Call_Log__c (before insert,before update,before delete,after insert,after update,after delete,after undelete) {
-    CallLogTriggerFrameworkHandler handler = new CallLogTriggerFrameworkHandler(
+   /* CallLogTriggerFrameworkHandler handler = new CallLogTriggerFrameworkHandler(
         (List<Call_Log__c>)Trigger.new,
         (List<Call_Log__c>)Trigger.old,
         (Map<Id, Call_Log__c>)Trigger.newMap,
@@ -17,5 +17,5 @@ trigger CallLogTrigger on Call_Log__c (before insert,before update,before delete
         if (Trigger.isUpdate) handler.afterUpdate();
         if (Trigger.isDelete) handler.afterDelete();
         if (Trigger.isUndelete) handler.afterUndelete();
-    }
+    } */
 }

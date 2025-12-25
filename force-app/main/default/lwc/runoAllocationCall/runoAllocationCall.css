@@ -10,6 +10,7 @@
     --slds-c-modal-footer-text-color: #ffffff;
 }
 
+
 /* CRITICAL: Remove all default padding and overflow from panel */
 .panel-wrapper {
     padding: 0 !important;

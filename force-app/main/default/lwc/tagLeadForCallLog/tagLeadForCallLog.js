@@ -61,13 +61,21 @@ export default class TagLeadForCallLog extends LightningElement {
         this.setDefaultFollowUpDate();
     }
 
-    setDefaultFollowUpDate() {
-        const now = new Date();
-        now.setHours(now.getHours() + 24);
-        const defaultDate = now.toISOString().slice(0, 16);
-        this.formData.nextFollowUpDate = defaultDate;
-        this.tagData.nextFollowUpDate = defaultDate;
-    }
+   setDefaultFollowUpDate() {
+    const next = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const yyyy = next.getFullYear();
+    const mm = String(next.getMonth() + 1).padStart(2, '0');
+    const dd = String(next.getDate()).padStart(2, '0');
+    const hh = String(next.getHours()).padStart(2, '0');
+    const mi = String(next.getMinutes()).padStart(2, '0');
+
+    const defaultDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+
+    this.formData.nextFollowUpDate = defaultDate;
+    this.tagData.nextFollowUpDate = defaultDate;
+}
+
 
     async loadDependentMap() {
         try {

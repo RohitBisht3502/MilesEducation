@@ -324,20 +324,19 @@ export default class RunoAllocationCall extends LightningElement {
     }
 
     // 🔥 NEW: helper to set nextFollowUpDate = now + 24h in ISO format
-    setAutoDate24() {
-        const now = new Date();
-        const next = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+ setAutoDate24() {
+    const next = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-        const yyyy = next.getFullYear();
-        const mm = String(next.getMonth() + 1).padStart(2, '0');
-        const dd = String(next.getDate()).padStart(2, '0');
-        const hh = String(next.getHours()).padStart(2, '0');
-        const mi = String(next.getMinutes()).padStart(2, '0');
-        const ss = String(next.getSeconds()).padStart(2, '0');
+    const yyyy = next.getFullYear();
+    const mm = String(next.getMonth() + 1).padStart(2, '0');
+    const dd = String(next.getDate()).padStart(2, '0');
+    const hh = String(next.getHours()).padStart(2, '0');
+    const mi = String(next.getMinutes()).padStart(2, '0');
 
-        // full ISO-like string without timezone offset
-        this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}.000Z`;
-    }
+    this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+}
+
+
 
     // -------------- SAVE FEEDBACK ----------
 
@@ -368,7 +367,7 @@ export default class RunoAllocationCall extends LightningElement {
         this.savingFeedback = true;
 
         try {
-            await updateCallFeedback({
+            const payload = {
                 recordId: this.recordId,
                 callId: this.lastCallId,
                 feedback: this.feedback?.trim(),
@@ -376,7 +375,12 @@ export default class RunoAllocationCall extends LightningElement {
                 l1: this.l1Value,
                 l2: this.l2Value,
                 stage: this.stageValue,
-                level: this.levelValue
+                level: this.levelValue,
+                notifyMe: false
+            };
+
+            await updateCallFeedback({
+                jsonBody: JSON.stringify(payload)
             });
 
             this.dispatchEvent(
@@ -434,7 +438,7 @@ export default class RunoAllocationCall extends LightningElement {
                 })
             );
         }
- finally {
+        finally {
             this.savingFeedback = false;
             this.disableCancel = false;
         }

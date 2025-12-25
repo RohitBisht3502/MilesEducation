@@ -167,7 +167,23 @@
                 options={levelOptions}
                 onchange={handleLevelChange}>
               </lightning-combobox>
+
+
+              
+                <!-- NOTIFY ME CHECKBOX -->
+           
+
+            
               </template>
+               <div class="slds-m-top_small">
+            <lightning-input
+               type="checkbox"
+               label="Notify Me"
+               checked={notifyMe}
+               onchange={handleNotifyChange}>
+           </lightning-input>
+            </div>
+              
             
 
               <!-- COMMENT BOX (ALWAYS VISIBLE, MANDATORY BASED ON RULE) -->

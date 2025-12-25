@@ -121,12 +121,16 @@ export default class WebinarCallModal extends LightningElement {
         this.subscribeToEvents();
         onError(err => console.warn('EMP API Error:', JSON.stringify(err)));
     }
+    handleCall() {
+        this.showCallPopup = true;
+    }
+
 
     disconnectedCallback() {
         this.stopTimer();
         this.clearTimers();
         if (this.subscription) {
-            unsubscribe(this.subscription, () => {});
+            unsubscribe(this.subscription, () => { });
             this.subscription = null;
         }
     }
@@ -312,7 +316,7 @@ export default class WebinarCallModal extends LightningElement {
         this.savingFeedback = true;
 
         try {
-            await updateCallFeedback({
+            const payload = {
                 recordId: this.leadId,
                 callId: this.lastCallId,
                 feedback: this.feedback?.trim(),
@@ -320,14 +324,19 @@ export default class WebinarCallModal extends LightningElement {
                 l1: this.l1Value,
                 l2: this.l2Value,
                 stage: this.stageValue,
-                level: this.levelValue
+                level: this.levelValue,
+                notifyMe: false
+            };
+
+            await updateCallFeedback({
+                jsonBody: JSON.stringify(payload)
             });
 
             this.showToast('Success', 'Feedback saved successfully.', 'success');
-            
+
             // Notify parent to refresh data
             this.dispatchEvent(new CustomEvent('feedbacksaved'));
-            
+
             // Close modal
             this.handleClose();
 

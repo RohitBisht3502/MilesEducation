@@ -88,7 +88,7 @@ export default class WebinarAttendedLeads extends LightningElement {
         this.isLoading = true;
         try {
             const webinars = await getWebinarsByNameOnly();
-            
+
             if (webinars && webinars.length > 0) {
                 this.webinarOptions = webinars.map(w => ({
                     label: w.name,
@@ -97,7 +97,7 @@ export default class WebinarAttendedLeads extends LightningElement {
             } else {
                 this.showToast('Info', 'No active webinars found', TOAST_VARIANT.INFO);
             }
-            
+
             // Check if user is GM
             const users = await getManagedUsers();
             if (users && users.length > 0) {
@@ -119,7 +119,7 @@ export default class WebinarAttendedLeads extends LightningElement {
         this.selectedWebinarName = this.webinarOptions.find(w => w.value === this.selectedWebinarId)?.label;
         this.activeWebinarId = this.selectedWebinarId;
         this.showWebinarSelection = false;
-        
+
         // Sync live data immediately after webinar selection
         this.syncAndLoadData();
     }
@@ -133,7 +133,7 @@ export default class WebinarAttendedLeads extends LightningElement {
         try {
             // First, sync live attendees to get live emails
             await this.handleSyncLiveAttendees();
-            
+
             // Then load the data with webinarId filter
             if (this.isGM) {
                 await this.loadAllSpocsData();
@@ -158,9 +158,9 @@ export default class WebinarAttendedLeads extends LightningElement {
             // Fetch data for each managed user with webinarId filter
             for (const user of this.managedUsers) {
                 try {
-                    const userData = await getActiveWebinarAttendeesForUser({ 
-                        userId: user.Id, 
-                        webinarId: this.selectedWebinarId 
+                    const userData = await getActiveWebinarAttendeesForUser({
+                        userId: user.Id,
+                        webinarId: this.selectedWebinarId
                     });
                     allData = [...allData, ...userData];
                 } catch (error) {
@@ -170,15 +170,15 @@ export default class WebinarAttendedLeads extends LightningElement {
 
             // Store all data for GM metrics
             this.allWebinarData = this.removeDuplicates(allData);
-            
+
             // Extract active webinar ID
             if (this.allWebinarData.length > 0 && this.allWebinarData[0].webinarId) {
                 this.activeWebinarId = this.allWebinarData[0].webinarId;
             }
-            
+
             // Apply live attendee status BEFORE calculating metrics
             this.applyLiveAttendeeStatus();
-            
+
             // Calculate metrics and build summary AFTER applying live status
             this.calculateGMMetrics();
             this.buildSpocSummary();
@@ -189,10 +189,10 @@ export default class WebinarAttendedLeads extends LightningElement {
 
     removeDuplicates(data) {
         const uniqueDataMap = new Map();
-        
+
         data.forEach(item => {
             const emailKey = item.email ? item.email.toLowerCase().trim() : `no-email-${item.webinarMemberId}`;
-            
+
             if (!uniqueDataMap.has(emailKey)) {
                 uniqueDataMap.set(emailKey, item);
             } else {
@@ -212,13 +212,13 @@ export default class WebinarAttendedLeads extends LightningElement {
         // Add current user (GM)
         const currentUserId = this.managedUsers.length > 0 ? this.managedUsers[0].ManagerId : null;
         const gmData = this.allWebinarData.filter(item => item.spocId === currentUserId);
-        
+
         if (gmData.length > 0 && currentUserId) {
             const present = gmData.filter(item => item.status === STATUS.PRESENT).length;
             const absent = gmData.filter(item => item.status === STATUS.ABSENT).length;
             const total = gmData.length;
             const attendanceRate = this.calculatePercentage(present, total);
-            
+
             spocMap.set(currentUserId, {
                 spocId: currentUserId,
                 spocName: gmData[0].spocName || 'GM (Self)',
@@ -236,7 +236,7 @@ export default class WebinarAttendedLeads extends LightningElement {
             const absent = userData.filter(item => item.status === STATUS.ABSENT).length;
             const total = userData.length;
             const attendanceRate = this.calculatePercentage(present, total);
-            
+
             spocMap.set(user.Id, {
                 spocId: user.Id,
                 spocName: user.Name,
@@ -262,7 +262,7 @@ export default class WebinarAttendedLeads extends LightningElement {
         this.isSyncing = true;
         try {
             const result = await syncLiveWebinarAttendees({ webinarId: this.activeWebinarId });
-            
+
             // Store live attendee emails from the API response
             if (result && result.liveEmails && Array.isArray(result.liveEmails)) {
                 this.liveAttendeeEmails = new Set(
@@ -270,14 +270,14 @@ export default class WebinarAttendedLeads extends LightningElement {
                 );
                 this.hasLiveSyncOccurred = true;
             }
-            
+
             // Apply live status to allWebinarData for GM
             if (this.isGM) {
                 this.applyLiveAttendeeStatus();
                 this.calculateGMMetrics();
                 this.buildSpocSummary();
             }
-            
+
             // Reload current view with updated live status
             if (this.selectedSpocId) {
                 const data = this.allWebinarData.filter(item => item.spocId === this.selectedSpocId);
@@ -287,18 +287,18 @@ export default class WebinarAttendedLeads extends LightningElement {
                 const data = this.webinarData.map(item => {
                     const emailLower = item.email ? item.email.toLowerCase().trim() : '';
                     const isLiveAttendee = this.liveAttendeeEmails.has(emailLower);
-                    
+
                     return {
                         ...item,
-                        status: this.hasLiveSyncOccurred 
+                        status: this.hasLiveSyncOccurred
                             ? (isLiveAttendee ? STATUS.PRESENT : STATUS.ABSENT)
                             : item.status,
                         statusBadgeClass: this.getStatusBadgeClass(
-                            this.hasLiveSyncOccurred 
+                            this.hasLiveSyncOccurred
                                 ? (isLiveAttendee ? STATUS.PRESENT : STATUS.ABSENT)
                                 : item.status
                         ),
-                        showCallButton: this.hasLiveSyncOccurred 
+                        showCallButton: this.hasLiveSyncOccurred
                             ? !isLiveAttendee
                             : (item.status === STATUS.ABSENT)
                     };
@@ -306,9 +306,9 @@ export default class WebinarAttendedLeads extends LightningElement {
                 this.webinarData = data;
                 this.applyFilters();
             }
-            
+
             this.showToast(
-                'Success', 
+                'Success',
                 `Synced successfully! Found ${result.liveAttendeesCount} live attendees.`,
                 TOAST_VARIANT.SUCCESS
             );
@@ -353,10 +353,10 @@ export default class WebinarAttendedLeads extends LightningElement {
         this.allWebinarData = this.allWebinarData.map(item => {
             const emailLower = item.email ? item.email.toLowerCase().trim() : '';
             const isLiveAttendee = this.liveAttendeeEmails.has(emailLower);
-            
+
             // Frontend-only status override
             const liveStatus = isLiveAttendee ? STATUS.PRESENT : STATUS.ABSENT;
-            
+
             return {
                 ...item,
                 status: liveStatus,
@@ -381,12 +381,12 @@ export default class WebinarAttendedLeads extends LightningElement {
                 // Filter from already loaded data (already has live status applied)
                 data = this.allWebinarData.filter(item => item.spocId === spocId);
             } else {
-                data = await getActiveWebinarAttendeesForUser({ 
-                    userId: spocId, 
-                    webinarId: this.selectedWebinarId 
+                data = await getActiveWebinarAttendeesForUser({
+                    userId: spocId,
+                    webinarId: this.selectedWebinarId
                 });
             }
-            
+
             this.processWebinarData(data);
         } catch (error) {
             this.handleError(error);
@@ -399,14 +399,14 @@ export default class WebinarAttendedLeads extends LightningElement {
     handleSpocQuickView(event) {
         const spocId = event.currentTarget.dataset.spocId;
         const filterType = event.currentTarget.dataset.filterType;
-        
+
         this.selectedSpocId = spocId;
         this.isLoading = true;
 
         try {
             // Filter data for this SPOC
             const data = this.allWebinarData.filter(item => item.spocId === spocId);
-            
+
             // Set the status filter based on which number was clicked
             if (filterType === 'present') {
                 this.statusFilterForSpoc = STATUS.PRESENT;
@@ -418,7 +418,7 @@ export default class WebinarAttendedLeads extends LightningElement {
                 this.statusFilterForSpoc = STATUS.ALL;
                 this.statusFilter = STATUS.ALL; // Sync with main filter
             }
-            
+
             // Process the data (filtering will happen in processWebinarData)
             this.processWebinarData(data);
         } catch (error) {
@@ -457,7 +457,7 @@ export default class WebinarAttendedLeads extends LightningElement {
             leadEmail,
             leadPhone
         };
-        
+
         this.showCallModal = true;
     }
 
@@ -469,14 +469,14 @@ export default class WebinarAttendedLeads extends LightningElement {
     handleFeedbackSaved() {
         this.showCallModal = false;
         this.selectedLeadForCall = null;
-        
+
         // Reload data after feedback is saved
         if (this.isGM) {
             this.loadAllSpocsData();
         } else {
             this.syncAndLoadData();
         }
-        
+
         this.showToast('Success', 'Call feedback saved and data refreshed', 'success');
     }
 
@@ -493,10 +493,10 @@ export default class WebinarAttendedLeads extends LightningElement {
             }
 
             this.webinarData = uniqueData.map(item => this.enrichWebinarItem(item));
-            
+
             // Apply the current status filter
             this.applyFilters();
-            
+
             if (!this.isGM) {
                 this.calculateMetrics();
             }
@@ -509,10 +509,10 @@ export default class WebinarAttendedLeads extends LightningElement {
     enrichWebinarItem(item) {
         const emailLower = item.email ? item.email.toLowerCase().trim() : '';
         const isLiveAttendee = this.liveAttendeeEmails.has(emailLower);
-        
+
         // If sync has occurred, override status based on live attendees
         // If not in live list → mark as Absent
-        const frontendStatus = this.hasLiveSyncOccurred 
+        const frontendStatus = this.hasLiveSyncOccurred
             ? (isLiveAttendee ? STATUS.PRESENT : STATUS.ABSENT)
             : item.status;
 
@@ -552,10 +552,10 @@ export default class WebinarAttendedLeads extends LightningElement {
     // -------------------------
     applyFilters() {
         this.filteredData = this.webinarData.filter(item =>
-            this.matchesSearchCriteria(item) && 
+            this.matchesSearchCriteria(item) &&
             this.matchesStatusFilter(item)
         );
-        
+
         if (!this.isGM) {
             this.calculateMetrics();
         }
@@ -652,8 +652,7 @@ export default class WebinarAttendedLeads extends LightningElement {
     }
 
     get showSyncButton() {
-        return this.activeWebinarId && !this.isLoading && !this.showWebinarSelection && 
-               (!this.isGM || (this.isGM && this.selectedSpocId));
+        return this.activeWebinarId && !this.isLoading && !this.showWebinarSelection;
     }
 
     get showMetrics() {
