@@ -1,7 +1,16 @@
+:host {
+       --slds-c-modal-sizing-small: 90vw;
+    --slds-c-modal-sizing-medium: 95vw;
+    --slds-c-modal-sizing-large: 95vw;
+}
 .wrap {
   padding: 12px;
   font-family: system-ui, Segoe UI, Arial, sans-serif;
   background-color: #f8fafc;
+}
+.slds-modal__container {
+      max-width: 65vw !important;
+    width: 65vw !important;
 }
 
 .toolbar {
@@ -300,4 +309,10 @@ table.matrix tbody tr:hover {
 
 .table-scroller::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+/* .slds-modal{
+  background-color: blue;
+} */
+.runo-section{
+  background-color: #2d4a6f;
 }

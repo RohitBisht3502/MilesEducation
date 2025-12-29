@@ -2,10 +2,12 @@
    GLOBAL WRAPPER + QUICK ACTION COLORS
    =========================================== */
 :host {
-    --slds-c-modal-sizing-width: 95vw !important;        
-    --slds-c-modal-sizing-max-width: 95vw !important; 
-    --slds-c-modal-sizing-height: 90vh !important;
-    --slds-c-modal-sizing-max-height: 90vh !important;
+       --slds-c-modal-sizing-small: 90vw;
+    --slds-c-modal-sizing-medium: 95vw;
+    --slds-c-modal-sizing-large: 95vw;
+
+    /* Optional height control */
+    --slds-c-modal-sizing-max-height: 90vh;
 
   
     
@@ -15,10 +17,18 @@
     --slds-c-modal-footer-color-background: #1e3a5f;
     --slds-c-modal-footer-text-color: #ffffff;
 }
-lightning-quick-action-panel {
+.slds-modal__container {
+      max-width: 90vw !important;
+    width: 90vw !important;
+}
+.slds-modal__container {
+   max-width: var(--slds-c-modal-sizing-medium);
+}
+
+/* lightning-quick-action-panel {
     width: 90% !important;
     max-width: 90% !important;
-}
+} */
 
 
 .panel-wrapper {
@@ -26,6 +36,8 @@ lightning-quick-action-panel {
     font-family: system-ui, Segoe UI, Arial, sans-serif;
     background-color: #f8fafc;
     border-radius: 8px;
+       height: 100%;
+    overflow: hidden !important;
 }
 
 /* ===========================================
@@ -129,8 +141,11 @@ lightning-quick-action-panel {
 
 .button-group {
     display: flex;
-    justify-content: space-between;
+
     margin-top: 16px;
+    text-align: center;
+    text-shadow: #2d4a6f;
+    justify-content: center;
 }
 
 /* Brand button (Save Feedback / Call Runo) */
@@ -291,4 +306,16 @@ lightning-quick-action-panel {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
+}
+.stage-section{
+    position:sticky;
+    text-shadow: #334155;
+
+    text-decoration: double;
+    color: #dc2626;
+}
+.btn-control-sect{
+    display: flex;
+    justify-content: space-between;
+    text-align: center;
 }

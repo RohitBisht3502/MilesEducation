@@ -3,6 +3,7 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { getRecord } from 'lightning/uiRecordApi';
 import appendUrls from '@salesforce/apex/AWSFileUploaderService.appendUrls';
 import getPresignedUrlApex from '@salesforce/apex/Callout_AWSFileUploader.getPresignedUrl';
+import { CloseActionScreenEvent } from 'lightning/actions';
 
 export default class FileUploader extends LightningElement {
   @api recordId;
@@ -74,6 +75,9 @@ export default class FileUploader extends LightningElement {
           urlsFieldApiName: this.urlsFieldApiName
         });
         this.toast('Success', 'Files uploaded and full URLs saved successfully.', 'success');
+
+        this.dispatchEvent(new CloseActionScreenEvent());
+        setTimeout(() => window.location.reload(), 800);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Error saving URLs:', error);

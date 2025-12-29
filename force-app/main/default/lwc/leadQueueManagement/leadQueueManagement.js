@@ -18,6 +18,8 @@ export default class LeadQueueManagement extends LightningElement {
     remainingCountdown = 0;
     countdownTimerId = null;
     isWaiting = false;
+    isQueuePaused = false;
+
 
     showModal = false;
 
@@ -73,71 +75,93 @@ export default class LeadQueueManagement extends LightningElement {
             this.pickNextLead();
         }
     }
+handleEnd() {
+    this.queueRunning = false;
+    this.isQueuePaused = false;
 
-    handleEnd() {
-        this.queueRunning = false;
-        this.clearCountdown();
-        this.showModal = false;
+    this.clearCountdown();
+    this.showModal = false;
+    this.currentLeadId = null;
+    this.currentIsCallLog = false;
+    this.remainingCountdown = 0;
+    this.pausedLeadId = null;
+}
+
+handlePause() {
+    if (!this.queueRunning) return;
+
+    this.queueRunning = false;
+    this.isQueuePaused = true;
+
+    this.clearCountdown();
+    this.remainingCountdown = this.countdown;
+    this.pausedLeadId = this.currentLeadId;
+
+    console.log('Queue paused at', this.remainingCountdown);
+}
+
+
+
+
+    handlePauseFromChild(){
+        console.log(' pause request from child model ');
+        this.handlePause();
+         this.showModal = false;
         this.currentLeadId = null;
-        this.currentIsCallLog = false; 
-        this.remainingCountdown = 0;
+        this.currentIsCallLog = false;
+
+    }
+
+    get disablePause() {
+    return !this.queueRunning;
+}
+
+handleResumeFromChild(){
+    console.log('resume request from call model ');
+    this.handleResume();
+}
+
+get disableResume() {
+    return this.queueRunning || !this.isQueuePaused;
+}
+
+
+
+
+   handleResume() {
+    if (this.queueRunning || this.leads.length === 0) return;
+
+    this.queueRunning = true;
+    this.isQueuePaused = false;
+
+    // Resume paused lead first
+    if (this.pausedLeadId) {
+        const row = this.leads.find(l => l.id === this.pausedLeadId);
+
+        if (row) {
+            this.currentLeadId = row.id;
+            this.currentIsCallLog = row.iscallLog ? true : false;
+            this.pausedLeadId = null;
+
+            this.showModal = true;
+
+            setTimeout(() => {
+                const cmp = this.template.querySelector('c-runo-allocation-calls');
+                if (cmp) cmp.startCall();
+            }, 0);
+
+            return;
+        }
+
         this.pausedLeadId = null;
     }
 
-    handlePause() {
-        if (!this.queueRunning) return;
-
-        this.queueRunning = false;
-        this.clearCountdown();
-        this.remainingCountdown = this.countdown;
-        this.pausedLeadId = this.currentLeadId;
-
-        console.log(
-            'Paused at countdown:',
-            this.remainingCountdown,
-            'Paused Lead ID:',
-            this.pausedLeadId
-        );
+    if (this.remainingCountdown > 0) {
+        this.startCountdown(this.remainingCountdown);
+    } else {
+        this.pickNextLead();
     }
-
-    handleResume() {
-        if (this.queueRunning || this.leads.length === 0) return;
-
-        this.queueRunning = true;
-
-        // Resume paused lead first
-        if (this.pausedLeadId) {
-
-            const exists = this.leads.some(l => l.id === this.pausedLeadId);
-
-            if (exists) {
-                this.currentLeadId = this.pausedLeadId;
-                const row = this.leads.find(l => l.id === this.currentLeadId);
-                this.currentIsCallLog = row && row.iscallLog ? true : false;
-                this.pausedLeadId = null;
-
-                this.showModal = true;
-
-                setTimeout(() => {
-                    const cmp = this.template.querySelector('c-runo-allocation-calls');
-                    if (cmp && typeof cmp.startCall === 'function') {
-                        console.log('Resuming paused lead:', this.currentLeadId);
-                        cmp.startCall();
-                    }
-                }, 0);
-
-                return;
-            }
-
-            this.pausedLeadId = null;
-        }
-
-        if (this.remainingCountdown > 0) {
-            this.startCountdown(this.remainingCountdown);
-        } else {
-            this.pickNextLead();
-        }
-    }
+}
 
     closeModal() {
         this.showModal = false;

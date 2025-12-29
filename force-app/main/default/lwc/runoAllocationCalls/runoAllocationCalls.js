@@ -13,18 +13,21 @@ import { subscribe, unsubscribe, onError } from 'lightning/empApi';
 export default class RunoAllocationCalls extends LightningElement {
     @api recordId;
     @api isCallLog; 
+    @api isQueuePaused;
 
     // ---------------------------------------------
     // 🔥 ADDED: flag for renderedCallback
     // ---------------------------------------------
     hasRendered = false;
-
+isStageDisabled = false;
+isQueueRunning = false;
     // UI / state
     loading = false;
     disableCancel = false;
 
     callButtonLabel = 'Call Runo';
     callButtonDisabled = false;
+
 
     // Call popup overlay (Calling Runo...)
     showCallPopup = false;
@@ -69,6 +72,8 @@ autoSetFollowUp = true;
     elapsedMs = 0;
     elapsedLabel = '00:00';
     timerId = null;
+
+
 
     // feedback
     showFeedback = false;
@@ -152,6 +157,8 @@ handleNotifyChange(event) {
         }
     }
 
+
+
     // ---------------------------------------------
     // 🔥 ADDED: renderedCallback to notify parent
     // ---------------------------------------------
@@ -170,13 +177,17 @@ handleNotifyChange(event) {
             }
         }
     }
-    handleAutoSetChange(e) {
+  handleAutoSetChange(e) {
     this.autoSetFollowUp = e.target.checked;
 
     if (this.autoSetFollowUp) {
         this.setAutoDate24();
+    } else {
+        // ✅ Allow manual entry without override
+        this.nextFollowUpDate = null;
     }
 }
+
 
     // ---------------------------------------------
 
@@ -224,6 +235,15 @@ handleNotifyChange(event) {
         }));
         this.isL2Disabled = this.l2Options.length === 0;
         this.l2Value = '';
+        
+
+        if(this.l1Value === 'Not-Connected'){
+            this.isStageDisabled = true;
+
+        }else{
+            this.isStageDisabled = false;
+
+        }
         this.updateCommentVisibility();
     }
 
@@ -244,11 +264,12 @@ handleNotifyChange(event) {
         this.feedback = e.target.value;
     }
 
-   handleNextFollowUpDateChange(e) {
+ handleNextFollowUpDateChange(e) {
     if (!this.autoSetFollowUp) {
         this.nextFollowUpDate = e.target.value;
     }
 }
+
 
 
     close() {
@@ -367,26 +388,30 @@ handleNotifyChange(event) {
     this.showFeedback = true;
     this.disableCancel = false;
 
-    if (this.autoSetFollowUp) {
+    // ✅ Only auto-set if:
+    // 1) autoSetFollowUp is true
+    // 2) user has NOT already selected a date
+    if (this.autoSetFollowUp && !this.nextFollowUpDate) {
         this.setAutoDate24();
     }
 }
 
 
+
 setAutoDate24() {
-    const now = new Date();
-    const next = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const next = new Date();
+    next.setHours(next.getHours() + 24);
 
-    const yyyy = next.getUTCFullYear();
-    const mm = String(next.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(next.getUTCDate()).padStart(2, '0');
-    const hh = String(next.getUTCHours()).padStart(2, '0');
-    const mi = String(next.getUTCMinutes()).padStart(2, '0');
-    const ss = String(next.getUTCSeconds()).padStart(2, '0');
+    const yyyy = next.getFullYear();
+    const mm = String(next.getMonth() + 1).padStart(2, '0');
+    const dd = String(next.getDate()).padStart(2, '0');
+    const hh = String(next.getHours()).padStart(2, '0');
+    const mi = String(next.getMinutes()).padStart(2, '0');
 
-    // Format as full ISO string without timezone offset
-    this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}.000Z`;
+    // datetime-local format (NO timezone issues)
+    this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
 }
+
 
 
     
@@ -409,6 +434,9 @@ setAutoDate24() {
          if (!this.l2Value) {
             this.toast('Required', 'l2 is required.', 'warning');
             return;
+        }
+        if(this.l1Value === 'Not-Connected'){
+            this.stageValue = null;
         }
 
         this.savingFeedback = true;
@@ -434,6 +462,8 @@ setAutoDate24() {
             });
 
             this.toast('Saved', 'Feedback saved successfully.', 'success');
+
+
 
             const eventDetail = {
                 recordId: this.recordId,
@@ -507,6 +537,25 @@ setAutoDate24() {
             clearInterval(this.timerId);
             this.timerId = null;
         }
+    }
+
+    handlePauseQueue(){
+        this.dispatchEvent(
+            new CustomEvent('pausequeue', {
+                bubbles : true,
+                composed :true
+
+            })
+        );
+    }
+    handleResumeQueue(){
+        this.dispatchEvent(
+            new CustomEvent('resumequeue',{
+                bubbles :true,
+                composed :true
+            })
+        );
+
     }
 
     setElapsed(ms) {
@@ -599,4 +648,13 @@ setAutoDate24() {
             console.error('toast dispatch failed', e);
         }
     }
+//// disable pause button 
+
+get disablePauseBtn(){
+    return !this.isLive;
+}
+
+
+
+
 }

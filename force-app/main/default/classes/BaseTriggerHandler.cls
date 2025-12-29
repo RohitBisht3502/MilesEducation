@@ -1,3 +1,7 @@
+/*
+    Author       : ROHIT SINGH BISHT
+    Description  : 
+*/
 public abstract class BaseTriggerHandler implements ITriggerHandler {
 
     protected List<SObject> newList;

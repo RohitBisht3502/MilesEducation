@@ -39,30 +39,59 @@ public without sharing class EligibilityDatalakeClient {
 
     public static String getDownloadUrl(String filePath) {
         if (String.isBlank(filePath)) {
-            throw new AuraHandledException('Missing file path for download.');
+            return null;
         }
 
-        HttpRequest req = new HttpRequest();
-        req.setMethod('GET');
-        String qp = EncodingUtil.urlEncode(filePath, 'UTF-8');
-        req.setEndpoint(BASE_URL + '/getEligibilityDocuments?file_path='+ qp);
-        req.setHeader('x-api-key', API_KEY);
+        IntegrationLogService.LogParams logParams = new IntegrationLogService.LogParams();
+        logParams.integrationType = 'File Visibility';
+        logParams.requestPayload = '{"file_path":"' + filePath + '"}';
+        logParams.status = 'failed';
 
-        Http http = new Http();
-        HTTPResponse res = http.send(req);
+        HTTPResponse res = null;
+        try {
+            HttpRequest req = new HttpRequest();
+            req.setMethod('GET');
+            String qp = EncodingUtil.urlEncode(filePath, 'UTF-8');
+            req.setEndpoint(BASE_URL + '/getEligibilityDocuments?file_path='+ qp);
+            req.setHeader('x-api-key', API_KEY);
 
-        if (res == null) {
-            throw new AuraHandledException('No response from datalake download API.');
-        }
-        if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
-            throw new AuraHandledException('Download API returned ' + res.getStatusCode() + ': ' + res.getBody());
-        }
+            Http http = new Http();
+            res = http.send(req);
 
-        DownloadResponse dr = (DownloadResponse) JSON.deserialize(res.getBody(), DownloadResponse.class);
-        if (dr == null || String.isBlank(dr.url)) {
-            throw new AuraHandledException('Download URL not found in API response.');
+            if (res == null) {
+                logParams.errorMessage = 'No response from datalake download API.';
+                logParams.responsePayload = null;
+                logParams.statusCode = null;
+                return null;
+            }
+            if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
+                logParams.errorMessage = 'HTTP ' + res.getStatusCode() + ': ' + res.getBody();
+                logParams.responsePayload = res.getBody();
+                logParams.statusCode = res.getStatusCode();
+                return null;
+            }
+
+            DownloadResponse dr = (DownloadResponse) JSON.deserialize(res.getBody(), DownloadResponse.class);
+            if (dr == null || String.isBlank(dr.url)) {
+                logParams.errorMessage = 'Download URL not found in API response.';
+                logParams.responsePayload = res.getBody();
+                logParams.statusCode = res.getStatusCode();
+                return null;
+            }
+
+            logParams.status = 'Success';
+            logParams.responsePayload = res.getBody();
+            logParams.statusCode = res.getStatusCode();
+            return dr.url;
+        } catch (Exception e) {
+            logParams.status = 'failed';
+            logParams.errorMessage = e.getMessage();
+            logParams.responsePayload = (res != null) ? res.getBody() : null;
+            logParams.statusCode = (res != null) ? res.getStatusCode() : null;
+            return null;
+        } finally {
+            IntegrationLogService.log(logParams);
         }
-        return dr.url;
     }
 
     public static CalloutResult postEligibilityResponse(EligibilityResponsePayload payload) {
@@ -74,29 +103,49 @@ public without sharing class EligibilityDatalakeClient {
             return cr;
         }
 
-        HttpRequest req = new HttpRequest();
-        req.setMethod('POST');
-        req.setEndpoint(BASE_URL + '/eligibilityResponseFromSalesForce');
-        req.setHeader('Content-Type', 'application/json');
-        req.setHeader('x-api-key', API_KEY);
-        req.setBody(JSON.serialize(payload));
+        String requestBody = JSON.serialize(payload);
+        IntegrationLogService.LogParams logParams = new IntegrationLogService.LogParams();
+        logParams.integrationType = 'Outbound status file';
+        logParams.requestPayload = requestBody;
 
-        Http http = new Http();
-        HTTPResponse res = http.send(req);
+        HTTPResponse res = null;
+        try {
+            HttpRequest req = new HttpRequest();
+            req.setMethod('POST');
+            req.setEndpoint(BASE_URL + '/eligibilityResponseFromSalesForce');
+            req.setHeader('Content-Type', 'application/json');
+            req.setHeader('x-api-key', API_KEY);
+            req.setBody(requestBody);
 
-        cr.statusCode = (res != null) ? res.getStatusCode() : null;
-        cr.body = (res != null) ? res.getBody() : null;
+            Http http = new Http();
+            res = http.send(req);
 
-        if (res == null) {
-            cr.message = 'No response received.';
+            cr.statusCode = (res != null) ? res.getStatusCode() : null;
+            cr.body = (res != null) ? res.getBody() : null;
+
+            if (res == null) {
+                cr.message = 'No response received.';
+            } else if (res.getStatusCode() >= 200 && res.getStatusCode() < 300) {
+                cr.success = true;
+                cr.message = 'ok';
+            } else {
+                cr.message = 'HTTP ' + res.getStatusCode() + ': ' + res.getBody();
+            }
+
+            logParams.status = cr.success ? 'Success' : 'failed';
+            logParams.responsePayload = (res != null) ? res.getBody() : null;
+            logParams.statusCode = (res != null) ? res.getStatusCode() : null;
+            logParams.errorMessage = cr.success ? null : cr.message;
             return cr;
+        } catch (Exception e) {
+            cr.message = e.getMessage();
+            logParams.status = 'failed';
+            logParams.errorMessage = e.getMessage();
+            logParams.responsePayload = (res != null) ? res.getBody() : null;
+            logParams.statusCode = (res != null) ? res.getStatusCode() : null;
+            return cr;
+        } finally {
+            IntegrationLogService.log(logParams);
         }
-        if (res.getStatusCode() >= 200 && res.getStatusCode() < 300) {
-            cr.success = true;
-            cr.message = 'ok';
-        } else {
-            cr.message = 'HTTP ' + res.getStatusCode() + ': ' + res.getBody();
-        }
-        return cr;
     }
 }

@@ -1,31 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Source_Bucket__c</fullName>
-    <externalId>false</externalId>
-    <formula>IF(
-    ISPICKVAL( Source__c , &quot;Facebook&quot;) ||
-    ISPICKVAL(Source__c , &quot;Advertisement&quot;) ||
-    ISPICKVAL(Source__c , &quot;website-contact_us&quot;) ||
-    ISPICKVAL(Source__c , &quot;Google Ads&quot;),
-    &quot;Bucket 1&quot;,
-
-IF(
-    ISPICKVAL(Source__c , &quot;Website&quot;) ||
-    ISPICKVAL(Source__c , &quot;Landing Page&quot;),
-    &quot;Bucket 2&quot;,
-
-IF(
-    ISPICKVAL(Source__c , &quot;Referral&quot;) ||
-    ISPICKVAL(Source__c , &quot;Partner&quot;),
-    &quot;Bucket 3&quot;,
-
-&quot;Bucket 4&quot;
-)))</formula>
-    <formulaTreatBlanksAs>BlankAsZero</formulaTreatBlanksAs>
     <label>Source Bucket</label>
     <required>false</required>
     <trackHistory>false</trackHistory>
     <trackTrending>false</trackTrending>
-    <type>Text</type>
-    <unique>false</unique>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetName>Bucket</valueSetName>
+    </valueSet>
 </CustomField>

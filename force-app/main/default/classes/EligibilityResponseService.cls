@@ -52,7 +52,22 @@ public without sharing class EligibilityResponseService {
             payload.files.certificates = new List<EligibilityDatalakeClient.FilePayload>();
         }
 
-        EligibilityDatalakeClient.postEligibilityResponse(payload);
+        IntegrationLogService.LogParams logParams = new IntegrationLogService.LogParams();
+        logParams.integrationType = 'Outbound status file';
+        logParams.requestPayload = JSON.serialize(payload);
+
+        try {
+            EligibilityDatalakeClient.CalloutResult result = EligibilityDatalakeClient.postEligibilityResponse(payload);
+            logParams.status = result.success ? 'Success' : 'failed';
+            logParams.responsePayload = result.body;
+            logParams.statusCode = result.statusCode;
+            logParams.errorMessage = result.success ? null : result.message;
+        } catch (Exception e) {
+            logParams.status = 'failed';
+            logParams.errorMessage = e.getMessage();
+        } finally {
+            IntegrationLogService.log(logParams);
+        }
     }
 
     @future(callout=true)
@@ -108,7 +123,22 @@ public without sharing class EligibilityResponseService {
         payload.files.certificates = certs;
         payload.files.mark_sheets = marks;
 
-        EligibilityDatalakeClient.postEligibilityResponse(payload);
+        IntegrationLogService.LogParams logParams = new IntegrationLogService.LogParams();
+        logParams.integrationType = 'Outbound status file';
+        logParams.requestPayload = JSON.serialize(payload);
+
+        try {
+            EligibilityDatalakeClient.CalloutResult result = EligibilityDatalakeClient.postEligibilityResponse(payload);
+            logParams.status = result.success ? 'Success' : 'failed';
+            logParams.responsePayload = result.body;
+            logParams.statusCode = result.statusCode;
+            logParams.errorMessage = result.success ? null : result.message;
+        } catch (Exception e) {
+            logParams.status = 'failed';
+            logParams.errorMessage = e.getMessage();
+        } finally {
+            IntegrationLogService.log(logParams);
+        }
     }
 
     private static EligibilityDatalakeClient.FilePayload mapFileToPayload(Eligibility_File__c f) {

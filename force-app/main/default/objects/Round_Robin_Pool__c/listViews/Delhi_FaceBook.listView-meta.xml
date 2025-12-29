@@ -1,15 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ListView xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Delhi_FaceBook</fullName>
-    <booleanFilter>1 AND 2 AND 3</booleanFilter>
+    <booleanFilter>1 AND 2 AND 3 AND 4</booleanFilter>
     <columns>NAME</columns>
     <columns>Sales_Rep__c</columns>
     <columns>Sequence__c</columns>
-    <columns>Maximum_Weightage__c</columns>
     <columns>Total_Assigned__c</columns>
     <columns>Assigned_Weight__c</columns>
     <columns>Current_Assigned_Weight__c</columns>
-    <columns>Max_Leads__c</columns>
     <columns>City__c</columns>
     <columns>Course__c</columns>
     <columns>Bucket__c</columns>
@@ -30,5 +28,10 @@
         <operation>equals</operation>
         <value>Bucket 1</value>
     </filters>
-    <label>Delhi - Bucket 1- CMA - Round Robin</label>
+    <filters>
+        <field>Course__c</field>
+        <operation>equals</operation>
+        <value>CMA</value>
+    </filters>
+    <label>Delhi - CMA- Facebook - Round Robin</label>
 </ListView>

@@ -123,98 +123,7 @@
                     </div>
 
                     <!-- FEEDBACK -->
-                    <template if:true={showFeedback}>
-                        <div class="section-card feedback-card">
-
-                            <!-- L1 -->
-                            <lightning-combobox
-                                name="l1"
-                                class="text-color"
-                                label="L1 Status"
-                                value={l1Value}
-                                options={l1Options}
-                                onchange={handleL1Change}>
-                            </lightning-combobox>
-
-                            <!-- L2 -->
-                            <lightning-combobox
-                                class="slds-m-top_small text-color"
-                                name="l2"
-                                label="L2 Sub Status"
-                                value={l2Value}
-                                options={l2Options}
-                                disabled={isL2Disabled}
-                                onchange={handleL2Change}>
-                            </lightning-combobox>
-
-                            <!-- STAGE -->
-                            <lightning-combobox
-                                class="slds-m-top_small text-color"
-                                name="stage"
-                                label="Stage"
-                                value={stageValue}
-                                options={stageOptions}
-                                onchange={handleStageChange}>
-                            </lightning-combobox>
-
-                            <!-- COURSE / LEVEL -->
-                            <lightning-combobox
-                                class="slds-m-top_small text-color"
-                                name="course"
-                                label="Course"
-                                value={levelValue}
-                                options={levelOptions}
-                                onchange={handleLevelChange}>
-                            </lightning-combobox>
-
-                            <!-- COMMENT BOX (ALWAYS VISIBLE, MANDATORY BASED ON RULE) -->
-                            <label class="feedback-label slds-m-top_small">
-                                Call Feedback
-                                <template if:true={isCommentMandatory}>
-                                    <span style="color:#c23934;"> (Mandatory)</span>
-                                </template>
-                                <template if:false={isCommentMandatory}>
-                                    <span style="color:#888;"> (Optional)</span>
-                                </template>
-                            </label>
-                            <lightning-textarea
-                                value={feedback}
-                                onchange={handleFeedbackChange}
-                                placeholder="Write call outcome…"
-                                maxlength="2000">
-                            </lightning-textarea>
-
-                            <!-- AUTO / MANUAL FOLLOW-UP CONTROL -->
-                            <div class="slds-m-top_small">
-                                <lightning-input
-                                    type="checkbox"
-                                    label="Auto-Set Next Follow-up Date (24 hrs)"
-                                    checked={autoSetFollowUp}
-                                    onchange={handleAutoSetChange}>
-                                </lightning-input>
-
-                                <lightning-input
-                                    class="slds-m-top_small text-color"
-                                    type="datetime-local"
-                                    label="Next Follow Up Date"
-                                    value={nextFollowUpDate}
-                                    onchange={handleNextFollowUpDateChange}
-                                    disabled={autoSetFollowUp}>
-                                </lightning-input>
-                            </div>
-
-                            <!-- BUTTONS -->
-                            <div class="button-group slds-m-top_small">
-                                <lightning-button
-                                    class="save-btn"
-                                    variant="brand"
-                                    label="Save Feedback"
-                                    onclick={saveFeedback}
-                                    disabled={isSaveDisabled}>
-                                </lightning-button>
-                            </div>
-                        </div>
-                    </template>
+                   
                 </div>
             </div>
 
@@ -225,6 +134,109 @@
                 </div>
             </template>
         </div>
+
+
+<!-- ================= FEEDBACK SECTION (BOTTOM) ================= -->
+<template if:true={showFeedback}>
+    <div class="section-card slds-m-top_large">
+
+        <div class="section-header">
+            <lightning-icon icon-name="utility:feedback" size="small"></lightning-icon>
+            <span>Call Feedback</span>
+        </div>
+
+        <div class="section-content slds-grid slds-wrap slds-gutters">
+
+            <!-- L1 -->
+            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                <lightning-combobox
+                    label="Call Status (L1)"
+                    value={l1Value}
+                    options={l1Options}
+                    onchange={handleL1Change}>
+                </lightning-combobox>
+            </div>
+
+            <!-- L2 -->
+            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                <lightning-combobox
+                    label="Sub Status (L2)"
+                    value={l2Value}
+                    options={l2Options}
+                    onchange={handleL2Change}
+                    disabled={isL2Disabled}>
+                </lightning-combobox>
+            </div>
+<div class="slds-col slds-size_1-of-1 slds-large-size_1-of-2 slds-m-top_small">
+  <lightning-combobox
+    class="text-color"
+    name="stage"
+    label="Stage"
+    value={stageValue}
+    options={stageOptions}
+    onchange={handleStageChange}
+    disabled={isStageDisabled}>
+  </lightning-combobox>
+</div>
+<template if:true={isStageDisabled}>
+ <div class="slds-text-color_weak slds-m-top_x-small stage-section">
+    Stage not applicable for Not-Connected calls
+  </div>
+</template>
+
+            <!-- <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                <lightning-combobox
+                    label="Course"
+                    value={levelValue}
+                    options={levelOptions}
+                    onchange={handleLevelChange}>
+                </lightning-combobox>
+            </div> -->
+
+            <!-- Feedback Comment -->
+            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                <lightning-textarea
+                    label="Feedback Comment"
+                    value={feedback}
+                    onchange={handleFeedbackChange}
+                    required={isCommentMandatory}>
+                </lightning-textarea>
+            </div>
+
+            <!-- Next Follow Up -->
+            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                <lightning-input
+                    type="datetime-local"
+                    label="Next Follow Up"
+                    value={nextFollowUpDate}
+                    onchange={handleNextFollowUpDateChange}
+                    disabled={autoSetFollowUp}>
+                </lightning-input>
+            </div>
+
+            <!-- Auto Follow Up -->
+            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-top_large">
+                <lightning-input
+                    type="checkbox"
+                    label="Auto set next follow up (+24 hrs)"
+                    checked={autoSetFollowUp}
+                    onchange={handleAutoSetChange}>
+                </lightning-input>
+            </div>
+
+            <!-- SAVE BUTTON -->
+            <div class="slds-col slds-size_1-of-1 slds-m-top_medium save-btn ">
+                <lightning-button
+                    variant="brand"
+                    label="Save Feedback"
+                    onclick={saveFeedback}
+                    disabled={isSaveDisabled}>
+                </lightning-button>
+            </div>
+
+        </div>
+    </div>
+</template>
 
         <!-- FOOTER BUTTONS -->
         <div slot="footer" class="footer-actions">

@@ -10,52 +10,65 @@
         </div>
 
         <!-- Phone Number Display -->
-        <div if:true={phoneNumber} class="phone-display-section">
-            <div class="phone-header">
-                <lightning-icon icon-name="utility:phone_portrait" size="small"></lightning-icon>
-                <h3>Phone Number</h3>
-            </div>
-            
-            <div class="phone-wrapper">
-                <div class="phone-number-box">
-                    <span class="phone-number">{phoneNumber}</span>
-                    <div class="phone-hint">Click to select</div>
+        <template if:true={phoneNumber}>
+            <div class="phone-display-section">
+                <div class="phone-header">
+                    <lightning-icon icon-name="utility:phone_portrait" size="small"></lightning-icon>
+                    <h3>Phone Number</h3>
                 </div>
                 
-                <div class="button-container">
-                    <button class="copy-btn" onclick={handleCopy}>
-                        <lightning-icon icon-name="utility:copy" size="x-small"></lightning-icon>
-                        Copy
-                    </button>
-                    <button class="close-btn" onclick={handleClose}>
-                        Close
-                    </button>
+                <div class="phone-wrapper">
+                    <div class="phone-number-box" onclick={selectPhoneText}>
+                        <span class="phone-number">{phoneNumber}</span>
+                        <div class="phone-hint">Click to select</div>
+                    </div>
+                    
+                    <div class="button-container">
+                        <button class="copy-btn" onclick={handleCopy}>
+                            <lightning-icon icon-name="utility:copy" size="x-small"></lightning-icon>
+                            Copy
+                        </button>
+                        <button class="close-btn" onclick={handleClose}>
+                            Close
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
+        </template>
 
         <!-- Action Section (when no phone shown) -->
-        <div if:false={phoneNumber} class="action-section">
-            <button 
-                class="view-btn" 
-                onclick={handleViewPhone}
-                disabled={isButtonDisabled}>
-                <lightning-icon icon-name="utility:phone" size="x-small"></lightning-icon>
-                View Phone Number
-            </button>
-            
-            <div if:true={showCreditError} class="error-container">
-                <div class="error-message">
-                    <lightning-icon icon-name="utility:error" size="x-small"></lightning-icon>
-                    <span>Insufficient credits to view phone number</span>
+        <template if:false={phoneNumber}>
+            <div class="action-section">
+                <button 
+                    class="view-btn" 
+                    onclick={handleViewPhone}
+                    disabled={isButtonDisabled}>
+                    <lightning-icon icon-name="utility:phone" size="x-small"></lightning-icon>
+                    View Phone Number
+                </button>
+                
+                <div if:true={showCreditError} class="error-container">
+                    <div class="error-message">
+                        <lightning-icon icon-name="utility:error" size="x-small"></lightning-icon>
+                        <span>Insufficient credits to view phone number</span>
+                    </div>
                 </div>
             </div>
-        </div>
+        </template>
 
         <!-- Loading Overlay -->
-        <div if:true={isLoading} class="loading-overlay">
-            <div class="spinner"></div>
-            <span>Loading...</span>
-        </div>
+        <template if:true={isLoading}>
+            <div class="loading-overlay">
+                <div class="spinner"></div>
+                <span>Processing...</span>
+            </div>
+        </template>
+        
+        <!-- Wire Method Loading -->
+        <template if:true={wireLoading}>
+            <div class="wire-loading">
+                <lightning-spinner alternative-text="Loading credits" size="small"></lightning-spinner>
+            </div>
+        </template>
     </div>
 </template>

@@ -3,14 +3,58 @@
     <lightning-card title="Eligibility File Verification" icon-name="custom:custom63">
         <!-- TOP PATH FOR GP LEAD STATUS (READ ONLY) -->
         <div class="ler-path-wrapper">
-            <div class="path-label">Eligibility Status</div>
-            <div class="path-steps">
-                <template for:each={pathItems} for:item="step">
-                    <div key={step.value} class={step.className}>
-                        {step.label}
+            <div class="path-header">
+                <div>
+                    <div class="path-label">Eligibility Status</div>
+                    <div class="path-steps">
+                        <template for:each={pathItems} for:item="step">
+                            <div key={step.value} class={step.className}>
+                                {step.label}
+                            </div>
+                        </template>
                     </div>
-                </template>
+                </div>
+                <div class="path-meta">
+                    <template for:each={statusCountsSummary} for:item="stat">
+                        <div key={stat.label} class="meta-pill">
+                            {stat.label}: {stat.count}
+                        </div>
+                    </template>
+                </div>
             </div>
+        </div>
+
+        <div class="ler-score-wrapper">
+            <div class="score-block">
+                <div class="score-label">Credit Score</div>
+                <div class="score-value">{creditScoreDisplay}</div>
+            </div>
+            <div class="score-block">
+                <div class="score-label">CPA Eligibility Status</div>
+                <div class="score-value score-status">{cpaStatusDisplay}</div>
+            </div>
+            <lightning-button
+                class="score-action"
+                variant="brand"
+                label="Calculate Eligibility Score"
+                title="Calculate Eligibility Score"
+                onclick={handleCalculateScore}
+                disabled={isCalculateDisabled}>
+            </lightning-button>
+            <lightning-button
+                class="score-action secondary"
+                variant="neutral"
+                label="Edit Eligibility"
+                title="Edit Eligibility"
+                onclick={openEditModal}
+                disabled={isCalculateDisabled}>
+            </lightning-button>
+        </div>
+
+        <div class="info-banner">
+            <p>
+                Once the user upload the data in MilesOne, it will be reflected here for verfication process.
+            </p>
         </div>
 
         <div class="ler-container">
@@ -256,12 +300,16 @@
 
                                                                             <div class="row-right">
                                                                                 <lightning-button
-                                                                                    variant="base"
+                                                                                    variant="brand-outline"
                                                                                     label="View"
-                                                                                    class="file-link"
+                                                                                    class="file-link view-button"
                                                                                     data-id={file.id}
-                                                                                    onclick={handleViewFile}>
+                                                                                    onclick={handleViewFile}
+                                                                                    disabled={file.isViewing}>
                                                                                 </lightning-button>
+                                                                                <template if:true={file.isViewing}>
+                                                                                    <lightning-spinner alternative-text="Loading" size="small" class="view-spinner"></lightning-spinner>
+                                                                                </template>
 
                                                                                 <span class={file.statusClass}>
                                                                                     <span class="status-dot"></span>
@@ -324,7 +372,7 @@
                             name="status"
                             label="Status"
                             value={editFile.status}
-                            options={statusOptions}
+                            options={fileStatusOptionsForUi}
                             onchange={handleFieldChange}>
                         </lightning-combobox>
 
@@ -359,7 +407,7 @@
                             label="Folder Status"
                             value={activeFolder.status}
                             placeholder="Select Status"
-                            options={folderStatusOptions}
+                            options={folderStatusOptionsForUi}
                             onchange={handleFolderStatusChange}>
                         </lightning-combobox>
 
@@ -373,6 +421,49 @@
                     <footer class="slds-modal__footer">
                         <lightning-button variant="neutral" label="Cancel" onclick={closeFolderModal}></lightning-button>
                         <lightning-button variant="brand" class="ler-btn-left_small" label="Save" onclick={saveFolderComment}></lightning-button>
+                    </footer>
+                </div>
+            </section>
+            <div class="slds-backdrop slds-backdrop_open"></div>
+        </template>
+
+        <!-- EDIT ELIGIBILITY MODAL -->
+        <template if:true={isEditModalOpen}>
+            <section role="dialog" tabindex="-1" aria-modal="true" class="slds-modal slds-fade-in-open">
+                <div class="slds-modal__container">
+                    <header class="slds-modal__header ler-modal-header">
+                        <h2 class="slds-text-heading_medium">
+                            Edit Eligibility Summary
+                        </h2>
+                    </header>
+                    <div class="slds-modal__content slds-p-around_medium">
+                        <lightning-input
+                            name="editCreditScore"
+                            type="number"
+                            label="Credit Score"
+                            value={editCreditScore}
+                            onchange={handleEditFieldChange}>
+                        </lightning-input>
+
+                        <lightning-combobox
+                            name="editCpaStatus"
+                            label="CPA Eligibility Status"
+                            value={editCpaStatus}
+                            options={cpaStatusOptions}
+                            onchange={handleEditFieldChange}>
+                        </lightning-combobox>
+
+                        <lightning-combobox
+                            name="editLeadStatus"
+                            label="Lead Eligibility Status"
+                            value={editLeadStatus}
+                            options={leadStatusOptionsForUi}
+                            onchange={handleEditFieldChange}>
+                        </lightning-combobox>
+                    </div>
+                    <footer class="slds-modal__footer">
+                        <lightning-button variant="neutral" label="Cancel" onclick={closeEditModal}></lightning-button>
+                        <lightning-button variant="brand" class="ler-btn-left_small" label="Save" onclick={saveEligibilitySnapshot}></lightning-button>
                     </footer>
                 </div>
             </section>

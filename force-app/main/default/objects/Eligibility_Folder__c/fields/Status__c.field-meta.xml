@@ -21,9 +21,9 @@
                 <label>Recheck</label>
             </value>
             <value>
-                <fullName>All Good</fullName>
+                <fullName>Approved</fullName>
                 <default>false</default>
-                <label>All Good</label>
+                <label>Approved</label>
             </value>
         </valueSetDefinition>
     </valueSet>

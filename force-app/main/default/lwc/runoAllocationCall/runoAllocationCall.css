@@ -164,6 +164,12 @@
     --sds-c-button-brand-color-text: #ffffff;
 }
 
+.save-btn{
+    display: block;
+    text-align: center;
+    justify-content: center;
+} 
+
 /* Footer buttons */
 .footer-actions {
     display: flex;

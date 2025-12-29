@@ -6,10 +6,12 @@ public without sharing class CandidateTriggerHelperClass {
 
     public static void handleBeforeInsert(List<Lead> newLeads) {
         // RoundRobinService.assignForLeads(newLeads);
+        BucketAssignmentService.assignBucket((List<SObject>)newLeads, null);
     }
     
     public static void handleBeforeUpdate(List<Lead> newLeads, Map<Id, Lead> oldMap) {
-       // TriggerRoundRobinService.handleBeforeUpdate(newLeads, oldMap);
+        // TriggerRoundRobinService.handleBeforeUpdate(newLeads, oldMap);
+        BucketAssignmentService.assignBucket((List<SObject>)newLeads,(Map<Id, SObject>)oldMap);
     }
 
     public static void handleAfterInsert(List<Lead> newLeads) {
@@ -181,6 +183,70 @@ public without sharing class CandidateTriggerHelperClass {
         }
         System.debug('City Code for Selected City from Candidate is :::::'+cityCodeMap);
         return cityCodeMap;
+    }
+    
+    
+    public static void transferRecordsOnConversion(List<Lead> newLeads, Map<Id, Lead> oldLeadsMap) {
+        
+        // Step 1: Find which leads were just converted
+        Map<Id, Id> convertedLeadToAccount = new Map<Id, Id>();
+        
+        for (Lead newLead : newLeads) {
+            Lead oldLead = oldLeadsMap.get(newLead.Id);
+            
+            // Check if this lead was just converted
+            if (newLead.isConverted && (oldLead == null || !oldLead.isConverted)) {
+                if (newLead.ConvertedAccountId != null) {
+                    convertedLeadToAccount.put(newLead.Id, newLead.ConvertedAccountId);
+                }
+            }
+        }
+        
+        // If no leads were converted, do nothing
+        if (convertedLeadToAccount.isEmpty()) {
+            return;
+        }
+        
+        // Step 2: Get all related records
+        Set<Id> convertedLeadIds = convertedLeadToAccount.keySet();
+        
+        // Get emails related to converted leads
+        List<Email__c> emails = [SELECT Id, Candidate__c FROM Email__c 
+                                WHERE Candidate__c IN :convertedLeadIds];
+        
+        // Get custom leads related to converted leads
+        List<Lead__c> customLeads = [SELECT Id, Candidate__c FROM Lead__c 
+                                    WHERE Candidate__c IN :convertedLeadIds];
+        
+        // Get phone numbers related to converted leads
+        List<Phone_Number__c> phoneNumbers = [SELECT Id, Candidate__c FROM Phone_Number__c 
+                                            WHERE Candidate__c IN :convertedLeadIds];
+        
+        // Step 3: Update records with Account Id
+        List<SObject> recordsToUpdate = new List<SObject>();
+        
+        // Update emails
+        for (Email__c email : emails) {
+            email.Student__c = convertedLeadToAccount.get(email.Candidate__c);
+            recordsToUpdate.add(email);
+        }
+        
+        // Update custom leads
+        for (Lead__c customLead : customLeads) {
+            customLead.Student__c = convertedLeadToAccount.get(customLead.Candidate__c);
+            recordsToUpdate.add(customLead);
+        }
+        
+        // Update phone numbers
+        for (Phone_Number__c phone : phoneNumbers) {
+            phone.Student__c = convertedLeadToAccount.get(phone.Candidate__c);
+            recordsToUpdate.add(phone);
+        }
+        
+        // Step 4: Save all changes
+        if (!recordsToUpdate.isEmpty()) {
+            update recordsToUpdate;
+        }
     }
 
 }

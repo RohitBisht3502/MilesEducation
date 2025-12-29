@@ -6,10 +6,12 @@ import { refreshApex } from '@salesforce/apex';
 import getFolderTree from '@salesforce/apex/EligibilityReviewController.getFolderTree';
 import saveFileApex from '@salesforce/apex/EligibilityReviewController.saveFile';
 import getFileFieldPicklists from '@salesforce/apex/EligibilityReviewController.getFileFieldPicklists';
-import getLeadEligibilityStatus from '@salesforce/apex/EligibilityReviewController.getLeadEligibilityStatus';
+import getLeadEligibilitySnapshot from '@salesforce/apex/EligibilityReviewController.getLeadEligibilitySnapshot';
 import saveFolderCommentApex from '@salesforce/apex/EligibilityReviewController.saveFolderComment';
 import updateFolderStatusApex from '@salesforce/apex/EligibilityReviewController.updateFolderStatus';
 import getDownloadUrlApex from '@salesforce/apex/EligibilityReviewController.getDownloadUrl';
+import calculateCreditScore from '@salesforce/apex/EligibilityReviewController.calculateCreditScore';
+import saveEligibilitySnapshotApex from '@salesforce/apex/EligibilityReviewController.saveEligibilitySnapshot';
 
 export default class LeadEligibilityReview extends LightningElement {
     @api recordId;
@@ -23,30 +25,83 @@ export default class LeadEligibilityReview extends LightningElement {
     @track rankOptions = [];
     @track yearOptions = [];
     @track totalFilesOverall = 0;
+    @track creditScore;
+    @track cpaEligibilityStatus;
+    @track statusOptions = [];
+    @track folderStatusOptions = [];
+    @track leadStatusOptions = [];
+    @track isCalculating = false;
+    @track isEditModalOpen = false;
+    @track editCreditScore;
+    @track editCpaStatus;
+    @track editLeadStatus;
+    @track allDegreesApproved = false;
+    @track statusCountsSummary = [];
+    @track viewLoadingId;
 
     @track isFolderModalOpen = false;
     @track activeFolder = {};
     @track folderCommentText = '';
 
     wiredTreeResult;
-    wiredLeadStatusResult;
-
-    statusOptions = [
-        { label: 'Submitted', value: 'Submitted' },
-        { label: 'Verified', value: 'Verified' },
-        { label: 'Reupload Required', value: 'Reupload_Required' },
-        { label: 'Recheck', value: 'Recheck' },
-        { label: 'Rejected', value: 'Rejected' }
-    ];
-
-    folderStatusOptions = [
-        { label: 'Pending Review', value: 'Pending Review' },
-        { label: 'All Good', value: 'All Good' },
-        { label: 'Recheck', value: 'Recheck' }
-    ];
+    wiredLeadSnapshotResult;
 
     connectedCallback() {
         this.initYearOptions();
+    }
+
+    get defaultFileStatuses() {
+        return ['Submitted', 'Verified', 'Recheck/Reupload', 'Not Applicable', 'Not application'];
+    }
+
+    get defaultFolderStatuses() {
+        return ['Pending review', 'Pending Review', 'Approved', 'Recheck'];
+    }
+
+    get defaultLeadStatuses() {
+        return [
+            'Yet to Initiate',
+            'Initiated',
+            'Under Verification',
+            'Verified',
+            'Not Eligible',
+            'Eligibility report generated'
+        ];
+    }
+
+    get fileStatusOptionsForUi() {
+        return (this.statusOptions && this.statusOptions.length)
+            ? this.statusOptions
+            : this.defaultFileStatuses.map(v => ({ label: v, value: v }));
+    }
+
+    get folderStatusOptionsForUi() {
+        return (this.folderStatusOptions && this.folderStatusOptions.length)
+            ? this.folderStatusOptions
+            : this.defaultFolderStatuses.map(v => ({ label: v, value: v }));
+    }
+
+    get cpaStatusOptions() {
+        return [
+            { label: 'Eligible for Exemption/License', value: 'Eligible for Exemption/License' },
+            { label: 'Eligible for Exams', value: 'Eligible for Exams' },
+            { label: 'Conditional Eligible', value: 'Conditional Eligible' },
+            { label: 'Not Eligible', value: 'Not Eligible' }
+        ];
+    }
+
+    get leadStatusOptionsForUi() {
+        return (this.leadStatusOptions && this.leadStatusOptions.length)
+            ? this.leadStatusOptions
+            : this.defaultLeadStatuses.map(v => ({ label: v, value: v }));
+    }
+
+    get creditScoreDisplay() {
+        return this.creditScore !== undefined && this.creditScore !== null ? this.creditScore : '--';
+    }
+
+    get cpaStatusDisplay() {
+        return this.cpaEligibilityStatus || '--';
     }
 
     @wire(getFolderTree, { leadId: '$recordId' })
@@ -59,6 +114,8 @@ export default class LeadEligibilityReview extends LightningElement {
             decorated = this.filterNodesWithFiles(decorated);
             this.folderTree = decorated;
             this.totalFilesOverall = this.computeTotalFiles(this.folderTree);
+            this.statusCountsSummary = this.computeStatusSummary(this.folderTree);
+            this.allDegreesApproved = this.checkAllDegreesApproved(this.folderTree);
         } else if (error) {
             // eslint-disable-next-line no-console
             console.error(error);
@@ -66,12 +123,17 @@ export default class LeadEligibilityReview extends LightningElement {
         }
     }
 
-    @wire(getLeadEligibilityStatus, { leadId: '$recordId' })
-    wiredLeadStatus(result) {
-        this.wiredLeadStatusResult = result;
+    @wire(getLeadEligibilitySnapshot, { leadId: '$recordId' })
+    wiredLeadSnapshot(result) {
+        this.wiredLeadSnapshotResult = result;
         const { data, error } = result;
         if (data) {
-            this.leadStatus = data;
+            this.leadStatus = data.leadStatus;
+            this.creditScore = data.creditScore;
+            this.cpaEligibilityStatus = data.cpaEligibilityStatus;
+            this.editCreditScore = data.creditScore;
+            this.editCpaStatus = data.cpaEligibilityStatus;
+            this.editLeadStatus = data.leadStatus;
         } else if (error) {
             // eslint-disable-next-line no-console
             console.error(error);
@@ -84,10 +146,22 @@ export default class LeadEligibilityReview extends LightningElement {
             const u = data.universityValues || [];
             const g = data.gradeValues || [];
             const r = data.rankValues || [];
+            const fStatuses = data.fileStatusValues && data.fileStatusValues.length
+                ? data.fileStatusValues
+                : this.defaultFileStatuses;
+            const folderStatuses = data.folderStatusValues && data.folderStatusValues.length
+                ? data.folderStatusValues
+                : this.defaultFolderStatuses;
+            const leadStatuses = data.leadStatusValues && data.leadStatusValues.length
+                ? data.leadStatusValues
+                : this.defaultLeadStatuses;
 
             this.universityOptions = u.map(v => ({ label: v, value: v }));
             this.gradeOptions = g.map(v => ({ label: v, value: v }));
             this.rankOptions = r.map(v => ({ label: v, value: v }));
+            this.statusOptions = fStatuses.map(v => ({ label: v, value: v }));
+            this.folderStatusOptions = folderStatuses.map(v => ({ label: v, value: v }));
+            this.leadStatusOptions = leadStatuses.map(v => ({ label: v, value: v }));
         } else if (error) {
             // eslint-disable-next-line no-console
             console.error(error);
@@ -112,41 +186,42 @@ export default class LeadEligibilityReview extends LightningElement {
         return this.computeTotalFiles(this.folderTree) > 0;
     }
 
+    get totalFolders() {
+        return this.countFolders(this.folderTree);
+    }
+
+    get totalFiles() {
+        return this.computeTotalFiles(this.folderTree);
+    }
+
+    get isCalculateDisabled() {
+        return !this.allDegreesApproved || this.isCalculating;
+    }
+
     get pathItems() {
-        const labels = [
-            'New lead',
-            'Verification',
-            'Verified',
-            'Recheck',
-            'Crosscheck (USP Process)',
-            'Not eligible',
-            'Refund'
-        ];
+        const options = (this.leadStatusOptions && this.leadStatusOptions.length)
+            ? this.leadStatusOptions
+            : this.defaultLeadStatuses.map(v => ({ label: v, value: v }));
 
-        const order = {
-            'New lead': 1,
-            'Verification': 2,
-            'Verified': 3,
-            'Recheck': 4,
-            'Crosscheck (USP Process)': 5,
-            'Not eligible': 6,
-            'Refund': 7
-        };
+        const order = {};
+        options.forEach((opt, idx) => {
+            order[opt.value] = idx + 1;
+        });
 
-        const current = this.leadStatus || 'New lead';
-        const currentOrder = order[current] || order['New lead'];
+        const current = this.leadStatus || (options.length ? options[0].value : null);
+        const currentOrder = current ? order[current] : null;
 
-        return labels.map(label => {
-            const stepOrder = order[label];
+        return options.map(opt => {
+            const stepOrder = order[opt.value];
             let cls = 'path-step';
-            if (stepOrder < currentOrder) {
+            if (currentOrder && stepOrder < currentOrder) {
                 cls += ' path-completed';
-            } else if (stepOrder === currentOrder) {
+            } else if (currentOrder && stepOrder === currentOrder) {
                 cls += ' path-current';
             }
             return {
-                label,
-                value: label,
+                label: opt.label || opt.value,
+                value: opt.value,
                 className: cls
             };
         });
@@ -202,22 +277,22 @@ export default class LeadEligibilityReview extends LightningElement {
         }
 
         // Aggregate status counts & total files (this node + descendants)
-        const counts = {
-            Verified: 0,
-            Recheck: 0,
-            Reupload_Required: 0,
-            Submitted: 0,
-            Rejected: 0
-        };
+        const countKeys = (this.statusOptions && this.statusOptions.length)
+            ? this.statusOptions.map(opt => opt.value)
+            : this.defaultFileStatuses;
+        const counts = {};
+        countKeys.forEach(k => { counts[k] = 0; });
+        const defaultCountKey = countKeys.length ? countKeys[0] : 'Submitted';
 
         if (decorated.children && decorated.children.length) {
             decorated.children.forEach(ch => {
                 if (ch.statusCounts) {
-                    counts.Verified += ch.statusCounts.Verified;
-                    counts.Recheck += ch.statusCounts.Recheck;
-                    counts.Reupload_Required += ch.statusCounts.Reupload_Required;
-                    counts.Submitted += ch.statusCounts.Submitted;
-                    counts.Rejected += ch.statusCounts.Rejected;
+                    Object.keys(ch.statusCounts).forEach(key => {
+                        if (!counts.hasOwnProperty(key)) {
+                            counts[key] = 0;
+                        }
+                        counts[key] += ch.statusCounts[key];
+                    });
                 }
             });
         }
@@ -227,19 +302,14 @@ export default class LeadEligibilityReview extends LightningElement {
                 const st = file.status;
                 if (st && counts.hasOwnProperty(st)) {
                     counts[st] = counts[st] + 1;
-                } else {
-                    counts.Submitted = counts.Submitted + 1;
+                } else if (counts.hasOwnProperty(defaultCountKey)) {
+                    counts[defaultCountKey] = counts[defaultCountKey] + 1;
                 }
             });
         }
 
         decorated.statusCounts = counts;
-        const totalFiles =
-            counts.Verified +
-            counts.Recheck +
-            counts.Reupload_Required +
-            counts.Submitted +
-            counts.Rejected;
+        const totalFiles = Object.keys(counts).reduce((sum, key) => sum + counts[key], 0);
 
         decorated.totalFiles = totalFiles;
 
@@ -249,11 +319,13 @@ export default class LeadEligibilityReview extends LightningElement {
 
         // Build a human-readable summary for top-level folders
         const summaryParts = [];
-        if (counts.Verified > 0) summaryParts.push(`Verified: ${counts.Verified}`);
-        if (counts.Recheck > 0) summaryParts.push(`Recheck: ${counts.Recheck}`);
-        if (counts.Reupload_Required > 0) summaryParts.push(`Reupload: ${counts.Reupload_Required}`);
-        if (counts.Submitted > 0) summaryParts.push(`Submitted: ${counts.Submitted}`);
-        if (counts.Rejected > 0) summaryParts.push(`Rejected: ${counts.Rejected}`);
+        const summaryOrder = ['Verified', 'Recheck/Reupload', 'Not Applicable', 'Not application', 'Submitted'];
+        summaryOrder.forEach(key => {
+            if (counts[key] > 0) {
+                const label = key === 'Recheck/Reupload' ? 'Recheck/Reupload' : key;
+                summaryParts.push(`${label}: ${counts[key]}`);
+            }
+        });
 
         decorated.statusSummary = summaryParts.join(' | ');
 
@@ -327,19 +399,90 @@ export default class LeadEligibilityReview extends LightningElement {
         return sum;
     }
 
+    countFolders(nodes) {
+        if (!nodes) return 0;
+        let count = 0;
+        nodes.forEach(n => {
+            count += 1;
+            if (n.children && n.children.length) {
+                count += this.countFolders(n.children);
+            }
+        });
+        return count;
+    }
+
+    checkAllDegreesApproved(nodes) {
+        let allApproved = true;
+        const traverse = (list) => {
+            if (!list) return;
+            list.forEach(item => {
+                if (item.folderType === 'Degree' && item.status && item.status.toLowerCase() !== 'approved') {
+                    allApproved = false;
+                }
+                if (item.children && item.children.length) traverse(item.children);
+            });
+        };
+        traverse(nodes);
+        return allApproved && nodes && nodes.length > 0;
+    }
+
+    computeStatusSummary(nodes) {
+        const counts = {};
+        const walk = (list) => {
+            if (!list) return;
+            list.forEach(n => {
+                if (n.files && n.files.length) {
+                    n.files.forEach(f => {
+                        const key = f.status || 'Submitted';
+                        counts[key] = (counts[key] || 0) + 1;
+                    });
+                }
+                if (n.children && n.children.length) walk(n.children);
+            });
+        };
+        walk(nodes);
+        const order = [...this.defaultFileStatuses];
+        Object.keys(counts).forEach(k => {
+            if (!order.includes(k)) {
+                order.push(k);
+            }
+        });
+        return order
+            .filter(k => counts[k])
+            .map(k => ({ label: k, count: counts[k] }));
+    }
+
+    updateViewState(activeId) {
+        const markNode = (node) => {
+            const clone = { ...node };
+            if (clone.files && clone.files.length) {
+                clone.files = clone.files.map(f => ({
+                    ...f,
+                    isViewing: activeId && (f.id === activeId || f.Id === activeId)
+                }));
+            }
+            if (clone.children && clone.children.length) {
+                clone.children = clone.children.map(ch => markNode(ch));
+            }
+            return clone;
+        };
+        this.folderTree = (this.folderTree || []).map(n => markNode(n));
+    }
+
     statusClassForFile(status) {
         let base = 'status-pill file-status';
-        if (status === 'Verified') return base + ' status-verified';
-        if (status === 'Recheck' || status === 'Reupload_Required') return base + ' status-recheck';
-        if (status === 'Rejected') return base + ' status-rejected';
+        const normalized = status ? status.toLowerCase() : '';
+        if (normalized === 'verified') return base + ' status-verified';
+        if (normalized === 'recheck/reupload' || normalized === 'not applicable' || normalized === 'not application') return base + ' status-recheck';
         return base + ' status-submitted';
     }
 
     statusClassForFolder(status) {
         let base = 'status-pill folder-status';
-        if (status === 'All Good') return base + ' status-verified';
-        if (status === 'Recheck') return base + ' status-recheck';
-        if (status === 'Pending Review') return base + ' status-pending';
+        const normalized = status ? status.toLowerCase() : '';
+        if (normalized === 'approved') return base + ' status-verified';
+        if (normalized === 'recheck') return base + ' status-recheck';
+        if (normalized === 'pending review') return base + ' status-pending';
         return base;
     }
 
@@ -394,6 +537,8 @@ export default class LeadEligibilityReview extends LightningElement {
     async handleViewFile(event) {
         const fileId = event.currentTarget.dataset.id;
         if (!fileId) return;
+        this.viewLoadingId = fileId;
+        this.updateViewState(fileId);
         try {
             const url = await getDownloadUrlApex({ fileId });
             if (url) {
@@ -409,6 +554,37 @@ export default class LeadEligibilityReview extends LightningElement {
                 (e && e.body && e.body.message) || e.message || 'Unable to fetch download link.',
                 'error'
             );
+        } finally {
+            this.viewLoadingId = null;
+            this.updateViewState(null);
+        }
+    }
+
+    async handleCalculateScore() {
+        if (!this.recordId) return;
+        this.isCalculating = true;
+        try {
+            const result = await calculateCreditScore({ leadId: this.recordId });
+            if (result) {
+                this.creditScore = result.creditScore;
+                this.cpaEligibilityStatus = result.cpaEligibilityStatus;
+                this.leadStatus = result.leadStatus || this.leadStatus;
+                this.editCreditScore = result.creditScore;
+                this.editCpaStatus = result.cpaEligibilityStatus;
+                this.editLeadStatus = result.leadStatus || this.leadStatus;
+            }
+            this.showToast('Success', 'Eligibility score calculated.', 'success');
+            await this.refreshTree();
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('Error calculating credit score', e);
+            this.showToast(
+                'Error',
+                (e && e.body && e.body.message) || e.message || 'Unable to calculate eligibility score.',
+                'error'
+            );
+        } finally {
+            this.isCalculating = false;
         }
     }
 
@@ -523,11 +699,11 @@ export default class LeadEligibilityReview extends LightningElement {
         }
 
         const s = this.editFile.status;
-        const needsComment = s === 'Recheck' || s === 'Rejected' || s === 'Reupload_Required';
+        const needsComment = s === 'Recheck/Reupload' || s === 'Not Applicable' || s === 'Not application';
         if (needsComment) {
             const c = (this.editFile.comment || '').trim();
             if (!c) {
-                this.showToast('Error', 'Comment is required for Recheck / Rejected / Reupload.', 'error');
+                this.showToast('Error', 'Comment is required for Recheck/Reupload or Not Applicable.', 'error');
                 return;
             }
         }
@@ -566,8 +742,8 @@ export default class LeadEligibilityReview extends LightningElement {
             if (this.wiredTreeResult) {
                 await refreshApex(this.wiredTreeResult);
             }
-            if (this.wiredLeadStatusResult) {
-                await refreshApex(this.wiredLeadStatusResult);
+            if (this.wiredLeadSnapshotResult) {
+                await refreshApex(this.wiredLeadSnapshotResult);
             }
         } catch (e) {
             // eslint-disable-next-line no-console
@@ -577,5 +753,60 @@ export default class LeadEligibilityReview extends LightningElement {
 
     showToast(title, message, variant) {
         this.dispatchEvent(new ShowToastEvent({ title, message, variant }));
+    }
+
+    openEditModal() {
+        this.editCreditScore = this.creditScore;
+        this.editCpaStatus = this.cpaEligibilityStatus;
+        this.editLeadStatus = this.leadStatus;
+        this.isEditModalOpen = true;
+    }
+
+    closeEditModal() {
+        this.isEditModalOpen = false;
+    }
+
+    handleEditFieldChange(event) {
+        const { name, value } = event.target;
+        if (name === 'editCreditScore') {
+            this.editCreditScore = value;
+        } else if (name === 'editCpaStatus') {
+            this.editCpaStatus = value;
+        } else if (name === 'editLeadStatus') {
+            this.editLeadStatus = value;
+        }
+    }
+
+    async saveEligibilitySnapshot() {
+        if (!this.recordId) return;
+        const creditScoreValue = this.editCreditScore === '' || this.editCreditScore === undefined || this.editCreditScore === null
+            ? null
+            : Number(this.editCreditScore);
+
+        try {
+            const result = await saveEligibilitySnapshotApex({
+                leadId: this.recordId,
+                creditScore: creditScoreValue,
+                cpaEligibilityStatus: this.editCpaStatus,
+                leadStatus: this.editLeadStatus
+            });
+
+            if (result) {
+                this.creditScore = result.creditScore;
+                this.cpaEligibilityStatus = result.cpaEligibilityStatus;
+                this.leadStatus = result.leadStatus;
+                this.showToast('Saved', 'Eligibility details updated.', 'success');
+            }
+            this.isEditModalOpen = false;
+            await this.refreshTree();
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('Error saving eligibility snapshot', e);
+            this.showToast(
+                'Error',
+                (e && e.body && e.body.message) || e.message || 'Unable to save eligibility details.',
+                'error'
+            );
+        }
     }
 }

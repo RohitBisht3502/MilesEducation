@@ -117,49 +117,4 @@ public class LeadQueueManagementController {
 
         return 'NE';
     }
-
-    @AuraEnabled
-    public static void saveLeadFeedbackAuto(Id leadId, String callId, String feedback, Datetime nextFollowUpDate, String l1, String l2, String stage, String level) {
-        System.debug('leadId  >>>'+leadId);
-        System.debug('callId  >>>'+callId);
-        if (leadId == null || String.isBlank(callId)) {
-            throw new AuraHandledException('Lead Id and Call Id are required.');
-        }
-
-        List<Call_Log__c> logs = [ SELECT Id FROM Call_Log__c WHERE Lead__c = :leadId AND Call_Id__c = :callId LIMIT 1 ];
-
-        if (logs.isEmpty()) {
-            throw new AuraHandledException('No call log found for this Lead and Call Id.');
-        }
-
-        Call_Log__c logRecord = logs[0];
-
-        logRecord.Feedback__c = feedback;
-        logRecord.Next_Follow_Up_Date__c = nextFollowUpDate;
-        logRecord.L1__c = l1;
-        logRecord.L2__c = l2;
-        logRecord.Stage__c = stage;
-        logRecord.Course__c = level;
-
-        update logRecord;
-
-        SObjectType sType = leadId.getSObjectType();
-        String objName = sType.getDescribe().getName();
-
-        if (objName == 'Lead__c') {
-            update new Lead__c(
-                Id = leadId,
-                Stage__c = stage,
-                Course__c = level,
-                Next_Follow_Up_Date__c = nextFollowUpDate
-            );
-        } else if (objName == 'Enquiry__c') {
-            update new Enquiry__c(
-                Id = leadId,
-                Stage__c = stage,
-                Course__c = level
-            );
-        }
-    }
-
 }

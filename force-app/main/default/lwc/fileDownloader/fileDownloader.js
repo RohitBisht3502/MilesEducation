@@ -3,6 +3,7 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { getRecord } from 'lightning/uiRecordApi';
 import appendUrlsCtx from '@salesforce/apex/AWSFileUploaderService.appendUrlsCtx';
 import getDownloadLinks from '@salesforce/apex/Callout_AWSFileDownloader.getDownloadLinks';
+import { CloseActionScreenEvent } from 'lightning/actions';
 
 export default class FileDownloader extends LightningElement {
   @api recordId;
@@ -52,7 +53,11 @@ export default class FileDownloader extends LightningElement {
       });
       this.lastResultMessage = `Saved ${items.length} download link(s).`;
       this.toast('Success', this.lastResultMessage, 'success');
+      
     }
+
+    this.dispatchEvent(new CloseActionScreenEvent());
+    setTimeout(() => window.location.reload(), 800);
     this.loading = false;
   }
 

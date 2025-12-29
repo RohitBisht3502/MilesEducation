@@ -81,21 +81,29 @@
     <template if:true={showModal}>
       <div class="modal-overlay slds-backdrop slds-backdrop_open"></div>
 
-      <section class="slds-modal slds-fade-in-open" style="display:block; background:transparent;">
-        <div class="slds-modal__container">
+      <section class="slds-modal slds-fade-in-open" style="display:block; background:transparent; ">
+        <div class="slds-modal__container runo-section"  style="background:transparent;">
           <header class="slds-modal__header">
             <button class="slds-button slds-button_icon slds-modal__close" onclick={closeModal}>
               <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
             </button>
-            <h2 class="slds-text-heading_medium">Calling</h2>
+           
           </header>
 
           <div class="slds-modal__content">
-            <c-runo-allocation-calls
-              record-id={currentLeadId}
-              is-call-log={currentIsCallLog}
-              oncallcomplete={handleCallComplete}>
-            </c-runo-allocation-calls>
+           
+
+<c-runo-allocation-calls
+  record-id={currentLeadId}
+  is-call-log={currentIsCallLog}
+  is-queue-running={queueRunning}
+  is-queue-paused={isQueuePaused}
+  oncallcomplete={handleCallComplete}
+  onpausequeue={handlePauseFromChild}
+  onresumequeue={handleResumeFromChild}>
+</c-runo-allocation-calls>
+
+
           </div>
         </div>
       </section>

@@ -33,14 +33,21 @@ global without sharing class EligibilityApi {
     @HttpPost
     global static ApiResponse upsertQualification() {
         ApiResponse res = new ApiResponse();
+        RestRequest req = RestContext.request;
+        String body = (req != null && req.requestBody != null) ? req.requestBody.toString() : null;
+
+        IntegrationLogService.LogParams logParams = new IntegrationLogService.LogParams();
+        logParams.integrationType = 'Inbound files';
+        logParams.requestPayload = body;
+
         try {
-            RestRequest req = RestContext.request;
-            String body = (req.requestBody != null) ? req.requestBody.toString() : null;
             System.debug('EligibilityApi.upsertQualification body: ' + body);
 
             if (String.isBlank(body)) {
                 res.success = false;
                 res.message = 'Request body is empty.';
+                logParams.status = 'failed';
+                logParams.errorMessage = res.message;
                 return res;
             }
 
@@ -50,6 +57,25 @@ global without sharing class EligibilityApi {
             if (raw == null || String.isBlank(raw.sf_id)) {
                 res.success = false;
                 res.message = 'Missing sf_id (Lead Id).';
+                logParams.status = 'failed';
+                logParams.errorMessage = res.message;
+                return res;
+            }
+
+            // Validate Lead status (must not be "Yet to Initiate")
+            Lead targetLead = [
+                SELECT GP_Lead_Status__c
+                FROM Lead
+                WHERE Id = :raw.sf_id
+                LIMIT 1
+            ];
+            if (targetLead != null &&
+                targetLead.GP_Lead_Status__c != null &&
+                targetLead.GP_Lead_Status__c.equalsIgnoreCase('Yet to Initiate')) {
+                res.success = false;
+                res.message = 'Candidate eligibility process is yet to be initiated. Please check with the sales SPOC to initiate the document verification process.';
+                logParams.status = 'failed';
+                logParams.errorMessage = res.message;
                 return res;
             }
 
@@ -68,17 +94,26 @@ global without sharing class EligibilityApi {
                 if (!svcRes.success) {
                     res.success = false;
                     res.message = svcRes.message;
+                    logParams.status = 'failed';
+                    logParams.errorMessage = res.message;
                     return res;
                 }
             }
 
             res.success = true;
             res.message = 'Qualification files synced successfully.';
+            logParams.status = 'Success';
+            logParams.responsePayload = JSON.serialize(res);
 
         } catch (Exception e) {
             System.debug('EligibilityApi.upsertQualification ERROR: ' + e.getMessage());
             res.success = false;
             res.message = 'Error processing request: ' + e.getMessage();
+            logParams.status = 'failed';
+            logParams.errorMessage = e.getMessage();
+            logParams.responsePayload = JSON.serialize(res);
+        } finally {
+            IntegrationLogService.log(logParams);
         }
         return res;
     }

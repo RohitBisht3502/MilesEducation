@@ -6,6 +6,8 @@ import updateCallFeedback from '@salesforce/apex/Webservice_RunoAllocationAPI.up
 import getL1L2Values from '@salesforce/apex/Webservice_RunoAllocationAPI.getL1L2Values';
 import getIdentity from '@salesforce/apex/RunoCallIdentityService.getIdentity';
 import getStageLevelValues from '@salesforce/apex/Webservice_RunoAllocationAPI.getStageLevelValues';
+import { CurrentPageReference } from 'lightning/navigation';
+
 
 import { CloseActionScreenEvent } from 'lightning/actions';
 import { subscribe, unsubscribe, onError } from 'lightning/empApi';
@@ -22,6 +24,7 @@ export default class RunoAllocationCall extends LightningElement {
 
     // Call popup overlay (Calling Runo...)
     showCallPopup = false;
+    isStageDisabled = false;
 
     // L1/L2
     l1Value = '';
@@ -119,10 +122,44 @@ export default class RunoAllocationCall extends LightningElement {
             this.errorText = error?.body?.message || 'Failed to load identity';
         }
     }
+    // -------------- PAGE REFERENCE (URL SAFE) --------------
+
+@wire(CurrentPageReference)
+wiredPageRef(pageRef) {
+    this.pageRef = pageRef;
+}
+
+
+
+
+
+
+// -------------- URL RECORD ID (SAFE FALLBACK) --------------
+resolveRecordIdFromPageRef() {
+    if (this.recordId) {
+        return; // already provided (Quick Action / Record Page)
+    }
+
+    const state = this.pageRef?.state;
+    if (!state) return;
+
+    const recId =
+        state.recordId ||
+        state.c__recordId ||
+        state.id ||
+        state.c__id;
+
+    if (recId && (recId.length === 15 || recId.length === 18)) {
+        this.recordId = recId;
+        console.log('RecordId resolved from pageRef:', this.recordId);
+    }
+}
+
 
     // --------------- LIFECYCLE -------------
 
     connectedCallback() {
+       this.resolveRecordIdFromPageRef();
         this.loadPicklists();
         this.loadStageLevel();
         this.subscribeToEvents();
@@ -183,6 +220,14 @@ export default class RunoAllocationCall extends LightningElement {
         }));
         this.isL2Disabled = this.l2Options.length === 0;
         this.l2Value = '';
+
+
+        if(this.l1Value === 'Not-Connected'){
+          this.isStageDisabled = true;
+        }else{
+          this.isStageDisabled = false;
+        }
+
         this.updateCommentVisibility();
     }
 
@@ -306,7 +351,7 @@ export default class RunoAllocationCall extends LightningElement {
 
         // show feedback when call is manually ended
         this.showFeedbackSection();
-        this.callButtonDisabled = false;
+        this.callButtonDisabled = true;
     }
 
     get isSaveDisabled() {
@@ -362,6 +407,9 @@ export default class RunoAllocationCall extends LightningElement {
                 })
             );
             return;
+        }
+        if(this.l1Value === 'Not-Connected'){
+            this.stageValue = null;
         }
 
         this.savingFeedback = true;
@@ -529,12 +577,13 @@ export default class RunoAllocationCall extends LightningElement {
         this.showCallPopup = false;
 
         this.stopTimer();
+
         this.clearFeedbackTimers();
 
         // show feedback when platform event says call ended
         this.showFeedbackSection();
 
-        this.callButtonDisabled = false;
+        this.callButtonDisabled = true;
 
         console.log('RUNO EVENT => CALL ENDED (UI updated)');
     }

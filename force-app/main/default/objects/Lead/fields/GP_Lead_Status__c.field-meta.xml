@@ -10,29 +10,29 @@
         <valueSetDefinition>
             <sorted>false</sorted>
             <value>
-                <fullName>New lead</fullName>
+                <fullName>Yet to Initiate</fullName>
                 <default>false</default>
-                <label>New lead</label>
+                <label>Yet to Initiate</label>
             </value>
             <value>
-                <fullName>Verification</fullName>
+                <fullName>Initiated</fullName>
                 <default>false</default>
-                <label>Verification</label>
+                <label>Initiated</label>
             </value>
             <value>
-                <fullName>Verified</fullName>
+                <fullName>Under Verification</fullName>
                 <default>false</default>
-                <label>Verified</label>
+                <label>Under Verification</label>
             </value>
             <value>
-                <fullName>Recheck</fullName>
+                <fullName>Verfied</fullName>
                 <default>false</default>
-                <label>Recheck</label>
+                <label>Verfied</label>
             </value>
             <value>
-                <fullName>Crosscheck (USP Process)</fullName>
+                <fullName>Eligibility Report Generated</fullName>
                 <default>false</default>
-                <label>Crosscheck (USP Process)</label>
+                <label>Eligibility Report Generated</label>
             </value>
             <value>
                 <fullName>Not eligible</fullName>
@@ -42,6 +42,7 @@
             <value>
                 <fullName>Refund</fullName>
                 <default>false</default>
+                <isActive>false</isActive>
                 <label>Refund</label>
             </value>
         </valueSetDefinition>

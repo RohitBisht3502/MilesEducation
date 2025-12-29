@@ -23,6 +23,21 @@
                 <default>false</default>
                 <label>AWS File Uploader</label>
             </value>
+            <value>
+                <fullName>Inbound files</fullName>
+                <default>false</default>
+                <label>Inbound files</label>
+            </value>
+            <value>
+                <fullName>Oubound Status files</fullName>
+                <default>false</default>
+                <label>Oubound Status files</label>
+            </value>
+            <value>
+                <fullName>File Visibility</fullName>
+                <default>false</default>
+                <label>File Visibility</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

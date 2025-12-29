@@ -1,0 +1,78 @@
+<template>
+    <template if:true={showModal}>
+        <div class="modal-overlay" onclick={close}>
+            <div class="modal-content" onclick={stopPropagation}>
+
+                <div class="modal-header">
+                    <h2>New Round Robin Entry</h2>
+                    <button class="close-btn" onclick={close}>×</button>
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="field">
+                        <label>City</label>
+                        <select onchange={handleCityChange}>
+                            <option value="">-- Select City --</option>
+                            <template for:each={cities} for:item="c">
+                                <option key={c} value={c}>{c}</option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label>Lead Source</label>
+                        <select onchange={handleSourceChange}>
+                            <option value="">-- Select Lead Source --</option>
+                            <template for:each={leadSources} for:item="s">
+                                <option key={s} value={s}>{s}</option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label>Sales Rep</label>
+                        <select onchange={handleRepChange}>
+                            <option value="">-- Select Sales Rep --</option>
+                            <template for:each={salesReps} for:item="r">
+                                <option key={r.value} value={r.value}>{r.label}</option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label>Course</label>
+                        <select onchange={handleCourseChange}>
+                            <option value="">-- Select Course --</option>
+                            <template for:each={courses} for:item="c">
+                                <option key={c} value={c}>{c}</option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label>Type</label>
+                        <select onchange={handleTypeChange}>
+                            <option value="">-- Select Type --</option>
+                            <template for:each={types} for:item="t">
+                                <option key={t} value={t}>{t}</option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label>Assigned Weight</label>
+                        <input type="number" min="1" onchange={handleWeightChange}/>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn ghost" onclick={close}>Cancel</button>
+                    <button class="btn primary" onclick={save}>Save</button>
+                </div>
+
+            </div>
+        </div>
+    </template>
+</template>

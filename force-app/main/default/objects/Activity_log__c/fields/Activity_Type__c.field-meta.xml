@@ -50,6 +50,11 @@
                 <default>false</default>
                 <label>Lead Merge</label>
             </value>
+            <value>
+                <fullName>View Phone Number</fullName>
+                <default>false</default>
+                <label>View Phone Number</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

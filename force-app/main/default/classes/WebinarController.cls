@@ -8,7 +8,8 @@ public class WebinarController {
     @AuraEnabled(cacheable=true)
     public static List<WebinarDTO> getWebinarsByNameOnly() {
         List<WebinarDTO> out = new List<WebinarDTO>();
-        for (Webinar__c w : [SELECT Id, Name,Webinar_Id__c FROM Webinar__c WHERE IsActive__c = TRUE ORDER BY Name ASC LIMIT 200 ]) {
+        Datetime nowDt = System.now();
+        for (Webinar__c w : [SELECT Id, Name,Webinar_Id__c FROM Webinar__c WHERE IsActive__c = TRUE  ORDER BY Name ASC LIMIT 200 ]) {
             WebinarDTO d = new WebinarDTO();
             d.id        = w.Id;
             d.name      = w.Name;

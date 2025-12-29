@@ -15,9 +15,9 @@
                 <label>Eligible for Exams</label>
             </value>
             <value>
-                <fullName>Eligible for Exams and License</fullName>
+                <fullName>Eligible for Exemption/License</fullName>
                 <default>false</default>
-                <label>Eligible for Exams and License</label>
+                <label>Eligible for Exemption/License</label>
             </value>
             <value>
                 <fullName>Conditional Eligible</fullName>

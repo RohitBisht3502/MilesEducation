@@ -39,7 +39,7 @@ public without sharing class EligibilityFolderService {
             f.Template__c           = tpl.Id;
 
             if (tpl.Folder_Type__c == 'Degree') {
-                f.Status__c = 'Pending Review';
+                f.Status__c = 'Pending review';
             }
 
             foldersToInsert.add(f);
@@ -162,7 +162,7 @@ public without sharing class EligibilityFolderService {
             Qualification_Type__c = qualificationType,
             Degree_Title__c       = degreeTitle,
             Parent_Folder__c      = typeFolder.Id,
-            Status__c             = 'Pending Review'
+            Status__c             = 'Pending review'
         );
         insert degreeFolder;
 
@@ -203,10 +203,10 @@ public without sharing class EligibilityFolderService {
 
         List<Eligibility_Folder__c> updates = new List<Eligibility_Folder__c>();
         for (Eligibility_Folder__c f : folders) {
-            if (f.Status__c != 'Pending Review') {
+            if (f.Status__c != 'Pending review') {
                 updates.add(new Eligibility_Folder__c(
                     Id = f.Id,
-                    Status__c = 'Pending Review'
+                    Status__c = 'Pending review'
                 ));
             }
         }
@@ -253,7 +253,7 @@ public without sharing class EligibilityFolderService {
                 t.WhoId   = l.Id;
                 t.ActivityDate = System.today();
 
-                if (statusChanged) {
+                if (statusChanged && newRec.Status__c != 'Approved') {
                     t.Subject = 'Eligibility folder status updated - ' +
                         (String.isNotBlank(newRec.Name) ? newRec.Name : 'Folder');
                     t.Status   = 'Not Started';
@@ -265,7 +265,7 @@ public without sharing class EligibilityFolderService {
                         (String.isNotBlank(newRec.Comments__c)
                             ? '\nReviewer comment: ' + newRec.Comments__c
                             : '');
-                } else {
+                } else if (commentChanged) {
                     t.Subject = 'Eligibility folder comment added - ' +
                         (String.isNotBlank(newRec.Name) ? newRec.Name : 'Folder');
                     t.Status   = 'Not Started';
@@ -340,6 +340,15 @@ public without sharing class EligibilityFolderService {
     // ---------------- LEAD STATUS AGGREGATION ----------------
 
     /**
+     * UPDATED LOGIC:
+     * - All Degree folders Approved -> Verified
+     * - All files Verified -> Verified
+     * - All files Not Applicable -> Not Eligible
+     * - Any files present -> Under Verification
+     * - Otherwise keep existing status (Initiated / Yet to Initiate)
+     */
+
+    /**
      * Aggregates folder.Status__c for each Lead and sets Lead.GP_Lead_Status__c:
      * - If any folder = 'Recheck'      → 'Recheck'
      * - Else if all folders = 'All Good' → 'Verified'
@@ -361,6 +370,19 @@ public without sharing class EligibilityFolderService {
             filesByLead.get(f.Candidate__c).add(f);
         }
 
+        Map<Id, List<Eligibility_Folder__c>> degreeFoldersByLead = new Map<Id, List<Eligibility_Folder__c>>();
+        for (Eligibility_Folder__c f : [
+            SELECT Id, Candidate__c, Status__c
+            FROM Eligibility_Folder__c
+            WHERE Candidate__c IN :leadIds
+              AND Folder_Type__c = 'Degree'
+        ]) {
+            if (!degreeFoldersByLead.containsKey(f.Candidate__c)) {
+                degreeFoldersByLead.put(f.Candidate__c, new List<Eligibility_Folder__c>());
+            }
+            degreeFoldersByLead.get(f.Candidate__c).add(f);
+        }
+
         Map<Id, Lead> existingLeads = new Map<Id, Lead>([
             SELECT Id, GP_Lead_Status__c
             FROM Lead
@@ -371,38 +393,48 @@ public without sharing class EligibilityFolderService {
 
         for (Id lid : leadIds) {
             List<Eligibility_File__c> flist = filesByLead.get(lid);
-            if (flist == null || flist.isEmpty()) continue;
+            Boolean hasFiles = flist != null && !flist.isEmpty();
+            Boolean allFilesVerified = hasFiles;
+            Boolean allFilesNotApplicable = hasFiles;
 
-            Boolean anyRecheck = false;
-            Boolean allVerified = true;
-            Boolean allPending = true;
-
-            for (Eligibility_File__c f : flist) {
-                String s = f.Status__c;
-                if (s == 'Recheck') {
-                    anyRecheck = true;
-                }
-                if (s != 'Verified') {
-                    allVerified = false;
-                }
-                if (s != 'Pending Review' && s != 'Submitted' && s != null) {
-                    allPending = false;
+            if (hasFiles) {
+                for (Eligibility_File__c f : flist) {
+                    String s = f.Status__c;
+                    if (s == null || !s.equalsIgnoreCase('Verified')) {
+                        allFilesVerified = false;
+                    }
+                    if (s == null || (!s.equalsIgnoreCase('Not Applicable') && !s.equalsIgnoreCase('Not application'))) {
+                        allFilesNotApplicable = false;
+                    }
                 }
             }
 
-            String newStatus;
-            if (anyRecheck) {
-                newStatus = 'Recheck';
-            } else if (allVerified) {
+            List<Eligibility_Folder__c> degFolders = degreeFoldersByLead.get(lid);
+            Boolean hasDegreeFolders = degFolders != null && !degFolders.isEmpty();
+            Boolean allFoldersApproved = hasDegreeFolders;
+            if (hasDegreeFolders) {
+                for (Eligibility_Folder__c df : degFolders) {
+                    if (df.Status__c == null || !df.Status__c.equalsIgnoreCase('Approved')) {
+                        allFoldersApproved = false;
+                        break;
+                    }
+                }
+            }
+
+            String newStatus = null;
+            if (allFoldersApproved) {
                 newStatus = 'Verified';
-            } else if (allPending) {
-                newStatus = 'New lead';
-            } else {
-                newStatus = 'Verification';
+            } else if (hasFiles && allFilesNotApplicable) {
+                newStatus = 'Not Eligible';
+            } else if (hasFiles && allFilesVerified) {
+                newStatus = 'Verified';
+            } else if (hasFiles) {
+                newStatus = 'Under Verification';
             }
 
             Lead existing = existingLeads.get(lid);
-            if (existing == null || existing.GP_Lead_Status__c == newStatus) continue;
+            if (existing == null) continue;
+            if (String.isBlank(newStatus) || existing.GP_Lead_Status__c == newStatus) continue;
 
             updates.add(new Lead(
                 Id = lid,

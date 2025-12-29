@@ -51,7 +51,7 @@ public without sharing class RoundRobinHelper {
             ];
         } else {
             return [
-                SELECT Id, Name, Object_Api_Name__c, City__c, Bucket__c,
+                SELECT Id, Name, Object_Api_Name__c, City__c, Bucket__c,Lead_Source__c,
                        Sales_Rep__c, Sequence__c, Max_Weight__c, Assigned_Weight__c,
                        Max_Leads__c, Total_Assigned__c, Maximum_Weightage__c,
                        Current_Assigned_Weight__c, Active__c, Course__c, Type__c
@@ -61,7 +61,7 @@ public without sharing class RoundRobinHelper {
                   AND City__c = :city
                   AND Course__c = :courseUpper
                   AND Type__c = :typeValue
-                  AND Bucket__c = :src
+                  AND Lead_Source__c = :src
                 FOR UPDATE
             ];
         }

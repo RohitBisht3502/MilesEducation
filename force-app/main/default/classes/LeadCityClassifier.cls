@@ -59,7 +59,7 @@ public without sharing class LeadCityClassifier {
         }
 
        // return city;
-        return 'Ahmedabad';
+        return 'Kolkata';
     }
 
     // Helper to extract city from nested response structures

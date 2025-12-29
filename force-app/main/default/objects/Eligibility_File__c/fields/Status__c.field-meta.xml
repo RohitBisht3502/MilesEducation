@@ -21,24 +21,32 @@
                 <label>Verified</label>
             </value>
             <value>
-                <fullName>Reupload_Required</fullName>
+                <fullName>Recheck/Reupload</fullName>
                 <default>false</default>
-                <label>Reupload_Required</label>
+                <label>Recheck/Reupload</label>
             </value>
             <value>
-                <fullName>Recheck</fullName>
+                <fullName>Not Applicable</fullName>
                 <default>false</default>
-                <label>Recheck</label>
-            </value>
-            <value>
-                <fullName>Rejected</fullName>
-                <default>false</default>
-                <label>Rejected</label>
+                <label>Not Applicable</label>
             </value>
             <value>
                 <fullName>Re-uploaded</fullName>
                 <default>false</default>
+                <isActive>false</isActive>
                 <label>Re-uploaded</label>
+            </value>
+            <value>
+                <fullName>Rejected</fullName>
+                <default>false</default>
+                <isActive>false</isActive>
+                <label>Rejected</label>
+            </value>
+            <value>
+                <fullName>Reupload_Required</fullName>
+                <default>false</default>
+                <isActive>false</isActive>
+                <label>Reupload_Required</label>
             </value>
             <value>
                 <fullName>Superseded</fullName>

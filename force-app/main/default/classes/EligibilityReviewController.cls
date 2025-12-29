@@ -37,11 +37,20 @@ public without sharing class EligibilityReviewController {
         @AuraEnabled public List<String> universityValues;
         @AuraEnabled public List<String> gradeValues;
         @AuraEnabled public List<String> rankValues;
+        @AuraEnabled public List<String> fileStatusValues;
+        @AuraEnabled public List<String> folderStatusValues;
+        @AuraEnabled public List<String> leadStatusValues;
     }
 
     public class SimpleResponse {
         @AuraEnabled public Boolean success;
         @AuraEnabled public String message;
+    }
+
+    public class EligibilitySnapshot {
+        @AuraEnabled public String leadStatus;
+        @AuraEnabled public Decimal creditScore;
+        @AuraEnabled public String cpaEligibilityStatus;
     }
 
     private class FileInput {
@@ -150,6 +159,123 @@ public without sharing class EligibilityReviewController {
         return l.GP_Lead_Status__c;
     }
 
+    @AuraEnabled(cacheable=true)
+    public static EligibilitySnapshot getLeadEligibilitySnapshot(Id leadId) {
+        EligibilitySnapshot snap = new EligibilitySnapshot();
+        if (leadId == null) return snap;
+
+        Lead l = [
+            SELECT Id, GP_Lead_Status__c, Credit_score__c, CPA_Eligibility_Status__c
+            FROM Lead
+            WHERE Id = :leadId
+            LIMIT 1
+        ];
+
+        snap.leadStatus = l.GP_Lead_Status__c;
+        snap.creditScore = l.Credit_score__c;
+        snap.cpaEligibilityStatus = l.CPA_Eligibility_Status__c;
+        return snap;
+    }
+
+    @AuraEnabled
+    public static EligibilitySnapshot calculateCreditScore(Id leadId) {
+        EligibilitySnapshot snap = new EligibilitySnapshot();
+        if (leadId == null) return snap;
+
+        try {
+            List<Eligibility_Folder__c> degreeFolders = [
+                SELECT Degree_Title__c, Status__c
+                FROM Eligibility_Folder__c
+                WHERE Candidate__c = :leadId
+                  AND Folder_Type__c = 'Degree'
+                  AND Degree_Title__c != null
+            ];
+
+            Set<String> approvedTitles = new Set<String>();
+            for (Eligibility_Folder__c f : degreeFolders) {
+                if (f.Status__c != null && f.Status__c.equalsIgnoreCase('Approved')) {
+                    approvedTitles.add(f.Degree_Title__c);
+                }
+            }
+
+            System.debug('calculateCreditScore - approved degree titles: ' + approvedTitles);
+
+            Decimal total = 0;
+            if (!approvedTitles.isEmpty()) {
+                for (Eligibility_Credit_Scoring__c ecs : [
+                    SELECT Short_Code__c, Credit_POint__c
+                    FROM Eligibility_Credit_Scoring__c
+                    WHERE Short_Code__c IN :approvedTitles
+                ]) {
+                    System.debug('calculateCreditScore - adding points for ' + ecs.Short_Code__c + ' = ' + ecs.Credit_POint__c);
+                    if (ecs.Credit_POint__c != null) {
+                        total += ecs.Credit_POint__c;
+                    }
+                }
+            }
+
+            String cpaStatus;
+            if (total >= 150) {
+                cpaStatus = 'Eligible for Exemption/License';
+            } else if (total >= 120) {
+                cpaStatus = 'Eligible for Exams';
+            } else if (total > 0) {
+                cpaStatus = 'Conditional Eligible';
+            } else {
+                cpaStatus = 'Not Eligible';
+            }
+
+            Lead upd = new Lead(
+                Id = leadId,
+                Credit_score__c = total,
+                CPA_Eligibility_Status__c = cpaStatus
+                //GP_Lead_Status__c = 'Eligibility report generated'
+            );
+            update upd;
+
+            snap.creditScore = total;
+            snap.cpaEligibilityStatus = cpaStatus;
+            //snap.leadStatus = 'Eligibility report generated';
+        } catch (Exception e) {
+            System.debug('calculateCreditScore error: ' + e.getMessage());
+            snap.cpaEligibilityStatus = 'Not Eligible';
+            snap.creditScore = 0;
+            snap.leadStatus = null;
+        }
+        return snap;
+    }
+
+    @AuraEnabled
+    public static EligibilitySnapshot saveEligibilitySnapshot(Id leadId, Decimal creditScore, String cpaEligibilityStatus, String leadStatus) {
+        EligibilitySnapshot snap = new EligibilitySnapshot();
+        if (leadId == null) return snap;
+
+        Lead upd = new Lead(Id = leadId);
+        if (creditScore != null) {
+            upd.Credit_score__c = creditScore;
+        }
+        if (!String.isBlank(cpaEligibilityStatus)) {
+            upd.CPA_Eligibility_Status__c = cpaEligibilityStatus;
+        }
+        if (!String.isBlank(leadStatus)) {
+            upd.GP_Lead_Status__c = leadStatus;
+        }
+
+        update upd;
+
+        Lead l = [
+            SELECT GP_Lead_Status__c, Credit_score__c, CPA_Eligibility_Status__c
+            FROM Lead
+            WHERE Id = :leadId
+            LIMIT 1
+        ];
+
+        snap.creditScore = l.Credit_score__c;
+        snap.cpaEligibilityStatus = l.CPA_Eligibility_Status__c;
+        snap.leadStatus = l.GP_Lead_Status__c;
+        return snap;
+    }
+
     // ----------- PICKLISTS FOR FILE FIELDS -----------
 
     @AuraEnabled(cacheable=true)
@@ -158,6 +284,9 @@ public without sharing class EligibilityReviewController {
         res.universityValues = new List<String>();
         res.gradeValues = new List<String>();
         res.rankValues = new List<String>();
+        res.fileStatusValues = new List<String>();
+        res.folderStatusValues = new List<String>();
+        res.leadStatusValues = new List<String>();
 
         Schema.DescribeSObjectResult d = Eligibility_File__c.SObjectType.getDescribe();
         Map<String, Schema.SObjectField> fm = d.fields.getMap();
@@ -178,6 +307,31 @@ public without sharing class EligibilityReviewController {
             Schema.DescribeFieldResult fr = fm.get('Rank_Division__c').getDescribe();
             for (Schema.PicklistEntry pe : fr.getPicklistValues()) {
                 res.rankValues.add(pe.getLabel());
+            }
+        }
+
+        if (fm.containsKey('Status__c')) {
+            Schema.DescribeFieldResult fr = fm.get('Status__c').getDescribe();
+            for (Schema.PicklistEntry pe : fr.getPicklistValues()) {
+                res.fileStatusValues.add(pe.getValue());
+            }
+        }
+
+        Schema.DescribeSObjectResult folderDescribe = Eligibility_Folder__c.SObjectType.getDescribe();
+        Map<String, Schema.SObjectField> folderFields = folderDescribe.fields.getMap();
+        if (folderFields.containsKey('Status__c')) {
+            Schema.DescribeFieldResult fr = folderFields.get('Status__c').getDescribe();
+            for (Schema.PicklistEntry pe : fr.getPicklistValues()) {
+                res.folderStatusValues.add(pe.getValue());
+            }
+        }
+
+        Schema.DescribeSObjectResult leadDescribe = Lead.SObjectType.getDescribe();
+        Map<String, Schema.SObjectField> leadFields = leadDescribe.fields.getMap();
+        if (leadFields.containsKey('GP_Lead_Status__c')) {
+            Schema.DescribeFieldResult fr = leadFields.get('GP_Lead_Status__c').getDescribe();
+            for (Schema.PicklistEntry pe : fr.getPicklistValues()) {
+                res.leadStatusValues.add(pe.getValue());
             }
         }
 
@@ -219,6 +373,7 @@ public without sharing class EligibilityReviewController {
 
         String oldStatus = file.Status__c;
         String newStatus = input.status;
+        String newStatusLower = (newStatus != null) ? newStatus.toLowerCase() : null;
 
         Eligibility_File__c upd = new Eligibility_File__c(
             Id = file.Id,
@@ -230,17 +385,20 @@ public without sharing class EligibilityReviewController {
         // Recalculate Lead status based on existing folder statuses (no folder auto-update)
         EligibilityFolderService.recalcFromFiles(new Set<Id>{ file.Id });
 
-        // Task on file status change (except Verified)
-        if (file.Candidate__c != null && oldStatus != newStatus && newStatus != 'Verified') {
+        // Task on file status change (every change except Verified)
+        if (file.Candidate__c != null
+            && oldStatus != newStatus
+            && (newStatusLower == null || newStatusLower != 'verified')) {
             Lead l = [
                 SELECT Id, OwnerId
                 FROM Lead
                 WHERE Id = :file.Candidate__c
                 LIMIT 1
             ];
-            if (l.OwnerId != null) {
+            Id taskOwner = l.OwnerId;
+            if (taskOwner != null) {
                 Task t = new Task();
-                t.OwnerId = l.OwnerId;
+                t.OwnerId = taskOwner;
                 t.WhoId = l.Id;
                 t.Subject = 'Eligibility file status updated - ' + (String.isNotBlank(file.Name) ? file.Name : 'Document');
                 t.Status = 'Not Started';
@@ -257,7 +415,7 @@ public without sharing class EligibilityReviewController {
         }
 
         // Post to Datalake (async) except when Verified
-        if (oldStatus != newStatus && newStatus != 'Verified') {
+        if (oldStatus != newStatus && (newStatusLower == null || newStatusLower != 'verified')) {
             try {
                 EligibilityResponseService.sendForFile(file.Id);
             } catch (Exception e) {
@@ -323,8 +481,8 @@ public without sharing class EligibilityReviewController {
 
         // Post to Datalake except for neutral statuses
         if (oldFolder.Status__c != finalStatus
-            && finalStatus != 'All Good'
-            && finalStatus != 'Pending Review') {
+            && finalStatus != 'Approved'
+            && finalStatus != 'Pending review') {
             try {
                 EligibilityResponseService.sendForDegreeFolder(oldFolder.Id);
             } catch (Exception e) {

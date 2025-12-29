@@ -7,10 +7,12 @@
     <columns>Total_Assigned__c</columns>
     <columns>Maximum_Weightage__c</columns>
     <columns>Assigned_Weight__c</columns>
+    <columns>City__c</columns>
+    <columns>Bucket__c</columns>
     <columns>Current_Assigned_Weight__c</columns>
     <columns>Max_Leads__c</columns>
     <columns>Lead_Source__c</columns>
-    <columns>City__c</columns>
+    <columns>CREATED_DATE</columns>
     <filterScope>Everything</filterScope>
     <label>All</label>
 </ListView>

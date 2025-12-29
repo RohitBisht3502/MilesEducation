@@ -56,13 +56,13 @@ public without sharing class RoundRobinMatrixController {
         Set<String> srcs = new Set<String>();
 
         for (Round_Robin_Pool__c p : [
-            SELECT City__c, Bucket__c , Course__c,Sales_Rep__c,Sequence__c
+            SELECT City__c, Bucket__c , Lead_Source__c,Course__c,Sales_Rep__c,Sequence__c
             FROM Round_Robin_Pool__c
             WHERE Active__c = true
             AND Object_Api_Name__c = :objectApiName
         ]) {
             if (!String.isBlank(p.City__c)) cities.add(p.City__c);
-            if (!String.isBlank(p.Bucket__c)) srcs.add(p.Bucket__c);
+            if (!String.isBlank(p.Lead_Source__c)) srcs.add(p.Lead_Source__c);
         }
 
         FilterInit f = new FilterInit();
@@ -89,7 +89,7 @@ public without sharing class RoundRobinMatrixController {
         List<Round_Robin_Pool__c> poolList;
         if (leadSources == null || leadSources.isEmpty()) {
             poolList = [
-                SELECT Id, Bucket__c, Sales_Rep__c,Course__c, Assigned_Weight__c, Active__c, Sequence__c
+                SELECT Id, Bucket__c, Sales_Rep__c,Lead_Source__c,Course__c, Assigned_Weight__c, Active__c, Sequence__c
                 FROM Round_Robin_Pool__c
                 WHERE Active__c = true
                 AND Object_Api_Name__c = :objectApiName
@@ -97,12 +97,12 @@ public without sharing class RoundRobinMatrixController {
             ];
         } else {
             poolList = [
-                SELECT Id, Bucket__c,Course__c, Sales_Rep__c, Assigned_Weight__c, Active__c, Sequence__c
+                SELECT Id, Bucket__c,Course__c, Lead_Source__c,Sales_Rep__c, Assigned_Weight__c, Active__c, Sequence__c
                 FROM Round_Robin_Pool__c
                 WHERE Active__c = true
                 AND Object_Api_Name__c = :objectApiName
                 AND City__c = :city
-                AND Bucket__c IN :leadSources
+                AND Lead_Source__c IN :leadSources
             ];
         }
 
@@ -110,7 +110,7 @@ public without sharing class RoundRobinMatrixController {
         Set<String> srcs = new Set<String>();
         for (Round_Robin_Pool__c p : poolList) {
             if (p.Sales_Rep__c != null) repIds.add(p.Sales_Rep__c);
-            if (!String.isBlank(p.Bucket__c)) srcs.add(p.Bucket__c);
+            if (!String.isBlank(p.Lead_Source__c)) srcs.add(p.Lead_Source__c);
         }
 
         List<String> columns = new List<String>(srcs);
@@ -124,11 +124,11 @@ public without sharing class RoundRobinMatrixController {
 
         Map<Id, Map<String, Round_Robin_Pool__c>> byRep = new Map<Id, Map<String, Round_Robin_Pool__c>>();
         for (Round_Robin_Pool__c p : poolList) {
-            if (p.Sales_Rep__c == null || String.isBlank(p.Bucket__c)) continue;
+            if (p.Sales_Rep__c == null || String.isBlank(p.Lead_Source__c)) continue;
             if (!byRep.containsKey(p.Sales_Rep__c)) {
                 byRep.put(p.Sales_Rep__c, new Map<String, Round_Robin_Pool__c>());
             }
-            byRep.get(p.Sales_Rep__c).put(p.Bucket__c, p);
+            byRep.get(p.Sales_Rep__c).put(p.Lead_Source__c, p);
         }
 
         List<Row> allRows = new List<Row>();
@@ -290,4 +290,75 @@ public without sharing class RoundRobinMatrixController {
         }
         update toUpdate;
     }
+
+    @AuraEnabled(cacheable=true)
+public static Map<String, List<String>> getPicklists() {
+    Map<String, List<String>> res = new Map<String, List<String>>();
+
+    Schema.DescribeFieldResult city =
+        Round_Robin_Pool__c.City__c.getDescribe();
+    Schema.DescribeFieldResult course =
+        Round_Robin_Pool__c.Course__c.getDescribe();
+    Schema.DescribeFieldResult typeF =
+        Round_Robin_Pool__c.Type__c.getDescribe();
+    Schema.DescribeFieldResult leadSrc =
+        Round_Robin_Pool__c.Lead_Source__c.getDescribe();
+
+    res.put('cities', getValues(city));
+    res.put('courses', getValues(course));
+    res.put('types', getValues(typeF));
+    res.put('leadSources', getValues(leadSrc));
+
+    return res;
+}
+
+private static List<String> getValues(Schema.DescribeFieldResult d) {
+    List<String> vals = new List<String>();
+    for (Schema.PicklistEntry p : d.getPicklistValues()) {
+        if (p.isActive()) vals.add(p.getLabel());
+    }
+    return vals;
+}
+
+@AuraEnabled(cacheable=true)
+public static List<User> getSalesReps() {
+    return [
+        SELECT Id, Name
+        FROM User
+        WHERE IsActive = true
+        ORDER BY Name
+    ];
+}
+@AuraEnabled
+public static void createRoundRobinEntry(
+    String city,
+    String leadSource,
+    Id salesRepId,
+    String course,
+    String typeVal,
+    Integer weight,
+    String objectApiName
+) {
+    if (String.isBlank(objectApiName)) {
+        objectApiName = 'Lead__c';
+    }
+
+    if (String.isBlank(city) || String.isBlank(leadSource) || salesRepId == null) {
+        throw new AuraHandledException('Required fields are missing');
+    }
+
+    Round_Robin_Pool__c rr = new Round_Robin_Pool__c();
+    rr.City__c = city;
+    rr.Lead_Source__c = leadSource;
+    rr.Sales_Rep__c = salesRepId;
+    rr.Course__c = course;
+    rr.Type__c = typeVal;
+    rr.Assigned_Weight__c = weight;
+    rr.Active__c = true;
+    rr.Object_Api_Name__c = objectApiName;
+
+    insert rr;
+}
+
+
 }

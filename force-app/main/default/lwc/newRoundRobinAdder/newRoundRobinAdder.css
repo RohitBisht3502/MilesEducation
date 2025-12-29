@@ -1,0 +1,180 @@
+/* ================= MODAL OVERLAY ================= */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(
+        rgba(0, 0, 0, 0.55),
+        rgba(0, 0, 0, 0.65)
+    );
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+/* ================= MODAL CONTAINER ================= */
+.modal-content {
+    width: 520px;
+    max-width: 95%;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(16px);
+    border-radius: 18px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+    transform: scale(0.95);
+    animation: popIn 0.35s ease forwards;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+/* ================= HEADER ================= */
+.modal-header {
+    padding: 18px 22px;
+    background: linear-gradient(135deg, #0176d3, #00b4d8);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #fff;
+}
+
+.modal-header h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: 0.4px;
+}
+
+.close-btn {
+    background: transparent;
+    border: none;
+    font-size: 26px;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.close-btn:hover {
+    transform: rotate(90deg);
+    opacity: 0.8;
+}
+
+/* ================= BODY ================= */
+.modal-body {
+    padding: 22px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    background: rgba(255, 255, 255, 0.92);
+}
+
+/* Full width for last field */
+.modal-body .field:last-child {
+    grid-column: span 2;
+}
+
+/* ================= FIELD ================= */
+.field {
+    display: flex;
+    flex-direction: column;
+}
+
+.field label {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #2c3e50;
+}
+
+.field select,
+.field input {
+    height: 40px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid #d8dde6;
+    font-size: 14px;
+    background: #ffffff;
+    transition: all 0.25s ease;
+}
+
+/* ================= FOCUS EFFECT ================= */
+.field select:focus,
+.field input:focus {
+    outline: none;
+    border-color: #0176d3;
+    box-shadow: 0 0 0 3px rgba(1, 118, 211, 0.15);
+}
+
+/* ================= FOOTER ================= */
+.modal-footer {
+    padding: 16px 22px;
+    background: #f4f6f9;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+/* ================= BUTTONS ================= */
+.btn {
+    min-width: 100px;
+    height: 40px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    border: none;
+}
+
+/* Ghost Button */
+.btn.ghost {
+    background: transparent;
+    color: #0176d3;
+}
+
+.btn.ghost:hover {
+    background: rgba(1, 118, 211, 0.08);
+}
+
+/* Primary Button */
+.btn.primary {
+    background: linear-gradient(135deg, #0176d3, #00b4d8);
+    color: #fff;
+    box-shadow: 0 8px 20px rgba(1, 118, 211, 0.35);
+}
+
+.btn.primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(1, 118, 211, 0.45);
+}
+
+/* ================= ANIMATIONS ================= */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes popIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* ================= RESPONSIVE ================= */
+@media (max-width: 600px) {
+    .modal-body {
+        grid-template-columns: 1fr;
+    }
+
+    .modal-body .field:last-child {
+        grid-column: span 1;
+    }
+}

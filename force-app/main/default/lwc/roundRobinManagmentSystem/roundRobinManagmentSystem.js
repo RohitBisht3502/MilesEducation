@@ -314,4 +314,11 @@ export default class RoundRobinManagmentSystem extends LightningElement {
   get colspan() {
     return 1 + (this.columns?.length || 0);
   }
+  openNewPresence() {
+    this.template
+        .querySelector('c-new-round-robin-adder')
+        .open();
+}
+
+
 }

@@ -8,7 +8,6 @@
     <columns>Next_Follow_Up_Date__c</columns>
     <columns>Source__c</columns>
     <columns>Stage__c</columns>
-    <columns>Source_Bucket__c</columns>
     <filterScope>Mine</filterScope>
     <label>My Leads</label>
 </ListView>

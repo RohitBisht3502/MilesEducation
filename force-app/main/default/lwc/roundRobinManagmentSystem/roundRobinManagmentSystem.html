@@ -22,6 +22,9 @@
       <div class="actions">
         <button class="btn small" onclick={reload}>Apply</button>
         <button class="btn small" onclick={saveEdits}>Save</button>
+            <button class="btn small" onclick={openNewPresence}>
+    New 
+  </button>
         <button class="btn small ghost" onclick={clearFilters}>Clear</button>
       </div>
     </div>
@@ -45,6 +48,7 @@
           </div>
           <div class="modal-footer">
             <button class="btn small" onclick={applySelection}>Apply</button>
+       
             <button class="btn small ghost" onclick={closeModal}>Cancel</button>
           </div>
         </div>
@@ -88,6 +92,7 @@
           <div class="modal-footer">
             <button class="btn small" onclick={saveSeqEdits}>Save</button>
             <button class="btn small ghost" onclick={closeSeqModal}>Cancel</button>
+         
           </div>
         </div>
       </div>
@@ -152,4 +157,8 @@
       </table>
     </div>
   </div>
+  <c-new-round-robin-adder
+  onsuccess={loadMatrix}>
+</c-new-round-robin-adder>
+
 </template>

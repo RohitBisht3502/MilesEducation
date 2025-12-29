@@ -206,7 +206,8 @@ public without sharing class EligibilityFileService {
                     Name = fileName,
                     Storage_Key__c = inf.path,
                     File_Format__c = inf.format,
-                    File_Type__c = logicalFileType
+                    File_Type__c = logicalFileType,
+                    Status__c = 'Submitted'
                 );
                 toUpsert.add(upd);
             } else {

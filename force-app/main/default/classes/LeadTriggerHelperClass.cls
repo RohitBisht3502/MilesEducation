@@ -6,10 +6,14 @@ public without sharing class LeadTriggerHelperClass {
     
     public static void handleBeforeInsert(List<Lead__c> newLeads) { 
         TriggerRoundRobinService.handleBeforeInsert(newLeads);
+        BucketAssignmentService.assignBucket((List<SObject>)newLeads, null);
+        
     }
     
     public static void handleBeforeUpdate(List<Lead__c> newLeads, Map<Id, Lead__c> oldMap) {
         TriggerRoundRobinService.handleBeforeUpdate(newLeads, oldMap);
+        BucketAssignmentService.assignBucket((List<SObject>)newLeads,(Map<Id, SObject>)oldMap); 
+        
     }
     
     public static void handleAfterInsert1(List<Lead__c> newLeads) {

@@ -111,75 +111,75 @@
                     </div>
 
                     <!-- FEEDBACK -->
-                    <template if:true={showFeedback}>
-                        <div class="section-card feedback-card">
-
-                            <lightning-combobox
-                                label="L1 Status"
-                                value={l1Value}
-                                options={l1Options}
-                                onchange={handleL1Change}>
-                            </lightning-combobox>
-
-                            <lightning-combobox
-                                class="slds-m-top_small"
-                                label="L2 Sub Status"
-                                value={l2Value}
-                                options={l2Options}
-                                disabled={isL2Disabled}
-                                onchange={handleL2Change}>
-                            </lightning-combobox>
-
-                            <lightning-combobox
-                                class="slds-m-top_small"
-                                label="Stage"
-                                value={stageValue}
-                                options={stageOptions}
-                                onchange={handleStageChange}>
-                            </lightning-combobox>
-
-                            <lightning-combobox
-                                class="slds-m-top_small"
-                                label="Course"
-                                value={levelValue}
-                                options={levelOptions}
-                                onchange={handleLevelChange}>
-                            </lightning-combobox>
-
-                            <label class="feedback-label slds-m-top_small">
-                                Call Feedback
-                                <span if:true={isCommentMandatory} class="mandatory-text">(Mandatory)</span>
-                                <span if:false={isCommentMandatory} class="optional-text">(Optional)</span>
-                            </label>
-
-                            <lightning-textarea
-                                value={feedback}
-                                onchange={handleFeedbackChange}
-                                maxlength="2000">
-                            </lightning-textarea>
-
-                            <lightning-input
-                                class="slds-m-top_small"
-                                type="datetime-local"
-                                label="Next Follow Up Date"
-                                value={nextFollowUpDate}
-                                onchange={handleNextFollowUpDateChange}>
-                            </lightning-input>
-
-                            <div class="button-group">
-                                <lightning-button
-                                    variant="brand"
-                                    label="Save Feedback"
-                                    onclick={handleSaveFeedback}
-                                    disabled={savingFeedback}>
-                                </lightning-button>
-                            </div>
-                        </div>
-                    </template>
-
+                  
                 </div>
             </div>
         </div>
+        <template if:true={showFeedback}>
+    <div class="section-card feedback-card slds-m-top_large">
+
+        <lightning-combobox
+            label="L1 Status"
+            value={l1Value}
+            options={l1Options}
+            onchange={handleL1Change}>
+        </lightning-combobox>
+
+        <lightning-combobox
+            class="slds-m-top_small"
+            label="L2 Sub Status"
+            value={l2Value}
+            options={l2Options}
+            disabled={isL2Disabled}
+            onchange={handleL2Change}>
+        </lightning-combobox>
+
+        <lightning-combobox
+            class="slds-m-top_small"
+            label="Stage"
+            value={stageValue}
+            options={stageOptions}
+            onchange={handleStageChange}>
+        </lightning-combobox>
+
+        <lightning-combobox
+            class="slds-m-top_small"
+            label="Course"
+            value={levelValue}
+            options={levelOptions}
+            onchange={handleLevelChange}>
+        </lightning-combobox>
+
+        <label class="feedback-label slds-m-top_small">
+            Call Feedback
+            <span if:true={isCommentMandatory} class="mandatory-text">(Mandatory)</span>
+            <span if:false={isCommentMandatory} class="optional-text">(Optional)</span>
+        </label>
+
+        <lightning-textarea
+            value={feedback}
+            onchange={handleFeedbackChange}
+            maxlength="2000">
+        </lightning-textarea>
+
+        <lightning-input
+            class="slds-m-top_small"
+            type="datetime-local"
+            label="Next Follow Up Date"
+            value={nextFollowUpDate}
+            onchange={handleNextFollowUpDateChange}>
+        </lightning-input>
+
+        <div class="button-group">
+            <lightning-button
+                variant="brand"
+                label="Save Feedback"
+                onclick={handleSaveFeedback}
+                disabled={savingFeedback}>
+            </lightning-button>
+        </div>
+    </div>
+</template>
 
         <!-- ================= FOOTER ================= -->
         <div slot="footer" class="footer-actions">
