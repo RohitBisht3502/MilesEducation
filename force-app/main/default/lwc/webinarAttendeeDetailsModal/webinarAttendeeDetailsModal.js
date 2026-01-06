@@ -1,3 +1,13 @@
+/**
+ * @File Name          : WebinarAttendeeDetailsModal.js
+ * @Description        : LWC to display webinar attendee details in a modal 
+ * @Author             : Dheeraj Kumar
+ * @Last Modified On   : Dec 29, 2025
+ 
+ **/
+
+
+
 import { LightningElement, api, wire, track } from 'lwc';
 import fetchLeadData from '@salesforce/apex/Webservice_RegistantAttendee.fetchLeadData';
 import getWebinarsForLead from '@salesforce/apex/WebinarSelectionController.getWebinarsForLead';
@@ -32,51 +42,47 @@ export default class WebinarAttendeeDetailsModal extends LightningElement {
     totalPages = 0;
 
     /* ========= STEP 1: FETCH UNIQUE WEBINARS ========= */
-    connectedCallback() {
-        this.loadWebinars();
-    }
-
-    loadWebinars() {
+    @wire(getWebinarsForLead, { leadId: '$recordId' })
+    wiredWebinars({ error, data }) {
         this.isLoadingWebinars = true;
-
-        getWebinarsForLead({ leadId: this.recordId })
-            .then(result => {
-                if (result && result.length > 0) {
-                    // Map to combobox options format
-                    this.webinarOptions = result.map(webinar => ({
-                        value: webinar.webinarId,
-                        label: `${webinar.webinarName} - ${webinar.topic || 'No Topic'}`,
-                        webinarName: webinar.webinarName,
-                        topic: webinar.topic,
-                        status: webinar.status,
-                        startDateTime: webinar.startDateTime,
-                        webinarMemberId: webinar.webinarMemberId,
-                        registrantId: webinar.registrantId
-                    }));
-                    this.webinarError = null;
-                } else {
-                    this.webinarError = 'No webinar registrations found for this lead';
-                }
-                this.isLoadingWebinars = false;
-            })
-            .catch(err => {
-                this.webinarError = err?.body?.message || err.message || 'Error loading webinar data';
-                this.isLoadingWebinars = false;
-            });
+        if (data) {
+            if (data.length > 0) {
+                this.webinarOptions = data.map(webinar => ({
+                    value: webinar.webinarId,
+                    label: `${webinar.webinarName} - ${webinar.topic || 'No Topic'}`,
+                    webinarName: webinar.webinarName,
+                    topic: webinar.topic,
+                    startDateTime: webinar.startDateTime,
+                    webinarMemberId: webinar.webinarMemberId,
+                    registrantId: webinar.registrantId
+                }));
+                this.webinarError = null;
+            } else {
+                this.webinarOptions = [];
+                this.webinarError = 'No webinar registrations found for this lead';
+            }
+            this.isLoadingWebinars = false;
+        } else if (error) {
+            this.webinarError = error?.body?.message || error.message || 'Error loading webinar data';
+            this.isLoadingWebinars = false;
+        }
     }
+
+
 
     /* ========= HANDLE WEBINAR SELECTION ========= */
     handleWebinarChange(event) {
         this.selectedWebinarId = event.detail.value;
-        
+
         // Find the selected webinar and store its member ID and registrant ID
         const selectedWebinar = this.webinarOptions.find(
             option => option.value === this.selectedWebinarId
         );
-        
+
         if (selectedWebinar) {
             this.selectedWebinarMemberId = selectedWebinar.webinarMemberId;
             this.selectedRegistrantId = selectedWebinar.registrantId;
+            this.viewDetails();
         }
     }
 
@@ -177,6 +183,7 @@ export default class WebinarAttendeeDetailsModal extends LightningElement {
         this.polls = [];
         this.pagedPolls = [];
         this.detailsError = null;
+        this.selectedWebinarId = null;
     }
 
     /* ========= GETTERS ========= */

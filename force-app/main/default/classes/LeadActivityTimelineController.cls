@@ -9,6 +9,8 @@ public with sharing class LeadActivityTimelineController {
         @AuraEnabled public Id id;
         @AuraEnabled public String name;
         @AuraEnabled public String activityType;
+        @AuraEnabled public String loggingId;
+        @AuraEnabled public Decimal availCreditScore;
         @AuraEnabled public String l1;
         @AuraEnabled public String l2;
         @AuraEnabled public Decimal callDurationSeconds;
@@ -58,6 +60,9 @@ public with sharing class LeadActivityTimelineController {
             SELECT Id,
                    Name,
                    Activity_Type__c,
+            	   Available_Credit_Score__c,
+                   Logging_Id__c,
+                   Lead__c,
                    L1__c,
                    L2__c,
                    Call_Duration_Seconds__c,
@@ -91,6 +96,8 @@ public with sharing class LeadActivityTimelineController {
             dto.id                  = al.Id;
             dto.name                = al.Name;
             dto.activityType        = al.Activity_Type__c;
+            dto.availCreditScore    = al.Available_Credit_Score__c;
+            dto.loggingId			= al.Logging_Id__c;
             dto.l1                  = al.L1__c;
             dto.l2                  = al.L2__c;
             dto.callDurationSeconds = al.Call_Duration_Seconds__c;

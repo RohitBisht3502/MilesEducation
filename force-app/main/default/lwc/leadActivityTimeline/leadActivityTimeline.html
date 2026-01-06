@@ -203,6 +203,42 @@
                                 </div>
                             </template>
 
+                            <!-- VIEW PHONE NUMBER ON LEAD ACTIVITY -->
+                            <template if:true={act.isViewedPhoneNumber}>
+                                <div class="merge-card">
+                                    <div class="merge-header">
+                                        <div class="merge-title-section">
+                                            <lightning-icon
+                                                icon-name="utility:phone_portrait"
+                                                size="medium">
+                                            </lightning-icon>
+                                            <div>
+                                                <div class="merge-title">{act.name}</div>
+                                                <div class="merge-meta">
+                                                    Category • <span class="value">{act.activityType}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="merge-time">
+                                           Available Credit Score • {act.availCreditScore}
+                                        </div>
+                                    </div>
+
+                                    <div class="merge-body">
+                                        <span class="label">Logging Id:</span>
+                                        <div class="merge-description">
+                                            {act.loggingId}
+                                        </div>
+                                        
+                                    </div>
+
+                                    <div class="merge-footer">
+                                        <span class="label">Action Performed By:</span>
+                                        <span class="value">{act.actionByName}</span>
+                                    </div>
+                                </div>
+                            </template>
+
                         </div>
                     </div>
                 </template>

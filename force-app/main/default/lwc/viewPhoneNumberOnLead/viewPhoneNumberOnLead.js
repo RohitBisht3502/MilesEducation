@@ -5,7 +5,7 @@ import getPhoneNumber from '@salesforce/apex/ViewPhoneNumberController.getPhoneN
 
 export default class ViewPhoneNumberOnLead extends LightningElement {
     @api recordId;
-    @api objectApiName = 'Lead__c';
+    @api objectApiName = 'Lead__c'; // Default value
     
     @track creditBalance = 0;
     @track phoneNumber = '';

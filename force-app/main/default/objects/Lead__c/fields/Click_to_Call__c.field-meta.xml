@@ -3,9 +3,9 @@
     <fullName>Click_to_Call__c</fullName>
     <externalId>false</externalId>
     <formula>HYPERLINK(
-  &quot;/lightning/n/Click_to_Call?c__recordId=&quot; &amp; Id,
-  &quot;Call&quot;,
-  &quot;_self&quot;
+&quot;/lightning/n/Click_to_Call?c__recordId=&quot; &amp; Id &amp; &quot;&amp;c__autoCall=true&quot;,
+&quot;Call&quot;,
+&quot;_self&quot;
 )</formula>
     <formulaTreatBlanksAs>BlankAsZero</formulaTreatBlanksAs>
     <label>Click to Call</label>

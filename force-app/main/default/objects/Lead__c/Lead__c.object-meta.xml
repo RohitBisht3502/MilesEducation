@@ -166,7 +166,10 @@
         <type>Text</type>
     </nameField>
     <pluralLabel>Leads</pluralLabel>
-    <searchLayouts></searchLayouts>
+    <searchLayouts>
+        <excludedStandardButtons>ChangeOwner</excludedStandardButtons>
+        <listViewButtons>Owner_Change</listViewButtons>
+    </searchLayouts>
     <sharingModel>ReadWrite</sharingModel>
     <visibility>Public</visibility>
 </CustomObject>

@@ -7,12 +7,13 @@ import getL1L2Values from '@salesforce/apex/Webservice_RunoAllocationAPI.getL1L2
 import getIdentity from '@salesforce/apex/RunoCallIdentityService.getIdentity';
 import getStageLevelValues from '@salesforce/apex/Webservice_RunoAllocationAPI.getStageLevelValues';
 import { CurrentPageReference } from 'lightning/navigation';
-
-
+import { NavigationMixin } from 'lightning/navigation';
 import { CloseActionScreenEvent } from 'lightning/actions';
 import { subscribe, unsubscribe, onError } from 'lightning/empApi';
 
-export default class RunoAllocationCall extends LightningElement {
+
+export default class RunoAllocationCall extends NavigationMixin(LightningElement) {
+
     @api recordId;
 
     // UI / state
@@ -42,6 +43,11 @@ export default class RunoAllocationCall extends LightningElement {
     levelValue = '';
     stageOptions = [];
     levelOptions = [];
+
+    // auto call start from lead url 
+    autoCall = false;
+hasAutoCalled = false;
+
 
     // Toast / error
     showPopup = false;
@@ -127,6 +133,17 @@ export default class RunoAllocationCall extends LightningElement {
 @wire(CurrentPageReference)
 wiredPageRef(pageRef) {
     this.pageRef = pageRef;
+
+    const state = pageRef?.state;
+    if (!state) return;
+
+    // resolve recordId (already your logic)
+    this.resolveRecordIdFromPageRef();
+
+    // ✅ AUTO CALL FLAG
+    if (state.c__autoCall === 'true') {
+        this.autoCall = true;
+    }
 }
 
 
@@ -164,6 +181,13 @@ resolveRecordIdFromPageRef() {
         this.loadStageLevel();
         this.subscribeToEvents();
         onError(err => console.warn('EMP API Error:', JSON.stringify(err)));
+        setTimeout(() => {
+        if (this.autoCall && this.recordId && !this.hasAutoCalled) {
+            this.hasAutoCalled = true;
+            this.startCall();
+        }
+    }, 500);
+
     }
 
     disconnectedCallback() {
@@ -455,8 +479,9 @@ resolveRecordIdFromPageRef() {
             this.updateCommentVisibility();
             this.nextFollowUpDate = null;
 
-            this.dispatchEvent(new CloseActionScreenEvent());
-            setTimeout(() => window.location.reload(), 800);
+           this.dispatchEvent(new CloseActionScreenEvent());
+this.navigateAfterSave();
+
         } catch (e) {
             let message = 'Failed to save feedback.';
 
@@ -491,6 +516,38 @@ resolveRecordIdFromPageRef() {
             this.disableCancel = false;
         }
     }
+
+    navigateAfterSave() {
+    const state = this.pageRef?.state || {};
+    const recordIdFromUrl =
+        state.c__recordId ||
+        state.recordId ||
+        state.id ||
+        state.c__id;
+
+    // CASE 1: Utility / Nav item page (recordId in URL)
+    if (recordIdFromUrl) {
+        setTimeout(() => {
+            this[NavigationMixin.Navigate]({
+                type: 'standard__objectPage',
+                attributes: {
+                    objectApiName: 'Lead__c',
+                    actionName: 'list'
+                },
+                state: {
+                    filterName: 'All'
+                }
+            });
+        }, 300);
+    }
+    // CASE 2: Normal quick action → reload
+    else {
+        setTimeout(() => {
+            window.location.reload();
+        }, 800);
+    }
+}
+
 
     clearFeedbackTimers() {
         if (this.noResponseTimer) {

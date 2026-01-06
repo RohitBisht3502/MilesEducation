@@ -53,6 +53,14 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     overflow: visible !important;
 }
+.red-tost{
+    display:flex;
+    color: #dc2626; /* red */
+    font-size: 1rem;
+    font-weight: 300;
+   
+   
+}
 
 .section-header {
     display: flex;

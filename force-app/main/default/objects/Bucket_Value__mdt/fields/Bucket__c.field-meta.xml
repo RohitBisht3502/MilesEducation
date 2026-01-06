@@ -29,6 +29,11 @@
                 <default>false</default>
                 <label>NA</label>
             </value>
+            <value>
+                <fullName>Accounting Vertical</fullName>
+                <default>false</default>
+                <label>Accounting Vertical</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

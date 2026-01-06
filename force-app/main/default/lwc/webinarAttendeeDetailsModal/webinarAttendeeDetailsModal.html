@@ -1,5 +1,5 @@
 <template>
-    
+
     <!-- ========================================== -->
     <!-- STEP 1: WEBINAR SELECTION VIEW -->
     <!-- ========================================== -->
@@ -23,18 +23,13 @@
             <!-- Webinar Selection -->
             <template if:true={hasWebinars}>
                 <div class="selection-container">
-                    
+
                     <div class="instruction-text">
                         Please select a webinar to view attendee details:
                     </div>
 
-                    <lightning-combobox
-                        name="webinar"
-                        label="Webinar"
-                        value={selectedWebinarId}
-                        placeholder="Select a webinar"
-                        options={webinarOptions}
-                        onchange={handleWebinarChange}
+                    <lightning-combobox name="webinar" label="Webinar" value={selectedWebinarId}
+                        placeholder="Select a webinar" options={webinarOptions} onchange={handleWebinarChange}
                         class="webinar-combo">
                     </lightning-combobox>
 
@@ -45,10 +40,7 @@
                                 <lightning-icon icon-name="standard:event" size="x-small"></lightning-icon>
                                 <span>Webinar:</span> {selectedWebinar.webinarName}
                             </p>
-                            <p class="info-row">
-                                <lightning-icon icon-name="utility:success" size="x-small"></lightning-icon>
-                                <span>Status:</span> {selectedWebinar.status}
-                            </p>
+
                             <template if:true={selectedWebinar.startDateTime}>
                                 <p class="info-row">
                                     <lightning-icon icon-name="utility:clock" size="x-small"></lightning-icon>
@@ -62,15 +54,7 @@
             </template>
 
             <div slot="footer" class="footer">
-                <lightning-button
-                    label="Cancel"
-                    onclick={closeModal}>
-                </lightning-button>
-                <lightning-button
-                    label="View Details"
-                    variant="brand"
-                    onclick={viewDetails}
-                    disabled={isViewDetailsDisabled}>
+                <lightning-button label="Cancel" onclick={closeModal}>
                 </lightning-button>
             </div>
 
@@ -152,11 +136,8 @@
                         <div key={poll.key} class="poll-card">
 
                             <div class="poll-header">
-                                <lightning-button-icon
-                                    icon-name={poll.iconName}
-                                    alternative-text="Toggle"
-                                    data-index={index}
-                                    onclick={toggleCard}>
+                                <lightning-button-icon icon-name={poll.iconName} alternative-text="Toggle"
+                                    data-index={index} onclick={toggleCard}>
                                 </lightning-button-icon>
 
                                 <span class="poll-question">{poll.question}</span>
@@ -175,20 +156,14 @@
 
                     <!-- 🔹 PAGINATION -->
                     <div class="pagination">
-                        <lightning-button
-                            label="Previous"
-                            onclick={prevPage}
-                            disabled={isFirstPage}>
+                        <lightning-button label="Previous" onclick={prevPage} disabled={isFirstPage}>
                         </lightning-button>
 
                         <span class="page-indicator">
                             Page {currentPage} of {totalPages}
                         </span>
 
-                        <lightning-button
-                            label="Next"
-                            onclick={nextPage}
-                            disabled={isLastPage}>
+                        <lightning-button label="Next" onclick={nextPage} disabled={isLastPage}>
                         </lightning-button>
                     </div>
 
@@ -197,14 +172,9 @@
             </template>
 
             <div slot="footer" class="footer">
-                <lightning-button
-                    label="Back"
-                    onclick={handleBack}>
+                <lightning-button label="Back" onclick={handleBack}>
                 </lightning-button>
-                <lightning-button
-                    label="Close"
-                    variant="brand"
-                    onclick={closeModal}>
+                <lightning-button label="Close" variant="brand" onclick={closeModal}>
                 </lightning-button>
             </div>
 

@@ -50,5 +50,62 @@ public without sharing class Utility {
         return DateTime.valueOf(base2.replace('T', ' '));
     }
 
+    public static Set<String> buildPhoneVariants(String rawPhone) {
 
+        Set<String> variants = new Set<String>();
+
+        // Guard clause – no phone provided
+        if (String.isBlank(rawPhone)) {
+            System.debug(LoggingLevel.WARN,
+                'buildPhoneVariants | Raw phone is blank, returning empty variant set'
+            );
+            return variants;
+        }
+
+        // Remove all non-numeric characters (+, spaces, hyphens, brackets, etc.)
+        String digits = rawPhone.replaceAll('[^0-9]', '');
+
+        if (String.isBlank(digits)) {
+            System.debug(LoggingLevel.WARN,
+                'buildPhoneVariants | Raw phone produced no digits. rawPhone=' + rawPhone
+            );
+            return variants;
+        }
+
+        // Base variants
+        variants.add(digits);
+
+        // Remove leading zeros (e.g. 09560682867 → 9560682867)
+        String noLeadingZeros = digits;
+        while (noLeadingZeros.startsWith('0') && noLeadingZeros.length() > 1) {
+            noLeadingZeros = noLeadingZeros.substring(1);
+        }
+        variants.add(noLeadingZeros);
+
+        // CRITICAL: Always include last 10 digits when possible
+        if (noLeadingZeros.length() >= 10) {
+            String last10 = noLeadingZeros.substring(noLeadingZeros.length() - 10);
+
+            variants.add(last10);          // canonical
+            variants.add('0' + last10);    // legacy 0XXXXXXXXXX
+            variants.add('91' + last10);   // legacy 91XXXXXXXXXX
+            variants.add('+91' + last10);   // legacy 91XXXXXXXXXX
+
+            System.debug(LoggingLevel.INFO,
+                'buildPhoneVariants | Normalized phone. raw=' + rawPhone +
+                ', last10=' + last10
+            );
+        } else {
+            System.debug(LoggingLevel.WARN,
+                'buildPhoneVariants | Phone length < 10 after normalization. raw=' +
+                rawPhone + ', digits=' + digits
+            );
+        }
+
+        System.debug(LoggingLevel.DEBUG,
+            'buildPhoneVariants | Final variants=' + variants
+        );
+
+        return variants;
+    }
 }

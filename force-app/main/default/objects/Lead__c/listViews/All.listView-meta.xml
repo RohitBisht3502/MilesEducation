@@ -7,7 +7,6 @@
     <columns>Stage__c</columns>
     <columns>Course__c</columns>
     <columns>Email__c</columns>
-    <columns>Phone__c</columns>
     <columns>CREATED_DATE</columns>
     <columns>City__c</columns>
     <columns>Is_ReEnquiry__c</columns>

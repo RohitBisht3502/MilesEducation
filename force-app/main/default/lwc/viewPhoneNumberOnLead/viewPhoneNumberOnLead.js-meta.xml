@@ -2,6 +2,8 @@
 <LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
 	<apiVersion>63.0</apiVersion>
 	<isExposed>true</isExposed>
+	<masterLabel>View Phone Number</masterLabel>
+	<description>View phone number with credit system for multiple objects</description>
 	<targets>
 		<target>lightning__AppPage</target>
 		<target>lightning__HomePage</target>
@@ -11,7 +13,7 @@
 	<targetConfigs>
         <targetConfig targets="lightning__RecordPage">
             <property name="objectApiName" type="String" label="Object API Name" 
-                     description="API name of the object containing the phone field" 
+                     description="API name of the object: Lead__c, Account, Enquiry__c, or Lead" 
                      default="Lead__c"/>
         </targetConfig>
 		<targetConfig targets="lightning__RecordAction">

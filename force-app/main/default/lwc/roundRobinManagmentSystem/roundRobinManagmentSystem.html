@@ -1,77 +1,132 @@
 <template>
   <div class="wrap">
     <div class="toolbar">
+      <!-- City -->
       <div class="filter">
         <label>City</label>
-        <select onchange={onCityChange}>
-          <option value="">— Select —</option>
+        <select onchange={onCityChange} value={selectedCity}>
+          <option value="">Select</option>
           <template for:each={cities} for:item="c">
             <option key={c} value={c}>{c}</option>
           </template>
         </select>
       </div>
 
+      <!-- Bucket -->
       <div class="filter">
         <label>Bucket</label>
+        <select onchange={onBucketChange} value={selectedBucket}>
+          <option value="">Select Bucket</option>
+          <template for:each={buckets} for:item="b">
+            <option key={b} value={b}>{b}</option>
+          </template>
+        </select>
+      </div>
 
-        <div class="multiselect-trigger" onclick={openModal}>
+      <!-- Lead Sources -->
+      <div class="filter">
+        <label>Lead Sources</label>
+        <div
+          class="multiselect-trigger"
+          onclick={openModal}
+          data-disabled={isSourceDisabled}
+          title={sourceTriggerTitle}
+        >
           {selectedSourcesDisplay}
+          <template if:true={selectedBucket}>
+            <div class="bucket-hint">(From: {selectedBucket})</div>
+          </template>
         </div>
       </div>
 
+      <!-- Business Vertical (no logic for now) -->
+     <!-- Business Vertical -->
+<!-- Business Vertical -->
+<div class="filter">
+  <label>Business Vertical</label>
+  <select onchange={onBusinessVerticalChange} value={selectedBusinessVertical}>
+    <option value="">Select</option>
+    <template for:each={businessVerticals} for:item="bv">
+      <option key={bv} value={bv}>{bv}</option>
+    </template>
+  </select>
+</div>
+<!-- Type -->
+<div class="filter">
+  <label>Type</label>
+  <select onchange={onTypeChange} value={selectedType}>
+    <option value="">Select</option>
+    <template for:each={types} for:item="t">
+      <option key={t} value={t}>{t}</option>
+    </template>
+  </select>
+</div>
+    
+
+
+
+
+      <!-- Actions (✅ Removed New button) -->
       <div class="actions">
         <button class="btn small" onclick={reload}>Apply</button>
         <button class="btn small" onclick={saveEdits}>Save</button>
-            <button class="btn small" onclick={openNewPresence}>
-    New 
-  </button>
         <button class="btn small ghost" onclick={clearFilters}>Clear</button>
       </div>
     </div>
 
+    <!-- Lead Sources Modal -->
     <template if:true={showModal}>
       <div class="modal-overlay" onclick={closeModal}>
         <div class="modal-content" onclick={handleModalClick}>
           <div class="modal-header">
             <h3>Select Lead Sources</h3>
-            <button class="modal-close" onclick={closeModal}>×</button>
+            <button class="modal-close" onclick={closeModal}>X</button>
           </div>
+
           <div class="modal-body">
             <div class="multiselect-options">
               <template for:each={displayLeadSourcesTemp} for:item="s">
                 <label key={s.key} class="option-label">
-                  <input type="checkbox" data-value={s.value} checked={s.checked} onchange={handleCheckboxChange}/>
+                  <input
+                    type="checkbox"
+                    data-value={s.value}
+                    checked={s.checked}
+                    onchange={handleCheckboxChange}
+                  />
                   <span>{s.label}</span>
                 </label>
               </template>
             </div>
           </div>
+
           <div class="modal-footer">
             <button class="btn small" onclick={applySelection}>Apply</button>
-       
             <button class="btn small ghost" onclick={closeModal}>Cancel</button>
           </div>
         </div>
       </div>
     </template>
 
+    <!-- Sequence Modal -->
     <template if:true={showSeqModal}>
       <div class="modal-overlay" onclick={closeSeqModal}>
         <div class="modal-content" onclick={handleModalClick}>
           <div class="modal-header">
-            <h3>Edit Sequence — {seqColLabel}</h3>
-            <button class="modal-close" onclick={closeSeqModal}>×</button>
+            <h3>Edit Sequence - {seqColLabel}</h3>
+            <button class="modal-close" onclick={closeSeqModal}>X</button>
           </div>
+
           <div class="modal-body">
             <table class="matrix">
               <thead>
                 <tr>
                   <th>Sales Rep</th>
                   <th>Sequence</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
-                <template for:each={seqRows} for:item="r">
+                <template for:each={seqRows} for:item="r" for:index="index">
                   <tr key={r.poolId}>
                     <td>{r.salesRepName}</td>
                     <td>
@@ -84,20 +139,25 @@
                         oninput={onSeqInputChange}
                       />
                     </td>
+                    <td>
+                      <button class="seq-btn" data-index={index} onclick={moveSeqUp} title="Move Up">⬆</button>
+                      <button class="seq-btn" data-index={index} onclick={moveSeqDown} title="Move Down">⬇</button>
+                    </td>
                   </tr>
                 </template>
               </tbody>
             </table>
           </div>
+
           <div class="modal-footer">
             <button class="btn small" onclick={saveSeqEdits}>Save</button>
             <button class="btn small ghost" onclick={closeSeqModal}>Cancel</button>
-         
           </div>
         </div>
       </div>
     </template>
 
+    <!-- Matrix -->
     <div class="table-scroller">
       <table class="matrix">
         <thead>
@@ -121,18 +181,18 @@
                 <td>{row.salesRepName}</td>
                 <template for:each={row.cells} for:item="cell">
                   <td key={cell.key}>
-                    <template if:true={cell.poolId}>
-                      <span
-                        class="editable-cell"
-                        contenteditable="true"
-                        data-poolid={cell.poolId}
-                        onblur={onCellBlur}
-                        onkeydown={onCellKeydown}
-                      >
-                        {cell.value}
-                      </span>
-                    </template>
-                    <template if:false={cell.poolId}>—</template>
+                    <span
+                      class="editable-cell"
+                      contenteditable="true"
+                      data-poolid={cell.poolId}
+                      data-repid={row.key}
+                      data-src={cell.src}
+                      onblur={onCellBlur}
+                      onkeydown={onCellKeydown}
+                      title="Enter weight"
+                    >
+                      {cell.value}
+                    </span>
                   </td>
                 </template>
               </tr>
@@ -157,8 +217,6 @@
       </table>
     </div>
   </div>
-  <c-new-round-robin-adder
-  onsuccess={loadMatrix}>
-</c-new-round-robin-adder>
 
+  <c-new-round-robin-adder onsuccess={loadMatrix}></c-new-round-robin-adder>
 </template>

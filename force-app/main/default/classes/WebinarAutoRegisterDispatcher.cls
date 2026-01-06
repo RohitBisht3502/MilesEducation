@@ -10,7 +10,8 @@ public without sharing class WebinarAutoRegisterDispatcher {
     public static void dispatchForLeads(Set<Id> leadIds) {
         if (leadIds == null || leadIds.isEmpty()) return;
 
-        List<Webinar__c> autoWebinars = [SELECT Id, Webinar_Id__c FROM Webinar__c WHERE Auto_Register__c = true AND (IsActive__c = true OR IsActive__c = null)];
+        //List<Webinar__c> autoWebinars = [SELECT Id, Webinar_Id__c FROM Webinar__c WHERE Auto_Register__c = true AND (IsActive__c = true OR IsActive__c = null)];
+        List<Webinar__c> autoWebinars = [SELECT Id, Webinar_Id__c FROM Webinar__c WHERE Auto_Register__c = true AND (IsActive__c = true OR IsActive__c = null) AND Status__c = 'Created'];
         if (autoWebinars.isEmpty()) return;
 
         Set<Id> webinarIds = new Set<Id>();

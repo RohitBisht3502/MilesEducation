@@ -107,7 +107,10 @@ global without sharing class MilesWebService {
             Id studentAccountId;
             Id candidateIdFromPhone;
 
-            List<Phone_Number__c> phoneExistingList = [SELECT Id, Phone__c, Candidate__c, Student__c, Lead__c FROM Phone_Number__c WHERE Phone__c = :inputData.phone LIMIT 1];
+            // checking all scnerios number staring from +91,0 etc
+            Set<String> phoneVariants = Utility.buildPhoneVariants(inputData.phone);
+            
+            List<Phone_Number__c> phoneExistingList = [SELECT Id, Phone__c, Candidate__c, Student__c, Lead__c FROM Phone_Number__c WHERE Phone__c IN :phoneVariants LIMIT 1];
             if (!phoneExistingList.isEmpty()) {
                 phoneExisting       = phoneExistingList[0];
                 studentAccountId    = phoneExisting.Student__c;

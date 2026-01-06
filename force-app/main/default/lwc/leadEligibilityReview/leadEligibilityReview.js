@@ -39,6 +39,8 @@ export default class LeadEligibilityReview extends LightningElement {
     @track statusCountsSummary = [];
     @track viewLoadingId;
 
+    lastOpenedPath = [];
+
     @track isFolderModalOpen = false;
     @track activeFolder = {};
     @track folderCommentText = '';
@@ -48,6 +50,7 @@ export default class LeadEligibilityReview extends LightningElement {
 
     connectedCallback() {
         this.initYearOptions();
+        this.restoreLastOpenedPath();
     }
 
     get defaultFileStatuses() {
@@ -96,6 +99,10 @@ export default class LeadEligibilityReview extends LightningElement {
             : this.defaultLeadStatuses.map(v => ({ label: v, value: v }));
     }
 
+    get lastPathStorageKey() {
+        return `ler:lastPath:${this.recordId || 'global'}`;
+    }
+
     get creditScoreDisplay() {
         return this.creditScore !== undefined && this.creditScore !== null ? this.creditScore : '--';
     }
@@ -112,6 +119,7 @@ export default class LeadEligibilityReview extends LightningElement {
             const clean = JSON.parse(JSON.stringify(data || []));
             let decorated = this.decorateTree(clean, 1);
             decorated = this.filterNodesWithFiles(decorated);
+            decorated = this.applySavedPathExpansion(decorated);
             this.folderTree = decorated;
             this.totalFilesOverall = this.computeTotalFiles(this.folderTree);
             this.statusCountsSummary = this.computeStatusSummary(this.folderTree);
@@ -230,6 +238,56 @@ export default class LeadEligibilityReview extends LightningElement {
     decorateTree(nodes, level) {
         if (!nodes) return [];
         return nodes.map(node => this.decorateNode(node, level));
+    }
+
+    applySavedPathExpansion(nodes) {
+        if (!nodes || !nodes.length || !this.lastOpenedPath || !this.lastOpenedPath.length) {
+            return nodes;
+        }
+
+        const expandLevel = (list, pathIndex) => list.map(item => {
+            const clone = { ...item };
+            if (clone.id === this.lastOpenedPath[pathIndex]) {
+                clone.expanded = true;
+                if (clone.children && clone.children.length && pathIndex < this.lastOpenedPath.length - 1) {
+                    clone.children = expandLevel(clone.children, pathIndex + 1);
+                }
+            } else if (clone.children && clone.children.length) {
+                clone.children = expandLevel(clone.children, pathIndex);
+            }
+            return clone;
+        });
+
+        return expandLevel(nodes, 0);
+    }
+
+    rememberLastOpenedPath(pathArray) {
+        if (!pathArray || !pathArray.length) return;
+        this.lastOpenedPath = [...pathArray];
+        try {
+            if (typeof window !== 'undefined' && window.sessionStorage) {
+                window.sessionStorage.setItem(this.lastPathStorageKey, JSON.stringify(this.lastOpenedPath));
+            }
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('Unable to persist last opened path', e);
+        }
+    }
+
+    restoreLastOpenedPath() {
+        try {
+            if (typeof window === 'undefined' || !window.sessionStorage) return;
+            const cached = window.sessionStorage.getItem(this.lastPathStorageKey);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed)) {
+                    this.lastOpenedPath = parsed;
+                }
+            }
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('Unable to restore last opened path', e);
+        }
     }
 
     decorateNode(node, level) {
@@ -515,6 +573,10 @@ export default class LeadEligibilityReview extends LightningElement {
             this.showToast('Error', 'File not found.', 'error');
             return;
         }
+        const pathToFile = this.findPathToFile(fileId, this.folderTree);
+        if (pathToFile && pathToFile.length) {
+            this.rememberLastOpenedPath(pathToFile);
+        }
         this.editFile = { ...file };
         this.isModalOpen = true;
     }
@@ -596,6 +658,11 @@ export default class LeadEligibilityReview extends LightningElement {
         if (!folder || !folder.allowFolderEdit) {
             this.showToast('Error', 'This folder cannot be edited.', 'error');
             return;
+        }
+
+        const pathToFolder = this.findPathToFolder(folderId, this.folderTree);
+        if (pathToFolder && pathToFolder.length) {
+            this.rememberLastOpenedPath(pathToFolder);
         }
 
         this.activeFolder = {
@@ -735,6 +802,36 @@ export default class LeadEligibilityReview extends LightningElement {
                 'error'
             );
         }
+    }
+
+    findPathToFile(fileId, nodes, ancestors = []) {
+        if (!nodes) return null;
+        for (let n of nodes) {
+            const pathHere = [...ancestors, n.id];
+            if (n.files && n.files.find(f => f.id === fileId || f.Id === fileId)) {
+                return pathHere;
+            }
+            if (n.children && n.children.length) {
+                const childPath = this.findPathToFile(fileId, n.children, pathHere);
+                if (childPath) return childPath;
+            }
+        }
+        return null;
+    }
+
+    findPathToFolder(folderId, nodes, ancestors = []) {
+        if (!nodes) return null;
+        for (let n of nodes) {
+            const pathHere = [...ancestors, n.id];
+            if (n.id === folderId) {
+                return pathHere;
+            }
+            if (n.children && n.children.length) {
+                const childPath = this.findPathToFolder(folderId, n.children, pathHere);
+                if (childPath) return childPath;
+            }
+        }
+        return null;
     }
 
     async refreshTree() {

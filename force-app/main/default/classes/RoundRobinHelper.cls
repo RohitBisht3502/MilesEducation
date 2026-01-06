@@ -40,12 +40,12 @@ public without sharing class RoundRobinHelper {
                 SELECT Id, Name, Object_Api_Name__c, City__c, Bucket__c,
                        Sales_Rep__c, Sequence__c, Max_Weight__c, Assigned_Weight__c,
                        Max_Leads__c, Total_Assigned__c, Maximum_Weightage__c,
-                       Current_Assigned_Weight__c, Active__c, Course__c, Type__c
+                       Current_Assigned_Weight__c, Active__c, Course__c,Course_Bucket__c, Type__c
                 FROM Round_Robin_Pool__c
                 WHERE Active__c = true
                   AND Object_Api_Name__c = :obj
                   AND City__c = :city
-                  AND Course__c = :courseUpper
+                  AND Course_Bucket__c = :courseUpper
                   AND Type__c = :typeValue
                 FOR UPDATE
             ];
@@ -54,12 +54,12 @@ public without sharing class RoundRobinHelper {
                 SELECT Id, Name, Object_Api_Name__c, City__c, Bucket__c,Lead_Source__c,
                        Sales_Rep__c, Sequence__c, Max_Weight__c, Assigned_Weight__c,
                        Max_Leads__c, Total_Assigned__c, Maximum_Weightage__c,
-                       Current_Assigned_Weight__c, Active__c, Course__c, Type__c
+                       Current_Assigned_Weight__c, Active__c, Course__c,Course_Bucket__c, Type__c
                 FROM Round_Robin_Pool__c
                 WHERE Active__c = true
                   AND Object_Api_Name__c = :obj
                   AND City__c = :city
-                  AND Course__c = :courseUpper
+                  AND Course_Bucket__c = :courseUpper
                   AND Type__c = :typeValue
                   AND Lead_Source__c = :src
                 FOR UPDATE

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ListView xmlns="http://soap.sforce.com/2006/04/metadata">
-    <fullName>Delhi_FaceBook</fullName>
+    <fullName>Delhi_Account_Facebook_Round_Robin</fullName>
     <booleanFilter>1 AND 2 AND 3 AND 4</booleanFilter>
     <columns>NAME</columns>
     <columns>Sales_Rep__c</columns>
@@ -28,12 +28,12 @@
     <filters>
         <field>Lead_Source__c</field>
         <operation>equals</operation>
-        <value>Advertisement</value>
+        <value>Facebook</value>
     </filters>
     <filters>
         <field>Course_Bucket__c</field>
         <operation>equals</operation>
         <value>Accounting Vertical</value>
     </filters>
-    <label>Delhi - CMA- Advertisement- Round Robin</label>
+    <label>Delhi - Account- Facebook - Round Robin</label>
 </ListView>

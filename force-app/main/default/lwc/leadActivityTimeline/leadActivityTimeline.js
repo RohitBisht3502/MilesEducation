@@ -40,6 +40,7 @@ export default class LeadActivityTimeline extends LightningElement {
                 const isCall = log.activityType === 'Call';
                 const isLevelChange = log.activityType === 'Level Change';
                 const isMergeLead = log.activityType === 'Lead Merge';
+                const isViewedPhoneNumber = log.activityType === 'View Phone Number';
                 const isCreated = log.name?.includes('Created') || false;
                 const isUpdated = log.name?.includes('Updated') || false;
 
@@ -70,6 +71,7 @@ export default class LeadActivityTimeline extends LightningElement {
                     isCall,
                     isLevelChange,
                     isMergeLead,
+                    isViewedPhoneNumber,
                     isCreated,
                     isUpdated,
                     formattedChangedDateTime,

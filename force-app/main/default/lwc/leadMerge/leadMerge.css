@@ -391,16 +391,53 @@
     .container {
         padding: 20px;
     }
-    
+
     .search-container {
         flex-direction: column;
     }
-    
+
     .search-box {
         max-width: 100%;
     }
-    
+
     .cards-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* Comments Section */
+.comments-section {
+    padding: 1rem 0;
+    margin-top: 16px;
+    border-top: 1px solid #e8eaed;
+}
+
+.field-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 8px;
+}
+
+.comment-input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #dadce0;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.5;
+    resize: vertical;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+.comment-input:focus {
+    outline: none;
+    border-color: #1967d2;
+    box-shadow: 0 0 0 2px rgba(25, 103, 210, 0.2);
+}
+
+.comment-input::placeholder {
+    color: #80868b;
 }

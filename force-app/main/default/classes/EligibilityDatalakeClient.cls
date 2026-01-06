@@ -52,7 +52,7 @@ public without sharing class EligibilityDatalakeClient {
             HttpRequest req = new HttpRequest();
             req.setMethod('GET');
             String qp = EncodingUtil.urlEncode(filePath, 'UTF-8');
-            req.setEndpoint(BASE_URL + '/getEligibilityDocuments?file_path='+ qp);
+            req.setEndpoint(BASE_URL + '/getPresignedUrlForFileDownload?file_path='+ qp);
             req.setHeader('x-api-key', API_KEY);
 
             Http http = new Http();

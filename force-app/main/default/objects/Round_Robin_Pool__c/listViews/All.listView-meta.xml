@@ -8,11 +8,19 @@
     <columns>Maximum_Weightage__c</columns>
     <columns>Assigned_Weight__c</columns>
     <columns>City__c</columns>
+    <columns>Course__c</columns>
     <columns>Bucket__c</columns>
     <columns>Current_Assigned_Weight__c</columns>
     <columns>Max_Leads__c</columns>
     <columns>Lead_Source__c</columns>
     <columns>CREATED_DATE</columns>
+    <columns>Type__c</columns>
+    <columns>Course_Bucket__c</columns>
     <filterScope>Everything</filterScope>
+    <filters>
+        <field>Type__c</field>
+        <operation>equals</operation>
+        <value>Eligibility Criteria</value>
+    </filters>
     <label>All</label>
 </ListView>

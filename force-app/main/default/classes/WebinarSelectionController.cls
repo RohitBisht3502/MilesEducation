@@ -12,7 +12,6 @@ public with sharing class WebinarSelectionController {
         @AuraEnabled public String webinarIdExternal;
         @AuraEnabled public Id webinarMemberId;
         @AuraEnabled public String registrantId;
-        @AuraEnabled public String status;
     }
     
     /**
@@ -64,7 +63,6 @@ public with sharing class WebinarSelectionController {
                     option.webinarIdExternal = wm.Webinar__r.Webinar_Id__c;
                     option.webinarMemberId = wm.Id;
                     option.registrantId = wm.Registrant_Id__c;
-                    // option.status = wm.Status__c;
                     
                     webinarOptions.add(option);
                 }

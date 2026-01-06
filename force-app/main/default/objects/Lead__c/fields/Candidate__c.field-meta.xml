@@ -4,7 +4,6 @@
     <deleteConstraint>SetNull</deleteConstraint>
     <label>Candidate</label>
     <referenceTo>Lead</referenceTo>
-    <relationshipLabel>Leads</relationshipLabel>
     <relationshipName>Leads</relationshipName>
     <required>false</required>
     <trackHistory>false</trackHistory>

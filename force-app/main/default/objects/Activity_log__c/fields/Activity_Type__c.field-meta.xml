@@ -55,6 +55,16 @@
                 <default>false</default>
                 <label>View Phone Number</label>
             </value>
+            <value>
+                <fullName>Lead Downgraded</fullName>
+                <default>false</default>
+                <label>Lead Downgraded</label>
+            </value>
+            <value>
+                <fullName>Owner Change</fullName>
+                <default>false</default>
+                <label>Owner Change</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

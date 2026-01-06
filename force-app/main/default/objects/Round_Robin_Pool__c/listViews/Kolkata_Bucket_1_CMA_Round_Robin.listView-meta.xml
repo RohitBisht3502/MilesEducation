@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ListView xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Kolkata_Bucket_1_CMA_Round_Robin</fullName>
-    <booleanFilter>1 AND 2</booleanFilter>
     <columns>NAME</columns>
     <columns>Sales_Rep__c</columns>
     <columns>Sequence__c</columns>
@@ -9,9 +8,8 @@
     <columns>Assigned_Weight__c</columns>
     <columns>Current_Assigned_Weight__c</columns>
     <columns>City__c</columns>
-    <columns>Course__c</columns>
+    <columns>Course_Bucket__c</columns>
     <columns>Lead_Source__c</columns>
-    <columns>Bucket__c</columns>
     <columns>Type__c</columns>
     <columns>Object_Api_Name__c</columns>
     <filterScope>Everything</filterScope>
@@ -20,10 +18,5 @@
         <operation>equals</operation>
         <value>Kolkata</value>
     </filters>
-    <filters>
-        <field>Type__c</field>
-        <operation>equals</operation>
-        <value>Round Robin</value>
-    </filters>
-    <label>Kolkata - Bucket 1- CMA - Round Robin</label>
+    <label>Kolkata - Facebook  - Accounting RR</label>
 </ListView>

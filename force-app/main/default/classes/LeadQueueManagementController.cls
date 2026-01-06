@@ -26,6 +26,7 @@ public class LeadQueueManagementController {
             FROM Call_Log__c
             WHERE (Untracked__c = TRUE)
             AND OwnerId = :UserInfo.getUserId()
+            AND Lead__c = null
             ORDER BY CreatedDate DESC LIMIT 200];
 
         User currentUser = [SELECT Id, UserRole.Name FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1 ];
@@ -82,6 +83,7 @@ public class LeadQueueManagementController {
             dto.createdDate = e.CreatedDate;
             dto.iscallLog   = true;
             dto.primaryTag  = 'Untracked calls';
+            // dto.primaryTag  = 'Unknown';
             dto.roleTag     = currentUser.UserRole != null ? currentUser.UserRole.Name : null;
             dto.bucketTag   = 'ALL';
             allItems.add(dto);
@@ -107,7 +109,7 @@ public class LeadQueueManagementController {
             }
         }
 
-        if (!String.isBlank(callStatus) && callStatus.equalsIgnoreCase('Missed')) {
+        if (!String.isBlank(callStatus) && callStatus.equalsIgnoreCase('missed')) {
             return 'Missed calls';
         }
 

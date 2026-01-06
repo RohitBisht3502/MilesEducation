@@ -5,7 +5,6 @@
     <columns>LEAD.COMPANY</columns>
     <columns>LEAD.TITLE</columns>
     <columns>LEAD.STATE</columns>
-    <columns>LEAD.PHONE</columns>
     <columns>LEAD.EMAIL</columns>
     <columns>LEAD.STATUS</columns>
     <columns>CORE.USERS.FIRST_NAME</columns>
@@ -19,5 +18,5 @@
         <operation>notEqual</operation>
         <value>Qualified</value>
     </filters>
-    <label>All Open Leads</label>
+    <label>All Open Candidates</label>
 </ListView>

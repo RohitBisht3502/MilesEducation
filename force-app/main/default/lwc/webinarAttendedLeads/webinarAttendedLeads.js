@@ -298,9 +298,7 @@ export default class WebinarAttendedLeads extends LightningElement {
                                 ? (isLiveAttendee ? STATUS.PRESENT : STATUS.ABSENT)
                                 : item.status
                         ),
-                        showCallButton: this.hasLiveSyncOccurred
-                            ? !isLiveAttendee
-                            : (item.status === STATUS.ABSENT)
+                        showCallButton: true
                     };
                 });
                 this.webinarData = data;
@@ -361,7 +359,7 @@ export default class WebinarAttendedLeads extends LightningElement {
                 ...item,
                 status: liveStatus,
                 statusBadgeClass: this.getStatusBadgeClass(liveStatus),
-                showCallButton: !isLiveAttendee
+                showCallButton: true
             };
         });
     }
@@ -528,7 +526,7 @@ export default class WebinarAttendedLeads extends LightningElement {
             statusBadgeClass: this.getStatusBadgeClass(frontendStatus),
             spocName: item.spocName || 'Not Assigned',
             spocId: item.spocId,
-            showCallButton: this.hasLiveSyncOccurred ? !isLiveAttendee : (item.status === STATUS.ABSENT)
+            showCallButton: true
         };
     }
 
