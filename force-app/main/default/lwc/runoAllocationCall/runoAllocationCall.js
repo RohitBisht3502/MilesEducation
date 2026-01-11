@@ -37,6 +37,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
 
     // 🔥 NEW: auto-set next follow up date flag (like good LWC)
     autoSetFollowUp = true;
+    userChangedStage = false;
 
     // Stage / Course
     stageValue = '';
@@ -175,20 +176,23 @@ resolveRecordIdFromPageRef() {
 
     // --------------- LIFECYCLE -------------
 
-    connectedCallback() {
-       this.resolveRecordIdFromPageRef();
-        this.loadPicklists();
-        this.loadStageLevel();
-        this.subscribeToEvents();
-        onError(err => console.warn('EMP API Error:', JSON.stringify(err)));
-        setTimeout(() => {
+   connectedCallback() {
+
+    
+    this.resolveRecordIdFromPageRef();
+    this.loadPicklists();
+    this.loadStageLevel();
+    this.subscribeToEvents();
+    onError(err => console.warn('EMP API Error:', JSON.stringify(err)));
+
+    setTimeout(() => {
         if (this.autoCall && this.recordId && !this.hasAutoCalled) {
             this.hasAutoCalled = true;
             this.startCall();
         }
     }, 500);
+}
 
-    }
 
     disconnectedCallback() {
         this.stopTimer();
@@ -238,6 +242,7 @@ resolveRecordIdFromPageRef() {
 
     handleL1Change(e) {
         this.l1Value = e.target.value;
+         this.userChangedStage = false;
         this.l2Options = (this.fullMap[this.l1Value] || []).map(v => ({
             label: v,
             value: v
@@ -258,10 +263,15 @@ resolveRecordIdFromPageRef() {
     handleL2Change(e) {
         this.l2Value = e.target.value;
         this.updateCommentVisibility();
-    }
+         if (this.l2Value) {
+    this.applyAutoStageLogic();
+         }
+}
+
 
     handleStageChange(e) {
         this.stageValue = e.target.value;
+          this.userChangedStage = true;
     }
 
     handleLevelChange(e) {
@@ -404,6 +414,45 @@ resolveRecordIdFromPageRef() {
 
     this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
 }
+applyAutoStageLogic() {
+    // ❌ Do nothing if user already selected stage
+    if (this.userChangedStage) {
+        return;
+    }
+
+    let autoStage = null;
+
+    if (this.l1Value === 'Connected') {
+        if (
+            this.l2Value === 'Not Eligible' ||
+            this.l2Value === 'Wrong Number' ||
+            this.l2Value === 'Not Interested (DND)' ||
+            this.l2Value === 'Language Barrier'
+        ) {
+            autoStage = 'M1';
+        }
+        else if (
+            this.l2Value === 'Visit Confirmed' ||
+            this.l2Value === 'Google Meet Completed' ||
+            this.l2Value === 'Gmeet Confirmed'
+        ) {
+            autoStage = 'M3+';
+        }
+        else if (this.l2Value === 'Postponed') {
+            autoStage = 'M4';
+        }
+    }
+    else if (this.l1Value === 'Not-Connected') {
+        if (this.l2Value === 'Invalid Number') {
+            autoStage = 'M1';
+        } else {
+            autoStage = null;
+        }
+    }
+
+    this.stageValue = autoStage;
+}
+
 
 
 
@@ -422,11 +471,11 @@ resolveRecordIdFromPageRef() {
             return;
         }
 
-        if (!this.stageValue) {
+        if (this.l1Value === 'Connected' && !this.stageValue) {
             this.dispatchEvent(
                 new ShowToastEvent({
                     title: 'Required',
-                    message: 'Stage and Course are required.',
+                    message: 'Stage is required when call is connected.',
                     variant: 'warning'
                 })
             );
@@ -446,7 +495,7 @@ resolveRecordIdFromPageRef() {
                 nextFollowUpDate: this.nextFollowUpDate,
                 l1: this.l1Value,
                 l2: this.l2Value,
-                stage: this.stageValue,
+                stage: this.stageValue  || null,
                 level: this.levelValue,
                 notifyMe: false
             };
@@ -478,8 +527,9 @@ resolveRecordIdFromPageRef() {
             this.l2Value = '';
             this.updateCommentVisibility();
             this.nextFollowUpDate = null;
+            sessionStorage.setItem('RUNO_REFRESH_ON_BACK', 'true');
 
-           this.dispatchEvent(new CloseActionScreenEvent());
+        //    this.dispatchEvent(new CloseActionScreenEvent());
 this.navigateAfterSave();
 
         } catch (e) {
@@ -501,6 +551,8 @@ this.navigateAfterSave();
                 } else if (e && e.message) {
                     message = e.message;
                 }
+
+
             } catch (err) {}
 
             this.dispatchEvent(
@@ -517,7 +569,7 @@ this.navigateAfterSave();
         }
     }
 
-    navigateAfterSave() {
+ navigateAfterSave() {
     const state = this.pageRef?.state || {};
     const recordIdFromUrl =
         state.c__recordId ||
@@ -525,28 +577,35 @@ this.navigateAfterSave();
         state.id ||
         state.c__id;
 
-    // CASE 1: Utility / Nav item page (recordId in URL)
+    // CASE 1: Opened from URL / Utility / Nav item
     if (recordIdFromUrl) {
+        this[NavigationMixin.Navigate]({
+            type: 'standard__objectPage',
+            attributes: {
+                objectApiName: 'Lead__c',
+                actionName: 'list'
+            },
+            state: {
+                filterName: 'All'
+            }
+        });
+
+        // 🔥 FORCE HARD RELOAD AFTER NAVIGATION
         setTimeout(() => {
-            this[NavigationMixin.Navigate]({
-                type: 'standard__objectPage',
-                attributes: {
-                    objectApiName: 'Lead__c',
-                    actionName: 'list'
-                },
-                state: {
-                    filterName: 'All'
-                }
-            });
-        }, 300);
+            window.location.href = window.location.href;
+        }, 600);
     }
-    // CASE 2: Normal quick action → reload
+    // CASE 2: Opened as Quick Action
     else {
+        this.dispatchEvent(new CloseActionScreenEvent());
+
         setTimeout(() => {
             window.location.reload();
-        }, 800);
+        }, 300);
     }
 }
+
+
 
 
     clearFeedbackTimers() {

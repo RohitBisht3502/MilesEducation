@@ -171,11 +171,41 @@ public without sharing class LeadTriggerHandler {
             }
         }
         
-        // Insert all activity logs
         if (!logsToInsert.isEmpty()) {
             insert logsToInsert;
         }
     }
+
+    /**
+     * Creates activity logs for Owner changes
+     */
+    public static void createOwnerChangeActivityLogs(List<Lead__c> newList, Map<Id, Lead__c> oldMap) {
+        List<Activity_Log__c> logsToInsert = new List<Activity_Log__c>();
+
+        for (Lead__c ld : newList) {
+            Lead__c oldRec = oldMap.get(ld.Id);
+            // Check if Owner Changed
+            if (oldRec != null && oldRec.OwnerId != ld.OwnerId) {
+                Activity_Log__c log = new Activity_Log__c();
+                log.Lead__c          = ld.Id;
+                log.Logging_Id__c    = ld.Id;
+                log.Activity_Type__c = 'Owner Change'; 
+                log.Created_By__c    = ld.OwnerId; // Assigned to new owner
+                
+                log.Name                   = 'Lead Owner Updated';
+                log.Changed_Date_Time__c   = System.now(); // or ld.LastModifiedDate
+                log.Action_Performed_By__c = UserInfo.getUserId(); 
+                log.Description__c         = 'Lead ownership transferred.';
+                
+                logsToInsert.add(log);
+            }
+        }
+        
+        if (!logsToInsert.isEmpty()) {
+            insert logsToInsert;
+        }
+    }
+
 
     public static void blockProtectedLeadDeletion(List<Lead__c> oldLeads) {
         for (Lead__c l : oldLeads) {

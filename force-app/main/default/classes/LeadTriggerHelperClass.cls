@@ -3,6 +3,32 @@
     Description  : 
 */
 public without sharing class LeadTriggerHelperClass {
+
+    public static void updateLevelSequence(List<Lead__c> newLeads, Map<Id, Lead__c> oldMap) {
+        // Fetch all "M Stage Sequence" metadata records
+        // Note: Custom Metadata SOQL does not count towards governor limits
+        Map<String, Decimal> stageToSequenceMap = new Map<String, Decimal>();
+        for (M_Stage_Sequence__mdt mdt : [SELECT Label, Level_Sequence__c FROM M_Stage_Sequence__mdt]) {
+            if (mdt.Label != null) {
+                stageToSequenceMap.put(mdt.Label, mdt.Level_Sequence__c);
+            }
+        }
+
+        for (Lead__c lead : newLeads) {
+            String currentStage = lead.Stage__c;
+            String oldStage = (oldMap != null && oldMap.containsKey(lead.Id)) ? oldMap.get(lead.Id).Stage__c : null;
+
+            // Trigger logic: Insert (oldMap is null) or Update (stage changed)
+            if (oldMap == null || currentStage != oldStage) {
+                if (currentStage != null && stageToSequenceMap.containsKey(currentStage)) {
+                    lead.Level_Sequence__c = stageToSequenceMap.get(currentStage);
+                } else {
+                    // If stage doesn't match any metadata or is null, consider clearing the sequence
+                    // lead.Level_Sequence__c = null; // Uncomment if you want to clear the sequence
+                }
+            }
+        }
+    }
     
     public static void handleBeforeInsert(List<Lead__c> newLeads) { 
         BucketAssignmentService.assignBucket((List<SObject>)newLeads, null);

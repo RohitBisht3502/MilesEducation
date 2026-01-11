@@ -22,6 +22,7 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
     }
 
     public override void beforeInsert() {
+        LeadTriggerHelperClass.updateLevelSequence(getNewLeads(), null);
         LeadTriggerHelperClass.handleBeforeInsert(getNewLeads());
         // If you want M1 owner logic on insert:
         // LeadTriggerHelperClass.assignOwnerForM1(getNewLeads(), null, true);
@@ -32,6 +33,7 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         Map<Id, Lead__c> oldMapLead = getOldLeadMap();
 
        // EnquiryStageService.validateStageTransitions(newLeads, oldMapLead); COMMENTED FOR DEMO ONLY
+        LeadTriggerHelperClass.updateLevelSequence(newLeads, oldMapLead);
         LeadTriggerHelperClass.handleBeforeUpdate(newLeads, oldMapLead);
         // If you want M1 owner logic on update:
         // LeadTriggerHelperClass.assignOwnerForM1(newLeads, oldMapLead, false);
@@ -58,14 +60,27 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
 
         // Auto-register only when Is_ReEnquiry__c flips to true 
         LeadTriggerHelperClass.afterUpdateAutoRegisterWebinar((Map<Id, Lead__c>)newMap, oldMapLead);
+
         // 3. Create activity logs for Merged Leads (AFTER merge logic completes)
         LeadTriggerHandler.createMergeLeadActivityLogs(newLeads, oldMapLead);
-        // sync owner to ()
-        LeadSyncOwnerChange.syncOnOwnerChange(oldMapLead, (Map<Id, Lead__c>)newMap);
+
         // sync city on candidate 
         LeadTriggerHelperClass.syncParentCityOnChildCityChange(newLeads, oldMapLead);
+
         // Update highest level on candidate 
         LeadTriggerHelperClass.updateHighestLevelOnCandidateWhenStageChanges(newLeads, oldMapLead);
+
+        // Assign Downgrade Re-Enquiry leads 
+        ReInquiryDowngradeReallocationService.handleAfterUpdate(newLeads, oldMapLead);
+
+        // sync owner to ()
+        LeadSyncOwnerChange.syncOnOwnerChange(oldMapLead, (Map<Id, Lead__c>)newMap);
+
+        //sync owner to related records 
+        LeadRelatedSyncService.syncOnOwnerChange(oldMapLead, (Map<Id, Lead__c>)newMap); 
+
+        // log owner change activity
+        LeadTriggerHandler.createOwnerChangeActivityLogs(newLeads, oldMapLead);
     }
 
     public override void beforeDelete() {

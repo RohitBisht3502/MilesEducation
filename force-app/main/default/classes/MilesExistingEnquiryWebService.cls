@@ -78,7 +78,8 @@ public without sharing class MilesExistingEnquiryWebService {
             for (Id ownerId : ownerToTasks.keySet()) {
                 List<Task> ownerTasks = ownerToTasks.get(ownerId);
                 if (ownerTasks == null || ownerTasks.isEmpty()) continue;
-
+                
+                // FIXED: Check list size
                 Integer cnt = ownerTasks.size();
                 Task targetTask = ownerTasks[0]; // target must be ONE record
 
@@ -111,4 +112,62 @@ public without sharing class MilesExistingEnquiryWebService {
         ];
         return types.isEmpty() ? null : types[0].Id;
     }
+
+
+    // -------------------------
+    // ✅ NEW: Notification for Lead Owner Change (Loss & Gain)
+    // -------------------------
+    public static void sendLeadOwnerChangeNotifications(List<Lead__c> leads, Map<Id, Lead__c> oldMap, String notificationDevName) {
+        if (leads == null || leads.isEmpty() || oldMap == null) return;
+        
+        Id cnTypeId = getCustomNotificationTypeId(notificationDevName);
+        if (cnTypeId == null) return;
+        
+        Map<Id, Integer> lostCount = new Map<Id, Integer>();
+        Map<Id, Integer> gainedCount = new Map<Id, Integer>();
+        Map<Id, Id> targetIds = new Map<Id, Id>(); 
+
+        for (Lead__c l : leads) {
+            Lead__c oldRec = oldMap.get(l.Id);
+            if (oldRec != null && l.OwnerId != null && oldRec.OwnerId != l.OwnerId) {
+                 // Lost Owner Logic
+                if (oldRec.OwnerId != null) {
+                    Integer c = lostCount.containsKey(oldRec.OwnerId) ? lostCount.get(oldRec.OwnerId) : 0;
+                    lostCount.put(oldRec.OwnerId, c + 1);
+                    if (!targetIds.containsKey(oldRec.OwnerId)) targetIds.put(oldRec.OwnerId, l.Id); 
+                }
+                // Gained Owner Logic
+                if (l.OwnerId != null) {
+                    Integer c = gainedCount.containsKey(l.OwnerId) ? gainedCount.get(l.OwnerId) : 0;
+                    gainedCount.put(l.OwnerId, c + 1);
+                    if (!targetIds.containsKey(l.OwnerId)) targetIds.put(l.OwnerId, l.Id);
+                }
+            }
+        }
+        
+        // Send Lost Notifications
+        for (Id uid : lostCount.keySet()) {
+             sendSingleNotification(uid, targetIds.get(uid), cnTypeId, 'Lead Ownership Transferred', 'You have transferred ownership of ' + lostCount.get(uid) + ' lead(s).');
+        }
+        
+        // Send Gained Notifications
+        for (Id uid : gainedCount.keySet()) {
+             sendSingleNotification(uid, targetIds.get(uid), cnTypeId, 'Lead Ownership Assigned', 'You have been assigned ownership of ' + gainedCount.get(uid) + ' lead(s).');
+        }
+    }
+
+    private static void sendSingleNotification(Id userId, Id targetId, Id typeId, String title, String body) {
+        Messaging.CustomNotification cn = new Messaging.CustomNotification();
+        cn.setTitle(title);
+        cn.setBody(body);
+        cn.setNotificationTypeId(typeId);
+        cn.setSenderId(UserInfo.getUserId());
+        cn.setTargetId(targetId);
+        try { 
+            cn.send(new Set<String>{String.valueOf(userId)}); 
+        } catch(Exception e) {
+            System.debug('Notification Error: ' + e.getMessage());
+        }
+    }
+
 }

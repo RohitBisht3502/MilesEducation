@@ -1,0 +1,231 @@
+/* ============ GLOBAL ============ */
+:host {
+    display: block;
+    max-width: 1450px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f4f6f8;
+    font-family: "Salesforce Sans", Arial, sans-serif;
+}
+
+/* ============ CARDS ============ */
+.card,
+.summary-card {
+    background: #fbfdff;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    border: 1px solid #dbe3ea;
+    box-shadow: 0 10px 30px rgba(11, 37, 69, 0.08);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover,
+.summary-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 40px rgba(11, 37, 69, 0.12);
+}
+
+/* ============ HEADERS ============ */
+.section-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #0b2545;
+}
+
+.card-header {
+    margin-bottom: 18px;
+}
+
+/* ============ SEARCH ============ */
+.search-box {
+    margin-bottom: 18px;
+}
+
+/* ============ TABLE ============ */
+.table-wrapper {
+    overflow-x: auto;
+}
+
+.custom-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.custom-table th {
+    background: #e6f1ff;
+    padding: 14px;
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #0b2545;
+}
+
+.custom-table td {
+    padding: 14px;
+    border-top: 1px solid #dbe3ea;
+    background: #fbfdff;
+    transition: background 0.2s ease;
+}
+
+.custom-table tbody tr:hover td {
+    background: #f0f7ff;
+}
+
+/* ============ TEXT ============ */
+.text-right {
+    text-align: right;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.muted {
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+/* ============ ICON BUTTONS ============ */
+.btn-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    transition: all 0.25s ease;
+}
+
+.btn-icon.primary {
+    background: linear-gradient(135deg, #0b2545, #3b82f6);
+    color: #ffffff;
+}
+
+.btn-icon.primary:hover {
+    background: linear-gradient(135deg, #3b82f6, #0b2545);
+    transform: scale(1.08);
+}
+
+.btn-icon.danger {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.btn-icon.danger:hover {
+    background: #fecaca;
+    transform: scale(1.08);
+}
+
+/* ============ QTY ============ */
+.qty-cell {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+.qty-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid #dbe3ea;
+    background: #e6f1ff;
+    color: #0b2545;
+    cursor: pointer;
+    font-weight: 700;
+    transition: all 0.2s ease;
+}
+
+.qty-btn:hover {
+    background: #3b82f6;
+    color: white;
+}
+
+.qty {
+    min-width: 24px;
+    font-weight: 700;
+    color: #0b2545;
+}
+
+/* ============ CART HEADER ============ */
+.cart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.badge {
+    background: linear-gradient(135deg, #0b2545, #3b82f6);
+    color: white;
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 0.75rem;
+}
+
+/* ============ CHECKOUT ============ */
+.checkout-container {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 30px;
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 14px 0;
+    border-bottom: 1px solid #dbe3ea;
+}
+
+.summary-item .price {
+    font-weight: 700;
+    color: #0b2545;
+}
+
+/* ============ PRICE ============ */
+.price-row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 14px;
+    color: #334155;
+}
+
+.price-row.total {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #0b2545;
+    margin-top: 20px;
+}
+
+/* ============ ACTIONS ============ */
+.action-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 18px;
+}
+
+.confirm-btn {
+    width: 100%;
+    margin-top: 22px;
+}
+
+/* ============ EMPTY ============ */
+.empty {
+    text-align: center;
+    padding: 28px;
+    color: #94a3b8;
+}
+
+/* ============ BACK LINK ============ */
+.back-link {
+    cursor: pointer;
+    color: #3b82f6;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 14px;
+    display: inline-block;
+}
+
+.back-link:hover {
+    text-decoration: underline;
+}

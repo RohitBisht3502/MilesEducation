@@ -279,6 +279,7 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
             return;
         }
 
+
         sType = recordId != null ? recordId.getSObjectType() : null;
         isLead = (sType == Lead__c.SObjectType);
         isCallLogRec = (sType == Call_Log__c.SObjectType);
@@ -289,6 +290,10 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         if (logRecord == null) {
             throw new AuraHandledException('No Call Log found for this record.');
         }
+        if (l1 == 'Connected' && String.isBlank(stage)) {
+    throw new AuraHandledException('Stage is required when L1 is Connected.');
+}
+
 
         logRecord.Feedback__c            = feedback;
         logRecord.Next_Follow_Up_Date__c = nextFollowUpDate;
@@ -337,7 +342,10 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         Datetime nextFollowUpDate = (request != null) ? request.nextFollowUpDate : null;
         String l1                 = (request != null && !String.isBlank(request.l1)) ? request.l1 : null;
         String l2                 = (request != null && !String.isBlank(request.l2)) ? request.l2 : null;
-        String stage              = (request != null  && !String.isBlank(request.stage)  && request.stage.toUpperCase() != 'NA') ? request.stage : null;
+       String stage = (request != null && !String.isBlank(request.stage))
+    ? request.stage
+    : null;
+
         String level              = (request != null && !String.isBlank(request.level)) ? request.level : null;
         Boolean notifyMe          = (request != null && request.notifyMe != null) ? request.notifyMe : false;
 

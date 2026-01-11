@@ -32,6 +32,9 @@ isQueueRunning = false;
     // Call popup overlay (Calling Runo...)
     showCallPopup = false;
 
+
+userChangedStage = false;
+
     // L1/L2
     l1Value = '';
     l2Value = '';
@@ -227,33 +230,36 @@ handleNotifyChange(event) {
         this.isCommentMandatory = this.mandatoryCommentRules[key] === true;
     }
 
-    handleL1Change(e) {
-        this.l1Value = e.target.value;
-        this.l2Options = (this.fullMap[this.l1Value] || []).map(v => ({
-            label: v,
-            value: v
-        }));
-        this.isL2Disabled = this.l2Options.length === 0;
-        this.l2Value = '';
-        
+   handleL1Change(e) {
+    this.l1Value = e.target.value;
+    this.userChangedStage = false; // 👈 reset
 
-        if(this.l1Value === 'Not-Connected'){
-            this.isStageDisabled = true;
+    this.l2Options = (this.fullMap[this.l1Value] || []).map(v => ({
+        label: v,
+        value: v
+    }));
+    this.isL2Disabled = this.l2Options.length === 0;
+    this.l2Value = '';
 
-        }else{
-            this.isStageDisabled = false;
-
-        }
-        this.updateCommentVisibility();
+    if (this.l1Value === 'Not-Connected') {
+        this.isStageDisabled = true;
+        this.stageValue = null;
+    } else {
+        this.isStageDisabled = false;
     }
+
+    this.updateCommentVisibility();
+}
 
     handleL2Change(e) {
         this.l2Value = e.target.value;
         this.updateCommentVisibility();
+        this.applyAutoStageLogic();
     }
 
     handleStageChange(e) {
         this.stageValue = e.target.value;
+          this.userChangedStage = true;
     }
 
     handleLevelChange(e) {
@@ -379,6 +385,45 @@ handleNotifyChange(event) {
         this.showFeedbackSection();
         this.callButtonDisabled = false;
     }
+applyAutoStageLogic() {
+    // ❌ do nothing if user already selected stage
+    if (this.userChangedStage) {
+        return;
+    }
+
+    let autoStage = null;
+
+    if (this.l1Value === 'Connected') {
+        if (
+            this.l2Value === 'Not Eligible' ||
+            this.l2Value === 'Wrong Number' ||
+            this.l2Value === 'Not Interested (DND)'
+        ) {
+            autoStage = 'M1';
+        }
+        else if (
+            this.l2Value === 'Visit Confirmed' ||
+            this.l2Value === 'Gmeet Confirmed'
+        ) {
+            autoStage = 'M3+';
+        }
+        else if (this.l2Value === 'Postponed') {
+            autoStage = 'M4';
+        }
+    }
+    else if (this.l1Value === 'Not-Connected') {
+        if (this.l2Value === 'Invalid Number') {
+            autoStage = 'M1';
+        }
+    }
+
+    this.stageValue = autoStage;
+}
+
+
+
+
+
 
     // get isSaveDisabled() {
     //     return this.savingFeedback || !this.showFeedback;
@@ -423,7 +468,7 @@ setAutoDate24() {
             return;
         }
 
-        if (!this.stageValue) {
+        if (this.l1Value === 'Connected' && !this.stageValue) {
             this.toast('Required', 'Stage and Course are required.', 'warning');
             return;
         }
@@ -453,7 +498,7 @@ setAutoDate24() {
                 nextFollowUpDate: this.nextFollowUpDate,
                 l1: this.l1Value,
                 l2: this.l2Value,
-                stage: this.stageValue,
+                stage: this.stageValue || null,
                 level: this.levelValue,
                 notifyMe: this.notifyMe
             };

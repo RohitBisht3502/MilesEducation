@@ -1,0 +1,192 @@
+<template>
+
+    <!-- ================= PRODUCT SEARCH + CART ================= -->
+    <template if:false={showCheckout}>
+
+        <!-- PRODUCT SEARCH -->
+        <section class="card">
+            <div class="card-header">
+                <h2 class="section-title">Product Catalog</h2>
+            </div>
+
+            <lightning-input
+                class="search-box"
+                type="search"
+                placeholder="Search products by name…"
+                onchange={handleSearch}>
+            </lightning-input>
+
+            <div class="table-wrapper">
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>SKU</th>
+                            <th>Category</th>
+                            <th class="text-right">Price</th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={filteredProducts} for:item="prod">
+                            <tr key={prod.id}>
+                                <td>
+                                    <strong>{prod.name}</strong>
+                                </td>
+                                <td class="muted">{prod.sku}</td>
+                                <td class="muted">{prod.category}</td>
+                                <td class="text-right">₹{prod.price}</td>
+                                <td class="text-center">
+                                    <button
+                                        class="btn-icon primary"
+                                        data-id={prod.id}
+                                        onclick={addToCart}>
+                                        +
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- CART -->
+        <section class="card">
+            <div class="card-header cart-header">
+                <h2 class="section-title">
+                    Cart Items <span class="badge">{cartCount}</span>
+                </h2>
+                <div class="subtotal">Subtotal: ₹{subTotal}</div>
+            </div>
+
+            <div class="table-wrapper">
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th class="text-center">Qty</th>
+                            <th class="text-right">Total</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template if:true={hasSelectedProducts}>
+                            <template for:each={selectedProducts} for:item="item">
+                                <tr key={item.id}>
+                                    <td>
+                                        <strong>{item.name}</strong>
+                                        <div class="muted">₹{item.price} each</div>
+                                    </td>
+                                    <td class="text-center qty-cell">
+                                        <button class="qty-btn" data-id={item.id} data-action="dec" onclick={updateQty}>−</button>
+                                        <span class="qty">{item.quantity}</span>
+                                        <button class="qty-btn" data-id={item.id} data-action="inc" onclick={updateQty}>+</button>
+                                    </td>
+                                    <td class="text-right">₹{item.total}</td>
+                                    <td class="text-center">
+                                        <button class="btn-icon danger" data-id={item.id} onclick={removeItem}>
+                                            🗑
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </template>
+
+                        <template if:false={hasSelectedProducts}>
+                            <tr>
+                                <td colspan="4" class="empty">
+                                    No products added to cart
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="action-bar">
+                <lightning-button
+                    variant="brand"
+                    label="Proceed to Checkout"
+                    onclick={proceedToCheckout}
+                    disabled={disableCreatePurchase}>
+                </lightning-button>
+            </div>
+        </section>
+
+    </template>
+
+    <!-- ================= CHECKOUT ================= -->
+    <template if:true={showCheckout}>
+
+        <section class="checkout-container">
+
+            <!-- ORDER SUMMARY -->
+            <div class="summary-card">
+                <a class="back-link" onclick={backToProducts}>← Back to Products</a>
+                <h2 class="section-title">Order Summary</h2>
+
+                <template for:each={selectedProducts} for:item="item">
+                    <div key={item.id} class="summary-item">
+                        <div>
+                            <strong>{item.name}</strong>
+                            <div class="muted">Qty: {item.quantity} × ₹{item.price}</div>
+                        </div>
+                        <div class="price">₹{item.total}</div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- PAYMENT / DISCOUNT -->
+            <div class="summary-card">
+                <h2 class="section-title">Pricing & Discount</h2>
+
+                <div class="radio-group">
+                    <label>
+                        <input type="radio" name="discountType" value="percentage"
+                               checked={isPercentage} onchange={handleDiscountType}/>
+                        Percentage
+                    </label>
+
+                    <label>
+                        <input type="radio" name="discountType" value="fixed"
+                               checked={isFixed} onchange={handleDiscountType}/>
+                        Fixed Amount
+                    </label>
+                </div>
+
+                <lightning-input
+                    type="number"
+                    label="Discount Value"
+                    onchange={handleDiscountValue}>
+                </lightning-input>
+
+                <div class="price-row">
+                    <span>Subtotal</span>
+                    <span>₹{subTotal}</span>
+                </div>
+
+                <div class="price-row">
+                    <span>Discount</span>
+                    <span>- ₹{discountAmount}</span>
+                </div>
+
+                <div class="price-row total">
+                    <span>Total Payable</span>
+                    <span>₹{finalPayable}</span>
+                </div>
+
+                <lightning-button
+                    class="confirm-btn"
+                    variant="brand"
+                    label="Confirm Purchase"
+                    onclick={confirmPurchase}
+                    disabled={disableConfirmPurchase}>
+                </lightning-button>
+            </div>
+
+        </section>
+
+    </template>
+
+</template>

@@ -1,37 +1,36 @@
 /*
-    Author       : ROHIT SINGH BISHT
-    Description  : 
+    Author             : Dheeraj Kumar
+    Created Date       : 07-01-2026
+    Last Modified Date : 07-01-2026
+    Description        : Service class to sync Lead owner changes to related records.
 */
-public without sharing class LeadSyncOwnerChange {
+public without sharing class LeadRelatedSyncService {
     
     public static void syncOnOwnerChange(Map<Id, Lead__c> oldMap, Map<Id, Lead__c> newMap) {
 
         Set<Id> leadIdsToSync = new Set<Id>();
-        Set<Id> forceSyncLeadIds = new Set<Id>();
+
 
         for (Id lid : newMap.keySet()) {
             Lead__c oldRec = oldMap.get(lid);
             Lead__c newRec = newMap.get(lid);
 
-            // Sync only when RoundRobin actually changes owner OR when City updates
-            if (oldRec.OwnerId != newRec.OwnerId || oldRec.City__c != newRec.City__c) {
+            // Sync when Owner changes 
+            if (oldRec.OwnerId != newRec.OwnerId) {
                 if (newRec.OwnerId != null) leadIdsToSync.add(lid);
             }
 
-            if (newRec.Downgraded__c == true && newRec.Is_ReEnquiry__c == true) {
-                if (newRec.OwnerId != null) {
-                    leadIdsToSync.add(lid); 
-                    forceSyncLeadIds.add(lid);
-                }
-            }            
+
         }
 
         if (leadIdsToSync.isEmpty()) return;
 
-        Datetime cutoff = System.now().addMinutes(-1);
+        // No cutoff needed for owner sync - we want to sync ALL related records regardless of age
+        // Datetime cutoff = System.now().addMinutes(-1); 
 
         // Fetch required Leads
-        List<Lead__c> leads = [SELECT Id, OwnerId, Phone__c, Email__c, Candidate__c FROM Lead__c WHERE Id IN :leadIdsToSync];
+        List<Lead__c> leads = [SELECT Id, Name, OwnerId, Phone__c, Email__c, Candidate__c FROM Lead__c WHERE Id IN :leadIdsToSync];
+
 
         Map<Id, Id> leadIdToOwner = new Map<Id, Id>();
         Map<Id, Id> leadIdToCandidate = new Map<Id, Id>();
@@ -57,35 +56,27 @@ public without sharing class LeadSyncOwnerChange {
 
         List<SObject> upd = new List<SObject>();
 
-        // Candidate owner (recent only)
+        // 1. Candidate Owner Sync
         List<Lead> candidates = [SELECT Id, OwnerId, CreatedDate, LastModifiedDate FROM Lead WHERE Id IN :leadIdToCandidate.values()];
         for (Lead c : candidates) {
-
-            Boolean shouldIgnoreCutoff = false;
-            for (Id leadId : leadIdToCandidate.keySet()) {
-                if (leadIdToCandidate.get(leadId) == c.Id && forceSyncLeadIds.contains(leadId)) {
-                    shouldIgnoreCutoff = true;
-                    break;
-                }
-            }
-            if (!shouldIgnoreCutoff && !(c.CreatedDate >= cutoff || c.LastModifiedDate >= cutoff)) continue;
-
-
-            // find which Lead__c maps to this candidate
+            // Updated: Removed cutoff check. 
+            // We iterate over leads mapping to this candidate to find if any need an update.
+            
             for (Id leadId : leadIdToCandidate.keySet()) {
                 if (leadIdToCandidate.get(leadId) == c.Id && c.OwnerId != leadIdToOwner.get(leadId)) {
                     c.OwnerId = leadIdToOwner.get(leadId);
                     upd.add(c);
+                    // Avoid adding same candidate multiple times if mapped to multiple leads in same batch (rare but possible)
+                    break; 
                 }
             }
         }
 
-        // Enquiry owner (recent only)
+        // 2. Enquiry Owner Sync
         List<Enquiry__c> enqs = [SELECT Id, OwnerId, Lead__c, CreatedDate, LastModifiedDate FROM Enquiry__c WHERE Lead__c IN :leadIdsToSync];
         for (Enquiry__c e : enqs) {
-
-            if (!forceSyncLeadIds.contains(e.Lead__c) && !(e.CreatedDate >= cutoff || e.LastModifiedDate >= cutoff)) continue;
-
+            // Updated: Removed cutoff check. 
+            
             Id target = leadIdToOwner.get(e.Lead__c);
             if (target != null && e.OwnerId != target) {
                 e.OwnerId = target;
@@ -93,12 +84,12 @@ public without sharing class LeadSyncOwnerChange {
             }
         }
 
+        // 3. Phone Number Owner Sync
         if (!phones.isEmpty()) {
             List<Phone_Number__c> phs = [
                 SELECT Id, OwnerId, Lead__c, Phone__c, CreatedDate, LastModifiedDate FROM Phone_Number__c WHERE Lead__c IN :leadIdsToSync OR Phone__c IN :phones];
             for (Phone_Number__c p : phs) {
-                Id leadIdForForce = p.Lead__c;
-                if (!forceSyncLeadIds.contains(leadIdForForce) && !(p.CreatedDate >= cutoff || p.LastModifiedDate >= cutoff)) continue;
+                // Updated: Removed cutoff check.
 
                 Id target = (p.Lead__c != null) ? leadIdToOwner.get(p.Lead__c) : null;
                 if (target != null && p.OwnerId != target) {
@@ -108,13 +99,12 @@ public without sharing class LeadSyncOwnerChange {
             }
         }
 
+        // 4. Email Owner Sync
         if (!emails.isEmpty()) {
             List<Email__c> ems = [
                 SELECT Id, OwnerId, Lead__c, Email__c, CreatedDate, LastModifiedDate FROM Email__c WHERE Lead__c IN :leadIdsToSync OR Email__c IN :emails];
             for (Email__c em : ems) {
-
-                Id leadIdForForce = em.Lead__c;
-                if (!forceSyncLeadIds.contains(leadIdForForce) && !(em.CreatedDate >= cutoff || em.LastModifiedDate >= cutoff)) continue;
+                // Updated: Removed cutoff check.
 
                 Id target = (em.Lead__c != null) ? leadIdToOwner.get(em.Lead__c) : null;
                 if (target != null && em.OwnerId != target) {
@@ -124,7 +114,7 @@ public without sharing class LeadSyncOwnerChange {
             }
         }
 
-        // Activity logs for Downgrade Re-inquiry
+        // 5. Activity Log Owner Sync
         Set<Id> candidateIds = new Set<Id>();
         candidateIds.addAll(candidateIdToLeadIds.keySet());
 
@@ -145,7 +135,6 @@ public without sharing class LeadSyncOwnerChange {
                 if (al.Lead__c != null) {
                     mappedLeadId = al.Lead__c;
                 } else if (al.Candidate__c != null && candidateIdToLeadIds.containsKey(al.Candidate__c)) {
-                    // If multiple leads map to same candidate, pick any one from current sync scope
                     mappedLeadId = candidateIdToLeadIds.get(al.Candidate__c).isEmpty()
                         ? null
                         : (Id)candidateIdToLeadIds.get(al.Candidate__c).iterator().next();
@@ -153,11 +142,8 @@ public without sharing class LeadSyncOwnerChange {
 
                 if (mappedLeadId == null) continue;
 
-                // cutoff handling
-                if (!forceSyncLeadIds.contains(mappedLeadId) && !(al.CreatedDate >= cutoff || al.LastModifiedDate >= cutoff)) {
-                    continue;
-                }
-
+                // Updated: Removed cutoff check.
+                
                 Id targetOwner = leadIdToOwner.get(mappedLeadId);
                 if (targetOwner != null && al.OwnerId != targetOwner) {
                     al.OwnerId = targetOwner;
@@ -166,29 +152,43 @@ public without sharing class LeadSyncOwnerChange {
             }
         }
 
+        // Update all owner sync changes
+        if (!upd.isEmpty()) {
+            // De-duplicate list to avoid "Duplicate id in list" error
+            Map<Id, SObject> updMap = new Map<Id, SObject>();
+            for(SObject s : upd) {
+                updMap.put(s.Id, s);
+            }
+            update updMap.values();
+        }
 
         // ---------------------------
         // NEW: Create Task on Enquiry
         // ---------------------------
+        // NOTE: Keeping restriction for Task creation to recent records likely makes sense, 
+        // to avoid spamming tasks on old enquiries if a massive data fix happens. 
+        // However, if the user wants strictly NO cutoff, we can remove it. 
+        // Given the requirement is about "seeing records" (ownership sync), I will relax the task creation logic too?
+        // Actually, creating tasks for year-old enquiries just because owner changed might be annoying.
+        // But the original code had: if (!(e.CreatedDate >= cutoff || e.LastModifiedDate >= cutoff)) continue;
+        // I will KEEP the cutoff for TASK CREATION unless instructed otherwise, as that is an "Action", not a "Sync".
+        
+        Datetime cutoff = System.now().addMinutes(-1); 
+
         Map<Id, Id> enquiryIdToTargetOwner = new Map<Id, Id>();
         Set<Id> enquiryIdsNeedingTask = new Set<Id>();
 
         for (Enquiry__c e : enqs) {
-            if (!(e.CreatedDate >= cutoff || e.LastModifiedDate >= cutoff)) continue;
+            // Apply cutoff specifically for the Task Creation part, assuming we only want this for 'fresh' interactions
+            if (!(e.CreatedDate >= cutoff || e.LastModifiedDate >= cutoff)) continue; 
 
             Id target = leadIdToOwner.get(e.Lead__c);
             if (target != null) {
                 enquiryIdToTargetOwner.put(e.Id, target);
-
-                // only when owner mismatch (owner change)
-              //  if (e.OwnerId != target) {
-                    enquiryIdsNeedingTask.add(e.Id);
-               // }
+                enquiryIdsNeedingTask.add(e.Id);
             }
         }
 
-        // Update all owner sync changes
-        if (!upd.isEmpty()) update upd;
 
         // Create tasks
         if (!enquiryIdsNeedingTask.isEmpty()) {
@@ -211,9 +211,14 @@ public without sharing class LeadSyncOwnerChange {
 
             if (!tasksToInsert.isEmpty()) {
                 insert tasksToInsert;
-
                 MilesExistingEnquiryWebService.sendTaskAssignedNotificationBulk( tasksToInsert, 'Custom_Notification' );
             }
         }
+
+        // ---------------------------
+        // Notify Lead Owners (Loss/Gain)
+        // ---------------------------
+        MilesExistingEnquiryWebService.sendLeadOwnerChangeNotifications(leads, oldMap, 'Custom_Notification');
+
     }
 }
