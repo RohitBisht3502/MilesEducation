@@ -19,12 +19,25 @@ public without sharing class Callout_PurchaseOrderService {
     public class RequestItem{
         public String program;
         public List<String> skus;
+
+        public List<EnrolmentLineItem> enrolment_line_items;
+
         public Decimal actual_price;
-        public Decimal agreed_price;
+        public Decimal agreed_fee;
         public Decimal discount;
-        public String loan_id;
+
+        public Integer loan_id;
+
         public Boolean has_training;
         public Boolean has_study_material;
+    }
+
+    public class EnrolmentLineItem{
+        public String item_name;
+        public Decimal price;
+        public Decimal price_with_gst;
+        public Decimal discound;
+        public Decimal final_price;
     }
 
     public class Response{
@@ -36,13 +49,10 @@ public without sharing class Callout_PurchaseOrderService {
         External_Service_Config__mdt cfg;
         try {
             cfg = [
-                SELECT Endpoint_URL__c, Http_Method__c, Api_Key__c, Api_Key_Header__c, Is_Active__c
-                FROM External_Service_Config__mdt
-                WHERE DeveloperName = 'Purcahse_Order_Service'
-                LIMIT 1];
+                SELECT Endpoint_URL__c, Http_Method__c, Api_Key__c, Api_Key_Header__c, Is_Active__c FROM External_Service_Config__mdt WHERE DeveloperName = 'Create_Enrolment_API' LIMIT 1];
         } catch (Exception e) {
             IntegrationLogUtil.insertLog(
-                'Purchase Order Service',
+                'Create Enrolment API',
                 null,
                 null,
                 'Config load error: ' + e.getMessage(),
@@ -54,7 +64,7 @@ public without sharing class Callout_PurchaseOrderService {
 
         if (cfg == null || !cfg.Is_Active__c || String.isBlank(cfg.Endpoint_URL__c)) {
             IntegrationLogUtil.insertLog(
-                'Purchase Order Service',
+                'Create Enrolment API',
                 null,
                 null,
                 'Config inactive or missing Endpoint_URL__c',
@@ -66,7 +76,7 @@ public without sharing class Callout_PurchaseOrderService {
 
         if (req == null) {
             IntegrationLogUtil.insertLog(
-                'Purchase Order Service',
+                'Create Enrolment API',
                 null,
                 null,
                 'Request is null',
@@ -98,7 +108,7 @@ public without sharing class Callout_PurchaseOrderService {
             httpRes = http.send(httpReq);
         } catch (Exception e) {
             IntegrationLogUtil.insertLog(
-                'Purchase Order Service',
+                'Create Enrolment API',
                 null,
                 null,
                 'Callout error: ' + e.getMessage(),
@@ -113,7 +123,7 @@ public without sharing class Callout_PurchaseOrderService {
 
         if (sc < 200 || sc >= 300 || String.isBlank(resBody)) {
             IntegrationLogUtil.insertLog(
-                'Purchase Order Service',
+                'Create Enrolment API',
                 null,
                 (resBody != null && resBody.length() > 3000 ? resBody.substring(0, 3000) : resBody),
                 'HTTP ' + sc + ' ' + httpRes.getStatus(),
@@ -128,7 +138,7 @@ public without sharing class Callout_PurchaseOrderService {
             resp = (Response) JSON.deserialize(resBody, Response.class);
         } catch (Exception pe) {
             IntegrationLogUtil.insertLog(
-                'Purchase Order Service',
+                'Create Enrolment API',
                 null,
                 (resBody != null && resBody.length() > 3000 ? resBody.substring(0, 3000) : resBody),
                 'Response parse error: ' + pe.getMessage(),
@@ -140,7 +150,7 @@ public without sharing class Callout_PurchaseOrderService {
 
         if (resp == null || String.isBlank(resp.purchase_id)) {
             IntegrationLogUtil.insertLog(
-                'Purchase Order Service',
+                'Create Enrolment API',
                 null,
                 (resBody != null && resBody.length() > 3000 ? resBody.substring(0, 3000) : resBody),
                 'purchase_id missing in response',
@@ -151,7 +161,7 @@ public without sharing class Callout_PurchaseOrderService {
         }
 
         IntegrationLogUtil.insertLog(
-            'Purchase Order Service',
+            'Create Enrolment API',
             null,
             (resBody != null && resBody.length() > 3000 ? resBody.substring(0, 3000) : resBody),
             'Success | purchase_id=' + resp.purchase_id,
@@ -161,8 +171,4 @@ public without sharing class Callout_PurchaseOrderService {
 
         return resp.purchase_id;
     }
-
-    // public static String createPurchase(){
-    //     throw new AuraHandledException('Use createPurchase(Request req) method with payload.');
-    // }
 }

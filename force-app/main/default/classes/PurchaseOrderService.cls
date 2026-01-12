@@ -99,6 +99,12 @@ public class PurchaseOrderService {
                 }
             }
 
+            if (!checkLeadAddress(req.leadId)) {
+    throw new AuraHandledException(
+        'Billing or Shipping address is required before creating Purchase Order.'
+    );
+}
+
             /* ------------------ CALL EXTERNAL API FIRST ------------------ */
 
         //     Callout_PurchaseOrderService.Request extReq = new Callout_PurchaseOrderService.Request();
@@ -155,4 +161,47 @@ public class PurchaseOrderService {
             throw new AuraHandledException('Save failed: ' + e.getMessage());
         }
     }
+
+@AuraEnabled
+public static Boolean checkLeadAddress(Id leadId) {
+    if (leadId == null) {
+        throw new AuraHandledException('Lead Id is missing');
+    }
+
+    Lead lead = [
+        SELECT
+            Street,
+            City,
+            State,
+            PostalCode,
+            Country,
+            Shipping_Street__c,
+            Shipping_City__c,
+            Shipping_State__c,
+            Shipping_Postal_Code__c,
+            Shipping_Country__c
+        FROM Lead
+        WHERE Id = :leadId
+        LIMIT 1
+    ];
+
+    // ✅ STANDARD (Billing-like) Address
+    Boolean hasBilling =
+        !String.isBlank(lead.Street) &&
+        !String.isBlank(lead.City) &&
+        !String.isBlank(lead.State) &&
+        !String.isBlank(lead.PostalCode) &&
+        !String.isBlank(lead.Country);
+
+    // ✅ CUSTOM Shipping Address
+    Boolean hasShipping =
+        !String.isBlank(lead.Shipping_Street__c) &&
+        !String.isBlank(lead.Shipping_City__c) &&
+        !String.isBlank(lead.Shipping_State__c) &&
+        !String.isBlank(lead.Shipping_Postal_Code__c) &&
+        !String.isBlank(lead.Shipping_Country__c);
+
+    return hasBilling || hasShipping;
+}
+
 }

@@ -581,123 +581,290 @@ toInsert.add(new Round_Robin_Pool__c(
 
 
     /* ================= SEQUENCES ================= */
+@AuraEnabled
+public static void saveSequences(String updatesJson) {
 
-    @AuraEnabled
-    public static void saveSequences(String updatesJson) {
-        if (String.isBlank(updatesJson)) {
-            throw new AuraHandledException('updatesJson is required.');
+    System.debug('💡 saveSequences START');
+    System.debug('💡 raw payload: ' + updatesJson);
+
+    if (String.isBlank(updatesJson)) {
+        System.debug('❌ updatesJson is blank');
+        throw new AuraHandledException('updatesJson is required.');
+    }
+
+    /* ================================
+       DEBUG: RAW JSON CHECK (SAFE)
+       ================================ */
+    try {
+        Map<String, Object> parsed =
+            (Map<String, Object>) JSON.deserializeUntyped(updatesJson);
+
+        System.debug('💡 parsed.leadSource        : ' + (String) parsed.get('leadSource'));
+        System.debug('💡 parsed.city              : ' + (String) parsed.get('city'));
+        System.debug('💡 parsed.bucket            : ' + (String) parsed.get('bucket'));
+        System.debug('💡 parsed.businessVertical  : ' + (String) parsed.get('businessVertical'));
+        System.debug('💡 parsed.typeVal           : ' + (String) parsed.get('typeVal'));
+        System.debug('💡 parsed.updates (raw)     : ' + parsed.get('updates'));
+    } catch (Exception ex) {
+        System.debug('❌ JSON parsing error: ' + ex.getMessage());
+        throw ex;
+    }
+
+    /* ================================
+       STEP 0: DESERIALIZE STRONG TYPE
+       ================================ */
+    SeqPayload p = (SeqPayload) JSON.deserialize(updatesJson, SeqPayload.class);
+
+    System.debug('💡 payload deserialized? ' + (p != null));
+    if (p != null) {
+        System.debug('💡 p.leadSource       : ' + p.leadSource);
+        System.debug('💡 p.city             : ' + p.city);
+        System.debug('💡 p.bucket           : ' + p.bucket);
+        System.debug('💡 p.businessVertical : ' + p.businessVertical);
+        System.debug('💡 p.typeVal          : ' + p.typeVal);
+        System.debug('💡 p.updates.size     : ' + (p.updates == null ? 0 : p.updates.size()));
+    }
+
+    if (p == null || p.updates == null || p.updates.isEmpty()) {
+        System.debug('❌ No sequence updates provided');
+        throw new AuraHandledException('No sequence updates provided.');
+    }
+
+    if (String.isBlank(p.leadSource)) {
+        System.debug('❌ leadSource missing');
+        throw new AuraHandledException('leadSource is required.');
+    }
+
+    /* ================================
+       STEP 1: BASIC VALIDATION
+       ================================ */
+    Set<Id> ids = new Set<Id>();
+    Set<Integer> seen = new Set<Integer>();
+
+    for (SeqUpdateDTO u : p.updates) {
+        System.debug('💡 incoming update -> poolId=' + u.poolId + ', sequence=' + u.sequence);
+
+        if (u.poolId == null || u.sequence == null || u.sequence < 1) {
+            System.debug('❌ Invalid sequence data found in updates');
+            throw new AuraHandledException('Invalid sequence data.');
         }
 
-        SeqPayload p = (SeqPayload)JSON.deserialize(updatesJson, SeqPayload.class);
-        if (p == null || p.updates == null || p.updates.isEmpty()) {
-            throw new AuraHandledException('No sequence updates provided.');
-        }
-        if (String.isBlank(p.leadSource)) {
-            throw new AuraHandledException('leadSource is required.');
+        if (!seen.add(u.sequence)) {
+            System.debug('❌ Duplicate sequence detected: ' + u.sequence);
+            throw new AuraHandledException('Sequence values must be unique within this bucket.');
         }
 
-        Set<Id> ids = new Set<Id>();
-        Set<Integer> seen = new Set<Integer>();
-        for (SeqUpdateDTO u : p.updates) {
-            if (u.poolId == null || u.sequence == null || u.sequence < 1) {
-                throw new AuraHandledException('Invalid sequence data.');
-            }
-            if (!seen.add(u.sequence)) {
-                throw new AuraHandledException('Sequence values must be unique within this bucket.');
-            }
-            ids.add(u.poolId);
+        ids.add(u.poolId);
+    }
+
+    System.debug('💡 validated updates: count=' + p.updates.size() + ', uniquePoolIds=' + ids.size());
+
+    /* ================================
+       STEP 2: RESOLVE CONTEXT
+       ================================ */
+    String finalType = String.isBlank(p.typeVal) ? 'Round Robin' : p.typeVal;
+    String objectApiName = resolveObjectApiName(finalType);
+
+    System.debug('💡 resolved context -> finalType=' + finalType + ', objectApiName=' + objectApiName);
+
+    /* ================================
+       STEP 3: FETCH TARGET RECORDS
+       ================================ */
+    Map<Id, Round_Robin_Pool__c> targetMap =
+        new Map<Id, Round_Robin_Pool__c>([
+            SELECT Id,
+                   Bucket__c,
+                   Lead_Source__c,
+                   City__c,
+                   Course_Bucket__c,
+                   Sequence__c,
+                   Type__c,
+                   Object_Api_Name__c,
+                   Active__c
+            FROM Round_Robin_Pool__c
+            WHERE Id IN :ids
+        ]);
+
+    System.debug('💡 target records fetched: ' + targetMap.size());
+
+    if (targetMap.size() != ids.size()) {
+        System.debug('❌ Some records not found. expected=' + ids.size() + ', got=' + targetMap.size());
+        throw new AuraHandledException('Some records were not found. Please reload and try again.');
+    }
+
+    /* ================================
+       STEP 4: CONTEXT CONSISTENCY CHECK
+       (NULL-SAFE, JS-COMPATIBLE)
+       ================================ */
+    for (Round_Robin_Pool__c r : targetMap.values()) {
+
+        // Helpful per-record tracing
+        System.debug(
+            '💡 target row -> Id=' + r.Id +
+            ', Lead_Source__c=' + r.Lead_Source__c +
+            ', City__c=' + r.City__c +
+            ', Bucket__c=' + r.Bucket__c +
+            ', Course_Bucket__c=' + r.Course_Bucket__c +
+            ', Type__c=' + r.Type__c +
+            ', Object_Api_Name__c=' + r.Object_Api_Name__c +
+            ', Active__c=' + r.Active__c
+        );
+
+        if (r.Lead_Source__c != p.leadSource) {
+            System.debug('❌ Lead Source mismatch: expected=' + p.leadSource + ', got=' + r.Lead_Source__c);
+            throw new AuraHandledException('Lead Source mismatch detected.');
         }
 
-      Map<Id, Round_Robin_Pool__c> targetMap =
-    new Map<Id, Round_Robin_Pool__c>([
-        SELECT Id,
-               Bucket__c,
-               Lead_Source__c,
-               City__c,
-               Course_Bucket__c
-        FROM Round_Robin_Pool__c
-        WHERE Id IN :ids
-    ]);
+        if (p.city != null && r.City__c != p.city) {
+            System.debug('❌ City mismatch: expected=' + p.city + ', got=' + r.City__c);
+            throw new AuraHandledException('City mismatch detected.');
+        }
 
-for (Round_Robin_Pool__c r : targetMap.values()) {
+        if (p.bucket != null && r.Bucket__c != p.bucket) {
+            System.debug('❌ Bucket mismatch: expected=' + p.bucket + ', got=' + r.Bucket__c);
+            throw new AuraHandledException('Bucket mismatch detected.');
+        }
 
-    if (
-        r.Lead_Source__c != p.leadSource ||
-        r.City__c != p.city ||
-        r.Bucket__c != p.bucket ||
-        (
-            !String.isBlank(p.businessVertical) &&
-            r.Course_Bucket__c != p.businessVertical
-        )
-    ) {
-        throw new AuraHandledException(
-            'All sequence updates must belong to the same Lead Source, City, Bucket and Business Vertical.'
+        if (r.Type__c != finalType) {
+            System.debug('❌ Type mismatch: expected=' + finalType + ', got=' + r.Type__c);
+            throw new AuraHandledException('Type mismatch detected.');
+        }
+
+        if (r.Object_Api_Name__c != objectApiName) {
+            System.debug('❌ Object API mismatch: expected=' + objectApiName + ', got=' + r.Object_Api_Name__c);
+            throw new AuraHandledException('Object API mismatch detected.');
+        }
+
+        // ✅ NULL-SAFE BUSINESS VERTICAL CHECK
+        if ((p.businessVertical != null || r.Course_Bucket__c != null) &&
+            p.businessVertical != r.Course_Bucket__c) {
+
+            System.debug(
+                '❌ Business Vertical mismatch: expected=' + p.businessVertical +
+                ', got=' + r.Course_Bucket__c
+            );
+            throw new AuraHandledException('Business Vertical mismatch detected.');
+        }
+    }
+
+    System.debug('💡 context consistency check: PASSED');
+
+    /* ================================
+       STEP 5: FETCH PEERS (FIXED NULL-SAFE FILTER)
+       ================================ */
+    System.debug(
+        '💡 peer query filters -> leadSource=' + p.leadSource +
+        ', city=' + p.city +
+        ', bucket=' + p.bucket +
+        ', businessVertical=' + p.businessVertical +
+        ', finalType=' + finalType +
+        ', objectApiName=' + objectApiName
+    );
+
+    List<Round_Robin_Pool__c> peerList;
+
+    // ✅ FIX: Course_Bucket__c filter must be NULL-SAFE; otherwise "Course_Bucket__c = null" returns no rows.
+    if (p.businessVertical == null) {
+        peerList = [
+            SELECT Id, Sequence__c
+            FROM Round_Robin_Pool__c
+            WHERE Lead_Source__c = :p.leadSource
+              AND City__c = :p.city
+              AND Bucket__c = :p.bucket
+              AND Course_Bucket__c = NULL
+              AND Type__c = :finalType
+              AND Object_Api_Name__c = :objectApiName
+              AND Active__c = true
+        ];
+    } else {
+        peerList = [
+            SELECT Id, Sequence__c
+            FROM Round_Robin_Pool__c
+            WHERE Lead_Source__c = :p.leadSource
+              AND City__c = :p.city
+              AND Bucket__c = :p.bucket
+              AND Course_Bucket__c = :p.businessVertical
+              AND Type__c = :finalType
+              AND Object_Api_Name__c = :objectApiName
+              AND Active__c = true
+        ];
+    }
+
+    System.debug('💡 peers fetched: ' + peerList.size());
+
+    /* ================================
+       STEP 6: EXISTING SEQUENCE CHECK
+       ================================ */
+    Map<Integer, Id> existingSeqToId = new Map<Integer, Id>();
+
+    for (Round_Robin_Pool__c peer : peerList) {
+        if (!ids.contains(peer.Id) && peer.Sequence__c != null) {
+            Integer seq = Integer.valueOf(peer.Sequence__c);
+            existingSeqToId.put(seq, peer.Id);
+            System.debug('💡 peer seq in use -> seq=' + seq + ', byId=' + peer.Id);
+        }
+    }
+
+    for (SeqUpdateDTO u : p.updates) {
+        if (existingSeqToId.containsKey(u.sequence)) {
+            System.debug(
+                '❌ conflict: sequence=' + u.sequence +
+                ' already used by peerId=' + existingSeqToId.get(u.sequence)
+            );
+            throw new AuraHandledException(
+                'Sequence ' + u.sequence + ' is already used by another sales rep.'
+            );
+        }
+    }
+
+    System.debug('💡 sequence uniqueness against peers: PASSED');
+
+    /* ================================
+       STEP 7: PREPARE UPDATE
+       ================================ */
+    List<Round_Robin_Pool__c> toUpdate = new List<Round_Robin_Pool__c>();
+
+    for (SeqUpdateDTO u : p.updates) {
+        Round_Robin_Pool__c rr = targetMap.get(u.poolId);
+
+        // old value for logging
+        Decimal oldSeq = rr.Sequence__c;
+
+        rr.Sequence__c = u.sequence;
+        rr.Type__c = finalType;
+        rr.Object_Api_Name__c = objectApiName;
+        rr.Bucket__c = p.bucket;
+        rr.Course_Bucket__c = p.businessVertical;
+
+        toUpdate.add(rr);
+
+        System.debug(
+            '💡 prepared update -> Id=' + rr.Id +
+            ', oldSeq=' + oldSeq +
+            ', newSeq=' + rr.Sequence__c
         );
     }
-}
 
-String finalType = String.isBlank(p.typeVal)
-    ? 'Round Robin'
-    : p.typeVal;
+    System.debug('💡 toUpdate size: ' + toUpdate.size());
 
-String objectApiName = resolveObjectApiName(finalType);
-
-
-
-
-
-
-    // // City validation is OK
-    // if (p.city != null && p.city != r.City__c) {
-    //     throw new AuraHandledException('All updates must belong to the selected City.');
-    // }
-
-
-
-List<Round_Robin_Pool__c> peerList = [
-    SELECT Id, Sequence__c, Course_Bucket__c
-    FROM Round_Robin_Pool__c
-    WHERE Lead_Source__c = :p.leadSource
-    AND City__c = :p.city
-    AND Bucket__c = :p.bucket
-    AND Course_Bucket__c = :p.businessVertical
-    AND Type__c = :finalType
-    AND Object_Api_Name__c = :resolveObjectApiName(finalType)
-    AND Active__c = true
-];
-
-
-
-// Map current DB sequences for records NOT in update
-Map<Integer, Id> existingSeqToId = new Map<Integer, Id>();
-
-for (Round_Robin_Pool__c peer : peerList) {
-    if (!ids.contains(peer.Id) && peer.Sequence__c != null) {
-        existingSeqToId.put(
-            Integer.valueOf(peer.Sequence__c),
-            peer.Id
-        );
-    }
-}
-
-// Validate new sequences
-for (SeqUpdateDTO u : p.updates) {
-    if (existingSeqToId.containsKey(u.sequence)) {
-        throw new AuraHandledException(
-            'Sequence ' + u.sequence + ' is already used by another sales rep.'
-        );
-    }
-}
-
-
-        List<Round_Robin_Pool__c> toUpdate = new List<Round_Robin_Pool__c>();
-        for (SeqUpdateDTO u : p.updates) {
-            toUpdate.add(new Round_Robin_Pool__c(Id = u.poolId, Sequence__c = u.sequence));
+    /* ================================
+       STEP 8: DML (LWC-SAFE)
+       ================================ */
+    try {
+        if (!toUpdate.isEmpty()) {
+            update toUpdate;
+            System.debug('✅ update success. records=' + toUpdate.size());
+        } else {
+            System.debug('ℹ️ nothing to update');
         }
-
-        update toUpdate;
-         System.debug('Updated Sequences => ' + toUpdate);
+    } catch (Exception e) {
+        System.debug('❌ update failed: ' + e.getMessage());
+        throw new AuraHandledException('Sequence update failed: ' + e.getMessage());
     }
+
+    System.debug('💡 saveSequences END');
+}
+
    
 
 

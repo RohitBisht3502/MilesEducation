@@ -1,13 +1,14 @@
 import { LightningElement, api, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { CloseActionScreenEvent } from 'lightning/actions';
-import getWebinarsByNameOnly from '@salesforce/apex/WebinarController.getWebinarsByNameOnly';
+import getWebinarsByNameOrId from '@salesforce/apex/WebinarController.getWebinarsByNameOrId';
 import createWebinarMember from '@salesforce/apex/WebinarController.createWebinarMember';
 
-export default class WebinarRegisterPanel extends LightningElement {
+export default class zoomRegistrationPanel extends LightningElement {
   @api recordId;
   @track webinars = [];
   @track selectedWebinar = {};
+  @track searchKey = '';
   loading = true;
   saving = false;
 
@@ -18,10 +19,16 @@ export default class WebinarRegisterPanel extends LightningElement {
     this.fetchWebinars();
   }
 
-  async fetchWebinars() {
+  async fetchWebinars(searchKey) {
     this.loading = true;
+    this.webinars = [];
+    const key = (searchKey || '').trim();
+    if (!key) {
+      this.loading = false;
+      return;
+    }
     try {
-      const rows = await getWebinarsByNameOnly();
+      const rows = await getWebinarsByNameOrId({ searchKey: key });
       this.webinars = (rows || []).map(r => ({ ...r, isRegistered: false }));
     } catch (e) {
       this.toast('Error loading webinars', this.reduceError(e), 'error');
@@ -29,6 +36,12 @@ export default class WebinarRegisterPanel extends LightningElement {
       this.loading = false;
     }
   }
+
+  handleSearchChange = (event) => {
+    const value = event?.detail?.value ?? event?.target?.value ?? '';
+    this.searchKey = value;
+    this.fetchWebinars(this.searchKey);
+  };
 
   handleCardClick = (event) => {
     const webinarId = event.currentTarget?.dataset?.id;

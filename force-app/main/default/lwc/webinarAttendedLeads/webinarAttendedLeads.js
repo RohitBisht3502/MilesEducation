@@ -14,7 +14,7 @@ import getActiveWebinarAttendees from '@salesforce/apex/WebinarController.getAct
 import getActiveWebinarAttendeesForUser from '@salesforce/apex/WebinarController.getActiveWebinarAttendeesForUser';
 import getManagedUsers from '@salesforce/apex/WebinarController.getManagedUsers';
 import syncLiveWebinarAttendees from '@salesforce/apex/WebinarController.syncLiveWebinarAttendees';
-import getWebinarsByNameOnly from '@salesforce/apex/WebinarController.getWebinarsByNameOnly';
+import getWebinarsByNameOrId from '@salesforce/apex/WebinarController.getWebinarsByNameOrId';
 
 // Constants
 const STATUS = {
@@ -87,7 +87,7 @@ export default class WebinarAttendedLeads extends LightningElement {
     async loadWebinars() {
         this.isLoading = true;
         try {
-            const webinars = await getWebinarsByNameOnly();
+            const webinars = await getWebinarsByNameOrId({ searchKey: '' });
 
             if (webinars && webinars.length > 0) {
                 this.webinarOptions = webinars.map(w => ({

@@ -19,6 +19,34 @@ public class WebinarController {
         return out;
     }
 
+    @AuraEnabled(cacheable=true)
+    public static List<WebinarDTO> getWebinarsByNameOrId(String searchKey) {
+        // if (String.isBlank(searchKey)) {
+        //     return getWebinarsByNameOnly();
+        // }
+
+        String key = '%' + String.escapeSingleQuotes(searchKey.trim()) + '%';
+        List<WebinarDTO> out = new List<WebinarDTO>();
+
+        for (Webinar__c w : [
+            SELECT Id, Name, Webinar_Id__c
+            FROM Webinar__c
+            WHERE IsActive__c = TRUE
+            AND (Name LIKE :key OR Webinar_Id__c LIKE :key)
+            AND Status__c = 'Created'
+            ORDER BY Name ASC
+            LIMIT 200
+        ]) {
+            WebinarDTO d = new WebinarDTO();
+            d.id = w.Id;
+            d.name = w.Name;
+            d.webinarId = w.Webinar_Id__c;
+            out.add(d);
+        }
+        System.debug('Webinar search results for key "' + searchKey + '": ' + out);
+        return out;
+    }
+
     @AuraEnabled
     public static Id createWebinarMember(Id recordId, Id webinarId) {
         if (recordId == null || webinarId == null) {
