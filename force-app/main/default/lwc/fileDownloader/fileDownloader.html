@@ -12,6 +12,21 @@
       </div>
     </template>
 
+    
+<template for:each={files} for:item="file">
+  <div key={file.url} class="slds-m-top_x-small">
+    <lightning-button
+      label={file.name}
+      variant="base"
+      data-url={file.url}
+      onclick={openFile}>
+    </lightning-button>
+  </div>
+</template>
+
+
+
+
     <template if:true={lastResultMessage}>
       <div class="slds-p-horizontal_medium slds-m-top_small">
         <lightning-formatted-text value={lastResultMessage}></lightning-formatted-text>

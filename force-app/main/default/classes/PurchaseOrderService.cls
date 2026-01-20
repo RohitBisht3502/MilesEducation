@@ -5,20 +5,26 @@
  * Created Date    : Jan 8, 2026
  */
 
-public class PurchaseOrderService {
+public without sharing class PurchaseOrderService {
 
-    public class PurchaseOrderRequest{
+    public class PurchaseOrderRequest {
         @AuraEnabled public Id leadId;
         @AuraEnabled public Decimal discount;
+        @AuraEnabled public String addressType;
         @AuraEnabled public List<LineItemRequest> items;
     }
 
-    public class LineItemRequest{
+    public class LineItemRequest {
         @AuraEnabled public Id productId;
         @AuraEnabled public Decimal unitPrice;
         @AuraEnabled public Decimal qty;
-		@AuraEnabled public String learningType;
+        @AuraEnabled public String learningType;
     }
+
+    public class AddressStatusDTO {
+    @AuraEnabled public Boolean hasBilling;
+    @AuraEnabled public Boolean hasShipping;
+}
 
 
     public class ProductDTO {
@@ -26,37 +32,31 @@ public class PurchaseOrderService {
         @AuraEnabled public String name;
         @AuraEnabled public String productCode;
         @AuraEnabled public String family;
-        @AuraEnabled public Decimal unitPrice; 
+        @AuraEnabled public Decimal unitPrice;
+        @AuraEnabled public String type;
 
-        public ProductDTO(Id id,String name, String code, String family, Decimal price) {
-            this.id          = id;
-            this.name        = name;
+        public ProductDTO(Id id, String name, String code, String family, Decimal price,String type) {
+            this.id = id;
+            this.name = name;
             this.productCode = code;
-            this.family      = family;
-            this.unitPrice   = price;
+            this.family = family;
+            this.unitPrice = price;
+            this.type = type;
         }
     }
 
-
-    /* =====================================================
-       FETCH ACTIVE PRODUCTS
-       ===================================================== */
     @AuraEnabled(cacheable=true)
     public static List<ProductDTO> getActiveProducts() {
-
-        Id stdPbId = [SELECT Id FROM Pricebook2 WHERE IsStandard = true LIMIT 1].Id;
-
         List<ProductDTO> products = new List<ProductDTO>();
 
-        for (PricebookEntry pbe : [
-            SELECT Product2Id, Product2.Name, Product2.ProductCode, Product2.Family, UnitPrice  FROM PricebookEntry WHERE IsActive = true        
-        ]) {
+        for (PricebookEntry pbe : [SELECT Product2Id, Product2.Name, Product2.ProductCode, Product2.Family, Product2.type__c,UnitPrice FROM PricebookEntry WHERE IsActive = true]) {
             products.add(new ProductDTO(
                 pbe.Product2Id,
                 pbe.Product2.Name,
                 pbe.Product2.ProductCode,
                 pbe.Product2.Family,
-                pbe.UnitPrice
+                pbe.UnitPrice,
+                pbe.Product2.type__c
             ));
         }
 
@@ -64,144 +64,530 @@ public class PurchaseOrderService {
     }
 
     @AuraEnabled
-    public static Id save(String requestJson){
-        try{
-            if(String.isBlank(requestJson)){
-                throw new AuraHandledException('Empty request');
-            }
+    public static Id save(String requestJson) {
+        try {
+            PurchaseOrderRequest req = (PurchaseOrderRequest) JSON.deserialize(
+                requestJson, 
+                PurchaseOrderRequest.class
+            );
 
-            PurchaseOrderRequest req =
-                (PurchaseOrderRequest) JSON.deserialize(requestJson, PurchaseOrderRequest.class);
+            System.debug('Purchase Order Request: ' + requestJson);
+            validateRequest(req);
 
-            if(req.leadId == null) throw new AuraHandledException('Lead Id is required');
-            if(req.items == null || req.items.isEmpty()) throw new AuraHandledException('Items are required');
+            RecordContext context = identifyRecordContext(req.leadId);
+            validateAddress(context, req);
 
-            for(LineItemRequest li : req.items){
-                if(li == null) throw new AuraHandledException('Invalid line item');
-                if(li.productId == null) throw new AuraHandledException('Product Id is required');
-                if(li.qty == null || li.qty <= 0) throw new AuraHandledException('Qty must be greater than zero');
-                if(li.unitPrice == null || li.unitPrice < 0) throw new AuraHandledException('Unit Price is invalid');
-            }                
 
-            Lead__c lead = [SELECT Id, Candidate__c,Course__c FROM Lead__c WHERE Id = :req.leadId LIMIT 1];
+            Lead__c lead = fetchLeadIfNeeded(context.leadRecordId);
+            Lead candidate = fetchCandidateIfNeeded(lead);
+            Account student = fetchStudentIfNeeded(context.studentAccountId);
 
-            Boolean hasTraining = false;
-            Boolean hasStudyMaterial = false;
+            // api callout to miles
+            Callout_PurchaseOrderService.CalloutResult calloutRes = callExternalPurchaseService(req, lead, candidate);
 
-            for(LineItemRequest li : req.items){
-                if (li != null && !String.isBlank(li.learningType)) {
-                    if (li.learningType == 'Training') {
-                        hasTraining = true;
-                    }
-                    if (li.learningType == 'Study Material') {
-                        hasStudyMaterial = true;
-                    }
-                }
-            }
-
-            if (!checkLeadAddress(req.leadId)) {
-    throw new AuraHandledException(
-        'Billing or Shipping address is required before creating Purchase Order.'
-    );
-}
-
-            /* ------------------ CALL EXTERNAL API FIRST ------------------ */
-
-        //     Callout_PurchaseOrderService.Request extReq = new Callout_PurchaseOrderService.Request();
-
-        //     extReq.source = 'sf';
-        //     extReq.sf_id = String.valueOf(req.leadId);
-        //    // extReq.uuid = String.valueOf(Crypto.getRandomUUID());
-        //     extReq.down_payment = 0;
-
-        //     Callout_PurchaseOrderService.RequestItem item = new Callout_PurchaseOrderService.RequestItem();
-
-        //     item.program = lead.Course__c;
-        //     item.skus = new List<String>();
-        //     item.actual_price = 0;
-        //     item.agreed_price = 0;
-        //     item.discount = req.discount;
-        //     item.loan_id = null;
-
-        //     item.has_training = hasTraining;
-        //     item.has_study_material = hasStudyMaterial;
-
-        //     extReq.purchase_items = new List<Callout_PurchaseOrderService.RequestItem>{ item };
-
-        //     String externalPurchaseId = Callout_PurchaseOrderService.createPurchase(extReq);
-
-            /* ------------------ INSERT PO ONLY AFTER SUCCESS ------------------ */
-
-            Purchase_Order__c po = new Purchase_Order__c();
-            po.Lead__c = req.leadId;
-            po.Candidate__c = lead.Candidate__c;
-            po.Discount_Amount__c = req.discount;
-            po.Purchase_Order_Date__c = Date.today();
-           // po.Purchase_Order_Id__c = externalPurchaseId;
+            Purchase_Order__c po    = createPurchaseOrder(req, context, lead, candidate, student);
+            po.Purchase_Order_Id__c = String.valueOf(calloutRes.purchaseId);
+            po.Response_Payload__c  = calloutRes.responseBody;
             insert po;
 
-            List<Purchase_Order_Line_Item__c> lines = new List<Purchase_Order_Line_Item__c>();
-
-            for(LineItemRequest li : req.items){
-                Purchase_Order_Line_Item__c row = new Purchase_Order_Line_Item__c();
-                row.Purchase_Order__c = po.Id;
-                row.Product__c = li.productId;
-                row.Quantity__c = li.qty;
-                row.Unit_Price__c = li.unitPrice;
-                lines.add(row);
-            }
-
-            insert lines;
+            createLineItems(po.Id, req.items);
 
             return po.Id;
 
-        } catch (AuraHandledException e){
+        } catch (AuraHandledException e) {
             throw e;
-        } catch (Exception e){
+        } catch (Exception e) {
             throw new AuraHandledException('Save failed: ' + e.getMessage());
         }
     }
 
-@AuraEnabled
-public static Boolean checkLeadAddress(Id leadId) {
-    if (leadId == null) {
-        throw new AuraHandledException('Lead Id is missing');
+    private static void validateRequest(PurchaseOrderRequest req) {
+        if (req == null || req.items == null || req.items.isEmpty()) {
+            throw new AuraHandledException('Items are required');
+        }
+
+        for (LineItemRequest li : req.items) {
+            if (li == null || li.productId == null) {
+                throw new AuraHandledException('Product Id is required');
+            }
+            if (li.qty == null || li.qty <= 0) {
+                throw new AuraHandledException('Qty must be greater than zero');
+            }
+            if (li.unitPrice == null || li.unitPrice < 0) {
+                throw new AuraHandledException('Unit Price is invalid');
+            }
+        }
     }
 
-    Lead lead = [
-        SELECT
-            Street,
-            City,
-            State,
-            PostalCode,
-            Country,
-            Shipping_Street__c,
-            Shipping_City__c,
-            Shipping_State__c,
-            Shipping_Postal_Code__c,
-            Shipping_Country__c
-        FROM Lead
-        WHERE Id = :leadId
-        LIMIT 1
-    ];
+    private static RecordContext identifyRecordContext(Id recordId) {
+        if (recordId == null) {
+            throw new AuraHandledException('Record Id is required');
+        }
 
-    // ✅ STANDARD (Billing-like) Address
-    Boolean hasBilling =
-        !String.isBlank(lead.Street) &&
-        !String.isBlank(lead.City) &&
-        !String.isBlank(lead.State) &&
-        !String.isBlank(lead.PostalCode) &&
-        !String.isBlank(lead.Country);
+        RecordContext context = new RecordContext();
+        Schema.SObjectType sobType = recordId.getSObjectType();
 
-    // ✅ CUSTOM Shipping Address
-    Boolean hasShipping =
-        !String.isBlank(lead.Shipping_Street__c) &&
-        !String.isBlank(lead.Shipping_City__c) &&
-        !String.isBlank(lead.Shipping_State__c) &&
-        !String.isBlank(lead.Shipping_Postal_Code__c) &&
-        !String.isBlank(lead.Shipping_Country__c);
+        if (sobType == Lead__c.SObjectType) {
+            context.leadRecordId = recordId;
+        } else if (sobType == Course_Enrolled__c.SObjectType) {
+            context.courseEnrolledId = recordId;
+            Course_Enrolled__c ce = [
+                SELECT Id, Student__c
+                FROM Course_Enrolled__c
+                WHERE Id = :recordId
+                LIMIT 1
+            ];
+            context.studentAccountId = ce.Student__c;
+        } else {
+            throw new AuraHandledException('Unsupported record type for Purchase Order creation');
+        }
 
-    return hasBilling || hasShipping;
+        return context;
+    }
+
+   private static void validateAddress(RecordContext context, PurchaseOrderRequest req) {
+
+    Boolean shippingRequired = hasStudyMaterial(req.items);
+
+    if (context.courseEnrolledId != null) {
+
+        if (context.studentAccountId == null) {
+            throw new AuraHandledException('Student (Account) is not linked.');
+        }
+
+        Account acc = [
+            SELECT
+                BillingStreet, BillingCity,
+                ShippingStreet, ShippingCity
+            FROM Account
+            WHERE Id = :context.studentAccountId
+            LIMIT 1
+        ];
+
+        // Billing is ALWAYS mandatory
+        if (!hasCompleteAddress(acc.BillingStreet, acc.BillingCity, null, null, null)) {
+            throw new AuraHandledException(
+                'Billing address is mandatory before creating Purchase Order.'
+            );
+        }
+
+        // Shipping mandatory only for Study Material
+        if (shippingRequired &&
+            !hasCompleteAddress(acc.ShippingStreet, acc.ShippingCity, null, null, null)) {
+            throw new AuraHandledException(
+                'Shipping address is mandatory for Study Material.'
+            );
+        }
+
+    } else {
+
+        Lead__c leadRec = [
+            SELECT Candidate__c
+            FROM Lead__c
+            WHERE Id = :context.leadRecordId
+            LIMIT 1
+        ];
+
+        Lead candidate = [
+            SELECT
+                Street, City,
+                Shipping_Street__c, Shipping_City__c
+            FROM Lead
+            WHERE Id = :leadRec.Candidate__c
+            LIMIT 1
+        ];
+
+        // Billing mandatory
+        if (!hasCompleteAddress(candidate.Street, candidate.City, null, null, null)) {
+            throw new AuraHandledException(
+                'Billing address is mandatory before creating Purchase Order.'
+            );
+        }
+
+        // Shipping mandatory only for Study Material
+        if (shippingRequired &&
+            !hasCompleteAddress(candidate.Shipping_Street__c, candidate.Shipping_City__c, null, null, null)) {
+            throw new AuraHandledException(
+                'Shipping address is mandatory for Study Material.'
+            );
+        }
+    }
+}
+private static Boolean hasStudyMaterial(List<LineItemRequest> items) {
+    if (items == null) return false;
+
+    for (LineItemRequest li : items) {
+        if (li != null && li.learningType == 'Study Material') {
+            return true;
+        }
+    }
+    return false;
 }
 
+
+    private static Lead__c fetchLeadIfNeeded(Id leadRecordId) {
+        if (leadRecordId == null) return null;
+
+        Lead__c lead = [
+            SELECT Id, Candidate__c, Course__c
+            FROM Lead__c
+            WHERE Id = :leadRecordId
+            LIMIT 1
+        ];
+
+        if (lead.Candidate__c == null) {
+            throw new AuraHandledException('Candidate is not linked to this Lead');
+        }
+
+        return lead;
+    }
+
+    private static Lead fetchCandidateIfNeeded(Lead__c lead) {
+        if (lead == null) return null;
+
+        List<Lead> candidates = [
+            SELECT
+                Street, City, State, PostalCode, Country,
+                Shipping_Street__c, Shipping_City__c,
+                Shipping_State__c, Shipping_Postal_Code__c,
+                Shipping_Country__c,UUID__c
+            FROM Lead
+            WHERE Id = :lead.Candidate__c
+        ];
+
+        if (candidates.isEmpty()) {
+            throw new AuraHandledException('Candidate Lead not found');
+        }
+
+        return candidates[0];
+    }
+
+    private static Account fetchStudentIfNeeded(Id studentAccountId) {
+        if (studentAccountId == null) return null;
+
+        return [
+            SELECT
+                BillingStreet, BillingCity, BillingState, BillingPostalCode, BillingCountry,
+                ShippingStreet, ShippingCity, ShippingState, ShippingPostalCode, ShippingCountry
+            FROM Account
+            WHERE Id = :studentAccountId
+            LIMIT 1
+        ];
+    }
+
+    private static Purchase_Order__c createPurchaseOrder(
+        PurchaseOrderRequest req,
+        RecordContext context,
+        Lead__c lead,
+        Lead candidate,
+        Account student
+    ) {
+        Purchase_Order__c po = new Purchase_Order__c();
+
+        if (context.courseEnrolledId != null) {
+            po.Course_Enrolled__c = context.courseEnrolledId;
+            if (context.leadRecordId != null) {
+                po.Lead__c = context.leadRecordId;
+            }
+        } else {
+            po.Lead__c = context.leadRecordId;
+        }
+
+        if (lead != null) {
+            po.Candidate__c = lead.Candidate__c;
+        }
+
+        po.Discount_Amount__c = req.discount;
+        po.Purchase_Order_Date__c = Date.today();
+
+        setAddress(po, req.addressType, context, candidate, student);
+
+        return po;
+    }
+
+    private static void setAddress(
+        Purchase_Order__c po,
+        String addressType,
+        RecordContext context,
+        Lead candidate,
+        Account student
+    ) {
+        if (context.courseEnrolledId != null && student != null) {
+            if (addressType == 'billing') {
+                po.Shipping_Street__c = student.BillingStreet;
+                po.Shipping_City__c = student.BillingCity;
+                po.Shipping_State__c = student.BillingState;
+                po.Shipping_Postal_Code__c = student.BillingPostalCode;
+                po.Shipping_Country__c = student.BillingCountry;
+            } else {
+                po.Shipping_Street__c = student.ShippingStreet;
+                po.Shipping_City__c = student.ShippingCity;
+                po.Shipping_State__c = student.ShippingState;
+                po.Shipping_Postal_Code__c = student.ShippingPostalCode;
+                po.Shipping_Country__c = student.ShippingCountry;
+            }
+        } else if (candidate != null) {
+            if (addressType == 'billing') {
+                po.Shipping_Street__c = candidate.Street;
+                po.Shipping_City__c = candidate.City;
+                po.Shipping_State__c = candidate.State;
+                po.Shipping_Postal_Code__c = candidate.PostalCode;
+                po.Shipping_Country__c = candidate.Country;
+            } else {
+                po.Shipping_Street__c = candidate.Shipping_Street__c;
+                po.Shipping_City__c = candidate.Shipping_City__c;
+                po.Shipping_State__c = candidate.Shipping_State__c;
+                po.Shipping_Postal_Code__c = candidate.Shipping_Postal_Code__c;
+                po.Shipping_Country__c = candidate.Shipping_Country__c;
+            }
+        }
+    }
+
+    private static void createLineItems(Id purchaseOrderId, List<LineItemRequest> items) {
+        List<Purchase_Order_Line_Item__c> lines = new List<Purchase_Order_Line_Item__c>();
+
+        for (LineItemRequest li : items) {
+            Purchase_Order_Line_Item__c row = new Purchase_Order_Line_Item__c();
+            row.Purchase_Order__c = purchaseOrderId;
+            row.Product__c = li.productId;
+            row.Quantity__c = li.qty;
+            row.Unit_Price__c = li.unitPrice;
+            lines.add(row);
+        }
+
+        insert lines;
+    }
+
+    @AuraEnabled
+    public static Boolean checkLeadAddress(Id leadRecordId) {
+        Lead__c leadRec = [
+            SELECT Candidate__c
+            FROM Lead__c
+            WHERE Id = :leadRecordId
+            LIMIT 1
+        ];
+
+        if (leadRec.Candidate__c == null) {
+            throw new AuraHandledException('Candidate is not linked to this Lead');
+        }
+
+        Lead candidate = [
+            SELECT
+                Street, City, State, PostalCode, Country,
+                Shipping_Street__c, Shipping_City__c,
+                Shipping_State__c, Shipping_Postal_Code__c,
+                Shipping_Country__c
+            FROM Lead
+            WHERE Id = :leadRec.Candidate__c
+            LIMIT 1
+        ];
+
+        return hasCompleteAddress(
+            candidate.Street, candidate.City, candidate.State, 
+            candidate.PostalCode, candidate.Country
+        ) || hasCompleteAddress(
+            candidate.Shipping_Street__c, candidate.Shipping_City__c, 
+            candidate.Shipping_State__c, candidate.Shipping_Postal_Code__c, 
+            candidate.Shipping_Country__c
+        );
+    }
+
+    public static Boolean checkStudentAccountAddress(Id accountId) {
+        Account acc = [
+            SELECT
+                BillingStreet, BillingCity, BillingState, BillingPostalCode, BillingCountry,
+                ShippingStreet, ShippingCity, ShippingState, ShippingPostalCode, ShippingCountry
+            FROM Account
+            WHERE Id = :accountId
+            LIMIT 1
+        ];
+
+        return hasCompleteAddress(
+            acc.BillingStreet, acc.BillingCity, acc.BillingState, 
+            acc.BillingPostalCode, acc.BillingCountry
+        ) || hasCompleteAddress(
+            acc.ShippingStreet, acc.ShippingCity, acc.ShippingState, 
+            acc.ShippingPostalCode, acc.ShippingCountry
+        );
+    }
+
+    @AuraEnabled
+public static AddressStatusDTO checkAddressByRecordId(Id recordId) {
+    if (recordId == null) {
+        throw new AuraHandledException('Record Id is required');
+    }
+
+    AddressStatusDTO res = new AddressStatusDTO();
+    Schema.SObjectType sobType = recordId.getSObjectType();
+
+    if (sobType == Lead__c.SObjectType) {
+        Lead__c leadRec = [
+            SELECT Candidate__c
+            FROM Lead__c
+            WHERE Id = :recordId
+            LIMIT 1
+        ];
+
+        Lead candidate = [
+            SELECT
+                Street, City, State, PostalCode, Country,
+                Shipping_Street__c, Shipping_City__c,
+                Shipping_State__c, Shipping_Postal_Code__c,
+                Shipping_Country__c
+            FROM Lead
+            WHERE Id = :leadRec.Candidate__c
+        ];
+
+        res.hasBilling = hasCompleteAddress(
+            candidate.Street, candidate.City, candidate.State,
+            candidate.PostalCode, candidate.Country
+        );
+
+        res.hasShipping = hasCompleteAddress(
+            candidate.Shipping_Street__c, candidate.Shipping_City__c,
+            candidate.Shipping_State__c, candidate.Shipping_Postal_Code__c,
+            candidate.Shipping_Country__c
+        );
+
+        return res;
+    }
+
+    if (sobType == Course_Enrolled__c.SObjectType) {
+        Course_Enrolled__c ce = [
+            SELECT Student__c
+            FROM Course_Enrolled__c
+            WHERE Id = :recordId
+            LIMIT 1
+        ];
+
+        Account acc = [
+            SELECT
+                BillingStreet, BillingCity, BillingState, BillingPostalCode, BillingCountry,
+                ShippingStreet, ShippingCity, ShippingState, ShippingPostalCode, ShippingCountry
+            FROM Account
+            WHERE Id = :ce.Student__c
+        ];
+
+        res.hasBilling = hasCompleteAddress(
+            acc.BillingStreet, acc.BillingCity, acc.BillingState,
+            acc.BillingPostalCode, acc.BillingCountry
+        );
+
+        res.hasShipping = hasCompleteAddress(
+            acc.ShippingStreet, acc.ShippingCity, acc.ShippingState,
+            acc.ShippingPostalCode, acc.ShippingCountry
+        );
+
+        return res;
+    }
+
+    throw new AuraHandledException('Unsupported record type');
+}
+
+
+   private static Boolean hasCompleteAddress(
+    String street, String city, String state, String postalCode, String country
+) {
+    return !String.isBlank(street) && !String.isBlank(city);
+}
+
+
+    private static Callout_PurchaseOrderService.CalloutResult callExternalPurchaseService( PurchaseOrderRequest req, Lead__c lead, Lead candidate ) {
+
+        Set<Id> prodIds = new Set<Id>();
+        for (LineItemRequest li : req.items) {
+            if (li != null && li.productId != null)
+                prodIds.add(li.productId);
+        }
+
+        Map<Id, Product2> prodMap = new Map<Id, Product2>();
+        if (!prodIds.isEmpty()) {
+            prodMap = new Map<Id, Product2>([
+                SELECT Id, Name, ProductCode
+                FROM Product2
+                WHERE Id IN :prodIds
+            ]);
+        }
+
+        Callout_PurchaseOrderService.Request extReq = new Callout_PurchaseOrderService.Request();
+        extReq.source       = 'sf';
+        extReq.sf_id        = String.valueOf(lead.Id);
+        extReq.sf_lead_id   = String.valueOf(req.leadId);
+        extReq.uuid         = candidate.UUID__c;
+        extReq.down_payment = req.discount;
+        //extReq.created_by   = UserInfo.getName();
+        extReq.created_by   = 'MPE226';
+
+        Callout_PurchaseOrderService.RequestItem item = new Callout_PurchaseOrderService.RequestItem();
+      //  item.program = String.valueOf(lead.Course__c);
+        item.program = 'CPA';
+        Boolean hasTraining = false;
+        Boolean hasStudyMaterial = false;
+
+        item.skus = new List<String>();
+        item.enrolment_line_items = new List<Callout_PurchaseOrderService.EnrolmentLineItem>();
+
+        Decimal total = 0;
+
+        for (LineItemRequest li : req.items) {
+            if (li == null) continue;
+
+            if (!String.isBlank(li.learningType)) {
+                if (li.learningType == 'Training') hasTraining = true;
+                if (li.learningType == 'Study Material') hasStudyMaterial = true;
+            }
+
+            Product2 p = prodMap.get(li.productId);
+
+            String skuVal =
+                (p != null && !String.isBlank(p.ProductCode)) ? p.ProductCode :
+                (p != null ? p.Name : null);
+
+            if (!String.isBlank(skuVal))
+                item.skus.add(skuVal);
+
+            Callout_PurchaseOrderService.EnrolmentLineItem eli =
+                new Callout_PurchaseOrderService.EnrolmentLineItem();
+
+            eli.item_name = (p != null ? p.Name : 'Item');
+
+            Decimal lineAmount =
+                (li.unitPrice != null ? li.unitPrice : 0) *
+                (li.qty != null ? li.qty : 0);
+
+            eli.price          = lineAmount;
+            eli.price_with_gst = lineAmount;
+            eli.discound       = 0;
+            eli.final_price    = lineAmount;
+
+            item.enrolment_line_items.add(eli);
+
+            total += lineAmount;
+        }
+
+        item.has_training       = hasTraining;
+        item.has_study_material = hasStudyMaterial;
+
+        item.actual_price = total;
+        item.agreed_fee   = total;
+        item.discount     = req.discount;
+        item.loan_id      = null;
+
+        extReq.purchase_items =
+            new List<Callout_PurchaseOrderService.RequestItem>{ item };
+
+        Callout_PurchaseOrderService.CalloutResult result = Callout_PurchaseOrderService.createPurchase(extReq);
+
+        if (result == null || result.purchaseId == null) {
+            throw new AuraHandledException('External service did not return purchase_id. Purchase Order not created.');
+        }
+
+        return result;
+    }
+
+    private class RecordContext {
+        public Id leadRecordId;
+        public Id courseEnrolledId;
+        public Id studentAccountId;
+    }
 }

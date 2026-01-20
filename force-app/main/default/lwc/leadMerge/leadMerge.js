@@ -3,6 +3,7 @@ import searchLeads from '@salesforce/apex/LeadMergeController.searchLeads';
 import submitMergeForApproval from '@salesforce/apex/LeadMergeController.submitMergeForApproval';
 import getLeadDetails from '@salesforce/apex/LeadMergeController.getLeadDetails';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import { CloseActionScreenEvent } from 'lightning/actions';
 import USER_ID from '@salesforce/user/Id';
 
 export default class LeadMerge extends LightningElement {
@@ -127,6 +128,10 @@ export default class LeadMerge extends LightningElement {
             .then(result => {
                 this.showToast('Success', result, 'success');
                 this.resetComponent();
+                // Use setTimeout to ensure the event is processed after UI updates
+                setTimeout(() => {
+                    this.dispatchEvent(new CloseActionScreenEvent());
+                }, 200);
             })
             .catch(error => {
                 const errorMessage = error.body?.message || error.message || 'An error occurred during merge';

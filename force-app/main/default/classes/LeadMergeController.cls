@@ -176,7 +176,7 @@ public without sharing class LeadMergeController {
         idsToCheck.addAll(leadIdsToMerge);
 
         // Fetch leads to check for parents
-        List<Lead__c> leadsToCheck = [SELECT Id, Name, Lead__c, Status__c FROM Lead__c WHERE Id IN :leadIdsToMerge];
+        List<Lead__c> leadsToCheck = [SELECT Id, Name, Lead__c, Status__c, Course__c FROM Lead__c WHERE Id IN :leadIdsToMerge];
         Set<Id> parentIds = new Set<Id>();
         for (Lead__c l : leadsToCheck) {
             if (l.Lead__c != null) {
@@ -208,7 +208,7 @@ public without sharing class LeadMergeController {
         if (lockedIds.contains(mainLeadId)) {
              throw new AuraHandledException('The current lead is in an approval process.');
         }
-        Lead__c currentLead = [SELECT Id, Status__c, OwnerId FROM Lead__c WHERE Id = :mainLeadId];
+        Lead__c currentLead = [SELECT Id, Status__c, OwnerId, Course__c FROM Lead__c WHERE Id = :mainLeadId];
         if (currentLead.Status__c == 'Pending') {
              throw new AuraHandledException('The current lead status is Pending.');
         }
@@ -221,7 +221,7 @@ public without sharing class LeadMergeController {
             if (l.Status__c == 'Pending') {
                  throw new AuraHandledException('Lead ' + l.Name + ' status is Pending.');
             }
-            
+
             // C. Check Parents
             if (l.Lead__c != null) {
                 if (lockedIds.contains(l.Lead__c)) {

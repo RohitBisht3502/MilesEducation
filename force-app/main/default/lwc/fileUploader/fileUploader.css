@@ -1,0 +1,94 @@
+/* Hide native input */
+.hidden-file-input {
+  display: none;
+}
+
+/* File pill container */
+.file-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+
+  background: linear-gradient(135deg, #ffffff, #f7f9fc);
+  border: 1px solid #d8dde6;
+  border-radius: 999px;
+
+  padding: 8px 14px;
+  margin: 8px 8px 0 0;
+
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+/* Hover elevation */
+.file-pill:hover {
+  background: linear-gradient(135deg, #f3f6fb, #ffffff);
+  transform: translateY(-1px);
+  box-shadow:
+    0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+/* File name */
+.file-pill .slds-pill__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1b1c1d;
+
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  letter-spacing: 0.2px;
+}
+
+/* Remove (X) button */
+.slds-pill__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 20px;
+  height: 20px;
+
+  border-radius: 50%;
+  border: none;
+
+  background: #eef1f6;
+  color: #5f6a7d;
+
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.1s ease;
+}
+
+/* Hover remove */
+.slds-pill__remove:hover {
+  background: #ea001e;
+  color: #ffffff;
+  transform: scale(1.05);
+}
+
+/* Active click */
+.slds-pill__remove:active {
+  transform: scale(0.95);
+}
+
+/* Keyboard focus */
+.slds-pill__remove:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(234, 0, 30, 0.3);
+}

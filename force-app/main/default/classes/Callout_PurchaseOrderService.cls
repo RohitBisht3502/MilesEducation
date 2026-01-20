@@ -14,6 +14,7 @@ public without sharing class Callout_PurchaseOrderService {
         public String uuid;
         public List<RequestItem> purchase_items;
         public Decimal down_payment;
+        public String created_by;
     }
 
     public class RequestItem{
@@ -40,16 +41,35 @@ public without sharing class Callout_PurchaseOrderService {
         public Decimal final_price;
     }
 
-    public class Response{
-        public String purchase_id;
+    public class ApiResponse {
+        public Boolean status;
+        public String path;
+        public Integer statusCode;
+        public Result result;
     }
 
-    public static String createPurchase(Request req){
+    public class Result {
+        public Integer purchase_id;
+        public Decimal agreedCost;
+        public Decimal actualCost;
+    }
+
+    public class CalloutResult {
+        public Integer purchaseId;
+        public String responseBody;
+        public Integer httpStatusCode;
+    }
+
+    public static CalloutResult createPurchase(Request req){
 
         External_Service_Config__mdt cfg;
         try {
             cfg = [
-                SELECT Endpoint_URL__c, Http_Method__c, Api_Key__c, Api_Key_Header__c, Is_Active__c FROM External_Service_Config__mdt WHERE DeveloperName = 'Create_Enrolment_API' LIMIT 1];
+                SELECT Endpoint_URL__c, Http_Method__c, Api_Key__c, Api_Key_Header__c, Is_Active__c
+                FROM External_Service_Config__mdt
+                WHERE DeveloperName = 'Create_Enrolment_API'
+                LIMIT 1
+            ];
         } catch (Exception e) {
             IntegrationLogUtil.insertLog(
                 'Create Enrolment API',
@@ -89,16 +109,26 @@ public without sharing class Callout_PurchaseOrderService {
         String methodName = String.isBlank(cfg.Http_Method__c) ? 'POST' : cfg.Http_Method__c.trim().toUpperCase();
         if (methodName != 'POST') methodName = 'POST';
 
+        // HttpRequest httpReq = new HttpRequest();
+        // httpReq.setEndpoint(cfg.Endpoint_URL__c);
+        // httpReq.setMethod(methodName);
+        // httpReq.setHeader('Content-Type', 'application/json');
+        // httpReq.setHeader('Accept', 'application/json');
+        // System.debug('cfg.Api_Key_Header__c >> '+cfg.Api_Key_Header__c);
+        // System.debug('cfg.Api_Key__c >> '+cfg.Api_Key__c);
+        // if (!String.isBlank(cfg.Api_Key__c) && !String.isBlank(cfg.Api_Key_Header__c)) {
+        //     System.debug('cfg.Api_Key_Header__c >> '+cfg.Api_Key_Header__c);
+        //     System.debug('cfg.Api_Key__c >> '+cfg.Api_Key__c);
+        //     httpReq.setHeader(cfg.Api_Key_Header__c, cfg.Api_Key__c);
+        // }
         HttpRequest httpReq = new HttpRequest();
-        httpReq.setEndpoint(cfg.Endpoint_URL__c);
-        httpReq.setMethod(methodName);
+        httpReq.setEndpoint('https://1c8fjh4ddg.execute-api.ap-south-1.amazonaws.com/Miles360/purchases');
+        httpReq.setMethod('POST');
         httpReq.setHeader('Content-Type', 'application/json');
-
-        if (!String.isBlank(cfg.Api_Key__c) && !String.isBlank(cfg.Api_Key_Header__c)) {
-            httpReq.setHeader(cfg.Api_Key_Header__c, cfg.Api_Key__c);
-        }
-
+        httpReq.setHeader('Accept', 'application/json');
+        httpReq.setHeader('x-api-key', 'n7yno1N32NaXgZJFLbzf137wCHFf2UsM40j7gSgW');
         String requestBody = JSON.serialize(req);
+        System.debug('Create Enrolment API Request Body: ' + requestBody);
         httpReq.setBody(requestBody);
 
         Http http = new Http();
@@ -133,9 +163,9 @@ public without sharing class Callout_PurchaseOrderService {
             throw new AuraHandledException('External API failed (HTTP ' + sc + '): ' + (resBody == null ? '' : resBody));
         }
 
-        Response resp;
+        ApiResponse resp;
         try {
-            resp = (Response) JSON.deserialize(resBody, Response.class);
+            resp = (ApiResponse) JSON.deserialize(resBody, ApiResponse.class);
         } catch (Exception pe) {
             IntegrationLogUtil.insertLog(
                 'Create Enrolment API',
@@ -148,7 +178,7 @@ public without sharing class Callout_PurchaseOrderService {
             throw new AuraHandledException('Invalid response from external service.');
         }
 
-        if (resp == null || String.isBlank(resp.purchase_id)) {
+        if (resp == null || resp.result == null || resp.result.purchase_id == null) {
             IntegrationLogUtil.insertLog(
                 'Create Enrolment API',
                 null,
@@ -164,11 +194,15 @@ public without sharing class Callout_PurchaseOrderService {
             'Create Enrolment API',
             null,
             (resBody != null && resBody.length() > 3000 ? resBody.substring(0, 3000) : resBody),
-            'Success | purchase_id=' + resp.purchase_id,
+            'Success | purchase_id=' + String.valueOf(resp.result.purchase_id),
             'Success',
             sc
         );
 
-        return resp.purchase_id;
+        CalloutResult out = new CalloutResult();
+        out.purchaseId = resp.result.purchase_id;
+        out.responseBody = resBody;      
+        out.httpStatusCode = sc;
+        return out;
     }
 }

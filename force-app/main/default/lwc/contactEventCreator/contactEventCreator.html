@@ -1,317 +1,331 @@
 <template>
-    <lightning-card title="Schedule Meeting" icon-name="standard:event">
-        <div class="slds-p-around_medium">
-            <!-- Main Form Grid -->
-            <div class="slds-grid slds-gutters">
-                <!-- Left Column - Meeting Details -->
-                <div class="slds-col slds-size_1-of-2">
-                    <!-- Subject -->
-                    <div class="form-group">
-                        <lightning-input
-                            label="Meeting Subject"
-                            value={subject}
-                            onchange={handleSubjectChange}
-                            required
-                            variant="label-stacked"
-                            class="custom-input">
-                        </lightning-input>
-                    </div>
-
-                    <!-- Description -->
-                    <div class="form-group">
-                        <lightning-textarea
-                            label="Description"
-                            value={description}
-                            onchange={handleDescriptionChange}
-                            variant="label-stacked"
-                            class="custom-textarea">
-                        </lightning-textarea>
-                    </div>
-
-                    <!-- Meeting Type / Offline Type / Duration -->
-                    <div class="form-group">
-                        <lightning-combobox
-                            label="Meeting Type"
-                            value={meetingType}
-                            options={meetingTypeOptions}
-                            onchange={handleMeetingTypeChange}
-                            required
-                            variant="label-stacked"
-                            class="custom-combobox">
-                        </lightning-combobox>
-                    </div>
-
-                    <template if:true={showOfflineType}>
-                        <div class="form-group">
-                            <lightning-combobox
-                                label="Type of Offline Gmeet"
-                                value={offlineType}
-                                options={offlineTypeOptions}
-                                onchange={handleOfflineTypeChange}
-                                variant="label-stacked"
-                                class="custom-combobox">
-                            </lightning-combobox>
-                        </div>
-                    </template>
-
-                    <div class="form-group">
-                        <lightning-combobox
-                            label="Duration"
-                            value={duration}
-                            options={durationOptions}
-                            onchange={handleDurationChange}
-                            variant="label-stacked"
-                            class="custom-combobox">
-                        </lightning-combobox>
-                    </div>
-
-                    <!-- Date/Time Section -->
-                    <div class="datetime-section">
-                        <h3 class="section-title">Meeting Time</h3>
-                        
-                        <!-- Start Date/Time -->
+        <lightning-card title="Schedule Meeting" icon-name="standard:event">
+            <div class="slds-p-around_medium">
+                <!-- Main Form Grid -->
+                <div class="slds-grid slds-gutters">
+                    <!-- Left Column - Meeting Details -->
+                    <div class="slds-col slds-size_1-of-2">
+                        <!-- Subject -->
                         <div class="form-group">
                             <lightning-input
-                                type="datetime"
-                                label="Start Date/Time"
-                                value={startDateTime}
-                                onchange={handleStartDateTimeChange}
-                                variant="label-stacked"
+                                label="Meeting Subject"
+                                value={subject}
+                                onchange={handleSubjectChange}
                                 required
+                                variant="label-stacked"
                                 class="custom-input">
                             </lightning-input>
                         </div>
 
-                        <!-- End Date/Time -->
+                        <!-- Description -->
                         <div class="form-group">
-                            <lightning-input
-                                type="datetime"
-                                label="End Date/Time"
-                                value={endDateTime}
-                                onchange={handleEndDateTimeChange}
+                            <lightning-textarea
+                                label="Description"
+                                value={description}
+                                onchange={handleDescriptionChange}
                                 variant="label-stacked"
-                                required
-                                class="custom-input">
-                            </lightning-input>
+                                class="custom-textarea">
+                            </lightning-textarea>
                         </div>
 
-                        <!-- Timezone -->
+                        <!-- Meeting Type / Offline Type / Duration -->
                         <div class="form-group">
                             <lightning-combobox
-                                label="Timezone"
-                                value={timezone}
-                                options={timezoneOptions}
-                                onchange={handleTimezoneChange}
+                                label="Meeting Type"
+                                value={meetingType}
+                                options={meetingTypeOptions}
+                                onchange={handleMeetingTypeChange}
+                                required
                                 variant="label-stacked"
                                 class="custom-combobox">
                             </lightning-combobox>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Right Column - Participants -->
-                <div class="slds-col slds-size_1-of-2">
-                    <div class="participants-section">
-                        <h3 class="section-title">Participants</h3>
-                        
-                        <!-- Current User Info -->
-                        <div class="current-user-card slds-box slds-box_small slds-theme_default">
-                            <div class="slds-media">
-                                <div class="slds-media__figure">
-                                    <lightning-icon icon-name="standard:user" size="small" class="user-icon"></lightning-icon>
-                                </div>
-                                <div class="slds-media__body">
-                                    <div class="slds-text-heading_small">Organizer</div>
-                                    <div class="slds-text-body_regular user-email">{organizerEmail}</div>
-                                </div>
+
+
+                        <template if:true={showOfflineType}>
+                            <div class="form-group">
+                                <lightning-combobox
+                                    label="Type of Offline Gmeet"
+                                    value={offlineType}
+                                    options={offlineTypeOptions}
+                                    onchange={handleOfflineTypeChange}
+                                    variant="label-stacked"
+                                    class="custom-combobox">
+                                </lightning-combobox>
                             </div>
+                        </template>
+
+                        <div class="form-group">
+        <lightning-combobox
+            label="Type of Meeting"
+            value={typeOfMeeting}
+            options={typeOfMeetingOptions}
+            onchange={handleTypeOfMeetingChange}
+            variant="label-stacked"
+            class="custom-combobox">
+        </lightning-combobox>
+    </div>
+
+
+                        <div class="form-group">
+                            <lightning-combobox
+                                label="Duration"
+                                value={duration}
+                                options={durationOptions}
+                                onchange={handleDurationChange}
+                                variant="label-stacked"
+                                class="custom-combobox">
+                            </lightning-combobox>
                         </div>
 
-                        <!-- Add Participant -->
-                        <div class="add-participant-section slds-m-top_medium">
-                            <h4 class="subsection-title">Add Participant</h4>
+                        <!-- Date/Time Section -->
+                        <div class="datetime-section">
+                            <h3 class="section-title">Meeting Time</h3>
                             
-                            <!-- Select Existing User -->
-                            <div class="slds-grid slds-gutters_x-small slds-grid_vertical-align-end slds-m-bottom_small">
-                                <div class="slds-col slds-size_8-of-12">
-                                    <lightning-combobox
-                                        label="Select User"
-                                        value={selectedUser}
-                                        options={participantOptions}
-                                        onchange={handleUserSelection}
-                                        variant="label-hidden"
-                                        placeholder="Select existing user"
-                                        class="custom-combobox">
-                                    </lightning-combobox>
-                                </div>
-                                <div class="slds-col slds-size_4-of-12">
-                                    <lightning-button
-                                        label="Add User"
-                                        onclick={addSelectedUser}
-                                        variant="brand"
-                                        class="add-button"
-                                        disabled={isUserAddDisabled}>
-                                    </lightning-button>
-                                </div>
+                            <!-- Start Date/Time -->
+                            <div class="form-group">
+                                <lightning-input
+                                    type="datetime"
+                                    label="Start Date/Time"
+                                    value={startDateTime}
+                                    onchange={handleStartDateTimeChange}
+                                    variant="label-stacked"
+                                    required
+                                    class="custom-input">
+                                </lightning-input>
                             </div>
 
-                            <!-- Or Add Custom Email -->
-                            <div class="slds-grid slds-gutters_x-small slds-grid_vertical-align-end">
-                                <div class="slds-col slds-size_8-of-12">
-                                    <lightning-input
-                                        label="Custom Email"
-                                        type="email"
-                                        value={customEmail}
-                                        onchange={handleCustomEmailChange}
-                                        placeholder="Enter custom email address"
-                                        variant="label-hidden"
-                                        class="custom-input">
-                                    </lightning-input>
-                                </div>
-                                <div class="slds-col slds-size_4-of-12">
-                                    <lightning-button
-                                        label="Add Email"
-                                        onclick={addCustomEmail}
-                                        variant="neutral"
-                                        class="add-button"
-                                        disabled={isEmailAddDisabled}>
-                                    </lightning-button>
-                                </div>
+                            <!-- End Date/Time -->
+                            <div class="form-group">
+                                <lightning-input
+                                    type="datetime"
+                                    label="End Date/Time"
+                                    value={endDateTime}
+                                    onchange={handleEndDateTimeChange}
+                                    variant="label-stacked"
+                                    required
+                                    class="custom-input">
+                                </lightning-input>
+                            </div>
+
+                            <!-- Timezone -->
+                            <div class="form-group">
+                                <lightning-combobox
+                                    label="Timezone"
+                                    value={timezone}
+                                    options={timezoneOptions}
+                                    onchange={handleTimezoneChange}
+                                    variant="label-stacked"
+                                    class="custom-combobox">
+                                </lightning-combobox>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Participants List -->
-                        <div class="participants-list slds-m-top_medium">
-                            <h4 class="subsection-title">
-                                Participants List ({participants.length})
+                    <!-- Right Column - Participants -->
+                    <div class="slds-col slds-size_1-of-2">
+                        <div class="participants-section">
+                            <h3 class="section-title">Participants</h3>
+                            
+                            <!-- Current User Info -->
+                            <div class="current-user-card slds-box slds-box_small slds-theme_default">
+                                <div class="slds-media">
+                                    <div class="slds-media__figure">
+                                        <lightning-icon icon-name="standard:user" size="small" class="user-icon"></lightning-icon>
+                                    </div>
+                                    <div class="slds-media__body">
+                                        <div class="slds-text-heading_small">Organizer</div>
+                                        <div class="slds-text-body_regular user-email">{organizerEmail}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Add Participant -->
+                            <div class="add-participant-section slds-m-top_medium">
+                                <h4 class="subsection-title">Add Participant</h4>
+                                
+                                <!-- Select Existing User -->
+                                <div class="slds-grid slds-gutters_x-small slds-grid_vertical-align-end slds-m-bottom_small">
+                                    <div class="slds-col slds-size_8-of-12">
+                                        <lightning-combobox
+                                            label="Select User"
+                                            value={selectedUser}
+                                            options={participantOptions}
+                                            onchange={handleUserSelection}
+                                            variant="label-hidden"
+                                            placeholder="Select existing user"
+                                            class="custom-combobox">
+                                        </lightning-combobox>
+                                    </div>
+                                    <div class="slds-col slds-size_4-of-12">
+                                        <lightning-button
+                                            label="Add User"
+                                            onclick={addSelectedUser}
+                                            variant="brand"
+                                            class="add-button"
+                                            disabled={isUserAddDisabled}>
+                                        </lightning-button>
+                                    </div>
+                                </div>
+
+                                <!-- Or Add Custom Email -->
+                                <div class="slds-grid slds-gutters_x-small slds-grid_vertical-align-end">
+                                    <div class="slds-col slds-size_8-of-12">
+                                        <lightning-input
+                                            label="Custom Email"
+                                            type="email"
+                                            value={customEmail}
+                                            onchange={handleCustomEmailChange}
+                                            placeholder="Enter custom email address"
+                                            variant="label-hidden"
+                                            class="custom-input">
+                                        </lightning-input>
+                                    </div>
+                                    <div class="slds-col slds-size_4-of-12">
+                                        <lightning-button
+                                            label="Add Email"
+                                            onclick={addCustomEmail}
+                                            variant="neutral"
+                                            class="add-button"
+                                            disabled={isEmailAddDisabled}>
+                                        </lightning-button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Participants List -->
+                            <div class="participants-list slds-m-top_medium">
+                                <h4 class="subsection-title">
+                                    Participants List ({participants.length})
+                                    <template if:true={hasParticipants}>
+                                        <lightning-button-icon
+                                            icon-name="utility:clear"
+                                            alternative-text="Clear All"
+                                            onclick={clearAllParticipants}
+                                            variant="border-filled"
+                                            class="slds-float_right clear-all-btn">
+                                        </lightning-button-icon>
+                                    </template>
+                                </h4>
+                                
                                 <template if:true={hasParticipants}>
-                                    <lightning-button-icon
-                                        icon-name="utility:clear"
-                                        alternative-text="Clear All"
-                                        onclick={clearAllParticipants}
-                                        variant="border-filled"
-                                        class="slds-float_right clear-all-btn">
-                                    </lightning-button-icon>
-                                </template>
-                            </h4>
-                            
-                            <template if:true={hasParticipants}>
-                                <div class="participants-container">
-                                    <template for:each={participants} for:item="participant" for:index="index">
-                                        <div key={participant.id} class="participant-item slds-box slds-box_small slds-theme_default">
-                                            <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center">
-                                                <div class="slds-col">
-                                                    <div class="slds-grid slds-grid_vertical-align-center">
-                                                        <template if:true={participant.isCurrentUser}>
-                                                            <lightning-icon 
-                                                                icon-name="standard:user"
-                                                                size="small"
-                                                                class="slds-m-right_x-small participant-icon">
-                                                            </lightning-icon>
-                                                        </template>
-                                                        <template if:false={participant.isCurrentUser}>
-                                                            <lightning-icon 
-                                                                icon-name="standard:contact"
-                                                                size="small"
-                                                                class="slds-m-right_x-small participant-icon">
-                                                            </lightning-icon>
-                                                        </template>
-                                                        <div>
-                                                            <div class="participant-email">{participant.email}</div>
-                                                            <template if:true={participant.name}>
-                                                                <div class="participant-name slds-text-body_small">{participant.name}</div>
+                                    <div class="participants-container">
+                                        <template for:each={participants} for:item="participant" for:index="index">
+                                            <div key={participant.id} class="participant-item slds-box slds-box_small slds-theme_default">
+                                                <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center">
+                                                    <div class="slds-col">
+                                                        <div class="slds-grid slds-grid_vertical-align-center">
+                                                            <template if:true={participant.isCurrentUser}>
+                                                                <lightning-icon 
+                                                                    icon-name="standard:user"
+                                                                    size="small"
+                                                                    class="slds-m-right_x-small participant-icon">
+                                                                </lightning-icon>
                                                             </template>
+                                                            <template if:false={participant.isCurrentUser}>
+                                                                <lightning-icon 
+                                                                    icon-name="standard:contact"
+                                                                    size="small"
+                                                                    class="slds-m-right_x-small participant-icon">
+                                                                </lightning-icon>
+                                                            </template>
+                                                            <div>
+                                                                <div class="participant-email">{participant.email}</div>
+                                                                <template if:true={participant.name}>
+                                                                    <div class="participant-name slds-text-body_small">{participant.name}</div>
+                                                                </template>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                                <div class="slds-col slds-size_1-of-6 slds-text-align_right">
-                                                    <template if:false={participant.isCurrentUser}>
-                                                        <lightning-button-icon
-                                                            icon-name="utility:delete"
-                                                            alternative-text="Remove"
-                                                            onclick={removeParticipant}
-                                                            data-index={index}
-                                                            variant="border-filled"
-                                                            class="remove-btn">
-                                                        </lightning-button-icon>
-                                                    </template>
+                                                    <div class="slds-col slds-size_1-of-6 slds-text-align_right">
+                                                        <template if:false={participant.isCurrentUser}>
+                                                            <lightning-button-icon
+                                                                icon-name="utility:delete"
+                                                                alternative-text="Remove"
+                                                                onclick={removeParticipant}
+                                                                data-index={index}
+                                                                variant="border-filled"
+                                                                class="remove-btn">
+                                                            </lightning-button-icon>
+                                                        </template>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </template>
-                                </div>
-                            </template>
-                            <template if:false={hasParticipants}>
-                                <div class="slds-box slds-box_small slds-theme_default slds-text-align_center empty-state">
-                                    <lightning-icon icon-name="standard:people" size="small"></lightning-icon>
-                                    <div class="slds-text-body_regular slds-m-top_x-small">No participants added yet</div>
-                                </div>
-                            </template>
+                                        </template>
+                                    </div>
+                                </template>
+                                <template if:false={hasParticipants}>
+                                    <div class="slds-box slds-box_small slds-theme_default slds-text-align_center empty-state">
+                                        <lightning-icon icon-name="standard:people" size="small"></lightning-icon>
+                                        <div class="slds-text-body_regular slds-m-top_x-small">No participants added yet</div>
+                                    </div>
+                                </template>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Action Buttons -->
-            <div class="action-buttons slds-m-top_large slds-grid slds-grid_align-spread">
-                <div>
-                    <lightning-button
-                        label="Clear All"
-                        onclick={clearAll}
-                        variant="neutral"
-                        class="clear-btn">
-                    </lightning-button>
-                </div>
-                <div>
-                    <lightning-button
-                        label="Create Meeting"
-                        onclick={createMeeting}
-                        variant="brand"
-                        disabled={isLoading}
-                        class="create-btn">
-                    </lightning-button>
-                </div>
-            </div>
-
-            <!-- Loading Spinner -->
-            <template if:true={isLoading}>
-                <div class="loading-overlay">
-                    <div class="slds-align_absolute-center">
-                        <lightning-spinner alternative-text="Creating meeting..."></lightning-spinner>
-                        <div class="slds-text-heading_small slds-m-top_small">Creating Meeting...</div>
+                <!-- Action Buttons -->
+                <div class="action-buttons slds-m-top_large slds-grid slds-grid_align-spread">
+                    <div>
+                        <lightning-button
+                            label="Clear All"
+                            onclick={clearAll}
+                            variant="neutral"
+                            class="clear-btn">
+                        </lightning-button>
+                    </div>
+                    <div>
+                        <lightning-button
+                            label="Create Meeting"
+                            onclick={createMeeting}
+                            variant="brand"
+                            disabled={isLoading}
+                            class="create-btn">
+                        </lightning-button>
                     </div>
                 </div>
-            </template>
 
-            <!-- Success Message -->
-            <template if:true={showSuccess}>
-                <div class="slds-notify slds-notify_alert slds-theme_success slds-m-top_medium success-message">
-                    <span class="slds-icon_container slds-icon-utility-success slds-m-right_x-small">
-                        <lightning-icon icon-name="utility:success"></lightning-icon>
-                    </span>
-                    <h2 class="slds-text-heading_small">Meeting created successfully!</h2>
-                    <div class="slds-m-top_small">
-                        <a href={meetingResult.htmlLink} target="_blank" class="slds-button slds-button_outline-brand slds-m-right_x-small">
-                            View in Calendar
-                        </a>
-                        <template if:true={meetingResult.meetUrl}>
-                            <a href={meetingResult.meetUrl} target="_blank" class="slds-button slds-button_outline-brand">
-                                Join Google Meet
+                <!-- Loading Spinner -->
+                <template if:true={isLoading}>
+                    <div class="loading-overlay">
+                        <div class="slds-align_absolute-center">
+                            <lightning-spinner alternative-text="Creating meeting..."></lightning-spinner>
+                            <div class="slds-text-heading_small slds-m-top_small">Creating Meeting...</div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Success Message -->
+                <template if:true={showSuccess}>
+                    <div class="slds-notify slds-notify_alert slds-theme_success slds-m-top_medium success-message">
+                        <span class="slds-icon_container slds-icon-utility-success slds-m-right_x-small">
+                            <lightning-icon icon-name="utility:success"></lightning-icon>
+                        </span>
+                        <h2 class="slds-text-heading_small">Meeting created successfully!</h2>
+                        <div class="slds-m-top_small">
+                            <a href={meetingResult.htmlLink} target="_blank" class="slds-button slds-button_outline-brand slds-m-right_x-small">
+                                View in Calendar
                             </a>
-                        </template>
+                            <template if:true={meetingResult.meetUrl}>
+                                <a href={meetingResult.meetUrl} target="_blank" class="slds-button slds-button_outline-brand">
+                                    Join Google Meet
+                                </a>
+                            </template>
+                        </div>
                     </div>
-                </div>
-            </template>
+                </template>
 
-            <!-- Error Message -->
-            <template if:true={error}>
-                <div class="slds-notify slds-notify_alert slds-theme_error slds-m-top_medium error-message">
-                    <span class="slds-icon_container slds-icon-utility-error slds-m-right_x-small">
-                        <lightning-icon icon-name="utility:error"></lightning-icon>
-                    </span>
-                    <h2 class="slds-text-heading_small">Error: {error}</h2>
-                </div>
-            </template>
-        </div>
-    </lightning-card>
-</template>
+                <!-- Error Message -->
+                <!-- <template if:true={error}>
+                    <div class="slds-notify slds-notify_alert slds-theme_error slds-m-top_medium error-message">
+                        <span class="slds-icon_container slds-icon-utility-error slds-m-right_x-small">
+                            <lightning-icon icon-name="utility:error"></lightning-icon>
+                        </span>
+                        <h2 class="slds-text-heading_small">Error: {error}</h2>
+                    </div>
+                </template> -->
+            </div>
+        </lightning-card>
+    </template>

@@ -21,7 +21,20 @@ public without sharing class GoogleMeetService {
     }
 
     @AuraEnabled(cacheable=false)
-    public static CreateResult createMeetingWithEvent(Id recordId, String subject, String description, Datetime startUtc, Datetime endUtc, String timeZoneId, List<String> attendeeEmails, String meetingType, String offlineType, Integer durationMinutes) {
+  public static CreateResult createMeetingWithEvent(
+    Id recordId,
+    String subject,
+    String description,
+    Datetime startUtc,
+    Datetime endUtc,
+    String timeZoneId,
+    List<String> attendeeEmails,
+    String meetingType,
+    String typeOfMeeting,
+    String offlineType,
+    Integer durationMinutes
+)
+ {
         if (String.isBlank(timeZoneId)) timeZoneId = 'Asia/Kolkata';
         if (attendeeEmails == null) attendeeEmails = new List<String>();
 
@@ -61,6 +74,10 @@ public without sharing class GoogleMeetService {
         if (!String.isBlank(offlineType) && !String.isBlank(meetingType) && meetingType == 'Offline' && fMap.containsKey('Type_of_Offline_gmeet__c')) {
             ev.put('Type_of_Offline_gmeet__c', offlineType);
         }
+        if (!String.isBlank(typeOfMeeting) && fMap.containsKey('Type_of_Meeting__c')) {
+    ev.put('Type_of_Meeting__c', typeOfMeeting);
+}
+
         if (durationMinutes != null && fMap.containsKey('Duration__c')) {
             ev.put('Duration__c', durationMinutes);
         }
@@ -212,4 +229,60 @@ public without sharing class GoogleMeetService {
             throw new AuraHandledException('Error getting user email: ' + e.getMessage());
         }
     }
+
+   @AuraEnabled(cacheable=true)
+public static List<Map<String, String>> getEventPicklistValues(
+    String fieldApiName
+) {
+    if (String.isBlank(fieldApiName)) {
+        throw new AuraHandledException('Field API name is required');
+    }
+
+    Map<String, Schema.SObjectField> fieldMap =
+        Event.SObjectType.getDescribe().fields.getMap();
+
+    if (!fieldMap.containsKey(fieldApiName)) {
+        throw new AuraHandledException(
+            'Field does not exist on Event: ' + fieldApiName
+        );
+    }
+
+    Schema.DescribeFieldResult dfr =
+        fieldMap.get(fieldApiName).getDescribe();
+
+    List<Map<String, String>> options = new List<Map<String, String>>();
+
+    for (Schema.PicklistEntry pe : dfr.getPicklistValues()) {
+        if (pe.isActive()) {
+            options.add(new Map<String, String>{
+                'label' => pe.getLabel(),
+                'value' => pe.getValue()
+            });
+        }
+    }
+
+    return options;
+}
+
+@AuraEnabled
+public static Boolean checkExistingMeetings(Datetime startUtc, Datetime endUtc) {
+    try {
+        // Query for meetings with EXACT same start and end datetime
+        List<Event> existingEvents = [
+            SELECT Id 
+            FROM Event 
+            WHERE StartDateTime = :startUtc
+            AND EndDateTime = :endUtc
+            LIMIT 1
+        ];
+        
+        // Return true if duplicate found
+        return !existingEvents.isEmpty();
+        
+    } catch(Exception e) {
+        System.debug('Error: ' + e.getMessage());
+        return false;
+    }
+}
+
 }

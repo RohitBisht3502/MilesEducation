@@ -1,0 +1,22 @@
+<template>
+    <div class="nav-container">
+        <!-- Nav title dynamically shows latest source -->
+     <span class={navTitleClass}>{latestSource}</span>
+
+<template for:each={tabs} for:item="tab">
+    <div key={tab.name} class="tab-item-group">
+
+        <button class={tab.tabClass} type="button">
+            {tab.label}
+        </button>
+
+        <template if:true={tab.count}>
+            <span class="notification-badge">{tab.count}</span>
+        </template>
+
+    </div>
+</template>
+
+        </div>
+  
+</template>

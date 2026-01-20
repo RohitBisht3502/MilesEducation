@@ -27,26 +27,37 @@
                             <th class="text-center">Action</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <template for:each={filteredProducts} for:item="prod">
-                            <tr key={prod.id}>
-                                <td>
-                                    <strong>{prod.name}</strong>
-                                </td>
-                                <td class="muted">{prod.sku}</td>
-                                <td class="muted">{prod.category}</td>
-                                <td class="text-right">₹{prod.price}</td>
-                                <td class="text-center">
-                                    <button
-                                        class="btn-icon primary"
-                                        data-id={prod.id}
-                                        onclick={addToCart}>
-                                        +
-                                    </button>
-                                </td>
-                            </tr>
-                        </template>
-                    </tbody>
+                  <tbody>
+    <template if:true={showProducts}>
+        <template for:each={filteredProducts} for:item="prod">
+            <tr key={prod.id}>
+                <td>
+                    <strong>{prod.name}</strong>
+                </td>
+                <td class="muted">{prod.sku}</td>
+                <td class="muted">{prod.category}</td>
+                <td class="text-right">₹{prod.price}</td>
+                <td class="text-center">
+                    <button
+                        class="btn-icon primary"
+                        data-id={prod.id}
+                        onclick={addToCart}>
+                        +
+                    </button>
+                </td>
+            </tr>
+        </template>
+    </template>
+
+    <template if:false={showProducts}>
+        <tr>
+            <td colspan="5" class="empty">
+                Start typing to search products
+            </td>
+        </tr>
+    </template>
+</tbody>
+
                 </table>
             </div>
         </section>
@@ -121,68 +132,89 @@
 
         <section class="checkout-container">
 
-            <!-- ORDER SUMMARY -->
-            <div class="summary-card">
-                <a class="back-link" onclick={backToProducts}>← Back to Products</a>
-                <h2 class="section-title">Order Summary</h2>
+            <!-- LEFT COLUMN: ORDER SUMMARY -->
+            <div class="checkout-left">
+                <div class="summary-card">
+                    <a class="back-link" onclick={backToProducts}>← Back to Products</a>
+                    <h2 class="section-title">Order Summary</h2>
 
-                <template for:each={selectedProducts} for:item="item">
-                    <div key={item.id} class="summary-item">
-                        <div>
-                            <strong>{item.name}</strong>
-                            <div class="muted">Qty: {item.quantity} × ₹{item.price}</div>
+                    <template for:each={selectedProducts} for:item="item">
+                        <div key={item.id} class="summary-item">
+                            <div>
+                                <strong>{item.name}</strong>
+                                <div class="muted">Qty: {item.quantity} × ₹{item.price}</div>
+                            </div>
+                            <div class="price">₹{item.total}</div>
                         </div>
-                        <div class="price">₹{item.total}</div>
-                    </div>
-                </template>
+                    </template>
+                </div>
             </div>
 
-            <!-- PAYMENT / DISCOUNT -->
-            <div class="summary-card">
-                <h2 class="section-title">Pricing & Discount</h2>
+            <!-- RIGHT COLUMN: ADDRESS + DISCOUNT -->
+            <div class="checkout-right">
+                
+                <!-- SELECT ADDRESS -->
+                <div class="summary-card">
+                    <h2 class="section-title">Select Address</h2>
 
-                <div class="radio-group">
-                    <label>
-                        <input type="radio" name="discountType" value="percentage"
-                               checked={isPercentage} onchange={handleDiscountType}/>
-                        Percentage
-                    </label>
-
-                    <label>
-                        <input type="radio" name="discountType" value="fixed"
-                               checked={isFixed} onchange={handleDiscountType}/>
-                        Fixed Amount
-                    </label>
+                    <lightning-radio-group
+                        name="addressType"
+                        label="Choose Address"
+                        options={addressOptions}
+                        value={selectedAddressType}
+                        onchange={handleAddressChange}>
+                    </lightning-radio-group>
                 </div>
 
-                <lightning-input
-                    type="number"
-                    label="Discount Value"
-                    onchange={handleDiscountValue}>
-                </lightning-input>
+                <!-- PAYMENT / DISCOUNT -->
+                <div class="summary-card">
+                    <h2 class="section-title">Pricing & Discount</h2>
 
-                <div class="price-row">
-                    <span>Subtotal</span>
-                    <span>₹{subTotal}</span>
+                    <div class="radio-group">
+                        <label>
+                            <input type="radio" name="discountType" value="percentage"
+                                   checked={isPercentage} onchange={handleDiscountType}/>
+                            Percentage
+                        </label>
+
+                        <label>
+                            <input type="radio" name="discountType" value="fixed"
+                                   checked={isFixed} onchange={handleDiscountType}/>
+                            Fixed Amount
+                        </label>
+                    </div>
+
+                    <lightning-input
+                        type="number"
+                        label={discountLabel}
+                        value={discountValue}
+                        onchange={handleDiscountValue}>
+                    </lightning-input>
+
+                    <div class="price-row">
+                        <span>Subtotal</span>
+                        <span>₹{subTotal}</span>
+                    </div>
+
+                    <div class="price-row">
+                        <span>Discount</span>
+                        <span>- ₹{discountAmount}</span>
+                    </div>
+
+                    <div class="price-row total">
+                        <span>Total Payable</span>
+                        <span>₹{finalPayable}</span>
+                    </div>
+
+                    <lightning-button
+                        class="confirm-btn"
+                        variant="brand"
+                        label="Confirm Purchase"
+                        onclick={confirmPurchase}
+                        disabled={disableConfirmPurchase}>
+                    </lightning-button>
                 </div>
 
-                <div class="price-row">
-                    <span>Discount</span>
-                    <span>- ₹{discountAmount}</span>
-                </div>
-
-                <div class="price-row total">
-                    <span>Total Payable</span>
-                    <span>₹{finalPayable}</span>
-                </div>
-
-                <lightning-button
-                    class="confirm-btn"
-                    variant="brand"
-                    label="Confirm Purchase"
-                    onclick={confirmPurchase}
-                    disabled={disableConfirmPurchase}>
-                </lightning-button>
             </div>
 
         </section>

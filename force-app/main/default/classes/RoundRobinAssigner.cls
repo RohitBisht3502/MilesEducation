@@ -17,6 +17,14 @@ public without sharing class RoundRobinAssigner {
         }
         System.debug(LoggingLevel.INFO, 'RoundRobinAssigner.assignWithStickyAndRoundRobin: start, records=' + records.size() + ', object=' + objectApiName);
 
+        Boolean isMCOM = 'MCOM'.equalsIgnoreCase(type);
+        
+        if (isMCOM) {
+            System.debug(LoggingLevel.INFO, 'RoundRobinAssigner: MCOM detected, skipping sticky assignment, going straight to round robin');
+            RoundRobinService.assignForRecords(records, cfg);
+            return;
+        }
+        
         String phoneField  = cfg.phoneField;
         String sourceField = cfg.sourceField;
 

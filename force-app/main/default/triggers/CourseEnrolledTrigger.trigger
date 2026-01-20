@@ -1,7 +1,3 @@
-/*
-    Author       : ROHIT SINGH BISHT
-    Description  : 
-*/
 trigger CourseEnrolledTrigger on Course_Enrolled__c (
     before insert, after insert,
     before update, after update,

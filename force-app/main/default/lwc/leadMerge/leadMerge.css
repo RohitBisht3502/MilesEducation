@@ -1,8 +1,11 @@
 /* Container */
 .container {
     background: #ffffff;
-    padding: 32px;
-    min-height: 400px;
+    padding: 32px 32px 0 32px;
+    height: 70vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 /* Header */
@@ -440,4 +443,35 @@
 
 .comment-input::placeholder {
     color: #80868b;
+}
+
+/* Fixed Elements */
+.header,
+.search-container {
+    flex-shrink: 0;
+}
+
+/* Scrollable Area */
+.results-area {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 32px;
+    /* Bottom spacing for content */
+    scrollbar-width: thin;
+    scrollbar-color: #bdc1c6 transparent;
+    padding-right: 4px;
+    /* Space for scrollbar */
+}
+
+.results-area::-webkit-scrollbar {
+    width: 6px;
+}
+
+.results-area::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.results-area::-webkit-scrollbar-thumb {
+    background-color: #bdc1c6;
+    border-radius: 3px;
 }

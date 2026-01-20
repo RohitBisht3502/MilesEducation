@@ -116,7 +116,7 @@
                 <tr>
                   <th>Sales Rep</th>
                   <th>Sequence</th>
-                  <th>Action</th>
+                  <!-- <th>Action</th> -->
                 </tr>
               </thead>
               <tbody>
@@ -127,10 +127,10 @@
                       <input type="number" min="1" step="1" value={r.sequence} data-poolid={r.poolId}
                         oninput={onSeqInputChange} />
                     </td>
-                    <td>
+                    <!-- <td>
                       <button class="seq-btn" data-index={index} onclick={moveSeqUp} title="Move Up">⬆</button>
                       <button class="seq-btn" data-index={index} onclick={moveSeqDown} title="Move Down">⬇</button>
-                    </td>
+                    </td> -->
                   </tr>
                 </template>
               </tbody>
@@ -169,8 +169,9 @@
                 <td>{row.salesRepName}</td>
                 <template for:each={row.cells} for:item="cell">
                   <td key={cell.key}>
-                    <span class="editable-cell" contenteditable="true" data-poolid={cell.poolId} data-repid={row.key}
-                      data-src={cell.src} onblur={onCellBlur} onkeydown={onCellKeydown} title="Enter weight">
+                    <span class="editable-cell" contenteditable="true" data-poolid={cell.poolId}
+                      data-repid={row.salesRepId} data-src={cell.src} onblur={onCellBlur} onkeydown={onCellKeydown}
+                      title="Enter weight">
                       {cell.value}
                     </span>
                   </td>

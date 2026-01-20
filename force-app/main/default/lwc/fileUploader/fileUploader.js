@@ -30,9 +30,28 @@ export default class FileUploader extends LightningElement {
     return !this.recordId || !this.uuid || this.files.length === 0 || this.uploading;
   }
 
+  get hasFiles() {
+    return this.files && this.files.length > 0;
+  }
+
+  openFilePicker() {
+    this.template.querySelector('.hidden-file-input').click();
+  }
+
   handleFileChange(e) {
     this.files = Array.from(e.target.files || []);
     this.lastResultMessage = '';
+  }
+
+  removeFile(event) {
+    const index = event.currentTarget.dataset.index;
+    this.files.splice(index, 1);
+    this.files = [...this.files];
+
+    // Reset file input so same file can be selected again
+    if (this.files.length === 0) {
+      this.template.querySelector('.hidden-file-input').value = null;
+    }
   }
 
   async upload() {
@@ -61,7 +80,6 @@ export default class FileUploader extends LightningElement {
         success += 1;
       } catch (e) {
         failed += 1;
-        // eslint-disable-next-line no-console
         console.error('Upload failed:', e);
       }
     }
@@ -79,7 +97,6 @@ export default class FileUploader extends LightningElement {
         this.dispatchEvent(new CloseActionScreenEvent());
         setTimeout(() => window.location.reload(), 800);
       } catch (error) {
-        // eslint-disable-next-line no-console
         console.error('Error saving URLs:', error);
         this.toast('Warning', 'Files uploaded but failed to save full URLs.', 'warning');
       }

@@ -48,6 +48,9 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         // LeadTriggerHelperClass.registerLeadForUpcomingWebinars(getNewLeads());
         LeadTriggerHelperClass.afterInsertAutoRegisterWebinar(newLeads);
         LeadTriggerHandler.createLeadActivityLogs(newLeads, null, true);
+        
+        // M.Com Bridge Course Tasks
+        LeadTriggerHelperClass.createMComTasks(newLeads, null);
     }
 
     public override void afterUpdate() {
@@ -81,6 +84,12 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
 
         // log owner change activity
         LeadTriggerHandler.createOwnerChangeActivityLogs(newLeads, oldMapLead);
+
+        // M.Com Bridge Course Tasks (Status changes)
+        LeadTriggerHelperClass.createMComTasks(newLeads, oldMapLead);
+
+        // Validate mandatory comments for rejection
+        LeadTriggerHelperClass.validateApprovalComments(newLeads, oldMapLead);
     }
 
     public override void beforeDelete() {

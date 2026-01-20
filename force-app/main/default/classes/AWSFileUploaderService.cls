@@ -50,14 +50,25 @@ public without sharing class AWSFileUploaderService {
         @AuraEnabled public String url;
     }
 
-    static String buildHtml(List<S3Url> items, String context) {
-        String prefix = String.isBlank(context) ? '' : '[' + context.toUpperCase() + '] ';
-        String html = '';
-        for (S3Url i : items) {
-            if (String.isBlank(i.url)) continue;
-            String label = String.isBlank(i.name) ? i.url : i.name;
-            html += '<div><a href="' + i.url + '" target="_blank" rel="noopener noreferrer">' + prefix + label + '</a></div>';
-        }
-        return html;
+ static String buildHtml(List<S3Url> items, String context) {
+    String prefix = String.isBlank(context) ? '' : '[' + context.toUpperCase() + '] ';
+    String html = '';
+
+    for (S3Url i : items) {
+        if (String.isBlank(i.url)) continue;
+
+        String label = String.isBlank(i.name) ? i.url : i.name;
+
+        html += '<div>'
+             + '<a href="' + i.url + '" '
+             + 'target="_blank" '
+             + 'rel="noopener noreferrer" '
+             + 'onclick="event.stopPropagation();">'
+             + prefix + label
+             + '</a>'
+             + '</div>';
     }
+    return html;
+}
+
 }

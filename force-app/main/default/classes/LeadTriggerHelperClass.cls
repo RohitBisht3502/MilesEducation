@@ -138,6 +138,8 @@ public without sharing class LeadTriggerHelperClass {
     }
 
 
+    // Author => Dheeraj Kumar
+    // Description => After update merge leads
     public static void afterUpdateMergeLead(List<Lead__c> newList, Map<Id, Lead__c> oldMap) {
     
         // 1️⃣ Identify leads where status changed to 'Approved'
@@ -173,7 +175,7 @@ public without sharing class LeadTriggerHelperClass {
         
         // 2️⃣ Query all related leads that are tagged to the approved leads
         List<Lead__c> relatedLeads = [
-            SELECT Id, Stage__c, Lead__c
+            SELECT Id, Stage__c, Lead__c, Course__c, Candidate__c
             FROM Lead__c
             WHERE Lead__c IN :approvedLeadIds
         ];
@@ -182,10 +184,8 @@ public without sharing class LeadTriggerHelperClass {
         
         // 3️⃣ Create a map of main lead Id to its related leads
         Map<Id, List<Lead__c>> mainLeadToRelatedLeadsMap = new Map<Id, List<Lead__c>>();
-        Set<Id> allRelatedLeadIds = new Set<Id>();
         
         for (Lead__c relatedLead : relatedLeads) {
-            allRelatedLeadIds.add(relatedLead.Id);
             
             if (!mainLeadToRelatedLeadsMap.containsKey(relatedLead.Lead__c)) {
                 mainLeadToRelatedLeadsMap.put(relatedLead.Lead__c, new List<Lead__c>());
@@ -195,7 +195,7 @@ public without sharing class LeadTriggerHelperClass {
         
         // 4️⃣ Query main leads with their current stage
         Map<Id, Lead__c> mainLeadsMap = new Map<Id, Lead__c>(
-            [SELECT Id, Stage__c
+            [SELECT Id, Stage__c, Course__c, Candidate__c
             FROM Lead__c
             WHERE Id IN :approvedLeadIds]
         );
@@ -206,25 +206,45 @@ public without sharing class LeadTriggerHelperClass {
             'M4-' => 6, 'M4' => 7, 'M5' => 8, 'M6' => 9, 'M7' => 10
         };
         
-        // 6️⃣ Update stages for main leads (pick highest stage from all related leads)
+        // 6️⃣ Processing
         List<Lead__c> mainLeadsToUpdate = new List<Lead__c>();
         List<Lead__c> relatedLeadsToUpdate = new List<Lead__c>();
         
+        // Lists for Full Merge (Same Course)
+        Set<Id> sameCourseRelatedLeadIds = new Set<Id>();
+        List<Lead__c> sameCourseRelatedLeads = new List<Lead__c>();
+
         for (Id mainLeadId : mainLeadToRelatedLeadsMap.keySet()) {
             Lead__c mainLead = mainLeadsMap.get(mainLeadId);
             if (mainLead != null) {
                 String highestStage = mainLead.Stage__c;
                 
-                // Compare with all related leads to find highest stage
                 for (Lead__c relatedLead : mainLeadToRelatedLeadsMap.get(mainLeadId)) {
-                    highestStage = getHigherStage(highestStage, relatedLead.Stage__c, stageRankMap);
                     
-                    // Mark related lead as merged
+                    // Mark as merged (common for both scenarios)
                     relatedLead.Is_Merged__c = true;
+                    
+                    // SCENARIO 1: SAME COURSE (Original Logic)
+                    if (relatedLead.Course__c == mainLead.Course__c) {
+                        // Compare stages
+                        highestStage = getHigherStage(highestStage, relatedLead.Stage__c, stageRankMap);
+                        
+                        // Add to lists for Reparenting
+                        sameCourseRelatedLeadIds.add(relatedLead.Id);
+                        sameCourseRelatedLeads.add(relatedLead);
+                    } 
+                    // SCENARIO 2: DIFFERENT COURSE
+                    else {
+                        // Tag related lead to Main Lead's Candidate
+                        if (mainLead.Candidate__c != null) {
+                            relatedLead.Candidate__c = mainLead.Candidate__c;
+                        }
+                    }
+                    
                     relatedLeadsToUpdate.add(relatedLead);
                 }
                 
-                // Update stage only if it changed
+                // Update stage ONLY if logic from Same Course scenario changed it
                 if (highestStage != mainLead.Stage__c) {
                     mainLead.Stage__c = highestStage;
                     mainLeadsToUpdate.add(mainLead);
@@ -232,50 +252,52 @@ public without sharing class LeadTriggerHelperClass {
             }
         }
         
-        // 7️⃣ Query and reparent all child records in bulk
+        // 7️⃣ Reparent child records ONLY for Same Course leads
         List<SObject> childRecordsToUpdate = new List<SObject>();
         
-        // Reparent Enquiries
-        childRecordsToUpdate.addAll(reparentChildRecords(
-            [SELECT Id, Lead__c FROM Enquiry__c WHERE Lead__c IN :allRelatedLeadIds],
-            'Lead__c',
-            relatedLeads
-        ));
-        
-        // Reparent Phone Numbers
-        childRecordsToUpdate.addAll(reparentChildRecords(
-            [SELECT Id, Lead__c FROM Phone_Number__c WHERE Lead__c IN :allRelatedLeadIds],
-            'Lead__c',
-            relatedLeads
-        ));
-        
-        // Reparent Call Logs
-        childRecordsToUpdate.addAll(reparentChildRecords(
-            [SELECT Id, Lead__c FROM Call_Log__c WHERE Lead__c IN :allRelatedLeadIds],
-            'Lead__c',
-            relatedLeads
-        ));
-        
-        // Reparent Webinar Members
-        childRecordsToUpdate.addAll(reparentChildRecords(
-            [SELECT Id, Lead__c FROM Webinar_Member__c WHERE Lead__c IN :allRelatedLeadIds],
-            'Lead__c',
-            relatedLeads
-        ));
-        
-        // Reparent Activity Logs
-        childRecordsToUpdate.addAll(reparentChildRecords(
-            [SELECT Id, Lead__c FROM Activity_Log__c WHERE Lead__c IN :allRelatedLeadIds],
-            'Lead__c',
-            relatedLeads
-        ));
-        
-        // Reparent Eligibility Folders
-        childRecordsToUpdate.addAll(reparentChildRecords(
-            [SELECT Id, Lead__c FROM Eligibility_Folder__c WHERE Lead__c IN :allRelatedLeadIds],
-            'Lead__c',
-            relatedLeads
-        ));
+        if (!sameCourseRelatedLeadIds.isEmpty()) {
+            // Reparent Enquiries
+            childRecordsToUpdate.addAll(reparentChildRecords(
+                [SELECT Id, Lead__c FROM Enquiry__c WHERE Lead__c IN :sameCourseRelatedLeadIds],
+                'Lead__c',
+                sameCourseRelatedLeads
+            ));
+            
+            // Reparent Phone Numbers
+            childRecordsToUpdate.addAll(reparentChildRecords(
+                [SELECT Id, Lead__c FROM Phone_Number__c WHERE Lead__c IN :sameCourseRelatedLeadIds],
+                'Lead__c',
+                sameCourseRelatedLeads
+            ));
+            
+            // Reparent Call Logs
+            childRecordsToUpdate.addAll(reparentChildRecords(
+                [SELECT Id, Lead__c FROM Call_Log__c WHERE Lead__c IN :sameCourseRelatedLeadIds],
+                'Lead__c',
+                sameCourseRelatedLeads
+            ));
+            
+            // Reparent Webinar Members
+            childRecordsToUpdate.addAll(reparentChildRecords(
+                [SELECT Id, Lead__c FROM Webinar_Member__c WHERE Lead__c IN :sameCourseRelatedLeadIds],
+                'Lead__c',
+                sameCourseRelatedLeads
+            ));
+            
+            // Reparent Activity Logs
+            childRecordsToUpdate.addAll(reparentChildRecords(
+                [SELECT Id, Lead__c FROM Activity_Log__c WHERE Lead__c IN :sameCourseRelatedLeadIds],
+                'Lead__c',
+                sameCourseRelatedLeads
+            ));
+            
+            // Reparent Eligibility Folders
+            childRecordsToUpdate.addAll(reparentChildRecords(
+                [SELECT Id, Lead__c FROM Eligibility_Folder__c WHERE Lead__c IN :sameCourseRelatedLeadIds],
+                'Lead__c',
+                sameCourseRelatedLeads
+            ));
+        }
         
         // 8️⃣ Perform DML operations
         if (!mainLeadsToUpdate.isEmpty()) {
@@ -400,6 +422,8 @@ public without sharing class LeadTriggerHelperClass {
         if (!parentsToUpdate.isEmpty()) {
             update parentsToUpdate;
         }
+
+        
     }
     
     /*
@@ -445,5 +469,102 @@ public without sharing class LeadTriggerHelperClass {
     }
     
 
+    // Author: Dheeraj Kumar
+    // Description: Automate Task creation for M.Com Bridge Course
+    public static void createMComTasks(List<Lead__c> newLeads, Map<Id, Lead__c> oldMap) {
+        List<Task> tasksToInsert = new List<Task>();
+        
+        for (Lead__c lead : newLeads) {
+            // Ensure logic only applies to MCOM course
+            if (lead.Course__c != 'MCOM') continue;
 
+            String oldStage = (oldMap != null) ? oldMap.get(lead.Id).Stage__c : null;
+            
+            // 1. Initial Contact (Creation at B3 or Update to B3)
+            if (lead.Stage__c == 'B3' && (oldMap == null || oldStage != 'B3')) {
+                Task t = new Task();
+                t.Subject = 'Initial Contact: Bridge Course';
+                t.WhatId = lead.Id; 
+                t.OwnerId = lead.OwnerId;
+                t.ActivityDate = System.today().addDays(1);
+                t.Priority = 'High';
+                t.Status = 'Open';
+                tasksToInsert.add(t);
+            }
+            
+            // 2. Post-Enrollment (Change to B7 Enrolled)
+            if (lead.Stage__c == 'B7' && oldStage != 'B7') {
+                // 3 Days
+                tasksToInsert.add(createTask(lead, 'M.Com Post-Enrollment: 3 Days Follow-up', 3));
+                // 7 Days
+                tasksToInsert.add(createTask(lead, 'M.Com Post-Enrollment: 7 Days Follow-up', 7));
+                // 30, 60, 90 Days
+                tasksToInsert.add(createTask(lead, 'M.Com Monthly Call: 30 Days', 30));
+                tasksToInsert.add(createTask(lead, 'M.Com Monthly Call: 60 Days', 60));
+                tasksToInsert.add(createTask(lead, 'M.Com Monthly Call: 90 Days', 90));
+            }
+        }
+        
+        if(!tasksToInsert.isEmpty()) {
+            try {
+                insert tasksToInsert;
+            } catch (Exception e) {
+                System.debug('Error creating M.Com Tasks: ' + e.getMessage());
+            }
+        }
+    }
+
+    private static Task createTask(Lead__c lead, String subject, Integer daysOffset) {
+        Task t = new Task();
+        t.Subject = subject;
+        t.WhatId = lead.Id;
+        t.OwnerId = lead.OwnerId;
+        t.ActivityDate = System.today().addDays(daysOffset);
+        t.Status = 'Open';
+        t.Priority = 'Normal';
+        return t;
+    }
+
+
+    //Author => Dheeraj Kumar
+    //Description => Validate approval comments for leads   
+    public static void validateApprovalComments(List<Lead__c> newLeads, Map<Id, Lead__c> oldMap) {
+        Set<Id> leadsToCheck = new Set<Id>();
+
+        for (Lead__c lead : newLeads) {
+            Lead__c oldLead = oldMap.get(lead.Id);
+            // Check for Rejection
+            if (lead.Status__c == 'Rejected' && oldLead.Status__c != 'Rejected') { 
+                leadsToCheck.add(lead.Id);
+            }
+        }
+
+        if (leadsToCheck.isEmpty()) return;
+
+        Map<Id, String> leadToCommentMap = new Map<Id, String>();
+        
+        // Query the latest ProcessInstanceStep for these leads
+        List<ProcessInstanceStep> steps = [
+            SELECT ProcessInstance.TargetObjectId, Comments 
+            FROM ProcessInstanceStep 
+            WHERE ProcessInstance.TargetObjectId IN :leadsToCheck 
+            ORDER BY SystemModstamp DESC 
+            LIMIT 100
+        ];
+
+        for (ProcessInstanceStep step : steps) {
+            if (!leadToCommentMap.containsKey(step.ProcessInstance.TargetObjectId)) {
+                leadToCommentMap.put(step.ProcessInstance.TargetObjectId, step.Comments);
+            }
+        }
+
+        for (Lead__c lead : newLeads) {
+            if (leadsToCheck.contains(lead.Id)) {
+                String comments = leadToCommentMap.get(lead.Id);
+                if (String.isBlank(comments)) {
+                    lead.addError('Comments are mandatory when rejecting a Lead merge request.');
+                }
+            }
+        }
+    }
 }

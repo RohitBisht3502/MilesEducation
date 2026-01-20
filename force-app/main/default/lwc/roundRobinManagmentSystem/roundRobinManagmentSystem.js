@@ -292,7 +292,6 @@ export default class RoundRobinManagmentSystem extends LightningElement {
 
         const node = r?.byLeadSource?.[col];
 
-        // ✅ SAFE null handling
         if (node) {
           poolId = node.poolId || null;
 
@@ -311,8 +310,9 @@ export default class RoundRobinManagmentSystem extends LightningElement {
           this.poolIndex[poolId] = { ri, ci, poolId };
         }
 
+        // Generate guaranteed unique key using row index and column index
         return {
-          key: `${r.salesRepId}-${col}`,
+          key: `cell-${ri}-${ci}`,
           value,
           poolId,
           sequence,
@@ -320,8 +320,10 @@ export default class RoundRobinManagmentSystem extends LightningElement {
         };
       });
 
+      // Generate guaranteed unique key using row index
       return {
-        key: r.salesRepId,
+        key: `row-${ri}`,
+        salesRepId: r.salesRepId,
         salesRepName: r.salesRepName,
         cells,
         total
@@ -379,11 +381,17 @@ export default class RoundRobinManagmentSystem extends LightningElement {
         rows.push({
           salesRepName: r.salesRepName,
           poolId: cell.poolId,
-          bucketId: this.selectedBucket, // ⭐ CRITICAL
           sequence: Number.isFinite(n) ? n : ''
         });
 
       }
+    });
+    rows.sort((a, b) => {
+      let sa = typeof a.sequence === 'number' ? a.sequence : 999999;
+      let sb = typeof b.sequence === 'number' ? b.sequence : 999999;
+      if (sa === 0) sa = 999999;
+      if (sb === 0) sb = 999999;
+      return sa - sb;
     });
     this.seqColIndex = ci;
     this.seqColLabel = label;
@@ -407,51 +415,61 @@ export default class RoundRobinManagmentSystem extends LightningElement {
   };
 
   async saveSeqEdits() {
-
+    console.log('🔵 saveSeqEdits START');
+    console.log('🔵 seqRows:', JSON.stringify(this.seqRows, null, 2));
 
     const validation = this.validateColumnTotals();
     if (!validation.valid) {
       this.showToast(
-        'Validation eror',
-        `lead source "${validation.leadSource}" total is ${validation.total}. It must be ${validation.expected} (number of users in city).`,
+        'Validation Error',
+        `Lead source "${validation.leadSource}" total is ${validation.total}. It must be ${validation.expected} (number of users in city).`,
         'error'
       );
       return;
-
-
     }
+
     if (!this.seqRows.length) {
       this.showToast('Info', 'No sequence changes to save.', 'info');
       return;
     }
-    // ensure visual order = array order
-    //this.seqRows = [...this.seqRows];
 
-    // Recalculate sequence based on visual order
-    const payload = this.seqRows.map((r, index) => ({
+    // Use the actual sequence values from inputs, respecting manual edits
+    const payload = this.seqRows.map((r) => ({
       poolId: r.poolId,
-      sequence: index + 1,
-      bucketId: r.bucketId
+      sequence: Number(r.sequence)
     }));
-    debugger;
+
+    const requestPayload = {
+      leadSource: this.columns[this.seqColIndex],
+      city: this.selectedCity,
+      bucket: this.selectedBucket,
+      businessVertical: this.selectedBusinessVertical || null,
+      typeVal: this.selectedType || 'Round Robin',
+      updates: payload
+    };
+
+    console.log('📤 Full Request Payload:', JSON.stringify(requestPayload, null, 2));
 
     try {
       await saveSequences({
-        updatesJson: JSON.stringify({
-          leadSource: this.columns[this.seqColIndex],
-          city: this.selectedCity,
-          bucket: this.selectedBucket,
-          businessVertical: this.selectedBusinessVertical || null,
-          typeVal: this.selectedType || 'Round Robin',
-
-          updates: payload
-        })
+        updatesJson: JSON.stringify(requestPayload)
       });
+
+      console.log('✅ saveSequences Apex call completed');
 
       this.showToast('Success', 'Sequence order updated successfully.', 'success');
       this.closeSeqModal();
+
+      console.log('🔄 Refreshing matrix...');
       await this.loadMatrix();
+      console.log('✅ Matrix refresh completed');
+
     } catch (e) {
+      console.error('❌ saveSeqEdits ERROR:', e);
+      console.error('❌ Error body:', e?.body);
+      console.error('❌ Error message:', e?.message);
+      console.error('❌ Full error:', JSON.stringify(e, null, 2));
+
       const message = e?.body?.message || e?.message || 'Unknown error';
       this.showToast('Error', `Failed to save sequences: ${message}`, 'error');
     }

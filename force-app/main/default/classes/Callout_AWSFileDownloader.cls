@@ -53,18 +53,50 @@ public without sharing class Callout_AWSFileDownloader {
             throw new AuraHandledException('Download API returned error. Status: ' + code);
         }
         
-        Map<String, Object> untyped = (Map<String, Object>) JSON.deserializeUntyped(body);
-        Map<String, String> out = new Map<String, String>();
-        
-        if (untyped != null) {
-            for (String k : untyped.keySet()) {
-                Object v = untyped.get(k);
-                if (v != null) out.put(k, String.valueOf(v));
-            }
+     Map<String, Object> untyped =
+    (Map<String, Object>) JSON.deserializeUntyped(body);
+
+Map<String, String> out = new Map<String, String>();
+
+Object payload;
+
+// 🔹 Case 1: API Gateway / Lambda wrapper
+if (untyped.containsKey('body')) {
+    payload = untyped.get('body');
+
+    // body is JSON string → deserialize again
+    if (payload instanceof String) {
+        payload = JSON.deserializeUntyped((String) payload);
+    }
+}
+// 🔹 Case 2: Direct response (no wrapper)
+else {
+    payload = untyped;
+}
+
+// 🔹 Final extraction
+if (payload instanceof Map<String, Object>) {
+    Map<String, Object> files = (Map<String, Object>) payload;
+
+    for (String fileName : files.keySet()) {
+        Object url = files.get(fileName);
+        if (url != null && String.valueOf(url).startsWith('http')) {
+            out.put(fileName, String.valueOf(url));
         }
+    }
+}
+
+
+ IntegrationLogUtil.insertLog('AWS File Downloader',null,(body != null && body.length() > 3000 ? body.substring(0, 3000) : body),'Success','Success',200 );
+   
+
+return out;
+     
+
+
+
         
-        IntegrationLogUtil.insertLog('AWS File Downloader',null,(body != null && body.length() > 3000 ? body.substring(0, 3000) : body),'Success','Success',200 );
-        
-        return out;
+       
+      
     }
 }

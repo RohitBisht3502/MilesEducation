@@ -249,4 +249,72 @@ public without sharing class CandidateTriggerHelperClass {
         }
     }
 
+    // Author: Dheeraj Kumar
+    // Description: Create Bridge Course Leads  
+    // Date: 2026-01-13 
+    public static void createBridgeCourseLeads(List<Lead> leads, Map<Id, Lead> oldMap) {
+        Set<Id> eligibleCandidateIds = new Set<Id>();
+        List<Lead__c> leadsToCreate = new List<Lead__c>();
+
+        // 1. Identify currently Eligible candidates
+        for (Lead lead : leads) {
+            Boolean isEligible = String.isNotBlank(lead.CPA_Eligibility_Status__c) && 
+                                 (lead.CPA_Eligibility_Status__c == 'Eligible for Exams' || 
+                                  lead.CPA_Eligibility_Status__c == 'Conditional Eligible' || 
+                                  lead.CPA_Eligibility_Status__c == 'Conditionally Eligible');
+            
+            if (isEligible) {
+                eligibleCandidateIds.add(lead.Id);
+            }
+        }
+        
+        if (eligibleCandidateIds.isEmpty()) return;
+
+        // 2. Find which of these ALREADY have an M.Com Lead
+        Set<Id> candidatesWithExistingMCom = new Set<Id>();
+        for (Lead__c l : [SELECT Candidate__c FROM Lead__c WHERE Candidate__c IN :eligibleCandidateIds AND Course__c = 'MCOM']) {
+            candidatesWithExistingMCom.add(l.Candidate__c);
+        }
+
+        // Get MCOM RecordTypeId
+        Id mcomRecordTypeId = Schema.SObjectType.Lead__c.getRecordTypeInfosByDeveloperName().get('MCOM').getRecordTypeId();
+
+        // 3. Create leads for those who don't have one
+        for (Lead lead : leads) {
+            if (eligibleCandidateIds.contains(lead.Id) && !candidatesWithExistingMCom.contains(lead.Id)) {
+                Lead__c newBridgeLead = new Lead__c();
+                newBridgeLead.Name = lead.Name; 
+                newBridgeLead.Candidate__c = lead.Id; 
+                newBridgeLead.Email__c = lead.Email; 
+                newBridgeLead.Phone__c = lead.Phone; 
+                newBridgeLead.Course__c = 'MCOM'; 
+                
+                 // Assign MCOM Record Type
+                if (mcomRecordTypeId != null) {
+                    newBridgeLead.RecordTypeId = mcomRecordTypeId;
+                }
+
+                try {
+                     newBridgeLead.put('Stage__c', 'B3'); 
+                } catch(Exception e) {
+                    System.debug('Stage__c field might not exist or B3 is invalid: ' + e.getMessage());
+                }
+
+                newBridgeLead.OwnerId = lead.OwnerId; 
+                leadsToCreate.add(newBridgeLead);
+                
+                // Add to set to prevent duplicate creation if multiple leads in same batch map to same candidate (unlikely for Trigger.new but good practice)
+                candidatesWithExistingMCom.add(lead.Id);
+            }
+        }
+        
+        if (!leadsToCreate.isEmpty()) {
+            try {
+                insert leadsToCreate;
+            } catch (DmlException e) {
+                System.debug('Error creating M.Com Leads: ' + e.getMessage());
+            }
+        }
+    }
+
 }

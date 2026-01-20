@@ -18,13 +18,14 @@ public without sharing class RoundRobinService {
 
         try {
             System.debug(LoggingLevel.INFO, 'RoundRobinService.assignForRecords: start, records=' + records.size() + ', object=' + cfg.objectApiName);
+            System.debug(LoggingLevel.INFO, 'CONFIG >>' + cfg);
             Map<String, List<SObject>> byKey = new Map<String, List<SObject>>();
 
             for (SObject s : records) {
                 String city   = RoundRobinHelper.normCity(cfg.cityField != null ? String.valueOf(s.get(cfg.cityField)) : null);
                 String source = cfg.ignoreSource ? '(ANY)' : RoundRobinHelper.normSource(cfg.sourceField != null ? String.valueOf(s.get(cfg.sourceField)) : null);
                 String course = RoundRobinHelper.normCourse(cfg.courseField != null ? String.valueOf(s.get(cfg.courseField)) : null);
-
+                System.debug('course >> '+course);
                 String key = RoundRobinHelper.keyOf(cfg.objectApiName, city, source, course, cfg.typeValue);
 
                 if (!byKey.containsKey(key)) byKey.put(key, new List<SObject>());
@@ -37,6 +38,7 @@ public without sharing class RoundRobinService {
 
             for (String key : byKey.keySet()) {
                 RoundRobinHelper.BucketRef b = RoundRobinHelper.bucketFromKey(key);
+                System.debug('b >>> '+b);
 
                 List<Round_Robin_Pool__c> pool =
                     RoundRobinHelper.lockPoolMembers(b.objectApiName, b.cityUpper, b.sourceUpper, b.courseUpper, b.typeValue);

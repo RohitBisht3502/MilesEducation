@@ -1,0 +1,87 @@
+<template>
+    <lightning-card title="M.Com Bulk Enrollment Upload" icon-name="custom:custom19">
+        <div class="slds-p-around_medium">
+
+            <!-- Instructions -->
+            <div class="slds-box slds-theme_default slds-m-bottom_medium">
+                <p><strong>Instructions:</strong></p>
+                <ul class="slds-list_dotted">
+                    <li>Prepare your Excel sheet and <strong>save it as a CSV file</strong>.</li>
+                    <li>Ensure there is a column header named <strong>"Email"</strong>.</li>
+                    <li>The system will update matching M.Com leads to <strong>Status: B7 (Enrolled)</strong>.</li>
+                </ul>
+            </div>
+
+            <!-- File Input -->
+            <div class="slds-form-element">
+                <span class="slds-form-element__label" id="file-selector-primary-label">Upload CSV</span>
+                <div class="slds-form-element__control">
+                    <div class="slds-file-selector slds-file-selector_files">
+                        <div class="slds-file-selector__dropzone">
+                            <input type="file" class="slds-file-selector__input slds-assistive-text" accept=".csv"
+                                id="file-upload-input-01"
+                                aria-labelledby="file-selector-primary-label file-selector-secondary-label"
+                                onchange={handleFileChange} />
+                            <label class="slds-file-selector__body" for="file-upload-input-01"
+                                id="file-selector-secondary-label">
+                                <span class="slds-file-selector__button slds-button slds-button_neutral">
+                                    <lightning-icon icon-name="utility:upload" size="x-small"
+                                        class="slds-m-right_x-small"></lightning-icon>
+                                    Select CSV File
+                                </span>
+                                <span class="slds-file-selector__text slds-medium-show">or Drop Files</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Selected File Name -->
+            <div if:true={fileName} class="slds-m-top_small slds-text-color_success">
+                Selected File: <strong>{fileName}</strong>
+            </div>
+
+            <!-- Process Button -->
+            <div class="slds-m-top_medium">
+                <lightning-button variant="brand" label="Process Enrollment" title="Process Enrollment"
+                    onclick={handleProcess} disabled={isProcessing}></lightning-button>
+            </div>
+
+            <!-- Spinner -->
+            <div if:true={isProcessing} class="slds-is-relative slds-m-top_large" style="height: 50px;">
+                <lightning-spinner alternative-text="Processing" variant="brand" size="medium"></lightning-spinner>
+            </div>
+
+            <!-- Results -->
+            <div if:true={processed} class="slds-m-top_large">
+                <div class="slds-box slds-theme_shade">
+                    <h3 class="slds-text-heading_small slds-m-bottom_small">Results</h3>
+                    <p class="slds-text-color_success"><strong>Success:</strong> {result.successCount}</p>
+                    <p class="slds-text-color_error"><strong>Errors:</strong> {result.errorCount}</p>
+
+                    <!-- Messages -->
+                    <div if:true={hasMessages} class="slds-m-top_small">
+                        <ul class="slds-list_dotted">
+                            <template for:each={result.messages} for:item="msg">
+                                <li key={msg}>{msg}</li>
+                            </template>
+                        </ul>
+                    </div>
+
+                    <!-- Not Found Emails -->
+                    <div if:true={hasNotFound} class="slds-m-top_small slds-text-color_error">
+                        <p><strong>Emails not found in M.Com records:</strong></p>
+                        <div class="slds-scrollable_y" style="max-height: 100px;">
+                            <ul class="slds-list_dotted">
+                                <template for:each={result.notFoundEmails} for:item="email">
+                                    <li key={email}>{email}</li>
+                                </template>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </lightning-card>
+</template>
