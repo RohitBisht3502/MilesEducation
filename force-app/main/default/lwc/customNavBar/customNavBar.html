@@ -1,22 +1,33 @@
 <template>
     <div class="nav-container">
-        <!-- Nav title dynamically shows latest source -->
-     <span class={navTitleClass}>{latestSource}</span>
+        <span class={navTitleClass}>{latestSource}</span>
 
-<template for:each={tabs} for:item="tab">
-    <div key={tab.name} class="tab-item-group">
-
-        <button class={tab.tabClass} type="button">
-            {tab.label}
-        </button>
-
-        <template if:true={tab.count}>
-            <span class="notification-badge">{tab.count}</span>
+        <template if:true={enquiryTabs.length}>
+            <!-- <div class="section-title">Enquiry</div> -->
+            <template for:each={enquiryTabs} for:item="tab">
+                <div key={tab.name} class="tab-item-group">
+                    <button class={tab.tabClass} type="button">
+                        {tab.label}
+                    </button>
+                    <template if:true={tab.count}>
+                        <span class="notification-badge">{tab.count}</span>
+                    </template>
+                </div>
+            </template>
         </template>
 
+        <template if:true={webinarTabs.length}>
+            <!-- <div class="section-title">Webinar Member</div> -->
+            <template for:each={webinarTabs} for:item="tab">
+                <div key={tab.name} class="tab-item-group">
+                    <button class={tab.tabClass} type="button">
+                        {tab.label}
+                    </button>
+                    <template if:true={tab.count}>
+                        <span class="notification-badge">{tab.count}</span>
+                    </template>
+                </div>
+            </template>
+        </template>
     </div>
-</template>
-
-        </div>
-  
 </template>

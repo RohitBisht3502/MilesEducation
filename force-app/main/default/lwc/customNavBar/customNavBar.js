@@ -1,107 +1,93 @@
 import { LightningElement, api, track, wire } from 'lwc';
-import getSourceCounts from '@salesforce/apex/CandidateEnquirySourceController.getSourceCounts';
+import getNavData from '@salesforce/apex/SobjectNavBarController.getNavData';
+
+const BLINK_DURATION = 5000; // ⏱ 5 seconds
 
 export default class CustomNavBar extends LightningElement {
-    // Auto-provided on Record Page
     @api recordId;
-    @api objectApiName;
 
-    // Provided via App Builder
-    @api sourceFieldApiName;
-    @api candidateFieldApiName;
-
-    @track tabs = [];
+    @track enquiryTabs = [];
+    @track webinarTabs = [];
     @track latestSource = 'Sources';
+    @track blinkActive = false;
 
-    _hasRenderedOnce = false;
+    blinkTimeout;
 
-    // Wire Apex only when all params are available
-    @wire(getSourceCounts, {
-        recordId: '$recordId',
-        objectApiName: '$objectApiName',
-        sourceFieldApiName: '$sourceFieldApiName',
-        candidateFieldApiName: '$candidateFieldApiName'
-    })
-    wiredCounts({ data, error }) {
-
-        // 🔒 Guard clause – prevents invalid Apex calls
-        if (
-            !this.recordId ||
-            !this.objectApiName ||
-            !this.sourceFieldApiName ||
-            !this.candidateFieldApiName
-        ) {
-            return;
-        }
+    @wire(getNavData, { recordId: '$recordId' })
+    wiredNav({ data, error }) {
+        if (!this.recordId) return;
 
         if (data) {
-            console.log('Apex Data:', JSON.stringify(data));
+            const latestSource = data.latestSource;
+            this.latestSource = latestSource || 'Sources';
 
-            // Remove empty / blank sources
-            const filteredTabs = data.filter(
-                item => item.source && item.source.trim() !== ''
-            );
+            // 🔔 Enable blinking only if a real latest source exists
+            this.blinkActive = !!latestSource;
 
-            // Sort by latest modified
-            const sortedTabs = [...filteredTabs].sort(
-                (a, b) => new Date(b.lastModified) - new Date(a.lastModified)
-            );
+            const mapTabs = (arr) =>
+                (arr || [])
+                    .filter(i => i && i.source && i.source.trim() !== '')
+                    .map(i => {
+                        const isNew = this.blinkActive && i.source === latestSource;
+                        return {
+                            name: i.source,
+                            label: i.source,
+                            count: i.count,
+                            isNew,
+                            tabClass: isNew
+                                ? 'tab-pill blink-tab'
+                                : 'tab-pill'
+                        };
+                    });
 
-            // Map to UI model
-            this.tabs = sortedTabs.map(item => ({
-                name: item.source,
-                label: item.source,
-                count: item.count,
-                isNew: true
-            }));
+            this.enquiryTabs = mapTabs(data.enquiry);
+            this.webinarTabs = mapTabs(data.webinar);
 
-            // Set latest source title
-            this.latestSource = sortedTabs.length
-                ? sortedTabs[0].source
-                : 'Sources';
+            // ⏱ Stop blinking after X seconds
+            clearTimeout(this.blinkTimeout);
+            if (this.blinkActive) {
+                this.blinkTimeout = setTimeout(() => {
+                    this.stopBlinking();
+                }, BLINK_DURATION);
+            }
 
         } else if (error) {
             console.error('Apex Error:', error);
         }
     }
 
-    // Runs after DOM is ready
-    renderedCallback() {
+    stopBlinking() {
+        this.blinkActive = false;
+
+        const clearBlink = (tabs) =>
+            tabs.map(tab => ({
+                ...tab,
+                isNew: false,
+                tabClass: 'tab-pill'
+            }));
+
+        this.enquiryTabs = clearBlink(this.enquiryTabs);
+        this.webinarTabs = clearBlink(this.webinarTabs);
+    }
+
+    get navTitleClass() {
+        return this.blinkActive ? 'nav-title blink-nav' : 'nav-title';
+    }
+
+
+
+  renderedCallback() {
         if (this._hasRenderedOnce) return;
         this._hasRenderedOnce = true;
 
-        // Debug logs (safe here)
         console.log('recordId:', this.recordId);
-        console.log('objectApiName:', this.objectApiName);
-        console.log('sourceFieldApiName:', this.sourceFieldApiName);
-        console.log('candidateFieldApiName:', this.candidateFieldApiName);
 
-        // Animate title
         const navTitle = this.template.querySelector('.nav-title');
-        if (navTitle && this.tabs.length > 0) {
+        if (navTitle && (this.enquiryTabs.length > 0 || this.webinarTabs.length > 0)) {
             navTitle.classList.add('blink-nav');
         }
 
-        // Animate tabs
         const tabButtons = this.template.querySelectorAll('.tab-pill');
-        tabButtons.forEach((btn, index) => {
-            if (this.tabs[index]?.isNew) {
-                btn.classList.add('blink-tab');
-            }
-        });
-    }
-
-    // Dynamic title class
-    get navTitleClass() {
-        return this.tabs.length > 0
-            ? 'nav-title blink-nav'
-            : 'nav-title';
-    }
-
-    // Dynamic tab class (used in HTML)
-    getTabClass(tab) {
-        return tab.isNew
-            ? 'tab-pill blink-tab'
-            : 'tab-pill';
+        tabButtons.forEach((btn) => btn.classList.add('blink-tab'));
     }
 }

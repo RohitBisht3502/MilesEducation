@@ -1,6 +1,23 @@
 /* =========================================================
    GLOBAL WRAPPER
 ========================================================= */
+
+:host {
+  /* Miles Education Brand */
+  --brand-primary: #1f3a5f;      /* Navy blue */
+  --brand-secondary: #2f5fa7;    /* Miles blue */
+  --brand-accent: #4f86c6;       /* Soft accent blue */
+
+  /* Neutrals */
+  --bg-soft: #f4f7fb;
+  --bg-white: #ffffff;
+  --border-soft: #dbe5f1;
+  --text-dark: #0f172a;
+  --text-muted: #475569;
+}
+
+
+
 .wrap {
   padding: 16px;
   font-family: "Segoe UI", system-ui, Arial, sans-serif;
@@ -16,14 +33,83 @@
   display: flex;
   align-items: flex-end;
   gap: 44px;
-  background: #ffffff;
-  border: 1px solid #e3edf6;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+   background: var(--bg-white);
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 2px 8px rgba(31, 58, 95, 0.08);
   padding: 12px 14px;
   border-radius: 10px;
   margin-bottom: 16px;
   overflow-x: auto;
   /* scroll instead of wrap */
+}
+
+
+.rr-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #2ea3f2;
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.rr-city {
+  display: flex;
+  flex-direction: column;
+}
+
+.city-name {
+  font-weight: 600;
+}
+
+.rep-count {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+/* Toggle switch */
+.switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  background-color: #ccc;
+  border-radius: 24px;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.slider:before {
+  content: "";
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: 0.2s;
+}
+
+input:checked + .slider {
+  background-color: var(--brand-secondary);
+}
+
+
+input:checked + .slider:before {
+  transform: translateX(20px);
 }
 
 /* FILTER ROW */
@@ -94,16 +180,23 @@
   font-size: 13px;
   border-radius: 8px;
   border: none;
-  background: linear-gradient(135deg, #7fbfff, #5aa0ff);
+   background: linear-gradient(
+    135deg,
+    var(--brand-secondary),
+    var(--brand-primary)
+  );
   color: #ffffff;
   cursor: pointer;
   transition: all 0.25s ease;
 }
 
 .btn:hover {
-  background: linear-gradient(135deg, #ff6fae, #ff9acb);
-  /* dragon fruit */
-  box-shadow: 0 4px 10px rgba(255, 111, 174, 0.35);
+   background: linear-gradient(
+    135deg,
+    var(--brand-primary),
+    #16304f
+  );
+  box-shadow: 0 4px 12px rgba(31, 58, 95, 0.35);
   transform: translateY(-1px);
 }
 
@@ -112,15 +205,15 @@
 }
 
 .btn.ghost {
-  background: #f8fbff;
-  color: #5aa0ff;
-  border: 1px solid #d7e3f1;
+  background: var(--bg-white);
+  color: var(--brand-primary);
+  border: 1px solid var(--border-soft);
 }
 
 .btn.ghost:hover {
-  background: #eaf4ff;
-  border-color: #ff6fae;
-  color: #ff6fae;
+  background: #edf3fa;
+  color: var(--brand-secondary);
+  border-color: var(--brand-secondary);
 }
 
 /* =========================================================
@@ -128,20 +221,42 @@
 ========================================================= */
 .multiselect-trigger {
   padding: 7px 10px;
-  border: 1px solid #d7e3f1;
+ 
   border-radius: 8px;
-  background: #f8fbff;
+   background: linear-gradient(180deg, #ffffff, #f3f7fc);
+  border: 1px solid var(--border-soft);
+  color: var(--text-dark);
   min-height: 36px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s ease;
+  
 }
 
 .multiselect-trigger:hover {
-  background: #eaf4ff;
-  border-color: #9fd0ff;
+  background: #eef4fb;
+  border-color: var(--brand-secondary);
+}
+
+.ms-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ms-caret {
+  font-size: 12px;
+  color: var(--brand-secondary);
+  margin-left: 10px;
+}
+
+.bucket-hint {
+  font-size: 11px;
+  color: #64748b;
+  margin-left: 6px;
 }
 
 .multiselect-trigger[data-disabled="true"] {
@@ -174,18 +289,67 @@ table.matrix td {
   text-align: center;
 }
 
+table.matrix td {
+  color: #0b2545;
+  font-weight: 500;
+}
+
+
+.th-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px; /* space between text and button */
+}
+
+.icon-btn {
+  background: #7eb6ee; /* light background matching table rows */
+  border: 1px solid var(--border-soft); /* soft border */
+  border-radius: 4px; /* rounded corners */
+  padding: 4px; /* make button square-ish */
+  cursor: pointer;
+  font-size: 14px; /* slightly smaller to match icons elsewhere */
+  color: var(--brand-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.icon-btn:hover {
+  background: var(--bg-soft); /* subtle hover */
+  color: var(--brand-secondary);
+  transform: scale(1.1);
+}
+
+
+
 table.matrix th {
-  background: #eaf4ff;
-  color: #0f172a;
-  font-weight: 600;
+ background: linear-gradient(
+    180deg,
+    #e3edf9,
+    #d7e6f7
+  );
+  color: var(--brand-primary);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  border-bottom: 2px solid var(--brand-secondary);
   position: sticky;
+  
+  box-shadow: 0 2px 0 rgba(31, 58, 95, 0.15);
   top: 0;
   z-index: 2;
 }
 
-table.matrix tbody tr:hover {
-  background: #f2f7fb;
+
+
+table.matrix tbody tr:nth-child(even) {
+  background: #f7faff;
 }
+
+table.matrix tbody tr:nth-child(odd) {
+  background: #ffffff;
+}
+
 
 /* NO DATA */
 .no-data {
@@ -194,6 +358,12 @@ table.matrix tbody tr:hover {
   padding: 12px;
   font-style: italic;
 }
+
+table.matrix tbody tr:hover {
+  background: #eaf2fb;
+  box-shadow: inset 4px 0 0 var(--brand-secondary);
+}
+
 
 /* =========================================================
    EDITABLE CELLS
@@ -209,13 +379,13 @@ table.matrix tbody tr:hover {
 }
 
 .editable-cell:hover {
-  background: #eaf4ff;
+ background: #eef4fb;
 }
 
 .editable-cell:focus {
   outline: none;
   background: #ffffff;
-  box-shadow: inset 0 0 0 1px #5aa0ff;
+ box-shadow: inset 0 0 0 1px var(--brand-secondary);
 }
 
 /* TOTAL COLUMN */

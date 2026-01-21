@@ -26,13 +26,20 @@
       <!-- Lead Sources -->
       <div class="filter">
         <label>Lead Sources</label>
-        <div class="multiselect-trigger" onclick={openModal} data-disabled={isSourceDisabled}
-          title={sourceTriggerTitle}>
-          {selectedSourcesDisplay}
-          <template if:true={selectedBucket}>
-            <div class="bucket-hint">(From: {selectedBucket})</div>
-          </template>
-        </div>
+        <div
+  class="multiselect-trigger"
+  onclick={openModal}
+  data-disabled={isSourceDisabled}
+  title={sourceTriggerTitle}
+>
+  <span class="ms-text">{selectedSourcesDisplay}</span>
+  <span class="ms-caret">▾</span>
+
+  <template if:true={selectedBucket}>
+    <div class="bucket-hint">(From: {selectedBucket})</div>
+  </template>
+</div>
+
       </div>
 
 
@@ -67,9 +74,12 @@
 
       <!-- Actions (✅ Removed New button) -->
       <div class="actions">
-        <button class="btn small" onclick={reload}>Apply</button>
+          <button class="btn small" onclick={openRoundRobinModal}>
+        Round Robin
+    </button>
+        <button class="btn small" onclick={reload}>Apply Filter</button>
         <button class="btn small" onclick={saveEdits}>Save</button>
-        <button class="btn small ghost" onclick={clearFilters}>Clear</button>
+        <button class="btn small ghost" onclick={clearFilters}>Clear Filter</button>
       </div>
     </div>
 
@@ -100,6 +110,45 @@
         </div>
       </div>
     </template>
+
+    <template if:true={showRoundRobinModal}>
+  <div class="modal-overlay" onclick={closeRoundRobinModal}>
+    <div class="modal-content rr-modal" onclick={handleModalClick}>
+      <div class="modal-header">
+        <h3>Round Robin Settings</h3>
+        <button class="modal-close" onclick={closeRoundRobinModal}>✕</button>
+      </div>
+
+      <div class="modal-body">
+        <template for:each={roundRobinCities} for:item="city">
+          <div key={city.name} class="rr-row">
+            <div class="rr-city">
+              <span class="city-name">{city.name}</span>
+              <span class="rep-count">{city.count} sales reps</span>
+            </div>
+
+            <label class="switch">
+              <input
+                type="checkbox"
+                checked={city.enabled}
+                data-city={city.name}
+                onchange={toggleCityRoundRobin}
+              />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </template>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn small" onclick={applyRoundRobinSettings}>
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
 
     <!-- Sequence Modal -->
     <template if:true={showSeqModal}>
@@ -153,10 +202,11 @@
             <th>Sales Rep Name</th>
             <template for:each={columns} for:item="col">
               <th key={col}>
-                <span class="th-wrap">
-                  <span>{col}</span>
-                  <button class="icon-btn" data-ci={col} onclick={openSeqModal} title="Edit sequence">✎</button>
-                </span>
+               <span class="th-wrap">
+  <span class="col-text">{col}</span>
+  <button class="icon-btn" data-ci={col} onclick={openSeqModal} title="Edit sequence">✏️</button>
+</span>
+
               </th>
             </template>
           </tr>

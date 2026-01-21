@@ -8,6 +8,11 @@
     --notification-text: 0 0% 100%;
 }
 
+.blink-tab {
+    animation: blink 1.0s infinite;
+}
+
+
 .nav-container {
     background-color: hsl(var(--nav-background));
     padding: 0.625rem 1rem;

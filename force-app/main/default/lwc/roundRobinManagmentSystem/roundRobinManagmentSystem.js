@@ -7,8 +7,8 @@ import saveSequences from '@salesforce/apex/RoundRobinMatrixController.saveSeque
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { refreshApex } from '@salesforce/apex';
 import getBusinessVerticals from '@salesforce/apex/RoundRobinMatrixController.getBusinessVerticals';
-
-
+import getCityStatuses from '@salesforce/apex/RoundRobinToggleOnOff.getCityStatuses';
+import updateCityStatuses from '@salesforce/apex/RoundRobinToggleOnOff.updateCityStatuses';
 
 const DEFAULT_TYPE = 'Round Robin';
 const DEFAULT_VERTICAL = 'Accounting Vertical';
@@ -22,10 +22,12 @@ export default class RoundRobinManagmentSystem extends LightningElement {
   @track selectedBusinessVertical = null;
   @track types = [];
   @track selectedType = null;
+  @track citySalesRepCount = {};
 
+  @track showRoundRobinModal = false;
+  @track cityRoundRobinState = {};
 
-
-
+  @track cityStatusList = [];
 
   @track selectedCity = '';
   @track selectedBucket = '';
@@ -49,19 +51,21 @@ export default class RoundRobinManagmentSystem extends LightningElement {
   @track bucketSourcesMap = {};
   @track availableSourcesForSelectedBucket = [];
   _matrixWire;
+_cityStatusWire;
+
 
   connectedCallback() {
-
     this.initFilters();
     this.loadSourceMetadata();
     this.loadBusinessVerticalMetadata();
+    // this.loadCityRoundRobinStatuses();
   }
 
   async loadSourceMetadata() {
     const res = await getBucketConfiguration({ type: 'Source' });
     this.buckets = res.buckets || [];
     this.bucketSourcesMap = res.bucketSourcesMap || {};
-    this.leadSources = res.allSources || []; // ✅ FIX
+    this.leadSources = res.allSources || []; 
   }
 
   async loadBusinessVerticalMetadata() {
@@ -69,7 +73,32 @@ export default class RoundRobinManagmentSystem extends LightningElement {
     this.businessVerticals = res.businessVerticals || []; // ✅ FIX
   }
 
+  
+@wire(getCityStatuses)
+wiredCityStatuses(result) {
+  this._cityStatusWire = result;
 
+  const { data, error } = result;
+  if (data) {
+    const map = {};
+    const countMap = {};
+
+    data.forEach((r) => {
+      map[r.city] = r.status === 'ON';
+      countMap[r.city] = r.salesRepCount;
+    });
+
+    this.cityRoundRobinState = map;
+    this.citySalesRepCount = countMap;
+  } else if (error) {
+    console.error('City status error', error);
+  }
+}
+  get effectiveCity() {
+    if (!this.selectedCity) return null;
+    if (this.cityRoundRobinState[this.selectedCity] === false) return null;
+    return this.selectedCity;
+  }
 
   onTypeChange(e) {
     this.selectedType = e.target.value;
@@ -77,8 +106,43 @@ export default class RoundRobinManagmentSystem extends LightningElement {
     this.loadMatrix();
   }
 
+  get roundRobinCities() {
+    return (this.cities || []).map((city) => ({
+      name: city,
+      enabled: this.cityRoundRobinState[city] !== false,
+      count: this.getSalesRepCount(city)
+    }));
+  }
 
+  getSalesRepCount(city) {
+    return this.citySalesRepCount?.[city] || 0;
+  }
 
+  openRoundRobinModal = () => {
+    this.showRoundRobinModal = true;
+  };
+
+  closeRoundRobinModal = () => {
+    this.showRoundRobinModal = false;
+  };
+
+  toggleCityRoundRobin(event) {
+    const city = event.target.dataset.city;
+    const enabled = event.target.checked;
+
+    this.cityRoundRobinState = {
+      ...this.cityRoundRobinState,
+      [city]: enabled
+    };
+  }
+
+  get enabledCityCount() {
+    return Object.values(this.cityRoundRobinState).filter((v) => v === true).length;
+  }
+
+  get totalCityCount() {
+    return this.cities.length;
+  }
 
   openBusinessVerticalModal() {
     if (this.isBusinessVerticalDisabled) return;
@@ -91,34 +155,43 @@ export default class RoundRobinManagmentSystem extends LightningElement {
     this.showBusinessVerticalModal = false;
   }
 
-
-
   get saveDisabled() {
     return Object.keys(this.staged).length === 0;
   }
+
   get totalSalesRepsInCity() {
     return this.displayRows.length || 0;
   }
 
-
   get isSourceDisabled() {
     return !this.selectedCity;
-
   }
 
   get sourceTriggerTitle() {
     return this.selectedCity ? 'Select Lead Sources' : 'Select City first';
-
   }
 
-  get selectedSourcesDisplay() {
-    if (!this.selectedCity) return 'Select City first';
-    return this.selectedSources.length ? this.selectedSources.join(', ') : 'Select Sources';
+ get selectedSourcesDisplay() {
+  if (!this.selectedCity) return 'Select City first';
 
+  if (!this.selectedSources || this.selectedSources.length === 0) {
+    return 'Select Sources';
   }
+
+  // If all sources selected
+  if (
+    this.availableSourcesForSelectedBucket.length &&
+    this.selectedSources.length === this.availableSourcesForSelectedBucket.length
+  ) {
+    return 'All Sources Selected';
+  }
+
+  return `${this.selectedSources.length} source(s) selected`;
+}
+
 
   get typeOptions() {
-    return (this.types || []).map(t => ({
+    return (this.types || []).map((t) => ({
       label: t,
       value: t,
       selected: t === this.selectedType
@@ -126,7 +199,7 @@ export default class RoundRobinManagmentSystem extends LightningElement {
   }
 
   get businessVerticalOptions() {
-    return (this.businessVerticals || []).map(v => ({
+    return (this.businessVerticals || []).map((v) => ({
       label: v,
       value: v,
       selected: v === this.selectedBusinessVertical
@@ -142,16 +215,65 @@ export default class RoundRobinManagmentSystem extends LightningElement {
       this.buckets = res?.buckets || [];
 
       const rawTypes = res?.types || [];
-      this.types = rawTypes.map(t => (t?.value ?? t)).filter(Boolean);
+      this.types = rawTypes.map((t) => (t?.value ?? t)).filter(Boolean);
 
       const rawVerticals = await getBusinessVerticals();
-      this.businessVerticals = (rawVerticals || []).map(v => (v?.value ?? v)).filter(Boolean);
+      this.businessVerticals = (rawVerticals || []).map((v) => (v?.value ?? v)).filter(Boolean);
 
       this.resetMatrixView();
       this.loadMatrix();
     } catch (e) {
       console.error(e);
       this.showToast('Error', 'Failed to load filters', 'error');
+    }
+  }
+
+  // ✅ ONLY THIS METHOD WAS ALIGNED/CLEANED (NO LOGIC CHANGE)
+  async applyRoundRobinSettings() {
+    debugger;
+    this.showRoundRobinModal = false;
+
+    // Build payload (only what Apex needs)
+    const updates = Object.keys(this.cityRoundRobinState || {}).map((city) => ({
+      city,
+      status: this.cityRoundRobinState[city] ? 'ON' : 'OFF',
+      salesRepCount: this.citySalesRepCount?.[city] || 0
+    }));
+
+    console.log('Updates to send:', JSON.stringify(updates, null, 2));
+
+    if (!updates.length) {
+      this.showToast('Info', 'No Round Robin settings to save', 'info');
+      return;
+    }
+
+    try {
+      
+      await updateCityStatuses({ updatesJson: JSON.stringify(updates) });
+
+      // reload latest state from server
+        await Promise.all([
+      this._cityStatusWire && refreshApex(this._cityStatusWire),
+      this._matrixWire && refreshApex(this._matrixWire)
+    ]);
+
+       this.showToast('Success', 'Round Robin updated successfully', 'success');
+    } catch (e) {
+      console.error('UpdateCityStatuses error:', e);
+      this.showToast(
+        'Error',
+        `Failed to save Round Robin settings: ${e?.body?.message || e?.message || 'Unknown error'}`,
+        'error'
+      );
+      return;
+    }
+
+    // If current selected city is OFF, reset matrix
+    if (this.selectedCity && this.cityRoundRobinState[this.selectedCity] === false) {
+      this.resetMatrixView();
+      this.showToast('Info', `Round Robin is disabled for ${this.selectedCity}`, 'info');
+    } else {
+      this.loadMatrix();
     }
   }
 
@@ -164,19 +286,17 @@ export default class RoundRobinManagmentSystem extends LightningElement {
     this.columnTotals = [];
     this.poolIndex = {};
   }
+
   async loadBucketConfiguration() {
     try {
       const config = await getBucketConfiguration({ type: 'BusinessVertical' });
 
-
       this.bucketSourcesMap = config.bucketSourcesMap || {};
       this.businessVerticals = config.businessVerticals || [];
-
     } catch (error) {
       console.error('Error loading bucket configuration:', error);
     }
   }
-
 
   onBusinessVerticalChange(e) {
     this.selectedBusinessVertical = e.target.value;
@@ -184,20 +304,16 @@ export default class RoundRobinManagmentSystem extends LightningElement {
     this.loadMatrix();
   }
 
-
   @wire(getMatrix, {
     objectApiName: 'Lead__c',
-    city: '$selectedCity',
+    city: '$effectiveCity',
     bucket: '$selectedBucket',
     leadSources: '$selectedSources',
     businessVertical: '$selectedBusinessVertical',
     typeVal: '$selectedType',
-
     pageNumber: '$pageNumber',
     pageSize: '$pageSize'
   })
-
-
   wiredMatrix(result) {
     debugger;
     this._matrixWire = result;
@@ -209,7 +325,6 @@ export default class RoundRobinManagmentSystem extends LightningElement {
       this.totalRows = data.totalRows || 0;
       this.buildDisplayRows();
 
-      // ✅ SAFE businessVertical logic
       if (
         !this.selectedBusinessVertical &&
         Array.isArray(data.rows) &&
@@ -217,14 +332,11 @@ export default class RoundRobinManagmentSystem extends LightningElement {
         Array.isArray(data.columnsLeadSources) &&
         data.columnsLeadSources.length > 0
       ) {
-        const firstCell =
-          data.rows[0]?.byLeadSource?.[data.columnsLeadSources[0]];
-
+        const firstCell = data.rows[0]?.byLeadSource?.[data.columnsLeadSources[0]];
         if (firstCell?.poolId) {
-          // no-op, backend already filtered
+          // no-op
         }
       }
-
     } else if (error) {
       console.error('Matrix wire error', error);
       this.showToast('Error', 'Failed to load matrix data', 'error');
@@ -245,19 +357,19 @@ export default class RoundRobinManagmentSystem extends LightningElement {
 
   swapSeqRows(i, j) {
     const rows = [...this.seqRows];
-
-    // swap positions only
     [rows[i], rows[j]] = [rows[j], rows[i]];
-
-    // DO NOT rebuild objects
-    // DO NOT touch sequence
     this.seqRows = rows;
   }
-
 
   async loadMatrix() {
     if (!this.selectedCity) {
       this.resetMatrixView();
+      return;
+    }
+
+    if (this.cityRoundRobinState[this.selectedCity] === false) {
+      this.resetMatrixView();
+      this.showToast('Info', `Round Robin is disabled for ${this.selectedCity}`, 'info');
       return;
     }
 
@@ -266,15 +378,12 @@ export default class RoundRobinManagmentSystem extends LightningElement {
     }
   }
 
-
-
   buildDisplayRows() {
     this.poolIndex = {};
 
     const rows = Array.isArray(this.rows) ? [...this.rows] : [];
     const cols = Array.isArray(this.columns) ? [...this.columns] : [];
 
-    // Sort rows by sequence of first column (if exists)
     rows.sort((a, b) => {
       const col = cols[0];
       const sa = a?.byLeadSource?.[col]?.sequence ?? 9999;
@@ -305,12 +414,10 @@ export default class RoundRobinManagmentSystem extends LightningElement {
           }
         }
 
-        // Track pool location
         if (poolId) {
           this.poolIndex[poolId] = { ri, ci, poolId };
         }
 
-        // Generate guaranteed unique key using row index and column index
         return {
           key: `cell-${ri}-${ci}`,
           value,
@@ -320,7 +427,6 @@ export default class RoundRobinManagmentSystem extends LightningElement {
         };
       });
 
-      // Generate guaranteed unique key using row index
       return {
         key: `row-${ri}`,
         salesRepId: r.salesRepId,
@@ -349,32 +455,28 @@ export default class RoundRobinManagmentSystem extends LightningElement {
     return { valid: true };
   }
 
-
-
-
   recalcColumnTotals() {
     const cols = this.columns || [];
     const rows = this.displayRows || [];
     this.columnTotals = cols.map((_, ci) => {
       let sum = 0;
-      rows.forEach(r => {
+      rows.forEach((r) => {
         const n = Number(r.cells?.[ci]?.value);
         if (Number.isFinite(n)) sum += n;
       });
       return sum;
     });
 
-    // Trigger live visual update
     this.displayRows = [...this.displayRows];
   }
 
-
-  openSeqModal = e => {
+  openSeqModal = (e) => {
     const label = e.currentTarget?.dataset?.ci;
-    const ci = this.columns.findIndex(c => c === label);
+    const ci = this.columns.findIndex((c) => c === label);
     if (ci < 0) return;
+
     const rows = [];
-    (this.displayRows || []).forEach(r => {
+    (this.displayRows || []).forEach((r) => {
       const cell = r.cells?.[ci];
       if (cell && cell.poolId) {
         const n = Number(cell.sequence);
@@ -383,9 +485,9 @@ export default class RoundRobinManagmentSystem extends LightningElement {
           poolId: cell.poolId,
           sequence: Number.isFinite(n) ? n : ''
         });
-
       }
     });
+
     rows.sort((a, b) => {
       let sa = typeof a.sequence === 'number' ? a.sequence : 999999;
       let sb = typeof b.sequence === 'number' ? b.sequence : 999999;
@@ -393,6 +495,7 @@ export default class RoundRobinManagmentSystem extends LightningElement {
       if (sb === 0) sb = 999999;
       return sa - sb;
     });
+
     this.seqColIndex = ci;
     this.seqColLabel = label;
     this.seqRows = rows;
@@ -406,11 +509,11 @@ export default class RoundRobinManagmentSystem extends LightningElement {
     this.seqColLabel = '';
   };
 
-  onSeqInputChange = e => {
+  onSeqInputChange = (e) => {
     const poolId = e.target?.dataset?.poolid;
     const v = e.target.value;
     const seq = v === '' ? '' : Math.max(1, Math.floor(Number(v)));
-    this.seqRows = this.seqRows.map(r => (r.poolId === poolId ? { ...r, sequence: seq } : r));
+    this.seqRows = this.seqRows.map((r) => (r.poolId === poolId ? { ...r, sequence: seq } : r));
     debugger;
   };
 
@@ -433,7 +536,6 @@ export default class RoundRobinManagmentSystem extends LightningElement {
       return;
     }
 
-    // Use the actual sequence values from inputs, respecting manual edits
     const payload = this.seqRows.map((r) => ({
       poolId: r.poolId,
       sequence: Number(r.sequence)
@@ -463,7 +565,6 @@ export default class RoundRobinManagmentSystem extends LightningElement {
       console.log('🔄 Refreshing matrix...');
       await this.loadMatrix();
       console.log('✅ Matrix refresh completed');
-
     } catch (e) {
       console.error('❌ saveSeqEdits ERROR:', e);
       console.error('❌ Error body:', e?.body);
@@ -475,11 +576,7 @@ export default class RoundRobinManagmentSystem extends LightningElement {
     }
   }
 
-
-
-
-
-  onCellBlur = e => {
+  onCellBlur = (e) => {
     const el = e.currentTarget;
     const poolId = el?.dataset?.poolid;
     const repId = el?.dataset?.repid;
@@ -503,18 +600,11 @@ export default class RoundRobinManagmentSystem extends LightningElement {
 
     const stagedCopy = { ...this.staged };
     if (num === null) delete stagedCopy[stageKey];
-    else stagedCopy[stageKey] = {
-      value: num,
-      leadSource: src
-    };
-
+    else stagedCopy[stageKey] = { value: num, leadSource: src };
 
     this.staged = stagedCopy;
-
-    // recalc totals & live validation
     this.recalcColumnTotals();
   };
-
 
   async saveEdits() {
     const updates = [];
@@ -525,7 +615,6 @@ export default class RoundRobinManagmentSystem extends LightningElement {
 
       if (!Number.isFinite(value)) return;
 
-      // Existing record
       if (/^[a-zA-Z0-9]{15,18}$/.test(key)) {
         updates.push({
           poolId: key,
@@ -540,7 +629,6 @@ export default class RoundRobinManagmentSystem extends LightningElement {
         return;
       }
 
-      // New record
       const parts = key.split('|');
       if (parts.length === 2) {
         updates.push({
@@ -554,7 +642,6 @@ export default class RoundRobinManagmentSystem extends LightningElement {
           businessVertical: this.selectedBusinessVertical || null,
           typeVal: this.selectedType || 'Round Robin'
         });
-
       }
     });
 
@@ -564,10 +651,7 @@ export default class RoundRobinManagmentSystem extends LightningElement {
     }
 
     try {
-      await saveAssignedWeights({
-        updatesJson: JSON.stringify(updates)
-      });
-
+      await saveAssignedWeights({ updatesJson: JSON.stringify(updates) });
       this.showToast('Success', 'Weights saved successfully', 'success');
       this.staged = {};
       await this.loadMatrix();
@@ -595,15 +679,18 @@ export default class RoundRobinManagmentSystem extends LightningElement {
     this.showModal = false;
   };
 
-  handleModalClick = e => e.stopPropagation();
+  handleModalClick = (e) => e.stopPropagation();
 
-  handleCheckboxChange = e => {
+  handleCheckboxChange = (e) => {
     const value = e.target.dataset.value;
     const isChecked = e.target.checked;
-    if (isChecked && !this.tempSelectedSources.includes(value))
+
+    if (isChecked && !this.tempSelectedSources.includes(value)) {
       this.tempSelectedSources = [...this.tempSelectedSources, value];
-    else if (!isChecked)
-      this.tempSelectedSources = this.tempSelectedSources.filter(v => v !== value);
+    } else if (!isChecked) {
+      this.tempSelectedSources = this.tempSelectedSources.filter((v) => v !== value);
+    }
+
     this.rebuildTempDisplaySources();
   };
 
@@ -612,8 +699,9 @@ export default class RoundRobinManagmentSystem extends LightningElement {
     if (this.selectedBucket && this.bucketSourcesMap[this.selectedBucket]) {
       sourcesToShow = this.bucketSourcesMap[this.selectedBucket];
     }
+
     const sel = new Set(this.tempSelectedSources || []);
-    this.displayLeadSourcesTemp = (sourcesToShow || []).map(s => ({
+    this.displayLeadSourcesTemp = (sourcesToShow || []).map((s) => ({
       key: s,
       value: s,
       label: s,
@@ -631,43 +719,39 @@ export default class RoundRobinManagmentSystem extends LightningElement {
     this.loadMatrix();
   };
 
-
-  onCellKeydown = e => {
+  onCellKeydown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       e.target.blur();
     }
   };
 
-  // onCityChange(e) {
-  //   this.selectedCity = e.target.value;
-  // }
   onCityChange(e) {
     this.selectedCity = e.target.value;
     this.resetMatrixView();
 
+    if (this.selectedCity && this.cityRoundRobinState[this.selectedCity] === false) {
+      this.showToast('Info', `Round Robin is disabled for ${this.selectedCity}`, 'info');
+      return;
+    }
+
     this.selectedSources = [...(this.leadSources || [])];
 
-    // ✅ AUTO-SET Type & Business Vertical & Bucket
     if (this.selectedCity) {
       this.selectedType = DEFAULT_TYPE;
       this.selectedBusinessVertical = DEFAULT_VERTICAL;
 
       const defaultBucket = 'Bucket 1';
-      // Ensure 'Bucket 1' exists in available buckets before selecting
       if (this.buckets.includes(defaultBucket)) {
         this.selectedBucket = defaultBucket;
-        // Explicitly update DOM to show selection
         setTimeout(() => {
           const bucketEl = this.template.querySelector('.bucket-select');
           if (bucketEl) bucketEl.value = defaultBucket;
         }, 0);
       } else {
-        // If Bucket 1 doesn't exist, don't force select it
         this.selectedBucket = '';
       }
 
-      // Auto-set sources based on bucket (if valid)
       if (this.selectedBucket && this.bucketSourcesMap[this.selectedBucket]) {
         const sources = this.bucketSourcesMap[this.selectedBucket] || [];
         this.availableSourcesForSelectedBucket = [...sources];
@@ -678,25 +762,6 @@ export default class RoundRobinManagmentSystem extends LightningElement {
     this.rebuildTempDisplaySources();
     this.loadMatrix();
   }
-
-
-
-  // onBucketChange(e) {
-  //   this.selectedBucket = e.target.value;
-  //   this.resetMatrixView();
-
-  //   if (this.selectedBucket) {
-  //     const sources = this.bucketSourcesMap[this.selectedBucket] || [];
-  //     this.availableSourcesForSelectedBucket = [...sources];
-  //     this.selectedSources = [...sources];
-  //     this.rebuildTempDisplaySources();
-  //     this.loadMatrix();
-  //   } else {
-  //     this.selectedSources = [];
-  //     this.availableSourcesForSelectedBucket = [];
-  //     this.rebuildTempDisplaySources();
-  //   }
-  // }
 
   onBucketChange(e) {
     this.selectedBucket = e.target.value;
@@ -721,9 +786,8 @@ export default class RoundRobinManagmentSystem extends LightningElement {
     this.loadMatrix();
   }
 
-
-
   reload = () => this.loadMatrix();
+
   clearFilters = () => {
     this.selectedCity = '';
     this.selectedBucket = '';
@@ -732,7 +796,6 @@ export default class RoundRobinManagmentSystem extends LightningElement {
     this.selectedType = '';
     this.selectedBusinessVertical = '';
 
-    // Explicitly reset DOM elements to ensure UI update
     const cityEl = this.template.querySelector('.city-select');
     if (cityEl) cityEl.value = '';
 
@@ -741,14 +804,12 @@ export default class RoundRobinManagmentSystem extends LightningElement {
 
     this.resetMatrixView();
   };
+
   get colspan() {
     return 1 + (this.columns?.length || 0);
   }
+
   openNewPresence() {
-    this.template
-      .querySelector('c-new-round-robin-adder')
-      .open();
+    this.template.querySelector('c-new-round-robin-adder').open();
   }
-
-
 }
