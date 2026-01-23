@@ -30,6 +30,19 @@
     max-width: 90% !important;
 } */
 
+.body-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px; /* prevents scrollbar jump */
+}
+
+
+.footer-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+}
 
 .panel-wrapper {
     padding: 12px;
@@ -318,4 +331,14 @@
     display: flex;
     justify-content: space-between;
     text-align: center;
+}
+
+
+
+lightning-quick-action-panel {
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
 }

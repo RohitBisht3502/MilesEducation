@@ -2,6 +2,7 @@
        --slds-c-modal-sizing-small: 90vw;
     --slds-c-modal-sizing-medium: 95vw;
     --slds-c-modal-sizing-large: 95vw;
+     overflow: hidden;
 }
 .wrap {
   padding: 12px;
@@ -11,6 +12,7 @@
 .slds-modal__container {
       max-width: 65vw !important;
     width: 65vw !important;
+    overflow-x: hidden;
 }
 
 .toolbar {
@@ -315,4 +317,33 @@ table.matrix tbody tr:hover {
 } */
 .runo-section{
   background-color: #2d4a6f;
+}
+.slds-modal__content {
+  overflow: auto;
+ 
+     overflow-x: hidden;
+}
+
+.slds-modal {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+.slds-modal,
+.slds-modal__container,
+.slds-modal__content {
+  overflow: hidden !important;
+}
+
+/* Lock modal height */
+.slds-modal__container {
+  height: 90vh;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-body-fixed {
+  flex: 1;
+  overflow: hidden;
 }

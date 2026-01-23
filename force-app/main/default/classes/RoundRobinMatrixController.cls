@@ -6,9 +6,10 @@ public without sharing class RoundRobinMatrixController {
 
     public class FilterInit {
         @AuraEnabled public List<String> cities;
-        @AuraEnabled public List<String> leadSources; // holds Bucket values
+        @AuraEnabled public List<String> leadSources; 
         @AuraEnabled public List<String> buckets;
           @AuraEnabled public List<String> types;
+          @AuraEnabled public List<String> roles;
     }
 
     public class Cell {
@@ -156,7 +157,8 @@ Map<String, Object> bucketConfig = getBucketConfiguration('Source');
     f.cities = cityVals;
     f.buckets = configuredBuckets;
     f.leadSources = allSources;
-    f.types = typeVals; // ✅ VERY IMPORTANT
+    f.types = typeVals;
+     f.roles = new List<String>{ 'CC', 'SR' }; 
 
     return f;
 }
@@ -168,6 +170,7 @@ public static MatrixResult getMatrix(
     List<String> leadSources,
     String businessVertical,
     String typeVal,
+    String role,
     Integer pageNumber,
     Integer pageSize
 ) {
@@ -211,13 +214,30 @@ public static MatrixResult getMatrix(
         System.debug(LoggingLevel.DEBUG, 'getMatrix :: columns (final) size=' + columns.size() + ' => ' + columns);
 
         List<User> reps;
-        if (!String.isBlank(city)) {
-            reps = [
-                SELECT Id, Name, City__c
-                FROM User
-                WHERE IsActive = true AND City__c = :city
-                ORDER BY Name
-            ];
+     if (!String.isBlank(city)) {
+    if (!String.isBlank(role)) {
+        reps = [
+            SELECT Id, Name, City__c, UserRole.Name
+            FROM User
+            WHERE IsActive = true
+            AND City__c = :city
+            AND UserRole.Name = :role
+            ORDER BY Name
+        ];
+    } else {
+        reps = [
+            SELECT Id, Name, City__c
+            FROM User
+            WHERE IsActive = true
+            AND City__c = :city
+            ORDER BY Name
+        ];
+    }
+
+
+
+
+
             System.debug(LoggingLevel.INFO, 'getMatrix :: reps fetched size=' + reps.size());
         } else {
             System.debug(LoggingLevel.WARN, 'getMatrix :: city is blank, returning empty result');

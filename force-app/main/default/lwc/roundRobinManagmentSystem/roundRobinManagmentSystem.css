@@ -31,7 +31,8 @@
 ========================================================= */
 .toolbar {
   display: flex;
-  align-items: flex-end;
+  /* align-items: flex-end; */
+    align-items: flex-start;
   gap: 44px;
    background: var(--bg-white);
   border: 1px solid var(--border-soft);
@@ -128,6 +129,7 @@ input:checked + .slider:before {
 .filter {
   display: flex;
   flex-direction: column;
+   align-items: stretch;
   min-width: 160px;
 }
 
@@ -516,4 +518,29 @@ table.matrix tbody tr:hover {
 
 .table-scroller::-webkit-scrollbar-thumb:hover {
   background: #9fd0ff;
+}
+
+.filter lightning-combobox {
+  width: 100%;
+}
+
+/* Target SLDS input inside combobox */
+.filter lightning-combobox .slds-combobox__input {
+  min-height: 36px;
+  padding: 7px 10px;
+  font-size: 13px;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+/* Hover & focus to match selects */
+.filter lightning-combobox .slds-combobox__input:hover {
+  background: #eaf4ff;
+  border-color: #9fd0ff;
+}
+
+.filter lightning-combobox .slds-combobox__input:focus {
+  background: #ffffff;
+  border-color: #5aa0ff;
+  box-shadow: 0 0 0 2px rgba(90, 160, 255, 0.25);
 }

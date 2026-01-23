@@ -54,6 +54,26 @@ export default class RoundRobinManagmentSystem extends LightningElement {
 _cityStatusWire;
 
 
+@track selectedRole = '';
+@track roles = [];
+
+
+get roleOptions() {
+    return (this.roles || []).map(r => ({
+        label: r,
+        value: r
+    }));
+}
+
+
+handleRoleChange(event) {
+   this.selectedRole = event.target.value; 
+     this.resetMatrixView();
+    this.loadMatrix(); // reload table
+}
+
+
+
   connectedCallback() {
     this.initFilters();
     this.loadSourceMetadata();
@@ -213,6 +233,8 @@ wiredCityStatuses(result) {
       this.cities = res?.cities || [];
       this.leadSources = res?.leadSources || [];
       this.buckets = res?.buckets || [];
+      this.roles = res?.roles || [];
+
 
       const rawTypes = res?.types || [];
       this.types = rawTypes.map((t) => (t?.value ?? t)).filter(Boolean);
@@ -311,6 +333,7 @@ wiredCityStatuses(result) {
     leadSources: '$selectedSources',
     businessVertical: '$selectedBusinessVertical',
     typeVal: '$selectedType',
+      role: '$selectedRole',  
     pageNumber: '$pageNumber',
     pageSize: '$pageSize'
   })

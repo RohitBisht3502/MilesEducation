@@ -1,9 +1,3 @@
-/**
- * ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
- * Class Name      : 
- * Author          : Rohit Singh Bisht
- * Created Date    : Jan 21, 2026
- */
 @RestResource(urlMapping='/echo/*')
 global without sharing class EchoApi {
 
