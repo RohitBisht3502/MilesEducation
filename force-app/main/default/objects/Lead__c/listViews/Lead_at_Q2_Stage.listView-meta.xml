@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Lead_at_Q2_Stage</fullName>
+    <columns>NAME</columns>
+    <filterScope>Queue</filterScope>
+    <filters>
+        <field>Queue_Stage__c</field>
+        <operation>equals</operation>
+        <value>Q2</value>
+    </filters>
+    <label>Lead at Q2 Stage</label>
+    <queue>Public_Queue</queue>
+    <sharedTo>
+        <group>All_Internal_Users</group>
+    </sharedTo>
+</ListView>

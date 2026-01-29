@@ -4,6 +4,7 @@
     <columns>NAME</columns>
     <columns>Student__c</columns>
     <columns>CC_Spoc__c</columns>
+    <columns>Phone__c</columns>
     <columns>Course__c</columns>
     <columns>CREATEDBY_USER</columns>
     <columns>CREATED_DATE</columns>

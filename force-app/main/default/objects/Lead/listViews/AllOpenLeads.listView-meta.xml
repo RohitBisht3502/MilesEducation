@@ -12,6 +12,9 @@
     <columns>LEAD.CREATED_DATE</columns>
     <columns>LEAD.CITY</columns>
     <columns>City__c</columns>
+    <columns>LEAD.COUNTRY</columns>
+    <columns>Shipping_City__c</columns>
+    <columns>LEAD.STREET</columns>
     <filterScope>Everything</filterScope>
     <filters>
         <field>LEAD.STATUS</field>

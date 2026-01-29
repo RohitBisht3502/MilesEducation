@@ -1,12 +1,13 @@
 // file: RunoCallIdentityService.cls
-public without sharing  class RunoCallIdentityService {
+public without sharing class RunoCallIdentityService {
+
     public class IdentityDTO {
         @AuraEnabled public String name;
         @AuraEnabled public String email;
         @AuraEnabled public String phone;
         @AuraEnabled public String city;
         @AuraEnabled public String source;
-         @AuraEnabled public String stage;
+        @AuraEnabled public String stage;
     }
 
     @AuraEnabled(cacheable=true)
@@ -16,8 +17,14 @@ public without sharing  class RunoCallIdentityService {
 
         SObjectType sObjType = recordId.getSObjectType();
 
+        /* ===================== LEAD ===================== */
         if (sObjType == Lead__c.SObjectType) {
-            Lead__c l = [ SELECT Id, Name, Email__c, Phone__c, City__c, Course__c, Stage__c FROM Lead__c WHERE Id = :recordId LIMIT 1];
+            Lead__c l = [
+                SELECT Id, Name, Email__c, Phone__c, City__c, Course__c, Stage__c
+                FROM Lead__c
+                WHERE Id = :recordId
+                LIMIT 1
+            ];
 
             IdentityDTO dto = new IdentityDTO();
             dto.name   = l.Name;
@@ -26,12 +33,44 @@ public without sharing  class RunoCallIdentityService {
             dto.city   = l.City__c;
             dto.source = l.Course__c;
             dto.stage  = l.Stage__c;
-            System.debug('RunoCallIdentityService.getIdentity DTO (Lead) = ' + dto);
+
             return dto;
         }
 
+        /* ===================== COURSE ENROLLED ===================== */
+        if (sObjType == Course_Enrolled__c.SObjectType) {
+            Course_Enrolled__c ce = [
+                SELECT
+                    Id,
+                    Name,
+                    Phone__c,
+                    City__c,
+                    Course__c,
+                    Stages__c
+                FROM Course_Enrolled__c
+                WHERE Id = :recordId
+                LIMIT 1
+            ];
+
+            IdentityDTO dto = new IdentityDTO();
+            dto.name   = ce.Name;          // Auto Number
+            dto.email  = 'NA';             // Not available
+            dto.phone  = ce.Phone__c;
+            dto.city   = ce.City__c;
+            dto.source = ce.Course__c;
+            dto.stage  = ce.Stages__c;
+
+            return dto;
+        }
+
+        /* ===================== CALL LOG ===================== */
         if (sObjType == Call_Log__c.SObjectType) {
-            Call_Log__c cl = [SELECT Id, Customer_Name__c, Phone_Number__c FROM Call_Log__c WHERE Id = :recordId LIMIT 1 ];
+            Call_Log__c cl = [
+                SELECT Id, Customer_Name__c, Phone_Number__c
+                FROM Call_Log__c
+                WHERE Id = :recordId
+                LIMIT 1
+            ];
 
             IdentityDTO dto = new IdentityDTO();
             dto.name   = cl.Customer_Name__c;
@@ -40,10 +79,16 @@ public without sharing  class RunoCallIdentityService {
             dto.city   = 'NA';
             dto.source = 'NA';
             dto.stage  = 'NA';
-            System.debug('RunoCallIdentityService.getIdentity DTO (Call_Log__c) = ' + dto);
+
             return dto;
         }
 
         return null;
+    }
+
+    /* Optional wrapper for LWC clarity */
+    @AuraEnabled(cacheable=true)
+    public static IdentityDTO getCourseIdentity(Id recordId) {
+        return getIdentity(recordId);
     }
 }

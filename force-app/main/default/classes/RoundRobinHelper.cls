@@ -132,6 +132,7 @@ public without sharing class RoundRobinHelper {
             resetCycle(pool);
             r.cycleReset = true;
             r.member = findEligible(pool, null, false);
+            System.debug('r >> '+r);
             return r;
         }
 
@@ -147,6 +148,8 @@ public without sharing class RoundRobinHelper {
     }
 
     public static Round_Robin_Pool__c findEligible(List<Round_Robin_Pool__c> pool, Id lastOwnerId, Boolean avoidSame) {
+        System.debug('findEligible pool>> '+pool);
+        System.debug('lastOwnerId >> '+lastOwnerId);
         if (pool == null || pool.isEmpty()) return null;
 
         Integer startIndex = 0;
@@ -160,6 +163,7 @@ public without sharing class RoundRobinHelper {
         }
 
         for (Integer i = 0; i < pool.size(); i++) {
+            System.debug('Inside loop >>>> ');
             Integer currentIndex = Math.mod(startIndex + i, pool.size());
             Round_Robin_Pool__c p = pool[currentIndex];
 
@@ -171,6 +175,7 @@ public without sharing class RoundRobinHelper {
             if (used >= weight) continue;
             if (avoidSame && lastOwnerId != null && p.Sales_Rep__c == lastOwnerId) continue;
 
+            System.debug('p >>>> '+p);
             return p;
         }
 

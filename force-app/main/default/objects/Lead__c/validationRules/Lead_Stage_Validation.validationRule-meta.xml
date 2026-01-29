@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Lead_Stage_Validation</fullName>
+    <active>true</active>
+    <description>When Lead Stage is change from B4 to B4- then Status_Change_Reason__c is Mandatory before proceeding.</description>
+    <errorConditionFormula>AND(
+    ISCHANGED( Stage__c ),
+    OR(
+        ISPICKVAL(Stage__c , &quot;B4&quot;),
+        ISPICKVAL(Stage__c , &quot;B4-&quot;)
+    ),
+    ISBLANK(TEXT( Status_Change_Reason__c ))
+)</errorConditionFormula>
+    <errorMessage>Please select a Status Change Reason before moving the Lead to B4 / B4-.</errorMessage>
+</ValidationRule>

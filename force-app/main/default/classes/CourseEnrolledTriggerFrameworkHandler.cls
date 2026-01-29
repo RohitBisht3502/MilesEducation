@@ -27,6 +27,17 @@ public without sharing class CourseEnrolledTriggerFrameworkHandler extends BaseT
     }
 
     public override void beforeInsert() {
+        List<Course_Enrolled__c> recs = getNewCourses();
+        if (recs == null || recs.isEmpty()) return;
+
+        List<SObject> sobs = new List<SObject>();
+        sobs.addAll(recs);
+
+        RoundRobinAssigner.assignWithStickyAndRoundRobin(
+            sobs,
+            'Course_Enrolled__c',
+            'Round Robin'
+        );        
     }
 
     public override void beforeUpdate() {
@@ -38,7 +49,7 @@ public without sharing class CourseEnrolledTriggerFrameworkHandler extends BaseT
     }
 
     public override void afterUpdate() {
-        CourseEnrolledTriggerHandler.afterUpdate(getNewCourses(), getOldCourseMap());
+        //CourseEnrolledTriggerHandler.afterUpdate(getNewCourses(), getOldCourseMap());
     }
 
     public override void beforeDelete() {

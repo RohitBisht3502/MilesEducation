@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Committed_Checkbox</fullName>
+    <active>false</active>
+    <errorConditionFormula>AND(
+    ISBLANK(Expected_payment_date__c),
+    NOT(Not_Commited__c)
+)</errorConditionFormula>
+    <errorDisplayField>Not_Commited__c</errorDisplayField>
+    <errorMessage>checkbox is neccestity</errorMessage>
+</ValidationRule>

@@ -1,5 +1,5 @@
 public class CourseEnrolledTriggerHandler {
-
+/*
     public static void afterUpdate(
         List<Course_Enrolled__c> newList,
         Map<Id, Course_Enrolled__c> oldMap
@@ -110,5 +110,9 @@ public class CourseEnrolledTriggerHandler {
         }
 
         return Date.today().addDays(days);
+    } */
+    
+    public static void onAfterUpdate(Map<Id, Course_Enrolled__c> newMap, Map<Id, Course_Enrolled__c> oldMap) {
+        
     }
 }

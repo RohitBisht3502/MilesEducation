@@ -1,0 +1,265 @@
+<template>
+    <lightning-quick-action-panel header="Allocate Course Enrolled to Runo"
+ class="panel-wrapper">
+
+        <!-- LOADING STATE -->
+        <template if:true={loading}>
+            <div class="loading-state">
+                <lightning-spinner alternative-text="Sending..." size="small"></lightning-spinner>
+                <div class="loading-text">Calling Runo Allocation API…</div>
+            </div>
+        </template>
+
+        <!-- CALL POPUP OVERLAY -->
+        <template if:true={showCallPopup}>
+            <div class="call-overlay">
+                <div class="popup-inner wave-container">
+                    <div class="popup-call-icon pulse-icon">
+                        <lightning-icon icon-name="utility:call" size="large"></lightning-icon>
+                    </div>
+
+                    <div class="popup-text">Calling Runo...</div>
+
+                    <div class="wave-loader">
+                        <span></span><span></span><span></span><span></span>
+                    </div>
+
+                    <!-- END CALL BUTTON (AFTER 30s NO RESPONSE) -->
+                    <template if:true={canEndCall}>
+                        <div class="slds-m-top_medium">
+                            <lightning-button
+                                variant="destructive"
+                                label="End Call"
+                                onclick={handleEndCall}>
+                            </lightning-button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <!-- ERROR -->
+        <template if:true={errorText}>
+            <div class="error-box">
+                <div class="error-inner">
+                    <lightning-icon icon-name="utility:error" size="x-small" class="error-icon"></lightning-icon>
+                    <div class="error-message">{errorText}</div>
+                </div>
+            </div>
+        </template>
+
+        <!-- BODY -->
+        <div class="body-wrapper">
+            <div class="slds-grid slds-gutters slds-wrap">
+
+                <!-- LEFT : LEAD INFO -->
+                <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-2">
+                    <div class="section-card">
+                        <div class="section-header">
+                           <lightning-icon icon-name="standard:education" size="small"></lightning-icon>
+<span>Course Enrolled Information</span>
+
+                        </div>
+
+                        <div class="section-content">
+                            <div class="info-line">
+                                <lightning-icon icon-name="utility:user" size="x-small"></lightning-icon>
+                                <span>{identity.name}</span>
+                            </div>
+
+                            <div class="info-line">
+                                <lightning-icon icon-name="utility:email" size="x-small"></lightning-icon>
+                                <span>{identity.email}</span>
+                            </div>
+
+                            <div class="info-line">
+                                <lightning-icon icon-name="utility:phone_portrait" size="x-small"></lightning-icon>
+                                <span>{identity.phone}</span>
+                            </div>
+
+                            <div class="grid-2">
+                                <div class="info-line">
+                                    <lightning-icon icon-name="utility:location" size="x-small"></lightning-icon>
+                                    <span>{identity.city}</span>
+                                </div>
+
+                                <div class="info-line align-right">
+                                    <lightning-icon icon-name="utility:topic" size="x-small"></lightning-icon>
+                                    <span>{identity.source}</span>
+                                </div>
+                            </div>
+
+                            <div class="grid-2">
+                                <div class="info-line">
+                                    <lightning-icon icon-name="utility:collection" size="x-small"></lightning-icon>
+                                    <span>{identity.stage}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT : CALL STATUS + FEEDBACK -->
+                <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-2">
+
+                    <!-- CALL STATUS -->
+                    <div class="section-card call-box">
+                        <div class="section-header">
+                            <lightning-icon icon-name="utility:phone" size="small"></lightning-icon>
+                            <span>{callTitle}</span>
+
+                            <template if:true={isLive}>
+                                <span class="live-badge live-pulse">LIVE</span>
+                            </template>
+                        </div>
+
+                        <div class="section-content call-status-grid">
+                            <div class="call-status-item">
+                                <b>Status:</b> {callStatus}
+                            </div>
+
+                            <div class="call-status-item align-right">
+                                <b>Duration:</b> {elapsedLabel}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FEEDBACK -->
+                   
+                </div>
+            </div>
+
+            <!-- SMALL SUCCESS POPUP -->
+            <template if:true={showPopup}>
+                <div class="call-popup">
+                    Call Successfully sent
+                </div>
+            </template>
+        </div>
+
+
+<!-- ================= FEEDBACK SECTION (BOTTOM) ================= -->
+<template if:true={showFeedback}>
+    <div class="section-card slds-m-top_large">
+
+        <div class="section-header">
+            <lightning-icon icon-name="utility:feedback" size="small"></lightning-icon>
+            <span>Call Feedback</span>
+        </div>
+
+        <div class="section-content slds-grid slds-wrap slds-gutters">
+
+            <!-- L1 -->
+            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                <lightning-combobox
+                    label="Call Status (L1)"
+                    value={l1Value}
+                    options={l1Options}
+                    onchange={handleL1Change}>
+                </lightning-combobox>
+            </div>
+
+            <!-- L2 -->
+            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                <lightning-combobox
+                    label="Sub Status (L2)"
+                    value={l2Value}
+                    options={l2Options}
+                    onchange={handleL2Change}
+                    disabled={isL2Disabled}>
+                </lightning-combobox>
+            </div>
+<!-- <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-2 slds-m-top_small">
+  <lightning-combobox
+    class="text-color"
+    name="stage"
+    label="Stage"
+    value={stageValue}
+    options={stageOptions}
+    onchange={handleStageChange}
+    disabled={isStageDisabled}>
+  </lightning-combobox>
+</div>
+<template if:true={isStageDisabled}> -->
+
+
+            <!-- <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                <lightning-combobox
+                    label="Course"
+                    value={levelValue}
+                    options={levelOptions}
+                    onchange={handleLevelChange}>
+                </lightning-combobox>
+            </div> -->
+
+            <!-- Feedback Comment -->
+            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                <lightning-textarea
+                    label="Feedback Comment"
+                    value={feedback}
+                    onchange={handleFeedbackChange}
+                    required={isCommentMandatory}>
+                </lightning-textarea>
+            </div>
+
+            <!-- Next Follow Up -->
+            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+               <lightning-input
+    type="datetime-local"
+    label="Next Follow Up"
+    value={nextFollowUpDate}
+    min={minFollowUpDate}
+    max={maxFollowUpDate}
+    onchange={handleNextFollowUpDateChange}
+    disabled={autoSetFollowUp}>
+</lightning-input>
+
+            </div>
+
+            <!-- Auto Follow Up -->
+            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-top_large">
+                <lightning-input
+                    type="checkbox"
+                    label="Auto set next follow up (+24 hrs)"
+                    checked={autoSetFollowUp}
+                    onchange={handleAutoSetChange}>
+                </lightning-input>
+            </div>
+
+            <!-- SAVE BUTTON -->
+            <div class="slds-col slds-size_1-of-1 slds-m-top_medium save-btn ">
+                <lightning-button
+                    variant="brand"
+                    label="Save Feedback"
+                    onclick={saveFeedback}
+                    disabled={isSaveDisabled}>
+                </lightning-button>
+            </div>
+
+        </div>
+    </div>
+</template>
+
+        <!-- FOOTER BUTTONS -->
+        <div slot="footer" class="footer-actions">
+          
+            <!-- <lightning-button
+                variant="neutral"
+                label="Close"
+                onclick={close}
+                disabled={disableCancel}>
+            </lightning-button> -->
+
+            <lightning-button
+                class="call-btn"
+                data-id="callBtn"
+                variant="brand"
+                label={callButtonLabel}
+                onclick={callApi}
+                disabled={callButtonDisabled}>
+            </lightning-button>
+            
+        </div>
+
+    </lightning-quick-action-panel>
+</template>

@@ -73,7 +73,10 @@
   <select onchange={handleRoleChange}>
     <option value="">Select</option>
     <template for:each={roleOptions} for:item="r">
-       <option key={r.value} value={r.value} selected={r.selected}>
+      <option
+        key={r.value}
+        value={r.value}
+        selected={r.selected}>
         {r.label}
       </option>
     </template>
@@ -86,11 +89,10 @@
 
 
 
-
       <!-- Actions (✅ Removed New button) -->
       <div class="actions">
           <button class="btn small" onclick={openRoundRobinModal}>
-        Round Robin
+       ON/OFF
     </button>
         <button class="btn small" onclick={reload}>Apply Filter</button>
         <button class="btn small" onclick={saveEdits}>Save</button>

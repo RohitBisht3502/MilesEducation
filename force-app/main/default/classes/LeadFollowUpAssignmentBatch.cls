@@ -16,7 +16,8 @@ global class LeadFollowUpAssignmentBatch implements Database.Batchable<SObject>,
                       'FROM Lead__c ' +
                       'WHERE Queue_Stage__c = \'Q1\' ' +
                       'AND Next_Follow_Up_Date__c = null ' +
-                      'AND CreatedDate <= :timeLimit';
+                      'AND CreatedDate <= :timeLimit' +
+            		  'AND Source_Bucket__c = \'Bucket 1\'';
         
         return Database.getQueryLocator(query);
     }

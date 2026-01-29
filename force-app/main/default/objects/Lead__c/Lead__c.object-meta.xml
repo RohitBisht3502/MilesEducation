@@ -128,8 +128,8 @@
     </actionOverrides>
     <actionOverrides>
         <actionName>View</actionName>
-        <comment>Action override updated by Lightning App Builder during activation.</comment>
-        <content>Lead_Record_Page2</content>
+        <comment>Action override created by Lightning App Builder during activation.</comment>
+        <content>Lead_Record_Page3</content>
         <formFactor>Small</formFactor>
         <skipRecordTypeSelect>false</skipRecordTypeSelect>
         <type>Flexipage</type>
@@ -137,7 +137,7 @@
     <actionOverrides>
         <actionName>View</actionName>
         <comment>Action override created by Lightning App Builder during activation.</comment>
-        <content>Lead_Record_Page2</content>
+        <content>Lead_Record_Page3</content>
         <formFactor>Large</formFactor>
         <skipRecordTypeSelect>false</skipRecordTypeSelect>
         <type>Flexipage</type>
@@ -147,7 +147,7 @@
         <type>Default</type>
     </actionOverrides>
     <allowInChatterGroups>true</allowInChatterGroups>
-    <compactLayoutAssignment>SYSTEM</compactLayoutAssignment>
+    <compactLayoutAssignment>Lead_Compact_Layout</compactLayoutAssignment>
     <deploymentStatus>Deployed</deploymentStatus>
     <enableActivities>true</enableActivities>
     <enableBulkApi>true</enableBulkApi>
@@ -166,9 +166,11 @@
         <type>Text</type>
     </nameField>
     <pluralLabel>Leads</pluralLabel>
+    <recordTypeTrackHistory>false</recordTypeTrackHistory>
     <searchLayouts>
         <excludedStandardButtons>ChangeOwner</excludedStandardButtons>
         <listViewButtons>Owner_Change</listViewButtons>
+        <listViewButtons>Import_M_Com_Enrollment</listViewButtons>
     </searchLayouts>
     <sharingModel>ReadWrite</sharingModel>
     <visibility>Public</visibility>

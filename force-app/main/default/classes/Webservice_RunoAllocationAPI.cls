@@ -147,9 +147,10 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
 
         IntegrationLogUtil.insertLogs(logs);
 
-        if (isSuccess) {
-            createCallLog(recordId, payload.assignedTo, customerPhone);
-        }
+       if (isSuccess) {
+    String callId = extractCallId(resBody); // 🔹 GET callId from Runo response
+    createCallLog(recordId, payload.assignedTo, customerPhone, callId);
+}
 
         return resBody;
     }
@@ -219,51 +220,40 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
 
     //     insert callLog;
     // }
-    public static void createCallLog(Id recordId, String userPhone, String phone) {
-        Call_Log__c callLog = new Call_Log__c(
-            User_Phone__c = userPhone,
-            Phone_Number__c = phone,
-            Status__c = 'In Progress'
-        );
+    public static void createCallLog(
+    Id recordId,
+    String userPhone,
+    String phone,
+    String callId
+) {
+    Call_Log__c callLog = new Call_Log__c(
+        User_Phone__c  = userPhone,
+        Phone_Number__c = phone,
+        Status__c       = 'In Progress',
+        Call_Id__c      = callId,          // ✅ SAVE CALL ID
+        Untracked__c    = true
+    );
 
-        if (recordId != null) {
-            SObjectType sType = recordId.getSObjectType();
+    if (recordId != null) {
+        SObjectType sType = recordId.getSObjectType();
 
-            if (sType == Lead__c.SObjectType) {
-                callLog.Lead__c = recordId;
+        if (sType == Lead__c.SObjectType) {
+            callLog.Lead__c = recordId;
 
-                Id candidateId = Utility.candidateByPhone(phone);
-                if (candidateId != null) {
-                    callLog.Candidate__c = candidateId;
-                }
-
-            } else if (sType == Call_Log__c.SObjectType) {
-                // ✅ recordId is Call_Log__c, so fetch Lead__c from it
-                Call_Log__c cl = [
-                    SELECT Id, Lead__c, Candidate__c, Phone_Number__c
-                    FROM Call_Log__c
-                    WHERE Id = :recordId
-                    LIMIT 1
-                ];
-
-                if (cl.Lead__c != null) {
-                    callLog.Lead__c = cl.Lead__c;
-                }
-
-                if (cl.Candidate__c != null) {
-                    callLog.Candidate__c = cl.Candidate__c;
-                } else {
-                    Id candidateId = Utility.candidateByPhone(phone);
-                    if (candidateId != null) {
-                        callLog.Candidate__c = candidateId;
-                    }
-                }
+            Id candidateId = Utility.candidateByPhone(phone);
+            if (candidateId != null) {
+                callLog.Candidate__c = candidateId;
             }
-        }
 
-        System.debug('callLog >>> ' + callLog);
-        insert callLog;
+        } 
+        else if (sType == Course_Enrolled__c.SObjectType) {
+            callLog.Course_Enrolled__c = recordId; // ✅ LINK COURSE ENROLLED
+        }
     }
+
+    insert callLog;
+}
+
 
     @AuraEnabled
     public static void updateCallFeedback1(Id recordId, String callId, String feedback, Datetime nextFollowUpDate, String l1, String l2, String stage, String level ,   Boolean notifyMe  ) {
@@ -524,58 +514,69 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
 
     //     return logRecord;
     // }
+public static Call_Log__c findCallLog(Id recordId, String callId) {
 
-    public static Call_Log__c findCallLog(Id recordId, String callId) {
-        System.debug('findCallLog START | recordId=' + recordId + ' | callId=' + callId);
+    Call_Log__c logRecord;
 
-        Call_Log__c logRecord = null;
-
-        SObjectType sType = (recordId != null) ? recordId.getSObjectType() : null;
-        Boolean isLead    = (sType == Lead__c.SObjectType);
-        Boolean isCallLog = (sType == Call_Log__c.SObjectType);
-
-        System.debug('Type Check | isLead=' + isLead + ' | isCallLog=' + isCallLog);
-
-        if (isCallLog && recordId != null) {
-            System.debug('Resolve Path | By Call_Log Id');
-            List<Call_Log__c> tmp = [SELECT Id, Lead__c, Phone_Number__c, Call_Id__c, Untracked__c FROM Call_Log__c WHERE Id = :recordId LIMIT 1];
-            logRecord = (!tmp.isEmpty() ? tmp[0] : null);
-        } 
-        else if (String.isNotBlank(callId)) {
-            System.debug('Resolve Path | By callId');
-            List<Call_Log__c> tmp = [SELECT Id, Lead__c, Phone_Number__c, Call_Id__c, Untracked__c FROM Call_Log__c WHERE Call_Id__c = :callId ORDER BY CreatedDate DESC LIMIT 1];
-            logRecord = (!tmp.isEmpty() ? tmp[0] : null);
-        } 
-        else if (isLead && recordId != null) {
-            System.debug('Resolve Path | By Lead Id');
-            List<Call_Log__c> tmp = [SELECT Id, Lead__c, Phone_Number__c, Call_Id__c, Untracked__c FROM Call_Log__c WHERE Lead__c = :recordId ORDER BY CreatedDate DESC LIMIT 1];
-            logRecord = (!tmp.isEmpty() ? tmp[0] : null);
-        }
-
-        System.debug('Resolved logRecord=' + logRecord);
-
-        if (logRecord != null && String.isNotBlank(logRecord.Phone_Number__c)) {
-            System.debug('Phone Found => Update ALL logs for phone=' + logRecord.Phone_Number__c);
-
-            List<Call_Log__c> phoneLogs = [SELECT Id, Untracked__c FROM Call_Log__c WHERE Phone_Number__c = :logRecord.Phone_Number__c AND Untracked__c = true];
-            System.debug('phoneLogs (untracked=true) size=' + phoneLogs.size());
-            System.debug('phoneLogs ' + phoneLogs);
-
-            for (Call_Log__c cl : phoneLogs) cl.Untracked__c = false;
-
-            if (!phoneLogs.isEmpty()) {
-                update phoneLogs;
-                System.debug('Updated Untracked__c=false for ' + phoneLogs.size() + ' record(s).');
-            } else {
-                System.debug('No Untracked__c=true logs found for this phone.');
-            }
-        } else {
-            System.debug('No phone found OR logRecord null => skipping phone-based untracked update.');
-        }
-
-        System.debug('findCallLog END | returning=' + logRecord);
-        return logRecord;
+    // Best match → callId
+    if (String.isNotBlank(callId)) {
+        List<Call_Log__c> logs = [
+            SELECT Id, Phone_Number__c, Lead__c, Course_Enrolled__c
+            FROM Call_Log__c
+            WHERE Call_Id__c = :callId
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+        if (!logs.isEmpty()) logRecord = logs[0];
     }
+
+    //  Course Enrolled fallback
+    if (logRecord == null &&
+        recordId != null &&
+        recordId.getSObjectType() == Course_Enrolled__c.SObjectType) {
+
+        List<Call_Log__c> logs = [
+            SELECT Id, Phone_Number__c, Lead__c, Course_Enrolled__c
+            FROM Call_Log__c
+            WHERE Course_Enrolled__c = :recordId
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+        if (!logs.isEmpty()) logRecord = logs[0];
+    }
+
+    //  Lead fallback
+    if (logRecord == null &&
+        recordId != null &&
+        recordId.getSObjectType() == Lead__c.SObjectType) {
+
+        List<Call_Log__c> logs = [
+            SELECT Id, Phone_Number__c, Lead__c, Course_Enrolled__c
+            FROM Call_Log__c
+            WHERE Lead__c = :recordId
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+        if (!logs.isEmpty()) logRecord = logs[0];
+    }
+
+    //  Mark all phone logs as tracked
+    if (logRecord != null && String.isNotBlank(logRecord.Phone_Number__c)) {
+        List<Call_Log__c> phoneLogs = [
+            SELECT Id, Untracked__c
+            FROM Call_Log__c
+            WHERE Phone_Number__c = :logRecord.Phone_Number__c
+            AND Untracked__c = true
+        ];
+        for (Call_Log__c cl : phoneLogs) {
+            cl.Untracked__c = false;
+        }
+        if (!phoneLogs.isEmpty()) update phoneLogs;
+    }
+
+    return logRecord;
+}
+
 
 
     @AuraEnabled(cacheable=true)
@@ -605,6 +606,149 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
 
         return result;
     }
+
+ @AuraEnabled
+public static String allocateCourseNow(Id recordId) {
+
+    if (recordId == null) {
+        throw new AuraHandledException('Course Enrolled Id is required.');
+    }
+
+    Course_Enrolled__c ce = [
+        SELECT Id, Name, Phone__c, Student__r.Name, Student__r.Email__c
+        FROM Course_Enrolled__c
+        WHERE Id = :recordId
+        LIMIT 1
+    ];
+
+    if (String.isBlank(ce.Phone__c)) {
+        throw new AuraHandledException('Course Enrolled must have Phone.');
+    }
+
+    External_Service_Config__mdt cfg = getRunoConfig();
+
+    AllocationDTO payload = buildAllocationPayload(
+        ce.Student__r != null ? ce.Student__r.Name : ce.Name,
+        ce.Phone__c,
+        ce.Student__r != null ? ce.Student__r.Email__c : null
+    );
+
+    String bodyJson = JSON.serialize(payload);
+    HttpRequest req = buildHttpRequest(cfg, bodyJson);
+
+    Http http = new Http();
+    String resBody;
+    Integer statusCode;
+    Boolean isSuccess = false;
+
+    List<Integration_Log__c> logs = new List<Integration_Log__c>();
+
+    try {
+        HttpResponse res = http.send(req);
+        statusCode = res.getStatusCode();
+        resBody = res.getBody();
+        isSuccess = statusCode >= 200 && statusCode < 300;
+
+        logs.add(
+            IntegrationLogUtil.buildLog(
+                'Runo Allocation API - Course Enrolled',
+                bodyJson,
+                resBody,
+                isSuccess ? null : 'HTTP ' + statusCode,
+                isSuccess ? 'Success' : 'Failed',
+                statusCode
+            )
+        );
+    } catch (Exception e) {
+        logs.add(
+            IntegrationLogUtil.buildLog(
+                'Runo Allocation API - Course Enrolled',
+                bodyJson,
+                null,
+                e.getMessage(),
+                'Failed',
+                null
+            )
+        );
+        IntegrationLogUtil.insertLogs(logs);
+        throw e;
+    }
+
+    IntegrationLogUtil.insertLogs(logs);
+
+   if (isSuccess) {
+    String callId = extractCallId(resBody); // ✅ extract callId
+    createCallLog(recordId, payload.assignedTo, ce.Phone__c, callId);
+}
+
+
+    return resBody;
+}
+
+private static String extractCallId(String resBody) {
+    if (String.isBlank(resBody)) return null;
+
+    try {
+        Map<String, Object> m =
+            (Map<String, Object>) JSON.deserializeUntyped(resBody);
+        return (String) m.get('callId');
+    } catch (Exception e) {
+        System.debug('Failed to extract callId: ' + e.getMessage());
+        return null;
+    }
+}
+
+
+
+
+@AuraEnabled
+public static void updateCourseCallFeedback(String jsonBody) {
+
+    CallFeedbackRequest request;
+    try {
+        request = (CallFeedbackRequest) JSON.deserialize(jsonBody, CallFeedbackRequest.class);
+    } catch (Exception e) {
+        throw new AuraHandledException('Invalid JSON: ' + e.getMessage());
+    }
+
+    if (request == null || String.isBlank(request.recordId)) {
+        throw new AuraHandledException('Record Id missing.');
+    }
+
+    Id recordId = (Id) request.recordId;
+
+    Call_Log__c logRecord = findCallLog(recordId, request.callId);
+
+    if (logRecord == null) {
+        throw new AuraHandledException('No Call Log found.');
+    }
+
+    // 🔹 Update Call Log
+    logRecord.Feedback__c            = request.feedback;
+    logRecord.Next_Follow_Up_Date__c = request.nextFollowUpDate;
+    logRecord.L1__c                  = request.l1;
+    logRecord.L2__c                  = request.l2;
+    logRecord.Stage__c               = request.stage;
+    logRecord.Notify_Me__c           = request.notifyMe;
+    logRecord.Untracked__c           = false;
+
+    update logRecord;
+
+    // 🔹 Update Course Enrolled
+   Course_Enrolled__c ceUpdate = new Course_Enrolled__c(
+    Id = recordId,
+    Stages__c = request.stage,
+    Due_Date__c = request.nextFollowUpDate != null
+        ? request.nextFollowUpDate.date()
+        : null
+);
+
+
+    update ceUpdate;
+}
+
+
+
 
     public class CallFeedbackRequest {
         public String recordId;

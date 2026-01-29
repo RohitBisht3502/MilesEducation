@@ -13,6 +13,181 @@
                 <default>false</default>
                 <label>website-contact_us</label>
             </value>
+            <value>
+                <fullName>Google Ads</fullName>
+                <default>false</default>
+                <label>Google Ads</label>
+            </value>
+            <value>
+                <fullName>Website</fullName>
+                <default>false</default>
+                <label>Website</label>
+            </value>
+            <value>
+                <fullName>IVR</fullName>
+                <default>false</default>
+                <label>IVR</label>
+            </value>
+            <value>
+                <fullName>Organic</fullName>
+                <default>false</default>
+                <label>Organic</label>
+            </value>
+            <value>
+                <fullName>Whatsapp Marketing</fullName>
+                <default>false</default>
+                <label>Whatsapp Marketing</label>
+            </value>
+            <value>
+                <fullName>WhatsApp BOT on Website</fullName>
+                <default>false</default>
+                <label>WhatsApp BOT on Website</label>
+            </value>
+            <value>
+                <fullName>Live Chat on Website</fullName>
+                <default>false</default>
+                <label>Live Chat on Website</label>
+            </value>
+            <value>
+                <fullName>SuperBot</fullName>
+                <default>false</default>
+                <label>SuperBot</label>
+            </value>
+            <value>
+                <fullName>Facebook Ads</fullName>
+                <default>false</default>
+                <label>Facebook Ads</label>
+            </value>
+            <value>
+                <fullName>Email Marketing</fullName>
+                <default>false</default>
+                <label>Email Marketing</label>
+            </value>
+            <value>
+                <fullName>Miles One App</fullName>
+                <default>false</default>
+                <label>Miles One App</label>
+            </value>
+            <value>
+                <fullName>Referral - Manual</fullName>
+                <default>false</default>
+                <label>Referral - Manual</label>
+            </value>
+            <value>
+                <fullName>Zoom Webinar</fullName>
+                <default>false</default>
+                <label>Zoom Webinar</label>
+            </value>
+            <value>
+                <fullName>Social</fullName>
+                <default>false</default>
+                <label>Social</label>
+            </value>
+            <value>
+                <fullName>TimesInternet</fullName>
+                <default>false</default>
+                <label>TimesInternet</label>
+            </value>
+            <value>
+                <fullName>SMS Marketing</fullName>
+                <default>false</default>
+                <label>SMS Marketing</label>
+            </value>
+            <value>
+                <fullName>Newsletter Marketing</fullName>
+                <default>false</default>
+                <label>Newsletter Marketing</label>
+            </value>
+            <value>
+                <fullName>Youtube</fullName>
+                <default>false</default>
+                <label>Youtube</label>
+            </value>
+            <value>
+                <fullName>Live Chat</fullName>
+                <default>false</default>
+                <label>Live Chat</label>
+            </value>
+            <value>
+                <fullName>Incoming Call</fullName>
+                <default>false</default>
+                <label>Incoming Call</label>
+            </value>
+            <value>
+                <fullName>Instagram</fullName>
+                <default>false</default>
+                <label>Instagram</label>
+            </value>
+            <value>
+                <fullName>CA-DB</fullName>
+                <default>false</default>
+                <label>CA-DB</label>
+            </value>
+            <value>
+                <fullName>Blog Marketing</fullName>
+                <default>false</default>
+                <label>Blog Marketing</label>
+            </value>
+            <value>
+                <fullName>Times Jobs</fullName>
+                <default>false</default>
+                <label>Times Jobs</label>
+            </value>
+            <value>
+                <fullName>Placement Drive</fullName>
+                <default>false</default>
+                <label>Placement Drive</label>
+            </value>
+            <value>
+                <fullName>Naukri</fullName>
+                <default>false</default>
+                <label>Naukri</label>
+            </value>
+            <value>
+                <fullName>Quora</fullName>
+                <default>false</default>
+                <label>Quora</label>
+            </value>
+            <value>
+                <fullName>Purchased Data</fullName>
+                <default>false</default>
+                <label>Purchased Data</label>
+            </value>
+            <value>
+                <fullName>Voice SMS</fullName>
+                <default>false</default>
+                <label>Voice SMS</label>
+            </value>
+            <value>
+                <fullName>LMS</fullName>
+                <default>false</default>
+                <label>LMS</label>
+            </value>
+            <value>
+                <fullName>Manual Upload</fullName>
+                <default>false</default>
+                <label>Manual Upload</label>
+            </value>
+            <value>
+                <fullName>Webinar Attended</fullName>
+                <default>false</default>
+                <label>Webinar Attended</label>
+            </value>
+            <value>
+                <fullName>MF</fullName>
+                <default>false</default>
+                <label>MF</label>
+            </value>
+            <value>
+                <fullName>Linkedin InMails</fullName>
+                <default>false</default>
+                <label>Linkedin InMails</label>
+            </value>
+            <value>
+                <fullName>Pre-Enrolled Leads</fullName>
+                <default>false</default>
+                <label>Pre-Enrolled Leads</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

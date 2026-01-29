@@ -17,10 +17,5 @@
     <columns>Type__c</columns>
     <columns>Course_Bucket__c</columns>
     <filterScope>Everything</filterScope>
-    <filters>
-        <field>Type__c</field>
-        <operation>equals</operation>
-        <value>Eligibility Criteria</value>
-    </filters>
     <label>All</label>
 </ListView>

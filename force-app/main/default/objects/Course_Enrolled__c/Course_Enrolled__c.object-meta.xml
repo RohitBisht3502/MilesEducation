@@ -129,7 +129,7 @@
     <actionOverrides>
         <actionName>View</actionName>
         <comment>Action override created by Lightning App Builder during activation.</comment>
-        <content>Course_Enrolled_Record_Page</content>
+        <content>Course_Enrolled_Record_Page1</content>
         <formFactor>Small</formFactor>
         <skipRecordTypeSelect>false</skipRecordTypeSelect>
         <type>Flexipage</type>
@@ -137,7 +137,7 @@
     <actionOverrides>
         <actionName>View</actionName>
         <comment>Action override created by Lightning App Builder during activation.</comment>
-        <content>Course_Enrolled_Record_Page</content>
+        <content>Course_Enrolled_Record_Page1</content>
         <formFactor>Large</formFactor>
         <skipRecordTypeSelect>false</skipRecordTypeSelect>
         <type>Flexipage</type>
@@ -161,8 +161,9 @@
     <externalSharingModel>Private</externalSharingModel>
     <label>Course Enrolled</label>
     <nameField>
+        <displayFormat>Student Enrolled - {0000}</displayFormat>
         <label>Student Enrolled Name</label>
-        <type>Text</type>
+        <type>AutoNumber</type>
     </nameField>
     <pluralLabel>Course Enrolleds</pluralLabel>
     <searchLayouts></searchLayouts>

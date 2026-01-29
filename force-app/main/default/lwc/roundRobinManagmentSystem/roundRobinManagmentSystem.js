@@ -57,12 +57,12 @@ _cityStatusWire;
 @track selectedRole = '';
 @track roles = [];
 
-
 get roleOptions() {
-    return (this.roles || []).map(r => ({
-        label: r,
-        value: r
-    }));
+  return (this.roles || []).map(r => ({
+    label: r,
+    value: r,
+    selected: r === this.selectedRole
+  }));
 }
 
 
@@ -227,28 +227,37 @@ wiredCityStatuses(result) {
   }
 
   async initFilters() {
-    try {
-      const res = await getFilters({ objectApiName: 'Lead__c' });
+  try {
+    const res = await getFilters({ objectApiName: 'Lead__c' });
 
-      this.cities = res?.cities || [];
-      this.leadSources = res?.leadSources || [];
-      this.buckets = res?.buckets || [];
-      this.roles = res?.roles || [];
+    this.cities = res?.cities || [];
+    this.leadSources = res?.leadSources || [];
+    this.buckets = res?.buckets || [];
+    this.roles = res?.roles || [];
 
-
-      const rawTypes = res?.types || [];
-      this.types = rawTypes.map((t) => (t?.value ?? t)).filter(Boolean);
-
-      const rawVerticals = await getBusinessVerticals();
-      this.businessVerticals = (rawVerticals || []).map((v) => (v?.value ?? v)).filter(Boolean);
-
-      this.resetMatrixView();
-      this.loadMatrix();
-    } catch (e) {
-      console.error(e);
-      this.showToast('Error', 'Failed to load filters', 'error');
+    // ✅ AUTO-SELECT CC ROLE BY DEFAULT
+    if (this.roles.includes('CC')) {
+      this.selectedRole = 'CC';
+    } else if (this.roles.length > 0) {
+      this.selectedRole = this.roles[0]; // fallback
     }
+
+    const rawTypes = res?.types || [];
+    this.types = rawTypes.map(t => t?.value ?? t).filter(Boolean);
+
+    const rawVerticals = await getBusinessVerticals();
+    this.businessVerticals = (rawVerticals || [])
+      .map(v => v?.value ?? v)
+      .filter(Boolean);
+
+    this.resetMatrixView();
+    this.loadMatrix(); 
+  } catch (e) {
+    console.error(e);
+    this.showToast('Error', 'Failed to load filters', 'error');
   }
+}
+
 
   // ✅ ONLY THIS METHOD WAS ALIGNED/CLEANED (NO LOGIC CHANGE)
   async applyRoundRobinSettings() {
@@ -570,6 +579,7 @@ wiredCityStatuses(result) {
       bucket: this.selectedBucket,
       businessVertical: this.selectedBusinessVertical || null,
       typeVal: this.selectedType || 'Round Robin',
+      role: this.selectedRole, 
       updates: payload
     };
 
@@ -647,7 +657,8 @@ wiredCityStatuses(result) {
           bucket: this.selectedBucket || null,
           businessVertical: this.selectedBusinessVertical || null,
           visibleUserCount: this.displayRows.length,
-          typeVal: this.selectedType // ✅ ADD
+          typeVal: this.selectedType, // ✅ ADD
+           role: this.selectedRole 
         });
         return;
       }
@@ -663,7 +674,8 @@ wiredCityStatuses(result) {
           bucket: this.selectedBucket || null,
           course: 'CMA',
           businessVertical: this.selectedBusinessVertical || null,
-          typeVal: this.selectedType || 'Round Robin'
+          typeVal: this.selectedType || 'Round Robin',
+          role: this.selectedRole
         });
       }
     });
@@ -818,6 +830,9 @@ wiredCityStatuses(result) {
     this.availableSourcesForSelectedBucket = [];
     this.selectedType = '';
     this.selectedBusinessVertical = '';
+  this.selectedRole = this.roles.includes('CC')
+  ? 'CC'
+  : (this.roles[0] || '');
 
     const cityEl = this.template.querySelector('.city-select');
     if (cityEl) cityEl.value = '';
@@ -835,4 +850,12 @@ wiredCityStatuses(result) {
   openNewPresence() {
     this.template.querySelector('c-new-round-robin-adder').open();
   }
+
+//   renderedCallback() {
+//   const el = this.template.querySelector('select');
+//   if (el && this.selectedRole && el.value !== this.selectedRole) {
+//     el.value = this.selectedRole;
+//   }
+// }
+
 }

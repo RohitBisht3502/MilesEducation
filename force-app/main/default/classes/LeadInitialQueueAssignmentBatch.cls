@@ -16,7 +16,8 @@ global class LeadInitialQueueAssignmentBatch implements Database.Batchable<SObje
                       'FROM Lead__c ' +
                       'WHERE Queue_Stage__c = null ' +
                       'AND Next_Follow_Up_Date__c = null ' +
-                      'AND CreatedDate <= :timeLimit';
+                      'AND CreatedDate <= :timeLimit' + 
+            		  'AND Source_Bucket__c = \'Bucket 1\'';
         
         return Database.getQueryLocator(query);
     }

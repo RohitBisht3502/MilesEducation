@@ -46,6 +46,7 @@ public without sharing class RoundRobinMatrixController {
         @AuraEnabled public String businessVertical;
 @AuraEnabled public String course;
  @AuraEnabled public String typeVal;
+ @AuraEnabled public String role;
 
         @AuraEnabled public String objectApiName;
     }
@@ -178,7 +179,8 @@ public static MatrixResult getMatrix(
         ? 'Round Robin'
         : typeVal;
 
-    String objectApiName = resolveObjectApiName(finalType);
+   String objectApiName = resolveObjectApiNameByRole(role);
+
 
     System.debug(
         'getMatrix :: INPUTS => city=' + city +
@@ -372,231 +374,144 @@ if (!String.isBlank(objectApiName)) {
     }
 
     /* ================= WEIGHTS ================= */
+/* ================= WEIGHTS ================= */
 
-    @AuraEnabled
-    public static void saveAssignedWeights(String updatesJson) {
-        if (String.isBlank(updatesJson)) return;
-        List<WeightUpdate> updates = (List<WeightUpdate>)JSON.deserialize(updatesJson, List<WeightUpdate>.class);
-        applyUpdates(updates);
-    }
+@AuraEnabled
+public static void saveAssignedWeights(String updatesJson) {
+    if (String.isBlank(updatesJson)) return;
 
-
-
-    private static void validateLeadSourceTotals(List<WeightUpdate> updates) {
-
+    List<WeightUpdate> updates = (List<WeightUpdate>)JSON.deserialize(updatesJson, List<WeightUpdate>.class);
+    applyUpdates(updates);
+}
+private static void validateLeadSourceTotals(List<WeightUpdate> updates) {
     if (updates == null || updates.isEmpty()) return;
-String city = updates[0].city;
-String bucket = updates[0].bucket;
-String businessVertical = updates[0].businessVertical;
 
-String typeVal = String.isBlank(updates[0].typeVal)
-    ? 'Round Robin'
-    : updates[0].typeVal;
+    // Context from first update
+    WeightUpdate ctx = updates[0];
 
-// ADD THIS LINE
-String objectApiName = resolveObjectApiName(typeVal);
+    String city   = ctx.city;
+    String role   = ctx.role;
+    String bucket = ctx.bucket;
+    String vertical = ctx.businessVertical;
+    String typeVal = String.isBlank(ctx.typeVal) ? 'Round Robin' : ctx.typeVal;
+    String objectApiName = resolveObjectApiNameByRole(role);
 
+    // Mandatory fields check
+    if (String.isBlank(city))
+        throw new AuraHandledException('City is required.');
+    if (String.isBlank(role))
+        throw new AuraHandledException('Role is required.');
 
-// String objectApiName = resolveObjectApiName(typeVal);
+    // Fetch active users for this city + role
+    List<User> users = [
+        SELECT Id
+        FROM User
+        WHERE IsActive = true
+          AND City__c = :city
+          AND UserRole.Name = :role
+    ];
 
+    Integer expectedCount = users.size();
+    if (expectedCount == 0) {
+        throw new AuraHandledException(
+            'No active ' + role + ' users found in ' + city + '.'
+        );
+    }
 
-
-  Integer userCount =
-    updates[0].visibleUserCount != null
-        ? updates[0].visibleUserCount
-        : [
-            SELECT COUNT()
-            FROM User
-            WHERE IsActive = true
-            AND City__c = :city
-        ];
-
-
-    // 2️⃣ Collect lead sources & poolIds
+    // Collect Lead Sources from updates
     Set<String> sources = new Set<String>();
-    Set<Id> poolIds = new Set<Id>();
-
     for (WeightUpdate w : updates) {
-        if (w.leadSource != null) sources.add(w.leadSource);
-        if (w.poolId != null) poolIds.add(w.poolId);
+        if (!String.isBlank(w.leadSource)) sources.add(w.leadSource);
     }
+    if (sources.isEmpty()) return;
 
-    // 3️⃣ DB totals per Lead Source
-    Map<String, Decimal> totals = new Map<String, Decimal>();
-
-String aggQuery =
-    'SELECT Lead_Source__c src, SUM(Assigned_Weight__c) total ' +
-    'FROM Round_Robin_Pool__c ' +
-    'WHERE City__c = :city ' +
-    'AND Active__c = true ' +
-    'AND Lead_Source__c IN :sources ' +
-    'AND Object_Api_Name__c = :objectApiName ';
-
-
-if (!String.isBlank(typeVal)) {
-    aggQuery += ' AND Type__c = :typeVal ';
-}
-
-
-if (!String.isBlank(bucket)) {
-    aggQuery += ' AND Bucket__c = :bucket ';
-}
-if (!String.isBlank(businessVertical)) {
-    aggQuery += ' AND Course_Bucket__c = :businessVertical ';
-}
-
-aggQuery += ' GROUP BY Lead_Source__c';
-
-
-for (AggregateResult ar : Database.query(aggQuery)) {
-    totals.put((String)ar.get('src'), (Decimal)ar.get('total'));
-}
-
-
-    // 4️⃣ Fetch existing records being UPDATED
-    Map<Id, Round_Robin_Pool__c> existingMap = new Map<Id, Round_Robin_Pool__c>();
-    if (!poolIds.isEmpty()) {
-        existingMap = new Map<Id, Round_Robin_Pool__c>([
-SELECT Id, Lead_Source__c, Assigned_Weight__c
-FROM Round_Robin_Pool__c
-WHERE Id IN :poolIds
-AND City__c = :city
-AND Active__c = true
-AND Object_Api_Name__c = :objectApiName
-AND Type__c = :updates[0].typeVal
-
-
-        ]);
-    }
-
-    // 5️⃣ Apply updates CORRECTLY
-    for (WeightUpdate w : updates) {
-        if (w.leadSource == null || w.assignedWeight == null) continue;
-
-        Decimal currentTotal = totals.containsKey(w.leadSource)
-            ? totals.get(w.leadSource)
-            : 0;
-
-        // 🔁 Existing record → subtract old weight
-        if (w.poolId != null && existingMap.containsKey(w.poolId)) {
-            Decimal oldWeight = existingMap.get(w.poolId).Assigned_Weight__c;
-            if (oldWeight != null) {
-                currentTotal -= oldWeight;
+    // Validate: sum of assignedWeight for each Lead Source
+    for (String src : sources) {
+        Integer sumWeight = 0;
+        for (WeightUpdate w : updates) {
+            if (w.leadSource == src) {
+                sumWeight += (w.assignedWeight != null ? Integer.valueOf(w.assignedWeight) : 0);
             }
         }
 
-        // ➕ Add new weight
-        currentTotal += w.assignedWeight;
-        totals.put(w.leadSource, currentTotal);
-    }
-
-    // 6️⃣ Validate
-    for (String src : totals.keySet()) {
-        if (totals.get(src) != userCount) {
+        if (sumWeight != expectedCount) {
             throw new AuraHandledException(
-                'Total assigned weight for Lead Source "' + src +
-                '" must be ' + userCount +
-                ', but found ' + totals.get(src)
+                'Lead Source "' + src + '" must have total weight equal to ' +
+                expectedCount + ' (number of active ' + role + ' users), but found ' + sumWeight + '.'
             );
         }
     }
 }
 
-
 @AuraEnabled
 public static void applyUpdates(List<WeightUpdate> updates) {
     if (updates == null || updates.isEmpty()) return;
 
-    validateLeadSourceTotals(updates);
-
-    // Basic safety
+    // Validate basic weights
     for (WeightUpdate w : updates) {
         if (w.assignedWeight == null || w.assignedWeight < 0) {
             throw new AuraHandledException('Assigned Weight cannot be negative.');
         }
     }
 
-    // Collect keys
     Set<Id> poolIds = new Set<Id>();
-    Set<String> leadSources = new Set<String>();
     Set<Id> salesRepIds = new Set<Id>();
-
     for (WeightUpdate w : updates) {
         if (w.poolId != null) poolIds.add(w.poolId);
-        if (w.leadSource != null) leadSources.add(w.leadSource);
         if (w.salesRepId != null) salesRepIds.add(w.salesRepId);
     }
 
-    // Fetch existing pools by Id
     Map<Id, Round_Robin_Pool__c> existingById = new Map<Id, Round_Robin_Pool__c>();
     if (!poolIds.isEmpty()) {
-        existingById = new Map<Id, Round_Robin_Pool__c>([
-            SELECT Id, City__c, Sales_Rep__c, Lead_Source__c
-            FROM Round_Robin_Pool__c
-            WHERE Id IN :poolIds
-        ]);
-    }
-
-    // Fetch existing pools by rep+source (for inserts check)
-    Map<String, Round_Robin_Pool__c> existingByKey = new Map<String, Round_Robin_Pool__c>();
-    if (!salesRepIds.isEmpty() && !leadSources.isEmpty()) {
-        for (Round_Robin_Pool__c rr : [
-            SELECT Id, Sales_Rep__c, Lead_Source__c, City__c
-            FROM Round_Robin_Pool__c
-            WHERE Sales_Rep__c IN :salesRepIds
-            AND Lead_Source__c IN :leadSources
-        ]) {
-            existingByKey.put(rr.Sales_Rep__c + '|' + rr.Lead_Source__c, rr);
-        }
+        existingById = new Map<Id, Round_Robin_Pool__c>(
+            [SELECT Id FROM Round_Robin_Pool__c WHERE Id IN :poolIds]
+        );
     }
 
     List<Round_Robin_Pool__c> toInsert = new List<Round_Robin_Pool__c>();
     List<Round_Robin_Pool__c> toUpdate = new List<Round_Robin_Pool__c>();
 
     for (WeightUpdate w : updates) {
-
-        // 🔁 UPDATE
         if (w.poolId != null && existingById.containsKey(w.poolId)) {
+            // Update existing record
             Round_Robin_Pool__c rr = existingById.get(w.poolId);
             rr.Assigned_Weight__c = w.assignedWeight;
-            rr.Course__c = w.course;
-            rr.Course_Bucket__c = w.businessVertical;
             rr.Bucket__c = w.bucket;
-           String typeVal = String.isBlank(w.typeVal) ? 'Round Robin' : w.typeVal;
-
-rr.Type__c = typeVal;
-rr.Object_Api_Name__c = resolveObjectApiName(typeVal);
-
+            rr.Course_Bucket__c = w.businessVertical;
+            rr.Type__c = String.isBlank(w.typeVal) ? 'Round Robin' : w.typeVal;
+            rr.Object_Api_Name__c = resolveObjectApiNameByRole(w.role);
             rr.Active__c = true;
-            // ✅ City NOT REQUIRED here
             toUpdate.add(rr);
-        }
-        // ➕ INSERT
-        else {
-            if (String.isBlank(w.city)) {
-                throw new AuraHandledException('City is required for new entries.');
-            }
-           String typeVal = String.isBlank(w.typeVal) ? 'Round Robin' : w.typeVal;
-
-toInsert.add(new Round_Robin_Pool__c(
-    Sales_Rep__c = w.salesRepId,
-    Lead_Source__c = w.leadSource,
-    City__c = w.city,
-    Assigned_Weight__c = w.assignedWeight,
-    Course__c = w.course != null ? w.course : 'CMA',
-    Course_Bucket__c = w.businessVertical,
-    Bucket__c = w.bucket,
-    Type__c = typeVal,
-    Active__c = true,
-    Object_Api_Name__c = resolveObjectApiName(typeVal)
-));
-
+        } else {
+            // Insert new record
+            toInsert.add(new Round_Robin_Pool__c(
+                Sales_Rep__c = w.salesRepId,
+                Lead_Source__c = w.leadSource,
+                City__c = w.city,
+                Assigned_Weight__c = w.assignedWeight,
+                Bucket__c = w.bucket,
+                Course_Bucket__c = w.businessVertical,
+                Type__c = String.isBlank(w.typeVal) ? 'Round Robin' : w.typeVal,
+                Object_Api_Name__c = resolveObjectApiNameByRole(w.role),
+                Active__c = true
+            ));
         }
     }
 
+    // Perform DML
     if (!toUpdate.isEmpty()) update toUpdate;
     if (!toInsert.isEmpty()) insert toInsert;
+
+    // Validate totals after save
+    validateLeadSourceTotals(updates);
 }
+
+private static String resolveObjectApiNameByRole(String role) {
+    if (role == 'CC') return 'Lead__c';
+    if (role == 'SR') return 'Course_Enrolled__c';
+    throw new AuraHandledException('Invalid role');
+}
+
 
 
 
@@ -755,7 +670,7 @@ public static void saveSequences(String updatesJson) {
             throw new AuraHandledException('Object API mismatch detected.');
         }
 
-        // ✅ NULL-SAFE BUSINESS VERTICAL CHECK
+        // NULL-SAFE BUSINESS VERTICAL CHECK
         if ((p.businessVertical != null || r.Course_Bucket__c != null) &&
             p.businessVertical != r.Course_Bucket__c) {
 
@@ -783,7 +698,7 @@ public static void saveSequences(String updatesJson) {
 
     List<Round_Robin_Pool__c> peerList;
 
-    // ✅ FIX: Course_Bucket__c filter must be NULL-SAFE; otherwise "Course_Bucket__c = null" returns no rows.
+    //  FIX: Course_Bucket__c filter must be NULL-SAFE; otherwise "Course_Bucket__c = null" returns no rows.
     if (p.businessVertical == null) {
         peerList = [
             SELECT Id, Sequence__c

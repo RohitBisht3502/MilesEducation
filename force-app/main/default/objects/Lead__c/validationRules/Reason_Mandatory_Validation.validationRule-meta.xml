@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Reason_Mandatory_Validation</fullName>
+    <active>true</active>
+    <description>Reason is mandatory when
+Joining another university OR Other is selected.</description>
+    <errorConditionFormula>AND(
+    OR(
+        ISPICKVAL(Stage__c , &quot;B4&quot;),
+        ISPICKVAL(Stage__c , &quot;B4-&quot;)
+    ),
+    OR(
+        ISPICKVAL(Status_Change_Reason__c, &quot;Joining another university&quot;),
+        ISPICKVAL(Status_Change_Reason__c, &quot;Other&quot;)
+    ),
+    ISBLANK(Reason__c)
+)</errorConditionFormula>
+    <errorMessage>Please provide details for the selected reason.</errorMessage>
+</ValidationRule>

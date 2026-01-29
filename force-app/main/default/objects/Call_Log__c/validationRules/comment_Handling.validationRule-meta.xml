@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>comment_Handling</fullName>
+    <active>true</active>
+    <errorConditionFormula>AND(
+    ISPICKVAL(L1__c, &quot;connected&quot;),
+    ISBLANK(Feedback__c)
+)</errorConditionFormula>
+    <errorMessage>feedback is required if call is connected</errorMessage>
+</ValidationRule>

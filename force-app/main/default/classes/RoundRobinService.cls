@@ -43,6 +43,8 @@ public without sharing class RoundRobinService {
                 List<Round_Robin_Pool__c> pool =
                     RoundRobinHelper.lockPoolMembers(b.objectApiName, b.cityUpper, b.sourceUpper, b.courseUpper, b.typeValue);
 
+                    System.debug('RoundRobinHelper.lockPoolMembers >>> '+pool);
+
                 if (pool.isEmpty()) {
                     System.debug(LoggingLevel.INFO, 'RoundRobinService.assignForRecords: empty pool for key=' + key);
                     continue;
