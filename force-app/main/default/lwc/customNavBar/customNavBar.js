@@ -74,6 +74,11 @@ export default class CustomNavBar extends LightningElement {
         return this.blinkActive ? 'nav-title blink-nav' : 'nav-title';
     }
 
+    get navHeader() {
+    return this.recordId && this.recordId.startsWith('001') ? 'Account Sources' : 'Lead Sources';
+}
+
+
 
 
   renderedCallback() {

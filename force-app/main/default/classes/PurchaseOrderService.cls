@@ -1,10 +1,3 @@
-/**
- * ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
- * Class Name      : PurchaseOrderService
- * Author          : Rohit Singh Bisht
- * Created Date    : Jan 8, 2026
- */
-
 public without sharing class PurchaseOrderService {
 
     public class PurchaseOrderRequest {
@@ -83,11 +76,12 @@ public without sharing class PurchaseOrderService {
             Account student = fetchStudentIfNeeded(context.studentAccountId);
 
             // api callout to miles
-            Callout_PurchaseOrderService.CalloutResult calloutRes = callExternalPurchaseService(req, lead, candidate);
+           // Callout_PurchaseOrderService.CalloutResult calloutRes = callExternalPurchaseService(req, lead, candidate);
 
             Purchase_Order__c po    = createPurchaseOrder(req, context, lead, candidate, student);
-            po.Purchase_Order_Id__c = String.valueOf(calloutRes.purchaseId);
-            po.Response_Payload__c  = calloutRes.responseBody;
+            po.Purchase_Order_Id__c = 'Testing 123';
+          //  po.Purchase_Order_Id__c = String.valueOf(calloutRes.purchaseId);
+           // po.Response_Payload__c  = calloutRes.responseBody;
             insert po;
 
             createLineItems(po.Id, req.items);
@@ -100,6 +94,82 @@ public without sharing class PurchaseOrderService {
             throw new AuraHandledException('Save failed: ' + e.getMessage());
         }
     }
+@AuraEnabled
+public static void saveAddress(
+    Id recordId,
+    String addressType,
+    Map<String, String> address
+) {
+    if (recordId.getSObjectType() == Lead__c.SObjectType) {
+
+        Lead__c leadRec = [
+            SELECT Candidate__c
+            FROM Lead__c
+            WHERE Id = :recordId
+        ];
+
+        Lead candidate = [
+            SELECT Id
+            FROM Lead
+            WHERE Id = :leadRec.Candidate__c
+        ];
+
+        if (addressType == 'billing') {
+            candidate.Street = address.get('street');
+            candidate.City = address.get('city');
+            candidate.State = address.get('state');
+            candidate.PostalCode = address.get('postal');
+            candidate.Country = address.get('country');
+        } else {
+            candidate.Shipping_Street__c = address.get('street');
+            candidate.Shipping_City__c = address.get('city');
+            candidate.Shipping_State__c = address.get('state');
+            candidate.Shipping_Postal_Code__c = address.get('postal');
+            candidate.Shipping_Country__c = address.get('country');
+        }
+
+        update candidate;
+    }
+
+    if (recordId.getSObjectType() == Course_Enrolled__c.SObjectType) {
+
+        Course_Enrolled__c ce = [
+            SELECT Student__c
+            FROM Course_Enrolled__c
+            WHERE Id = :recordId
+        ];
+
+        Account acc = [
+            SELECT Id
+            FROM Account
+            WHERE Id = :ce.Student__c
+        ];
+
+        if (addressType == 'billing') {
+            acc.BillingStreet = address.get('street');
+            acc.BillingCity = address.get('city');
+            acc.BillingState = address.get('state');
+            acc.BillingPostalCode = address.get('postal');
+            acc.BillingCountry = address.get('country');
+        } else {
+            acc.ShippingStreet = address.get('street');
+            acc.ShippingCity = address.get('city');
+            acc.ShippingState = address.get('state');
+            acc.ShippingPostalCode = address.get('postal');
+            acc.ShippingCountry = address.get('country');
+        }
+
+        update acc;
+    }
+}
+
+
+
+
+
+
+
+
 
     private static void validateRequest(PurchaseOrderRequest req) {
         if (req == null || req.items == null || req.items.isEmpty()) {

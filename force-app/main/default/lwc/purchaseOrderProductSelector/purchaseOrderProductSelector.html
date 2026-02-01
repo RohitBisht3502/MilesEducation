@@ -126,6 +126,45 @@
         </section>
 
     </template>
+    
+<!-- ================= ADDRESS MODAL ================= -->
+<template if:true={showAddressModal}>
+    <div class="modal-backdrop"></div>
+
+    <section class="custom-modal">
+        <header class="modal-header">
+            <h2>Add {missingAddressType} Address</h2>
+            <button class="close-btn" onclick={closeAddressModal}>×</button>
+        </header>
+
+        <div class="modal-body">
+            <div class="address-grid">
+                <lightning-input label="Street" data-field="street"></lightning-input>
+                <lightning-input label="City" data-field="city"></lightning-input>
+                <lightning-input label="State" data-field="state"></lightning-input>
+                <lightning-input label="Postal Code" data-field="postal"></lightning-input>
+                <lightning-input label="Country" data-field="country"></lightning-input>
+            </div>
+        </div>
+
+        <footer class="modal-footer">
+            <lightning-button
+                label="Cancel"
+                variant="neutral"
+                onclick={closeAddressModal}>
+            </lightning-button>
+
+            <lightning-button
+                label="Save Address"
+                variant="brand"
+                onclick={saveAddress}>
+            </lightning-button>
+        </footer>
+    </section>
+</template>
+
+
+
 
     <!-- ================= CHECKOUT ================= -->
     <template if:true={showCheckout}>

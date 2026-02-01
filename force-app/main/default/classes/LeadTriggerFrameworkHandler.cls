@@ -90,6 +90,10 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
 
         // Validate mandatory comments for rejection
         LeadTriggerHelperClass.validateApprovalComments(newLeads, oldMapLead);
+
+
+       // conversion
+        LeadTriggerConversionClass.convertCandidateAndCreateCourseOnM7(newLeads, oldMapLead);
     }
 
     public override void beforeDelete() {

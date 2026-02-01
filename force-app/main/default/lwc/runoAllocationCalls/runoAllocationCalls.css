@@ -24,6 +24,59 @@
 .slds-modal__container {
    max-width: var(--slds-c-modal-sizing-medium);
 }
+.top-header-bar {
+  background: linear-gradient(90deg, #0b5cab, #1b75d0);
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 600;
+}
+
+.header-title {
+  font-size: 14px;
+}
+
+.header-right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.status-pill {
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-pill.ended {
+  background: #ea001e;
+  color: #fff;
+}
+
+.timer {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 12px;
+}
+
+
+.section-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
 
 /* lightning-quick-action-panel {
     width: 90% !important;

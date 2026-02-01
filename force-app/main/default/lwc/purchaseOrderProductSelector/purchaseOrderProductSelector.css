@@ -7,6 +7,175 @@
     background: #f4f6f8;
     font-family: "Salesforce Sans", Arial, sans-serif;
 }
+.address-card {
+    background: #ffffff;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.address-card .section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: #1f2937;
+}
+.address-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+}
+
+@media (max-width: 768px) {
+    .address-grid {
+        grid-template-columns: 1fr;
+    }
+}
+.address-grid lightning-input {
+    --slds-c-input-radius-border: 6px;
+}
+.address-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+.address-actions lightning-button {
+    --slds-c-button-brand-color-background: #2563eb;
+    --slds-c-button-brand-color-border: #2563eb;
+    --slds-c-button-brand-color-background-hover: #1e40af;
+    --slds-c-button-brand-color-border-hover: #1e40af;
+    border-radius: 8px;
+}
+/* Backdrop */
+/* Modal Backdrop */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5); /* semi-transparent black */
+    z-index: 999;
+    backdrop-filter: blur(2px); /* soft blur for modern effect */
+}
+
+/* Modal Container */
+.custom-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 500px;
+    max-width: 90%;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    font-family: 'Salesforce Sans', Arial, sans-serif;
+    overflow: hidden;
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Header */
+.modal-header {
+    background: linear-gradient(90deg, #1a73e8, #4285f4); /* modern gradient */
+    color: #fff;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.close-btn {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.close-btn:hover {
+    transform: rotate(90deg);
+}
+
+/* Body */
+.modal-body {
+    padding: 24px;
+    background: #f9f9f9;
+}
+
+.address-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+/* Footer */
+.modal-footer {
+    padding: 16px 24px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    background: #f1f1f1;
+}
+
+/* Buttons */
+.lightning-button {
+    border-radius: 6px;
+}
+
+.lightning-button[variant='brand'] {
+    background: linear-gradient(90deg, #34a853, #0f9d58);
+    color: #fff;
+    transition: all 0.2s ease;
+}
+
+.lightning-button[variant='brand']:hover {
+    background: linear-gradient(90deg, #0f9d58, #34a853);
+    transform: translateY(-2px);
+}
+
+.lightning-button[variant='neutral'] {
+    background: #e0e0e0;
+    color: #333;
+    transition: all 0.2s ease;
+}
+
+.lightning-button[variant='neutral']:hover {
+    background: #d5d5d5;
+    transform: translateY(-1px);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -48%);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+    }
+}
+
+
+/* Animation */
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -55%) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
 
 /* ============ CARDS ============ */
 .card,

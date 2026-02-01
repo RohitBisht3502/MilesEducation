@@ -383,65 +383,57 @@ public static void saveAssignedWeights(String updatesJson) {
     List<WeightUpdate> updates = (List<WeightUpdate>)JSON.deserialize(updatesJson, List<WeightUpdate>.class);
     applyUpdates(updates);
 }
+
+
 private static void validateLeadSourceTotals(List<WeightUpdate> updates) {
+
     if (updates == null || updates.isEmpty()) return;
 
-    // Context from first update
-    WeightUpdate ctx = updates[0];
+    /* ================================
+       STEP 1: GROUP UPDATES BY LEAD SOURCE
+       (ONLY WHAT USER EDITED / CAN SEE)
+       ================================ */
+    Map<String, Map<Id, Integer>> totalsByLeadSource =
+        new Map<String, Map<Id, Integer>>();
 
-    String city   = ctx.city;
-    String role   = ctx.role;
-    String bucket = ctx.bucket;
-    String vertical = ctx.businessVertical;
-    String typeVal = String.isBlank(ctx.typeVal) ? 'Round Robin' : ctx.typeVal;
-    String objectApiName = resolveObjectApiNameByRole(role);
+    Integer visibleUserCount = updates[0].visibleUserCount;
 
-    // Mandatory fields check
-    if (String.isBlank(city))
-        throw new AuraHandledException('City is required.');
-    if (String.isBlank(role))
-        throw new AuraHandledException('Role is required.');
+    for (WeightUpdate w : updates) {
+        if (w.salesRepId == null || String.isBlank(w.leadSource)) continue;
 
-    // Fetch active users for this city + role
-    List<User> users = [
-        SELECT Id
-        FROM User
-        WHERE IsActive = true
-          AND City__c = :city
-          AND UserRole.Name = :role
-    ];
+        if (!totalsByLeadSource.containsKey(w.leadSource)) {
+            totalsByLeadSource.put(w.leadSource, new Map<Id, Integer>());
+        }
 
-    Integer expectedCount = users.size();
-    if (expectedCount == 0) {
-        throw new AuraHandledException(
-            'No active ' + role + ' users found in ' + city + '.'
+        totalsByLeadSource.get(w.leadSource).put(
+            w.salesRepId,
+            w.assignedWeight == null ? 0 : Integer.valueOf(w.assignedWeight)
         );
     }
 
-    // Collect Lead Sources from updates
-    Set<String> sources = new Set<String>();
-    for (WeightUpdate w : updates) {
-        if (!String.isBlank(w.leadSource)) sources.add(w.leadSource);
-    }
-    if (sources.isEmpty()) return;
+    /* ================================
+       STEP 2: VALIDATION (UI-TRUTH ONLY)
+       ================================ */
+    for (String leadSource : totalsByLeadSource.keySet()) {
 
-    // Validate: sum of assignedWeight for each Lead Source
-    for (String src : sources) {
-        Integer sumWeight = 0;
-        for (WeightUpdate w : updates) {
-            if (w.leadSource == src) {
-                sumWeight += (w.assignedWeight != null ? Integer.valueOf(w.assignedWeight) : 0);
-            }
+        Integer total = 0;
+        for (Integer wt : totalsByLeadSource.get(leadSource).values()) {
+            total += wt;
         }
 
-        if (sumWeight != expectedCount) {
+        if (total >= visibleUserCount)
+ {
             throw new AuraHandledException(
-                'Lead Source "' + src + '" must have total weight equal to ' +
-                expectedCount + ' (number of active ' + role + ' users), but found ' + sumWeight + '.'
+                'Total assigned weight for Lead Source "' + leadSource +
+                '" must be equal to total Sales Reps (' +
+                visibleUserCount +
+                '). Current total is ' + total + '.'
             );
         }
     }
 }
+
+
 
 @AuraEnabled
 public static void applyUpdates(List<WeightUpdate> updates) {
@@ -498,12 +490,13 @@ public static void applyUpdates(List<WeightUpdate> updates) {
         }
     }
 
-    // Perform DML
-    if (!toUpdate.isEmpty()) update toUpdate;
-    if (!toInsert.isEmpty()) insert toInsert;
+ 
 
     // Validate totals after save
     validateLeadSourceTotals(updates);
+       // Perform DML
+    if (!toUpdate.isEmpty()) update toUpdate;
+    if (!toInsert.isEmpty()) insert toInsert;
 }
 
 private static String resolveObjectApiNameByRole(String role) {
