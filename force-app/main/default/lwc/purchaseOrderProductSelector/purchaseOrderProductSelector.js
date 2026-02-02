@@ -14,9 +14,9 @@ export default class PurchaseOrderProductSelector extends LightningElement {
     showCheckout = false;
     discountType = 'percentage';
     discountValue = 0;
+    downPayment = 0;
     selectedAddressType = 'billing';
     recordId;
-    showProducts = false;
 
     hasBillingAddress = false;
     hasShippingAddress = false;
@@ -32,7 +32,7 @@ export default class PurchaseOrderProductSelector extends LightningElement {
         }
     }
 
-    @wire(getActiveProducts)
+    @wire(getActiveProducts, { recordId: '$recordId' })
     wiredProducts({ data, error }) {
         if (data) {
             this.products = data.map(p => ({
@@ -78,10 +78,15 @@ export default class PurchaseOrderProductSelector extends LightningElement {
     }
 
     get filteredProducts() {
-        if (!this.showProducts) return [];
+        if (!this.products.length) return [];
+        if (!this.searchKey) return this.products;
         return this.products.filter(p =>
             (p.name || '').toLowerCase().includes(this.searchKey)
         );
+    }
+
+    get showProducts() {
+        return this.filteredProducts.length > 0;
     }
 
     get selectedProducts() {
@@ -114,7 +119,6 @@ export default class PurchaseOrderProductSelector extends LightningElement {
 
     handleSearch(event) {
         this.searchKey = event.target.value?.toLowerCase() || '';
-        this.showProducts = this.searchKey.length > 0;
     }
 
     handleAddressChange(event) {
@@ -123,7 +127,13 @@ export default class PurchaseOrderProductSelector extends LightningElement {
 
     addToCart(event) {
         const id = event.currentTarget.dataset.id;
-        this.products = this.products.map(p => (String(p.id) === id ? { ...p, selected: true } : p));
+        this.products = this.products.map(p => {
+            if (String(p.id) === id) {
+                return { ...p, selected: true };
+            }
+            return { ...p, selected: false, quantity: 1 };
+        });
+        this.syncDownPayment();
     }
 
     updateQty(event) {
@@ -135,11 +145,13 @@ export default class PurchaseOrderProductSelector extends LightningElement {
             }
             return p;
         });
+        this.syncDownPayment();
     }
 
     removeItem(event) {
         const id = event.currentTarget.dataset.id;
         this.products = this.products.map(p => (String(p.id) === id ? { ...p, selected: false, quantity: 1 } : p));
+        this.syncDownPayment();
     }
 
     handleDiscountType(event) {
@@ -160,6 +172,7 @@ export default class PurchaseOrderProductSelector extends LightningElement {
 
         this.discountType = newType;
         this.discountValue = newValue;
+        this.syncDownPayment();
     }
 
     handleDiscountValue(event) {
@@ -169,6 +182,28 @@ export default class PurchaseOrderProductSelector extends LightningElement {
         if (this.discountType === 'fixed') value = Math.min(value, this.subTotal);
 
         this.discountValue = value;
+        this.syncDownPayment();
+    }
+
+    handleDownPaymentChange(event) {
+        let value = Number(event.target.value) || 0;
+        const max = this.finalPayable;
+
+        if (value > max) {
+            event.target.setCustomValidity('Down payment cannot exceed total payable.');
+            event.target.reportValidity();
+            value = max;
+            event.target.setCustomValidity('');
+        } else if (value < 0) {
+            value = 0;
+            event.target.setCustomValidity('Down payment cannot be negative.');
+        } else {
+            event.target.setCustomValidity('');
+        }
+
+        event.target.value = value;
+        event.target.reportValidity();
+        this.downPayment = value;
     }
 
     backToProducts() {
@@ -244,6 +279,11 @@ export default class PurchaseOrderProductSelector extends LightningElement {
             return;
         }
 
+        if (this.downPayment > this.finalPayable) {
+            this.showToast('Warning', 'Down payment cannot exceed total payable.', 'warning');
+            return;
+        }
+
         if (!this.recordId) {
             this.showToast('Error', 'Record Id not found.', 'error');
             return;
@@ -252,6 +292,7 @@ export default class PurchaseOrderProductSelector extends LightningElement {
         const payload = {
             leadId: this.recordId,
             discount: this.discountAmount,
+            downPayment: this.downPayment,
             addressType: this.selectedAddressType,
             items: this.selectedProducts.map(p => ({
                 productId: p.id,
@@ -282,6 +323,7 @@ export default class PurchaseOrderProductSelector extends LightningElement {
         this.discountValue = 0;
         this.discountType = 'percentage';
         this.selectedAddressType = 'billing';
+        this.downPayment = 0;
     }
 
     showToast(title, message, variant) {
@@ -290,5 +332,19 @@ export default class PurchaseOrderProductSelector extends LightningElement {
 
     closeAddressModal() {
         this.showAddressModal = false;
+    }
+
+    syncDownPayment() {
+        const max = this.finalPayable;
+        const clamped = Math.min(Math.max(this.downPayment || 0, 0), max);
+        if (clamped !== this.downPayment) {
+            this.downPayment = clamped;
+        }
+        const input = this.template.querySelector('lightning-input[data-id="downPayment"]');
+        if (input) {
+            input.setCustomValidity('');
+            input.value = clamped;
+            input.reportValidity();
+        }
     }
 }

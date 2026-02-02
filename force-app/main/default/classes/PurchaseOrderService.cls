@@ -3,6 +3,7 @@ public without sharing class PurchaseOrderService {
     public class PurchaseOrderRequest {
         @AuraEnabled public Id leadId;
         @AuraEnabled public Decimal discount;
+        @AuraEnabled public Decimal downPayment;
         @AuraEnabled public String addressType;
         @AuraEnabled public List<LineItemRequest> items;
     }
@@ -39,10 +40,37 @@ public without sharing class PurchaseOrderService {
     }
 
     @AuraEnabled(cacheable=true)
-    public static List<ProductDTO> getActiveProducts() {
+    public static List<ProductDTO> getActiveProducts(Id recordId) {
         List<ProductDTO> products = new List<ProductDTO>();
+        String familyFilter = null;
 
-        for (PricebookEntry pbe : [SELECT Product2Id, Product2.Name, Product2.ProductCode, Product2.Family, Product2.type__c,UnitPrice FROM PricebookEntry WHERE IsActive = true]) {
+        if (recordId != null && recordId.getSObjectType() == Lead__c.SObjectType) {
+            Lead__c leadRec = [
+                SELECT Course__c
+                FROM Lead__c
+                WHERE Id = :recordId
+                LIMIT 1
+            ];
+            familyFilter = leadRec.Course__c;
+        }
+
+        List<PricebookEntry> entries;
+        if (String.isBlank(familyFilter)) {
+            entries = [
+                SELECT Product2Id, Product2.Name, Product2.ProductCode, Product2.Family, Product2.type__c, UnitPrice
+                FROM PricebookEntry
+                WHERE IsActive = true
+            ];
+        } else {
+            entries = [
+                SELECT Product2Id, Product2.Name, Product2.ProductCode, Product2.Family, Product2.type__c, UnitPrice
+                FROM PricebookEntry
+                WHERE IsActive = true
+                AND Product2.Family = :familyFilter
+            ];
+        }
+
+        for (PricebookEntry pbe : entries) {
             products.add(new ProductDTO(
                 pbe.Product2Id,
                 pbe.Product2.Name,
@@ -368,6 +396,7 @@ private static Boolean hasStudyMaterial(List<LineItemRequest> items) {
         }
 
         po.Discount_Amount__c = req.discount;
+        po.Down_Payment__c = req.downPayment;
         po.Purchase_Order_Date__c = Date.today();
 
         setAddress(po, req.addressType, context, candidate, student);

@@ -1,14 +1,5 @@
 public class StudentFileStatusTaskHandler {
 
-    // Key format: LEVEL||FILETYPE||STATUS   (all trimmed + lowercase)
-    private static String keyOf(String level, String fileType, String status) {
-        String l = String.valueOf(level).trim().toLowerCase();
-        String f = String.valueOf(fileType).trim().toLowerCase();
-        String s = String.valueOf(status).trim().toLowerCase();
-        return l + '||' + f + '||' + s;
-    }
-
-    // Who should own the task
     private enum AssigneeType { SR_SPOC, GP_SPOC, CC_SPOC }
 
     private class Rule {
@@ -20,54 +11,52 @@ public class StudentFileStatusTaskHandler {
         }
     }
 
-    // ====== RULES FROM YOUR IMAGE ======
-    // NOTE: "Doc Name" column = your Student_File_Status__c.File_Type__c
-    // NOTE: "Doc Status" column = your Student_File_Status__c.Status__c
-    private static Map<String, Rule> buildRules() {
-        Map<String, Rule> RULES = new Map<String, Rule>();
-
-        // M7#- : Educational documents at eligibility
-        RULES.put(
-            keyOf('M7#-', 'Educational documents at eligibility', 'Pending to upload'),
-            new Rule('Upload docs for Evaluation advice', AssigneeType.SR_SPOC)
-        );
-        RULES.put(
-            keyOf('M7#-', 'Educational documents at eligibility', 'Re-upload'),
-            new Rule('Upload docs for Evaluation advice', AssigneeType.SR_SPOC)
-        );
-        RULES.put(
-            keyOf('M7#-', 'Educational documents at eligibility', 'Under Review'),
-            new Rule('Approve docs needed to release Evaluation advice', AssigneeType.GP_SPOC)
-        );
-
-        // M7## : Educational documents at eligibility -> Approved
-        RULES.put(
-            keyOf('M7##', 'Educational documents at eligibility', 'Approved'),
-            new Rule('Release Evaluation Advice', AssigneeType.GP_SPOC)
-        );
-
-        // M8 : payment follow-up
-        RULES.put(
-            keyOf('M8', 'FAQs Payment status', 'Not paid'),
-            new Rule('Follow up for payment to Evaluation Agency', AssigneeType.SR_SPOC)
-        );
-        RULES.put(
-            keyOf('M8', 'NIES Receipt', 'yet to upload'),
-            new Rule('Follow up for payment to Evaluation Agency', AssigneeType.SR_SPOC)
-        );
-
-        return RULES;
+    private static String norm(String v) {
+        return String.valueOf(v).trim().toLowerCase();
     }
 
-    public static void handleAfterUpdate(
-        List<Student_File_Status__c> newList,
-        Map<Id, Student_File_Status__c> oldMap
-    ) {
+    private static String keyOf(String level, String fileType, String status) {
+        return norm(level) + '||' + norm(fileType) + '||' + norm(status);
+    }
+
+    private static void addRule(Map<String, Rule> m, String level, String fileType, String status, String subject, AssigneeType assignee) {
+        m.put(keyOf(level, fileType, status), new Rule(subject, assignee));
+    }
+
+    private static final Map<String, Rule> RULES = initRules();
+    private static Map<String, Rule> initRules() {
+        Map<String, Rule> m = new Map<String, Rule>();
+
+        addRule(m, 'M7#-', 'Educational documents at eligibility', 'Pending to upload', 'Upload docs for Evaluation advice', AssigneeType.SR_SPOC);
+        addRule(m, 'M7#-', 'Educational documents at eligibility', 'Re-upload',        'Upload docs for Evaluation advice', AssigneeType.SR_SPOC);
+        addRule(m, 'M7#-', 'Educational documents at eligibility', 'Under Review',    'Approve docs needed to release Evaluation advice', AssigneeType.GP_SPOC);
+        addRule(m, 'M7##', 'Educational documents at eligibility', 'Approved',        'Release Evaluation Advice', AssigneeType.GP_SPOC);
+
+        addRule(m, 'M8', 'FAQs Payment status', 'Not paid',     'Follow up for payment to Evaluation Agency', AssigneeType.SR_SPOC);
+        addRule(m, 'M8', 'NIES Receipt',        'Yet to upload','Follow up for payment to Evaluation Agency', AssigneeType.SR_SPOC);
+
+        addRule(m, 'M9',  'Evaluation report', 'Yet to upload', 'Follow up for Evaluation report', AssigneeType.SR_SPOC);
+        addRule(m, 'M9+', 'Evaluation report', 'Re-upload',     'Follow up for Evaluation report', AssigneeType.SR_SPOC);
+        addRule(m, 'M9+', 'Evaluation report', 'Under review',  'Approve the Evaluation report',   AssigneeType.GP_SPOC);
+        addRule(m, 'M10', 'Evaluation report', 'Approved',      'Release NTS Advice',              AssigneeType.GP_SPOC);
+
+        addRule(m, 'M11',  'NTS document', 'Yet to upload', 'Follow up for NTS', AssigneeType.SR_SPOC);
+        addRule(m, 'M11',  'NTS document', 'Re-upload',     'Follow up for NTS', AssigneeType.SR_SPOC);
+        addRule(m, 'M11',  'NTS document', 'Under review',  'Approve NTS',       AssigneeType.GP_SPOC);
+        addRule(m, 'M11+', 'NTS document', 'Approved',      'Exam Scheduling Advice to be released', AssigneeType.GP_SPOC);
+
+        addRule(m, 'M11#', 'Pro-metric', 'Yet to upload', 'Schedule Exam and upload pro-metric', AssigneeType.SR_SPOC);
+        addRule(m, 'M11#', 'Pro-metric', 'Re-upload',     'Schedule Exam and upload pro-metric', AssigneeType.SR_SPOC);
+        addRule(m, 'M11#', 'Pro-metric', 'Under review',  'Verify Pro-metric',                   AssigneeType.GP_SPOC);
+
+        addRule(m, 'M12', 'Pro-metric', 'Approved', 'Follow up for exam prep and exam completion', AssigneeType.SR_SPOC);
+
+        return m;
+    }
+
+    public static void handleAfterUpdate(List<Student_File_Status__c> newList, Map<Id, Student_File_Status__c> oldMap) {
         if (newList == null || newList.isEmpty() || oldMap == null) return;
 
-        Map<String, Rule> RULES = buildRules();
-
-        // 1) Only process records where Status changed
         Set<Id> courseIds = new Set<Id>();
         List<Student_File_Status__c> changed = new List<Student_File_Status__c>();
 
@@ -76,82 +65,65 @@ public class StudentFileStatusTaskHandler {
             if (oldRec == null) continue;
 
             if (sfs.Status__c != oldRec.Status__c) {
-                changed.add(sfs);
-                if (sfs.Course_Enrolled__c != null) courseIds.add(sfs.Course_Enrolled__c);
+                if (sfs.Course_Enrolled__c != null) {
+                    changed.add(sfs);
+                    courseIds.add(sfs.Course_Enrolled__c);
+                }
             }
         }
-        if (changed.isEmpty() || courseIds.isEmpty()) return;
+        if (changed.isEmpty()) return;
 
-        // 2) Get Course Enrolled SPOCs
         Map<Id, Course_Enrolled__c> courseMap = new Map<Id, Course_Enrolled__c>([
             SELECT Id, OwnerId, GP_Spoc__c, CC_Spoc__c
             FROM Course_Enrolled__c
             WHERE Id IN :courseIds
         ]);
 
-        // 3) (Optional but recommended) prevent duplicate open tasks:
-        //    If same Subject already open for same Course Enrolled, skip creating.
-        Set<Id> whatIds = new Set<Id>(courseIds);
         Map<String, Task> existingOpenByCourseAndSubject = new Map<String, Task>();
         for (Task t : [
             SELECT Id, WhatId, Subject, Status
             FROM Task
-            WHERE WhatId IN :whatIds
-              AND Status != 'Completed'
+            WHERE WhatId IN :courseIds
+            AND Status != 'Completed'
         ]) {
-            String k = String.valueOf(t.WhatId) + '||' + String.valueOf(t.Subject).trim().toLowerCase();
-            existingOpenByCourseAndSubject.put(k, t);
+            existingOpenByCourseAndSubject.put(String.valueOf(t.WhatId) + '||' + norm(t.Subject), t);
         }
 
-        // 4) Create tasks
         List<Task> toInsert = new List<Task>();
 
         for (Student_File_Status__c sfs : changed) {
             Course_Enrolled__c ce = courseMap.get(sfs.Course_Enrolled__c);
             if (ce == null) continue;
 
-            String ruleKey = keyOf(sfs.Level__c, sfs.File_Type__c, sfs.Status__c);
-            Rule r = RULES.get(ruleKey);
-            if (r == null) continue; // no rule, do nothing
+            Rule r = RULES.get(keyOf(sfs.Level__c, sfs.File_Type__c, sfs.Status__c));
+            if (r == null) continue;
 
             Id ownerId;
-            if (r.assigneeType == AssigneeType.SR_SPOC) {
-                ownerId = ce.OwnerId; // SR SPOC
-            } else if (r.assigneeType == AssigneeType.GP_SPOC) {
-                ownerId = ce.GP_Spoc__c;
-            } else if (r.assigneeType == AssigneeType.CC_SPOC) {
-                ownerId = ce.CC_Spoc__c;
-            }
+            if (r.assigneeType == AssigneeType.SR_SPOC) ownerId = ce.OwnerId;
+            else if (r.assigneeType == AssigneeType.GP_SPOC) ownerId = ce.GP_Spoc__c;
+            else ownerId = ce.CC_Spoc__c;
 
             if (ownerId == null) continue;
 
-            // duplicate prevention key
-            String dupKey = String.valueOf(ce.Id) + '||' + r.taskSubject.trim().toLowerCase();
-            if (existingOpenByCourseAndSubject.containsKey(dupKey)) {
-                continue;
-            }
+            String dupKey = String.valueOf(ce.Id) + '||' + norm(r.taskSubject);
+            if (existingOpenByCourseAndSubject.containsKey(dupKey)) continue;
 
-            Task t = new Task();
-            t.Subject   = r.taskSubject;
-            t.OwnerId   = ownerId;
-            t.WhatId    = ce.Id;               // relate to Course Enrolled
-            t.ActivityDate = Date.today();     // due today (change if you want)
-            t.Status    = 'Not Started';
-            t.Priority  = 'Normal';
-            t.Description = 'Auto-created from Student File Status update. '
-                          + 'Level=' + sfs.Level__c
-                          + ', FileType=' + sfs.File_Type__c
-                          + ', Status=' + sfs.Status__c
-                          + ', StudentFileStatusId=' + sfs.Id;
+            Task t = new Task(
+                Subject      = r.taskSubject,
+                OwnerId      = ownerId,
+                WhatId       = ce.Id,
+                ActivityDate = Date.today(),
+                Status       = 'Not Started',
+                Priority     = 'Normal',
+                Description  = 'Auto-created from Student File Status update. Level=' + sfs.Level__c +
+                               ', FileType=' + sfs.File_Type__c + ', Status=' + sfs.Status__c +
+                               ', StudentFileStatusId=' + sfs.Id
+            );
 
             toInsert.add(t);
-
-            // mark as existing so multiple SFS in same transaction won't create duplicates
             existingOpenByCourseAndSubject.put(dupKey, t);
         }
 
-        if (!toInsert.isEmpty()) {
-            insert toInsert;
-        }
+        if (!toInsert.isEmpty()) insert toInsert;
     }
 }

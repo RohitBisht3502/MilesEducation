@@ -52,7 +52,7 @@
     <template if:false={showProducts}>
         <tr>
             <td colspan="5" class="empty">
-                Start typing to search products
+                No products found
             </td>
         </tr>
     </template>
@@ -228,6 +228,17 @@
                         label={discountLabel}
                         value={discountValue}
                         onchange={handleDiscountValue}>
+                    </lightning-input>
+                    <lightning-input
+                        data-id="downPayment"
+                        type="number"
+                        label="Down Payment (₹)"
+                        value={downPayment}
+                        min="0"
+                        max={finalPayable}
+                        message-when-range-overflow="Down payment cannot exceed total payable."
+                        message-when-range-underflow="Down payment cannot be negative."
+                        onchange={handleDownPaymentChange}>
                     </lightning-input>
 
                     <div class="price-row">
