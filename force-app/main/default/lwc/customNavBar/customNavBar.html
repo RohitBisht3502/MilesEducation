@@ -7,7 +7,18 @@
             <template for:each={enquiryTabs} for:item="tab">
                 <div key={tab.name} class="tab-item-group">
                     <button class={tab.tabClass} type="button">
-                        {tab.label}
+                        <template if:true={tab.useImage}>
+                            <img
+                                src={tab.iconUrl}
+                                alt={tab.label}
+                                class="tab-img"
+                                data-group="enquiry"
+                                data-name={tab.name}
+                                onerror={handleImageError} />
+                        </template>
+                        <template if:false={tab.useImage}>
+                            {tab.label}
+                        </template>
                     </button>
                     <template if:true={tab.count}>
                         <span class="notification-badge">{tab.count}</span>
@@ -21,7 +32,42 @@
             <template for:each={webinarTabs} for:item="tab">
                 <div key={tab.name} class="tab-item-group">
                     <button class={tab.tabClass} type="button">
-                        {tab.label}
+                        <template if:true={tab.useImage}>
+                            <img
+                                src={tab.iconUrl}
+                                alt={tab.label}
+                                class="tab-img"
+                                data-group="webinar"
+                                data-name={tab.name}
+                                onerror={handleImageError} />
+                        </template>
+                        <template if:false={tab.useImage}>
+                            {tab.label}
+                        </template>
+                    </button>
+                    <template if:true={tab.count}>
+                        <span class="notification-badge">{tab.count}</span>
+                    </template>
+                </div>
+            </template>
+        </template>
+
+        <template if:true={eventTabs.length}>
+            <template for:each={eventTabs} for:item="tab">
+                <div key={tab.name} class="tab-item-group">
+                    <button class={tab.tabClass} type="button">
+                        <template if:true={tab.useImage}>
+                            <img
+                                src={tab.iconUrl}
+                                alt={tab.label}
+                                class="tab-img"
+                                data-group="event"
+                                data-name={tab.name}
+                                onerror={handleImageError} />
+                        </template>
+                        <template if:false={tab.useImage}>
+                            {tab.label}
+                        </template>
                     </button>
                     <template if:true={tab.count}>
                         <span class="notification-badge">{tab.count}</span>

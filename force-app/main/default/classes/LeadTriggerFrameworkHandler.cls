@@ -93,7 +93,7 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
 
 
        // conversion
-        LeadTriggerConversionClass.convertCandidateAndCreateCourseOnM7(newLeads, oldMapLead);
+        LeadTriggerConversionClass.convertCandidateOnFullPayment(newLeads, oldMapLead);
     }
 
     public override void beforeDelete() {

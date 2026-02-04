@@ -24,24 +24,24 @@
       </div>
 
       <!-- Lead Sources -->
+      <template if:true={showSourceFilter}>
       <div class="filter">
         <label>Lead Sources</label>
         <div
-  class="multiselect-trigger"
-  onclick={openModal}
-  data-disabled={isSourceDisabled}
-  title={sourceTriggerTitle}
->
-  <span class="ms-text">{selectedSourcesDisplay}</span>
-  <span class="ms-caret">▾</span>
+          class="multiselect-trigger"
+          onclick={openModal}
+          data-disabled={isSourceDisabled}
+          title={sourceTriggerTitle}
+        >
+          <span class="ms-text">{selectedSourcesDisplay}</span>
+          <span class="ms-caret">▾</span>
 
-  <template if:true={selectedBucket}>
-    <div class="bucket-hint">(From: {selectedBucket})</div>
-  </template>
-</div>
-
+          <template if:true={selectedBucket}>
+            <div class="bucket-hint">(From: {selectedBucket})</div>
+          </template>
+        </div>
       </div>
-
+      </template>
 
       <div class="filter">
         <label>Type</label>
@@ -53,9 +53,6 @@
         </select>
       </div>
 
-
-      <!-- Business Vertical (no logic for now) -->
-      <!-- Business Vertical -->
       <!-- Business Vertical -->
       <div class="filter">
         <label>Business Vertical</label>
@@ -66,37 +63,15 @@
           </template>
         </select>
       </div>
-    
-
-<div class="filter">
-  <label>Role</label>
-  <select onchange={handleRoleChange}>
-    <option value="">Select</option>
-    <template for:each={roleOptions} for:item="r">
-      <option
-        key={r.value}
-        value={r.value}
-        selected={r.selected}>
-        {r.label}
-      </option>
-    </template>
-  </select>
-</div>
-
-
-
-
-
-
 
       <!-- Actions (✅ Removed New button) -->
       <div class="actions">
-          <button class="btn small" onclick={openRoundRobinModal}>
-       ON/OFF
-    </button>
+        <button class="btn small" onclick={openRoundRobinModal}>
+          ON/OFF
+        </button>
         <button class="btn small" onclick={reload}>Apply Filter</button>
-        <button class="btn small" onclick={saveEdits}>Save</button>
         <button class="btn small ghost" onclick={clearFilters}>Clear Filter</button>
+        <button class="btn small" onclick={saveEdits}>Save</button>
       </div>
     </div>
 
@@ -113,7 +88,12 @@
             <div class="multiselect-options">
               <template for:each={displayLeadSourcesTemp} for:item="s">
                 <label key={s.key} class="option-label">
-                  <input type="checkbox" data-value={s.value} checked={s.checked} onchange={handleCheckboxChange} />
+                  <input
+                    type="checkbox"
+                    data-value={s.value}
+                    checked={s.checked}
+                    onchange={handleCheckboxChange}
+                  />
                   <span>{s.label}</span>
                 </label>
               </template>
@@ -129,43 +109,41 @@
     </template>
 
     <template if:true={showRoundRobinModal}>
-  <div class="modal-overlay" onclick={closeRoundRobinModal}>
-    <div class="modal-content rr-modal" onclick={handleModalClick}>
-      <div class="modal-header">
-        <h3>Round Robin Settings</h3>
-        <button class="modal-close" onclick={closeRoundRobinModal}>✕</button>
-      </div>
-
-      <div class="modal-body">
-        <template for:each={roundRobinCities} for:item="city">
-          <div key={city.name} class="rr-row">
-            <div class="rr-city">
-              <span class="city-name">{city.name}</span>
-              <span class="rep-count">{city.count} sales reps</span>
-            </div>
-
-            <label class="switch">
-              <input
-                type="checkbox"
-                checked={city.enabled}
-                data-city={city.name}
-                onchange={toggleCityRoundRobin}
-              />
-              <span class="slider"></span>
-            </label>
+      <div class="modal-overlay" onclick={closeRoundRobinModal}>
+        <div class="modal-content rr-modal" onclick={handleModalClick}>
+          <div class="modal-header">
+            <h3>Round Robin Settings</h3>
+            <button class="modal-close" onclick={closeRoundRobinModal}>✕</button>
           </div>
-        </template>
-      </div>
 
-      <div class="modal-footer">
-        <button class="btn small" onclick={applyRoundRobinSettings}>
-          Done
-        </button>
-      </div>
-    </div>
-  </div>
-</template>
+          <div class="modal-body">
+            <template for:each={roundRobinCities} for:item="city">
+              <div key={city.name} class="rr-row">
+                <div class="rr-city">
+                  <span class="city-name">{city.name}</span>
+                </div>
 
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    checked={city.enabled}
+                    data-city={city.name}
+                    onchange={toggleCityRoundRobin}
+                  />
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </template>
+          </div>
+
+          <div class="modal-footer">
+            <button class="btn small" onclick={applyRoundRobinSettings}>
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
 
     <!-- Sequence Modal -->
     <template if:true={showSeqModal}>
@@ -190,8 +168,14 @@
                   <tr key={r.poolId}>
                     <td>{r.salesRepName}</td>
                     <td>
-                      <input type="number" min="1" step="1" value={r.sequence} data-poolid={r.poolId}
-                        oninput={onSeqInputChange} />
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={r.sequence}
+                        data-poolid={r.poolId}
+                        oninput={onSeqInputChange}
+                      />
                     </td>
                     <!-- <td>
                       <button class="seq-btn" data-index={index} onclick={moveSeqUp} title="Move Up">⬆</button>
@@ -219,11 +203,17 @@
             <th>Sales Rep Name</th>
             <template for:each={columns} for:item="col">
               <th key={col}>
-               <span class="th-wrap">
-  <span class="col-text">{col}</span>
-  <button class="icon-btn" data-ci={col} onclick={openSeqModal} title="Edit sequence">✏️</button>
-</span>
-
+                <span class="th-wrap">
+                  <span class="col-text">{col}</span>
+                  <button
+                    class="icon-btn"
+                    data-ci={col}
+                    onclick={openSeqModal}
+                    title="Edit sequence"
+                  >
+                    ✏️
+                  </button>
+                </span>
               </th>
             </template>
           </tr>
@@ -236,9 +226,16 @@
                 <td>{row.salesRepName}</td>
                 <template for:each={row.cells} for:item="cell">
                   <td key={cell.key}>
-                    <span class="editable-cell" contenteditable="true" data-poolid={cell.poolId}
-                      data-repid={row.salesRepId} data-src={cell.src} onblur={onCellBlur} onkeydown={onCellKeydown}
-                      title="Enter weight">
+                    <span
+                      class="editable-cell"
+                      contenteditable="true"
+                      data-poolid={cell.poolId}
+                      data-repid={row.salesRepId}
+                      data-src={cell.src}
+                      onblur={onCellBlur}
+                      onkeydown={onCellKeydown}
+                      title="Enter weight"
+                    >
                       {cell.value}
                     </span>
                   </td>

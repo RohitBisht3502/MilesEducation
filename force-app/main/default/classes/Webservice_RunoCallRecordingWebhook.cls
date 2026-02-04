@@ -2,7 +2,7 @@
     Author       : ROHIT SINGH BISHT
     Description  : 
 */
-@RestResource(urlMapping='/runo/call-log/recording/*')
+@RestResource(urlMapping='/salesforce/recording/*')
 global without sharing class Webservice_RunoCallRecordingWebhook {
     private static final String VENDOR_TOKEN = '4f029d1bcee05d32cdc8a3d32b0fcda7';
 
@@ -61,16 +61,24 @@ global without sharing class Webservice_RunoCallRecordingWebhook {
             System.debug('dto.callId   '+dto.callId);
             List<Call_Log__c> logs = [ SELECT Id ,Call_Id__c,Recording_Url__c FROM Call_Log__c  WHERE Call_Id__c = :dto.callId ORDER BY CreatedDate DESC LIMIT 1 ];
             System.debug('logs   '+logs);
-            if (!logs.isEmpty()) {
-                update new Call_Log__c(
-                    Id = logs[0].Id,
-                    Recording_Url__c = dto.recordingUrl
-                );
+
+            if (logs.isEmpty()) {
+                statusCode = 404;
+                responseBody = '{"status":"failed","message":"Call log not found for callId"}';
+                res.statusCode = statusCode;
+                res.responseBody = Blob.valueOf(responseBody);
+                IntegrationLogUtil.insertLog('Runo → Miles Force', requestBody, responseBody, 'Call log not found', 'Failed', statusCode );
+                return;
             }
+
+            update new Call_Log__c(
+                Id = logs[0].Id,
+                Recording_Url__c = dto.recordingUrl
+            );
 
             status = 'Success';
             statusCode = 200;
-            responseBody = '{"status":"success","message":"Runo call recording data received"}';
+            responseBody = '{"status":"success","message":"Recording received and processed successfully"}';
             res.statusCode = statusCode;
             res.responseBody = Blob.valueOf(responseBody);
 

@@ -122,7 +122,7 @@ public without sharing class Callout_PurchaseOrderService {
         //     httpReq.setHeader(cfg.Api_Key_Header__c, cfg.Api_Key__c);
         // }
         HttpRequest httpReq = new HttpRequest();
-        httpReq.setEndpoint('https://1c8fjh4ddg.execute-api.ap-south-1.amazonaws.com/Miles360/purchases');
+        httpReq.setEndpoint('https://hn19ywvvng.execute-api.ap-south-1.amazonaws.com/Miles360/purchases');
         httpReq.setMethod('POST');
         httpReq.setHeader('Content-Type', 'application/json');
         httpReq.setHeader('Accept', 'application/json');

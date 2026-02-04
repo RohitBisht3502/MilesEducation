@@ -22,6 +22,7 @@ export default class RoundRobinManagmentSystem extends LightningElement {
   @track selectedBusinessVertical = null;
   @track types = [];
   @track selectedType = null;
+  @track selectedTypeUi = '';
   @track citySalesRepCount = {};
 
   @track showRoundRobinModal = false;
@@ -51,26 +52,28 @@ export default class RoundRobinManagmentSystem extends LightningElement {
   @track bucketSourcesMap = {};
   @track availableSourcesForSelectedBucket = [];
   _matrixWire;
-_cityStatusWire;
+  _cityStatusWire;
 
+  @track selectedRole = '';
+  @track roles = [];
 
-@track selectedRole = '';
-@track roles = [];
+  get roleOptions() {
+    return (this.roles || []).map((r) => ({
+      label: r === 'CC'
+        ? 'CC - Pre Enrollment'
+        : r === 'SR'
+          ? 'SR - Post Enrollment'
+          : r,
+      value: r,
+      selected: r === this.selectedRole
+    }));
+  }
 
-get roleOptions() {
-  return (this.roles || []).map(r => ({
-    label: r,
-    value: r,
-    selected: r === this.selectedRole
-  }));
-}
-
-
-handleRoleChange(event) {
-   this.selectedRole = event.target.value; 
-     this.resetMatrixView();
+  handleRoleChange(event) {
+    this.selectedRole = event.target.value;
+    this.resetMatrixView();
     this.loadMatrix(); // reload table
-}
+  }
 
 
 
@@ -116,12 +119,30 @@ wiredCityStatuses(result) {
 }
   get effectiveCity() {
     if (!this.selectedCity) return null;
-    if (this.cityRoundRobinState[this.selectedCity] === false) return null;
     return this.selectedCity;
   }
 
   onTypeChange(e) {
-    this.selectedType = e.target.value;
+    const uiValue = e.target.value;
+    this.selectedTypeUi = uiValue;
+
+    if (uiValue === 'RR_CC') {
+      this.selectedType = 'Round Robin';
+      this.selectedRole = 'CC';
+    } else if (uiValue === 'RR_SR') {
+      this.selectedType = 'Round Robin';
+      this.selectedRole = 'SR';
+    } else if (uiValue === 'ELIGIBILITY_GP') {
+      this.selectedType = 'Eligibility criteria';
+      this.selectedRole = '';
+    } else if (uiValue === 'MCOM') {
+      this.selectedType = 'MCOM';
+      this.selectedRole = '';
+    } else {
+      this.selectedType = '';
+      this.selectedRole = this.roles.includes('CC') ? 'CC' : (this.roles[0] || '');
+    }
+
     this.resetMatrixView();
     this.loadMatrix();
   }
@@ -129,8 +150,7 @@ wiredCityStatuses(result) {
   get roundRobinCities() {
     return (this.cities || []).map((city) => ({
       name: city,
-      enabled: this.cityRoundRobinState[city] !== false,
-      count: this.getSalesRepCount(city)
+      enabled: this.cityRoundRobinState[city] !== false
     }));
   }
 
@@ -180,7 +200,11 @@ wiredCityStatuses(result) {
   }
 
   get totalSalesRepsInCity() {
-    return this.displayRows.length || 0;
+    const rows = this.displayRows || [];
+    const roleScopedCount = rows.filter((r) =>
+      (r.cells || []).some((c) => !!c.poolId)
+    ).length;
+    return roleScopedCount > 0 ? roleScopedCount : rows.length;
   }
 
   get isSourceDisabled() {
@@ -206,16 +230,43 @@ wiredCityStatuses(result) {
     return 'All Sources Selected';
   }
 
-  return `${this.selectedSources.length} source(s) selected`;
+ return `${this.selectedSources.length} source(s) selected`;
 }
+
+  get isCityWiseOnlyMode() {
+    return this.selectedTypeUi === 'RR_SR'
+      || this.selectedTypeUi === 'ELIGIBILITY_GP'
+      || this.selectedTypeUi === 'MCOM';
+  }
+
+  get showSourceFilter() {
+    return this.selectedTypeUi === 'RR_CC';
+  }
 
 
   get typeOptions() {
-    return (this.types || []).map((t) => ({
-      label: t,
-      value: t,
-      selected: t === this.selectedType
-    }));
+    return [
+      {
+        label: 'CC - Pre Enrollment',
+        value: 'RR_CC',
+        selected: this.selectedTypeUi === 'RR_CC'
+      },
+      {
+        label: 'SR - Post Enrollment',
+        value: 'RR_SR',
+        selected: this.selectedTypeUi === 'RR_SR'
+      },
+      {
+        label: 'GP',
+        value: 'ELIGIBILITY_GP',
+        selected: this.selectedTypeUi === 'ELIGIBILITY_GP'
+      },
+      {
+        label: 'MCOM',
+        value: 'MCOM',
+        selected: this.selectedTypeUi === 'MCOM'
+      }
+    ];
   }
 
   get businessVerticalOptions() {
@@ -282,11 +333,10 @@ wiredCityStatuses(result) {
       
       await updateCityStatuses({ updatesJson: JSON.stringify(updates) });
 
-      // reload latest state from server
-        await Promise.all([
-      this._cityStatusWire && refreshApex(this._cityStatusWire),
-      this._matrixWire && refreshApex(this._matrixWire)
-    ]);
+      // metadata update is async; keep local toggle state and refresh matrix only
+      await Promise.all([
+        this._matrixWire && refreshApex(this._matrixWire)
+      ]);
 
        this.showToast('Success', 'Round Robin updated successfully', 'success');
     } catch (e) {
@@ -299,13 +349,7 @@ wiredCityStatuses(result) {
       return;
     }
 
-    // If current selected city is OFF, reset matrix
-    if (this.selectedCity && this.cityRoundRobinState[this.selectedCity] === false) {
-      this.resetMatrixView();
-      this.showToast('Info', `Round Robin is disabled for ${this.selectedCity}`, 'info');
-    } else {
-      this.loadMatrix();
-    }
+    this.loadMatrix();
   }
 
   resetMatrixView() {
@@ -399,12 +443,6 @@ wiredCityStatuses(result) {
       return;
     }
 
-    if (this.cityRoundRobinState[this.selectedCity] === false) {
-      this.resetMatrixView();
-      this.showToast('Info', `Round Robin is disabled for ${this.selectedCity}`, 'info');
-      return;
-    }
-
     if (this._matrixWire) {
       await refreshApex(this._matrixWire);
     }
@@ -427,7 +465,7 @@ wiredCityStatuses(result) {
       let total = 0;
 
       const cells = cols.map((col, ci) => {
-        let value = 0;
+        let value = 1;
         let poolId = null;
         let sequence = null;
 
@@ -438,7 +476,6 @@ wiredCityStatuses(result) {
 
           if (Number.isFinite(node.assignedWeight)) {
             value = node.assignedWeight;
-            total += node.assignedWeight;
           }
 
           if (Number.isFinite(node.sequence)) {
@@ -449,6 +486,8 @@ wiredCityStatuses(result) {
         if (poolId) {
           this.poolIndex[poolId] = { ri, ci, poolId };
         }
+
+        total += value;
 
         return {
           key: `cell-${ri}-${ci}`,
@@ -574,12 +613,12 @@ wiredCityStatuses(result) {
     }));
 
     const requestPayload = {
-      leadSource: this.columns[this.seqColIndex],
+      leadSource: this.isCityWiseOnlyMode ? null : this.columns[this.seqColIndex],
       city: this.selectedCity,
-      bucket: this.selectedBucket,
-      businessVertical: this.selectedBusinessVertical || null,
+      bucket: this.isCityWiseOnlyMode ? null : this.selectedBucket,
+      businessVertical: this.isCityWiseOnlyMode ? null : (this.selectedBusinessVertical || null),
       typeVal: this.selectedType || 'Round Robin',
-      role: this.selectedRole, 
+      role: this.selectedRole,
       updates: payload
     };
 
@@ -622,24 +661,58 @@ wiredCityStatuses(result) {
     }
 
     let raw = (el.textContent || '').trim();
-    let num = null;
+    let num = 1;
 
     if (raw !== '' && raw !== '—') {
       const parsed = Number(raw);
       if (Number.isFinite(parsed) && parsed >= 0) num = Math.floor(parsed);
     }
 
-    el.textContent = num === null ? '—' : String(num);
+    el.textContent = String(num);
+    this.updateDisplayCellValue(poolId, repId, src, num);
 
     const stagedCopy = { ...this.staged };
-    if (num === null) delete stagedCopy[stageKey];
-    else stagedCopy[stageKey] = { value: num, leadSource: src };
+    stagedCopy[stageKey] = { value: num, leadSource: src, salesRepId: repId };
 
     this.staged = stagedCopy;
     this.recalcColumnTotals();
   };
 
+  updateDisplayCellValue(poolId, repId, src, num) {
+    const nextValue = num === null ? 1 : num;
+    this.displayRows = (this.displayRows || []).map((row) => {
+      if (row.salesRepId !== repId) return row;
+
+      const cells = (row.cells || []).map((cell) => {
+        const matchesPool = poolId && cell.poolId === poolId;
+        const matchesSrc = cell.src === src;
+        if (matchesPool || matchesSrc) {
+          return { ...cell, value: nextValue };
+        }
+        return cell;
+      });
+
+      const total = cells.reduce((sum, cell) => {
+        const v = Number(cell.value);
+        return sum + (Number.isFinite(v) ? v : 0);
+      }, 0);
+
+      return { ...row, cells, total };
+    });
+  }
+
   async saveEdits() {
+    this.recalcColumnTotals();
+    const validation = this.validateColumnTotals();
+    if (!validation.valid) {
+      this.showToast(
+        'Validation Error',
+        `Lead source "${validation.leadSource}" total must be exactly ${validation.expected}. Current total is ${validation.total}.`,
+        'error'
+      );
+      return;
+    }
+
     const updates = [];
 
     Object.entries(this.staged).forEach(([key, data]) => {
@@ -652,13 +725,14 @@ wiredCityStatuses(result) {
         updates.push({
           poolId: key,
           assignedWeight: value,
+          salesRepId: data.salesRepId || null,
           city: this.selectedCity,
-          leadSource: leadSource,
-          bucket: this.selectedBucket || null,
-          businessVertical: this.selectedBusinessVertical || null,
+          leadSource: this.isCityWiseOnlyMode ? null : leadSource,
+          bucket: this.isCityWiseOnlyMode ? null : (this.selectedBucket || null),
+          businessVertical: this.isCityWiseOnlyMode ? null : (this.selectedBusinessVertical || null),
           visibleUserCount: this.displayRows.length,
-          typeVal: this.selectedType, // ✅ ADD
-           role: this.selectedRole 
+          typeVal: this.selectedType,
+          role: this.selectedRole
         });
         return;
       }
@@ -669,11 +743,12 @@ wiredCityStatuses(result) {
           poolId: null,
           assignedWeight: value,
           salesRepId: parts[0],
-          leadSource: leadSource,
+          leadSource: this.isCityWiseOnlyMode ? null : leadSource,
           city: this.selectedCity,
-          bucket: this.selectedBucket || null,
+          bucket: this.isCityWiseOnlyMode ? null : (this.selectedBucket || null),
           course: 'CMA',
-          businessVertical: this.selectedBusinessVertical || null,
+          businessVertical: this.isCityWiseOnlyMode ? null : (this.selectedBusinessVertical || null),
+          visibleUserCount: this.displayRows.length,
           typeVal: this.selectedType || 'Round Robin',
           role: this.selectedRole
         });
@@ -765,15 +840,12 @@ wiredCityStatuses(result) {
     this.selectedCity = e.target.value;
     this.resetMatrixView();
 
-    if (this.selectedCity && this.cityRoundRobinState[this.selectedCity] === false) {
-      this.showToast('Info', `Round Robin is disabled for ${this.selectedCity}`, 'info');
-      return;
-    }
-
     this.selectedSources = [...(this.leadSources || [])];
 
     if (this.selectedCity) {
       this.selectedType = DEFAULT_TYPE;
+      this.selectedRole = this.roles.includes('CC') ? 'CC' : (this.roles[0] || '');
+      this.selectedTypeUi = this.selectedRole === 'SR' ? 'RR_SR' : 'RR_CC';
       this.selectedBusinessVertical = DEFAULT_VERTICAL;
 
       const defaultBucket = 'Bucket 1';
@@ -805,6 +877,8 @@ wiredCityStatuses(result) {
 
     if (AUTO_BUCKETS.includes(this.selectedBucket)) {
       this.selectedType = DEFAULT_TYPE;
+      this.selectedRole = this.roles.includes('CC') ? 'CC' : (this.roles[0] || '');
+      this.selectedTypeUi = this.selectedRole === 'SR' ? 'RR_SR' : 'RR_CC';
       this.selectedBusinessVertical = DEFAULT_VERTICAL;
     }
 
@@ -829,6 +903,7 @@ wiredCityStatuses(result) {
     this.selectedSources = [];
     this.availableSourcesForSelectedBucket = [];
     this.selectedType = '';
+    this.selectedTypeUi = '';
     this.selectedBusinessVertical = '';
   this.selectedRole = this.roles.includes('CC')
   ? 'CC'

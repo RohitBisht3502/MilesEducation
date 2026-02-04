@@ -28,7 +28,7 @@
                             </lightning-textarea>
                         </div>
 
-                        <!-- Meeting Type / Offline Type / Duration -->
+                        <!-- Meeting Type / Type of Meeting / Duration -->
                         <div class="form-group">
                             <lightning-combobox
                                 label="Meeting Type"
@@ -43,29 +43,16 @@
 
 
 
-                        <template if:true={showOfflineType}>
-                            <div class="form-group">
-                                <lightning-combobox
-                                    label="Type of Offline Gmeet"
-                                    value={offlineType}
-                                    options={offlineTypeOptions}
-                                    onchange={handleOfflineTypeChange}
-                                    variant="label-stacked"
-                                    class="custom-combobox">
-                                </lightning-combobox>
-                            </div>
-                        </template>
-
                         <div class="form-group">
-        <lightning-combobox
-            label="Type of Meeting"
-            value={typeOfMeeting}
-            options={typeOfMeetingOptions}
-            onchange={handleTypeOfMeetingChange}
-            variant="label-stacked"
-            class="custom-combobox">
-        </lightning-combobox>
-    </div>
+                            <lightning-combobox
+                                label="Type of Meeting"
+                                value={typeOfMeeting}
+                                options={typeOfMeetingOptions}
+                                onchange={handleTypeOfMeetingChange}
+                                variant="label-stacked"
+                                class="custom-combobox">
+                            </lightning-combobox>
+                        </div>
 
 
                         <div class="form-group">
@@ -109,17 +96,6 @@
                                 </lightning-input>
                             </div>
 
-                            <!-- Timezone -->
-                            <div class="form-group">
-                                <lightning-combobox
-                                    label="Timezone"
-                                    value={timezone}
-                                    options={timezoneOptions}
-                                    onchange={handleTimezoneChange}
-                                    variant="label-stacked"
-                                    class="custom-combobox">
-                                </lightning-combobox>
-                            </div>
                         </div>
                     </div>
 

@@ -1,7 +1,3 @@
-/*
-    Author       : ROHIT SINGH BISHT
-    Description  : Send Webinar registration data (Webinar Member) to AWS
-*/
 public without sharing class Webservice_WebinarRegistrationsService {
 
     @future(callout=true)

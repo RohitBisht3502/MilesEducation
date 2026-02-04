@@ -1,9 +1,9 @@
 public class LeadTriggerConversionClass {
-    public static void convertCandidateAndCreateCourseOnM7(
+    public static void convertCandidateOnFullPayment(
         List<Lead__c> newLeads,
         Map<Id, Lead__c> oldMap
     ) {
-        System.debug('=== LeadTriggerConversionClass.convertCandidateAndCreateCourseOnM7 START ===');
+        System.debug('=== LeadTriggerConversionClass.convertCandidateOnFullPayment START ===');
         System.debug(
             'Incoming newLeads size=' + (newLeads == null ? 0 : newLeads.size()) +
             ', oldMap null?=' + (oldMap == null)
@@ -20,20 +20,22 @@ public class LeadTriggerConversionClass {
                 continue;
             }
             
-            Boolean movedToM7 = (n.Stage__c == 'M7') && (o == null || o.Stage__c != 'M7');
+            Boolean fullPaymentReceived =
+                (n.Payment_Received__c == 'Fully Received') &&
+                (o == null || o.Payment_Received__c != 'Fully Received');
             
-            if (!movedToM7) {
+            if (!fullPaymentReceived) {
                 System.debug(
                     'Skip Lead__c Id=' + n.Id + ' Candidate__c=' + n.Candidate__c +
-                    ' because movedToM7=false ' +
-                    '(newStage=' + n.Stage__c + ', oldStage=' + (o == null ? 'null' : o.Stage__c) + ')'
+                    ' because fullPaymentReceived=false ' +
+                    '(newPayment=' + n.Payment_Received__c + ', oldPayment=' + (o == null ? 'null' : o.Payment_Received__c) + ')'
                 );
                 continue;
             }
             
             leadCIdsToProcess.add(n.Id);
             candidateLeadIds.add(n.Candidate__c);
-            System.debug('ToProcess Lead__c Id=' + n.Id + ' Candidate__c=' + n.Candidate__c + ' (moved to M7)');
+            System.debug('ToProcess Lead__c Id=' + n.Id + ' Candidate__c=' + n.Candidate__c + ' (full payment received)');
         }
         
         System.debug(
@@ -47,7 +49,7 @@ public class LeadTriggerConversionClass {
         }
         
         Map<Id, Lead> candMap = new Map<Id, Lead>([
-            SELECT Id, Name, IsConverted, ConvertedAccountId
+            SELECT Id, Name, IsConverted, ConvertedAccountId, GP_User__c, OwnerId
             FROM Lead
             WHERE Id IN :candidateLeadIds
         ]);
@@ -125,17 +127,19 @@ public class LeadTriggerConversionClass {
         }
         
         Set<Id> studentAccountIds = new Set<Id>(candidateToAccount.values());
-        Set<Id> studentsHavingCourseEnrolled = new Set<Id>();
+        Set<String> studentCourseKeysHavingCourseEnrolled = new Set<String>();
         
         List<Course_Enrolled__c> existingCE = [
-            SELECT Id, Student__c
+            SELECT Id, Student__c, Course__c
             FROM Course_Enrolled__c
             WHERE Student__c IN :studentAccountIds
         ];
         
         for (Course_Enrolled__c ce : existingCE) {
             if (ce.Student__c != null) {
-                studentsHavingCourseEnrolled.add(ce.Student__c);
+                studentCourseKeysHavingCourseEnrolled.add(
+                    buildStudentCourseKey(ce.Student__c, ce.Course__c)
+                );
             }
         }
         
@@ -156,11 +160,24 @@ public class LeadTriggerConversionClass {
                 leadCToUpdate.add(new Lead__c(Id = n.Id, Student__c = accId));
             }
             
-            if (!studentsHavingCourseEnrolled.contains(accId)) {
+            String studentCourseKey = buildStudentCourseKey(accId, n.Course__c);
+            if (!studentCourseKeysHavingCourseEnrolled.contains(studentCourseKey)) {
                 Course_Enrolled__c ce = new Course_Enrolled__c();
                 ce.Student__c = accId;
+                ce.CC_Spoc__c = n.OwnerId;
+                ce.Source__c = n.Source__c;
+                ce.Phone__c = n.Phone__c;
+                ce.Course__c = n.Course__c;
+                ce.City__c = n.City__c;
+                ce.Course_Bucket__c = n.Course_Bucket__c;
+                Lead candidateLead = candMap.get(n.Candidate__c);
+                if (candidateLead != null) {
+                    ce.GP_SPOC__c = candidateLead.GP_User__c != null
+                        ? candidateLead.GP_User__c
+                        : candidateLead.OwnerId;
+                }
                 ceToInsert.add(ce);
-                studentsHavingCourseEnrolled.add(accId);
+                studentCourseKeysHavingCourseEnrolled.add(studentCourseKey);
             }
         }
         
@@ -253,5 +270,9 @@ public class LeadTriggerConversionClass {
             LIMIT 1
         ];
         return ls.MasterLabel;
+    }
+
+    private static String buildStudentCourseKey(Id studentId, String course) {
+        return String.valueOf(studentId) + '|' + String.valueOf(course);
     }
 }

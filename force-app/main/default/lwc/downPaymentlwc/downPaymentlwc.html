@@ -1,0 +1,24 @@
+<template>
+    <section class="payment-card">
+        <div class="header">
+            <h2>Generate Payment Link</h2>
+            <p>Enter amount to update payment</p>
+        </div>
+
+        <div class="content">
+            <lightning-input
+                type="number"
+                label="Generate Payment Link"
+                placeholder="₹ Enter amount"
+                onchange={handleDownPayment}>
+            </lightning-input>
+
+            <lightning-button
+                label="Save"
+                variant="brand"
+                class="save-btn"
+                onclick={handleSave}>
+            </lightning-button>
+        </div>
+    </section>
+</template>

@@ -7,6 +7,7 @@ import getActiveProducts from '@salesforce/apex/PurchaseOrderService.getActivePr
 import savePurchaseOrder from '@salesforce/apex/PurchaseOrderService.save';
 import checkAddressByRecordId from '@salesforce/apex/PurchaseOrderService.checkAddressByRecordId';
 import saveAddress from '@salesforce/apex/PurchaseOrderService.saveAddress';
+import MINIMUM_DOWNPAYMENT from '@salesforce/label/c.Minimum_Downpayment';
 
 export default class PurchaseOrderProductSelector extends LightningElement {
     @track products = [];
@@ -92,7 +93,7 @@ export default class PurchaseOrderProductSelector extends LightningElement {
     get selectedProducts() {
         return this.products
             .filter(p => p.selected)
-            .map(p => ({ ...p, total: p.price * p.quantity }));
+            .map(p => ({ ...p, total: p.price }));
     }
 
     get cartCount() {
@@ -132,18 +133,6 @@ export default class PurchaseOrderProductSelector extends LightningElement {
                 return { ...p, selected: true };
             }
             return { ...p, selected: false, quantity: 1 };
-        });
-        this.syncDownPayment();
-    }
-
-    updateQty(event) {
-        const { id, action } = event.currentTarget.dataset;
-        this.products = this.products.map(p => {
-            if (String(p.id) === id) {
-                const qty = action === 'inc' ? p.quantity + 1 : Math.max(1, p.quantity - 1);
-                return { ...p, quantity: qty };
-            }
-            return p;
         });
         this.syncDownPayment();
     }
@@ -284,6 +273,15 @@ export default class PurchaseOrderProductSelector extends LightningElement {
             return;
         }
 
+        if (this.downPayment < parseFloat(MINIMUM_DOWNPAYMENT)) {
+            this.showToast(
+                'Error',
+                `Minimum down payment should be ₹${MINIMUM_DOWNPAYMENT}`,
+                'error'
+            );
+            return;
+        }
+
         if (!this.recordId) {
             this.showToast('Error', 'Record Id not found.', 'error');
             return;
@@ -297,7 +295,7 @@ export default class PurchaseOrderProductSelector extends LightningElement {
             items: this.selectedProducts.map(p => ({
                 productId: p.id,
                 unitPrice: p.price,
-                qty: p.quantity,
+                qty: 1,
                 learningType: p.type
             }))
         };

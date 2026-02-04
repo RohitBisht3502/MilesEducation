@@ -18,10 +18,13 @@
     padding: 0.625rem 1rem;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 1.25rem; 
     overflow-x: auto;
     border-radius: 0.5rem;
     scrollbar-width: thin;
+   box-shadow: 
+        0 4px 12px rgba(37, 99, 235, 0.15),
+        0 2px 4px rgba(37, 99, 235, 0.08);
     scrollbar-color: hsl(var(--nav-label)) transparent;
 }
 
@@ -51,16 +54,25 @@
 .tab-item-group {
     position: relative;
     display: flex;
+    padding-right: 0.4rem;
+    
+    isolation: isolate;
+    padding-top: 0.2rem;
 }
 
+
 .tab-pill {
-    padding: 0.5rem 1rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 1.1rem;
     border-radius: 9999px;
     font-size: 0.875rem;
     font-weight: 500;
     color: hsl(var(--tab-text));
     white-space: nowrap;
     cursor: pointer;
+    
     background: linear-gradient(
         135deg,
         hsl(var(--tab-gradient-start)),
@@ -71,6 +83,34 @@
     outline: none;
     appearance: none;
 }
+
+.tab-icon-only {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.1rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    outline: none;
+    cursor: pointer;
+}
+
+.tab-icon {
+    --slds-c-icon-color-foreground-default: hsl(var(--tab-text));
+}
+
+.tab-img {
+    width: 56px;
+    height: 32px;
+    object-fit: contain;
+    border-radius: 0.5rem;
+    background: #fff;
+    padding: 2px;
+    box-sizing: border-box;
+}
+
 
 .tab-pill:hover {
     opacity: 0.9;
@@ -84,15 +124,14 @@
 @keyframes blink {
   0%, 100% {
     transform: scale(1);
-    opacity: 1;
-    box-shadow: 0 0 6px hsl(var(--notification-bg)), 0 0 12px hsl(var(--notification-bg));
+    box-shadow: 0 0 4px hsl(var(--notification-bg));
   }
   50% {
-    transform: scale(1.2);
-    opacity: 0.7;
-    box-shadow: 0 0 12px hsl(var(--notification-bg)), 0 0 24px hsl(var(--notification-bg));
+    transform: scale(1.15);
+    box-shadow: 0 0 10px hsl(var(--notification-bg));
   }
 }
+
 
 .notification-badge {
     position: absolute;

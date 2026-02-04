@@ -76,7 +76,6 @@
                     <thead>
                         <tr>
                             <th>Product</th>
-                            <th class="text-center">Qty</th>
                             <th class="text-right">Total</th>
                             <th></th>
                         </tr>
@@ -87,12 +86,7 @@
                                 <tr key={item.id}>
                                     <td>
                                         <strong>{item.name}</strong>
-                                        <div class="muted">₹{item.price} each</div>
-                                    </td>
-                                    <td class="text-center qty-cell">
-                                        <button class="qty-btn" data-id={item.id} data-action="dec" onclick={updateQty}>−</button>
-                                        <span class="qty">{item.quantity}</span>
-                                        <button class="qty-btn" data-id={item.id} data-action="inc" onclick={updateQty}>+</button>
+                                        <div class="muted">₹{item.price}</div>
                                     </td>
                                     <td class="text-right">₹{item.total}</td>
                                     <td class="text-center">
@@ -106,7 +100,7 @@
 
                         <template if:false={hasSelectedProducts}>
                             <tr>
-                                <td colspan="4" class="empty">
+                                <td colspan="3" class="empty">
                                     No products added to cart
                                 </td>
                             </tr>
@@ -181,7 +175,7 @@
                         <div key={item.id} class="summary-item">
                             <div>
                                 <strong>{item.name}</strong>
-                                <div class="muted">Qty: {item.quantity} × ₹{item.price}</div>
+                                <div class="muted">₹{item.price}</div>
                             </div>
                             <div class="price">₹{item.total}</div>
                         </div>

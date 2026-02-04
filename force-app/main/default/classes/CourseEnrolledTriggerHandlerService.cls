@@ -11,8 +11,41 @@ public class CourseEnrolledTriggerHandlerService {
             }
         }
         
+        completePreviousStageTasks(cpaStatusChangedList);
+        completePreviousStageTasks(cmaStatusChangedList);
+
         if(!cpaStatusChangedList.isEmpty()) createCPATasks(cpaStatusChangedList, oldMap);
-        if(!cmaStatusChangedList.isEmpty()) createCPATasks(cpaStatusChangedList, oldMap);
+        if(!cmaStatusChangedList.isEmpty()) createCMATasks(cmaStatusChangedList, oldMap);
+    }
+
+    static void completePreviousStageTasks(List<Course_Enrolled__c> statusChangedList) {
+        if(statusChangedList == null || statusChangedList.isEmpty()) return;
+
+        Set<Id> enrolledIds = new Set<Id>();
+        for(Course_Enrolled__c enrolledObj : statusChangedList) {
+            enrolledIds.add(enrolledObj.Id);
+        }
+
+        List<Task> taskToUpdate = new List<Task>();
+        Set<Id> processedWhatIds = new Set<Id>();
+
+        for(Task taskObj : [
+            SELECT Id, WhatId, Status
+            FROM Task
+            WHERE WhatId IN :enrolledIds
+            AND Status != 'Completed'
+            ORDER BY WhatId, CreatedDate DESC
+        ]) {
+            if(!processedWhatIds.contains(taskObj.WhatId)) {
+                taskObj.Status = 'Completed';
+                taskToUpdate.add(taskObj);
+                processedWhatIds.add(taskObj.WhatId);
+            }
+        }
+
+        if(!taskToUpdate.isEmpty()) {
+            update taskToUpdate;
+        }
     }
     
     
@@ -53,15 +86,39 @@ public class CourseEnrolledTriggerHandlerService {
             if(enrolledObj.Stages__c == 'M17+') taskList.add(createTask('Release NTS Advice', enrolledObj.Id, 0, enrolledObj.GP_SPOC__c));
             if(enrolledObj.Stages__c == 'M17++') taskList.add(createTask('Schedule Exam and upload pro-metric', enrolledObj.Id, 0, enrolledObj.OwnerId));
             if(enrolledObj.Stages__c == 'M17#') taskList.add(createTask('Follow up to get exam result', enrolledObj.Id, 0, enrolledObj.OwnerId));
-        }                      
+        }        
+
+        if(!taskList.isEmpty()) {
+            insert taskList;
+        }              
     }
-    
-    
+       
     static void createCMATasks(List<Course_Enrolled__c> cmaStatusChangedList, Map<Id, Course_Enrolled__c> oldMap) {
-                      
+        List<Task> taskList = new List<Task>();
+
+        for (Course_Enrolled__c enrolledObj : cmaStatusChangedList) {
+
+            // Assign to SR SPOC (Owner)
+            Id assigneeId = enrolledObj.OwnerId;
+
+            if (enrolledObj.Stages__c == 'M7+')  taskList.add(createTask('Complete Onboarding', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M7#')  taskList.add(createTask('Assist on IMA Customer ID Generation', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M7##') taskList.add(createTask('Visit in IMA Membership Selection and Coupon Code redemption', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M8')   taskList.add(createTask('Pay for membership', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M9')   taskList.add(createTask('Schedule Exam', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M12')  taskList.add(createTask('Check for Exam prep and Appearance', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M13')  taskList.add(createTask('Schedule/Reschedule for next exam and check for result', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M14')  taskList.add(createTask('Schedule/Reschedule for next exam', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M14#') taskList.add(createTask('Check for Exam prep and Appearance', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M15')  taskList.add(createTask('Schedule/Reschedule for next exam and check for result', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M15#') taskList.add(createTask('Check for Exam prep and Appearance', enrolledObj.Id, 0, assigneeId));
+        }
+
+        if (!taskList.isEmpty()) {
+            insert taskList;
+        }
     }
-    
-    
+   
     static Task createTask(String subjectName, String recordId, Integer noOfDays, String ownerId) {
         Task newTask = new Task();
         newTask.Subject = subjectName;

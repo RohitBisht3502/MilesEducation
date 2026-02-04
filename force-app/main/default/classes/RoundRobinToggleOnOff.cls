@@ -16,36 +16,35 @@ public with sharing class RoundRobinToggleOnOff {
 
     @AuraEnabled(cacheable=true)
     public static List<CityStatusWrapper> getCityStatuses() {
-        // city -> distinct sales reps
-        Map<String, Set<Id>> cityToReps = new Map<String, Set<Id>>();
-        // city -> has any inactive record
-        Set<String> cityHasInactive = new Set<String>();
+        // city -> ON/OFF from City Master CMDT (On__c picklist)
+        Map<String, String> cityStatusFromMdt = new Map<String, String>();
+        try {
+            List<SObject> cityMdtRows = Database.query(
+                'SELECT MasterLabel, City_Name__c, On__c FROM City_Master__mdt'
+            );
+            for (SObject row : cityMdtRows) {
+                String cityName = (String) row.get('City_Name__c');
+                if (String.isBlank(cityName)) {
+                    cityName = (String) row.get('MasterLabel');
+                }
+                if (String.isBlank(cityName)) {
+                    continue;
+                }
 
-        for (Round_Robin_Pool__c r : [
-            SELECT City__c, Active__c, Sales_Rep__c
-            FROM Round_Robin_Pool__c
-            WHERE City__c != null
-        ]) {
-            String city = r.City__c;
-
-            if (!cityToReps.containsKey(city)) {
-                cityToReps.put(city, new Set<Id>());
+                Boolean isOn = (Boolean) row.get('On__c');
+                cityStatusFromMdt.put(
+                    cityName,
+                    (isOn == true) ? 'ON' : 'OFF'
+                );
             }
-
-            if (r.Sales_Rep__c != null) {
-                cityToReps.get(city).add(r.Sales_Rep__c); 
-            }
-
-            if (r.Active__c == false) {
-                cityHasInactive.add(city);
-            }
+        } catch (Exception ex) {
+            System.debug('City_Master__mdt read failed, defaulting status to ON. ' + ex.getMessage());
         }
 
         List<CityStatusWrapper> res = new List<CityStatusWrapper>();
-        for (String city : cityToReps.keySet()) {
-            Integer repCount = cityToReps.get(city).size();
-            String status = cityHasInactive.contains(city) ? 'OFF' : 'ON';
-            res.add(new CityStatusWrapper(city, status, repCount));
+        for (String city : cityStatusFromMdt.keySet()) {
+            String status = cityStatusFromMdt.containsKey(city) ? cityStatusFromMdt.get(city) : 'ON';
+            res.add(new CityStatusWrapper(city, status, 0));
         }
         return res;
     }
@@ -67,44 +66,56 @@ public with sharing class RoundRobinToggleOnOff {
     System.debug('updates >>> ' + JSON.serialize(updates));
     if (updates == null || updates.isEmpty()) return;
 
-    Map<String, Boolean> cityToActive = new Map<String, Boolean>();
+    Map<String, Boolean> cityToIsOn = new Map<String, Boolean>();
     for (CityStatusWrapper w : updates) {
         System.debug('wrapper >>> city=' + w.city + ', status=' + w.status + ', cnt=' + w.salesRepCount);
         if (w == null || String.isBlank(w.city) || String.isBlank(w.status)) continue;
-        cityToActive.put(w.city.trim(), w.status.trim().toUpperCase() == 'ON');
+        cityToIsOn.put(w.city.trim().toUpperCase(), w.status.trim().toUpperCase() == 'ON');
     }
 
-    if (cityToActive.isEmpty()) return;
+    if (cityToIsOn.isEmpty()) return;
 
-    Set<String> citiesToUpdate = new Set<String>();
-    for (String c : cityToActive.keySet()) {
-        if (!String.isBlank(c)) citiesToUpdate.add(c);
-    }
-    if (citiesToUpdate.isEmpty()) return;
-
-    List<Round_Robin_Pool__c> recs = [
-        SELECT Id, City__c, Active__c
-        FROM Round_Robin_Pool__c
-        WHERE City__c IN :citiesToUpdate
+    List<City_Master__mdt> cityMdtRecs = [
+        SELECT DeveloperName, MasterLabel, City_Name__c
+        FROM City_Master__mdt
     ];
 
-    List<Round_Robin_Pool__c> recsToUpdate = new List<Round_Robin_Pool__c>();
-    for (Round_Robin_Pool__c r : recs) {
-        Boolean newActive = cityToActive.get(r.City__c);
-        if (newActive != null && r.Active__c != newActive) {
-        r.Active__c = newActive;
-        recsToUpdate.add(r);
+    Metadata.DeployContainer container = new Metadata.DeployContainer();
+    Integer changed = 0;
+
+    for (City_Master__mdt rec : cityMdtRecs) {
+        String cityByName = String.isNotBlank(rec.City_Name__c) ? rec.City_Name__c.trim().toUpperCase() : null;
+        String cityByLabel = String.isNotBlank(rec.MasterLabel) ? rec.MasterLabel.trim().toUpperCase() : null;
+        Boolean newIsOn = cityByName != null ? cityToIsOn.get(cityByName) : null;
+        if (newIsOn == null && cityByLabel != null) {
+            newIsOn = cityToIsOn.get(cityByLabel);
         }
+        if (newIsOn == null) {
+            continue;
+        }
+
+        Metadata.CustomMetadata cmd = new Metadata.CustomMetadata();
+        cmd.fullName = 'City_Master__mdt.' + rec.DeveloperName;
+        cmd.label = rec.MasterLabel;
+
+        Metadata.CustomMetadataValue v = new Metadata.CustomMetadataValue();
+        v.field = 'On__c';
+        v.value = newIsOn;
+        cmd.values.add(v);
+
+        container.addMetadata(cmd);
+        changed++;
     }
 
-    if (!recsToUpdate.isEmpty()) {
-        try {
-        update recsToUpdate;
-        } catch (DmlException e) {
-        System.debug('DML Error updating Round Robin Pools: ' + e.getMessage());
-        throw new AuraHandledException('Unable to update Round Robin Pools. Please check triggers and validation rules.');
-        }
+    if (changed > 0) {
+        Metadata.Operations.enqueueDeployment(container, new CityMasterDeployCallback());
     }
+    }
+
+    public class CityMasterDeployCallback implements Metadata.DeployCallback {
+        public void handleResult(Metadata.DeployResult result, Metadata.DeployCallbackContext context) {
+            System.debug('City master metadata deployment status: ' + result.status);
+        }
     }
 
 }

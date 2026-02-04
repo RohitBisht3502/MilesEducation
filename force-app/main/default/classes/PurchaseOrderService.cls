@@ -16,10 +16,9 @@ public without sharing class PurchaseOrderService {
     }
 
     public class AddressStatusDTO {
-    @AuraEnabled public Boolean hasBilling;
-    @AuraEnabled public Boolean hasShipping;
-}
-
+        @AuraEnabled public Boolean hasBilling;
+        @AuraEnabled public Boolean hasShipping;
+    }
 
     public class ProductDTO {
         @AuraEnabled public Id id;
@@ -98,7 +97,6 @@ public without sharing class PurchaseOrderService {
             RecordContext context = identifyRecordContext(req.leadId);
             validateAddress(context, req);
 
-
             Lead__c lead = fetchLeadIfNeeded(context.leadRecordId);
             Lead candidate = fetchCandidateIfNeeded(lead);
             Account student = fetchStudentIfNeeded(context.studentAccountId);
@@ -108,11 +106,12 @@ public without sharing class PurchaseOrderService {
 
             Purchase_Order__c po    = createPurchaseOrder(req, context, lead, candidate, student);
             po.Purchase_Order_Id__c = 'Testing 123';
-          //  po.Purchase_Order_Id__c = String.valueOf(calloutRes.purchaseId);
-           // po.Response_Payload__c  = calloutRes.responseBody;
+            //  po.Purchase_Order_Id__c = String.valueOf(calloutRes.purchaseId);
+            // po.Response_Payload__c  = calloutRes.responseBody;
             insert po;
 
             createLineItems(po.Id, req.items);
+            createTransaction(po.Id, req.downPayment, req.leadId);
 
             return po.Id;
 
@@ -122,82 +121,94 @@ public without sharing class PurchaseOrderService {
             throw new AuraHandledException('Save failed: ' + e.getMessage());
         }
     }
-@AuraEnabled
-public static void saveAddress(
-    Id recordId,
-    String addressType,
-    Map<String, String> address
-) {
-    if (recordId.getSObjectType() == Lead__c.SObjectType) {
 
-        Lead__c leadRec = [
-            SELECT Candidate__c
-            FROM Lead__c
-            WHERE Id = :recordId
-        ];
+    @AuraEnabled
+    public static void saveAddress(
+        Id recordId,
+        String addressType,
+        Map<String, String> address
+    ) {
+        if (recordId.getSObjectType() == Lead__c.SObjectType) {
 
-        Lead candidate = [
-            SELECT Id
-            FROM Lead
-            WHERE Id = :leadRec.Candidate__c
-        ];
+            Lead__c leadRec = [
+                SELECT Candidate__c
+                FROM Lead__c
+                WHERE Id = :recordId
+            ];
 
-        if (addressType == 'billing') {
-            candidate.Street = address.get('street');
-            candidate.City = address.get('city');
-            candidate.State = address.get('state');
-            candidate.PostalCode = address.get('postal');
-            candidate.Country = address.get('country');
-        } else {
-            candidate.Shipping_Street__c = address.get('street');
-            candidate.Shipping_City__c = address.get('city');
-            candidate.Shipping_State__c = address.get('state');
-            candidate.Shipping_Postal_Code__c = address.get('postal');
-            candidate.Shipping_Country__c = address.get('country');
+            Lead candidate = [
+                SELECT Id
+                FROM Lead
+                WHERE Id = :leadRec.Candidate__c
+            ];
+
+            if (addressType == 'billing') {
+                candidate.Street = address.get('street');
+                candidate.City = address.get('city');
+                candidate.State = address.get('state');
+                candidate.PostalCode = address.get('postal');
+                candidate.Country = address.get('country');
+            } else {
+                candidate.Shipping_Street__c = address.get('street');
+                candidate.Shipping_City__c = address.get('city');
+                candidate.Shipping_State__c = address.get('state');
+                candidate.Shipping_Postal_Code__c = address.get('postal');
+                candidate.Shipping_Country__c = address.get('country');
+            }
+
+            update candidate;
         }
 
-        update candidate;
+        if (recordId.getSObjectType() == Course_Enrolled__c.SObjectType) {
+
+            Course_Enrolled__c ce = [
+                SELECT Student__c
+                FROM Course_Enrolled__c
+                WHERE Id = :recordId
+            ];
+
+            Account acc = [
+                SELECT Id
+                FROM Account
+                WHERE Id = :ce.Student__c
+            ];
+
+            if (addressType == 'billing') {
+                acc.BillingStreet = address.get('street');
+                acc.BillingCity = address.get('city');
+                acc.BillingState = address.get('state');
+                acc.BillingPostalCode = address.get('postal');
+                acc.BillingCountry = address.get('country');
+            } else {
+                acc.ShippingStreet = address.get('street');
+                acc.ShippingCity = address.get('city');
+                acc.ShippingState = address.get('state');
+                acc.ShippingPostalCode = address.get('postal');
+                acc.ShippingCountry = address.get('country');
+            }
+
+            update acc;
+        }
     }
 
-    if (recordId.getSObjectType() == Course_Enrolled__c.SObjectType) {
-
-        Course_Enrolled__c ce = [
-            SELECT Student__c
-            FROM Course_Enrolled__c
-            WHERE Id = :recordId
-        ];
-
-        Account acc = [
-            SELECT Id
-            FROM Account
-            WHERE Id = :ce.Student__c
-        ];
-
-        if (addressType == 'billing') {
-            acc.BillingStreet = address.get('street');
-            acc.BillingCity = address.get('city');
-            acc.BillingState = address.get('state');
-            acc.BillingPostalCode = address.get('postal');
-            acc.BillingCountry = address.get('country');
-        } else {
-            acc.ShippingStreet = address.get('street');
-            acc.ShippingCity = address.get('city');
-            acc.ShippingState = address.get('state');
-            acc.ShippingPostalCode = address.get('postal');
-            acc.ShippingCountry = address.get('country');
+    private static void createTransaction(
+        Id purchaseOrderId,
+        Decimal amountReceived,
+        Id leadId
+    ) {
+        if (amountReceived == null || amountReceived <= 0) {
+            return; // No payment → no transaction
         }
 
-        update acc;
+        Transcation__c txn = new Transcation__c();
+
+        txn.Purchase_Orders__c = purchaseOrderId;
+
+        txn.Payment__c = amountReceived;
+        txn.Status__c  = 'Initiated';
+
+        insert txn;
     }
-}
-
-
-
-
-
-
-
-
 
     private static void validateRequest(PurchaseOrderRequest req) {
         if (req == null || req.items == null || req.items.isEmpty()) {
@@ -243,85 +254,85 @@ public static void saveAddress(
         return context;
     }
 
-   private static void validateAddress(RecordContext context, PurchaseOrderRequest req) {
+    private static void validateAddress(RecordContext context, PurchaseOrderRequest req) {
 
-    Boolean shippingRequired = hasStudyMaterial(req.items);
+        Boolean shippingRequired = hasStudyMaterial(req.items);
 
-    if (context.courseEnrolledId != null) {
+        if (context.courseEnrolledId != null) {
 
-        if (context.studentAccountId == null) {
-            throw new AuraHandledException('Student (Account) is not linked.');
-        }
+            if (context.studentAccountId == null) {
+                throw new AuraHandledException('Student (Account) is not linked.');
+            }
 
-        Account acc = [
-            SELECT
-                BillingStreet, BillingCity,
-                ShippingStreet, ShippingCity
-            FROM Account
-            WHERE Id = :context.studentAccountId
-            LIMIT 1
-        ];
+            Account acc = [
+                SELECT
+                    BillingStreet, BillingCity,
+                    ShippingStreet, ShippingCity
+                FROM Account
+                WHERE Id = :context.studentAccountId
+                LIMIT 1
+            ];
 
-        // Billing is ALWAYS mandatory
-        if (!hasCompleteAddress(acc.BillingStreet, acc.BillingCity, null, null, null)) {
-            throw new AuraHandledException(
-                'Billing address is mandatory before creating Purchase Order.'
-            );
-        }
+            // Billing is ALWAYS mandatory
+            if (!hasCompleteAddress(acc.BillingStreet, acc.BillingCity, null, null, null)) {
+                throw new AuraHandledException(
+                    'Billing address is mandatory before creating Purchase Order.'
+                );
+            }
 
-        // Shipping mandatory only for Study Material
-        if (shippingRequired &&
-            !hasCompleteAddress(acc.ShippingStreet, acc.ShippingCity, null, null, null)) {
-            throw new AuraHandledException(
-                'Shipping address is mandatory for Study Material.'
-            );
-        }
+            // Shipping mandatory only for Study Material
+            if (shippingRequired &&
+                !hasCompleteAddress(acc.ShippingStreet, acc.ShippingCity, null, null, null)) {
+                throw new AuraHandledException(
+                    'Shipping address is mandatory for Study Material.'
+                );
+            }
 
-    } else {
+        } else {
 
-        Lead__c leadRec = [
-            SELECT Candidate__c
-            FROM Lead__c
-            WHERE Id = :context.leadRecordId
-            LIMIT 1
-        ];
+            Lead__c leadRec = [
+                SELECT Candidate__c
+                FROM Lead__c
+                WHERE Id = :context.leadRecordId
+                LIMIT 1
+            ];
 
-        Lead candidate = [
-            SELECT
-                Street, City,
-                Shipping_Street__c, Shipping_City__c
-            FROM Lead
-            WHERE Id = :leadRec.Candidate__c
-            LIMIT 1
-        ];
+            Lead candidate = [
+                SELECT
+                    Street, City,
+                    Shipping_Street__c, Shipping_City__c
+                FROM Lead
+                WHERE Id = :leadRec.Candidate__c
+                LIMIT 1
+            ];
 
-        // Billing mandatory
-        if (!hasCompleteAddress(candidate.Street, candidate.City, null, null, null)) {
-            throw new AuraHandledException(
-                'Billing address is mandatory before creating Purchase Order.'
-            );
-        }
+            // Billing mandatory
+            if (!hasCompleteAddress(candidate.Street, candidate.City, null, null, null)) {
+                throw new AuraHandledException(
+                    'Billing address is mandatory before creating Purchase Order.'
+                );
+            }
 
-        // Shipping mandatory only for Study Material
-        if (shippingRequired &&
-            !hasCompleteAddress(candidate.Shipping_Street__c, candidate.Shipping_City__c, null, null, null)) {
-            throw new AuraHandledException(
-                'Shipping address is mandatory for Study Material.'
-            );
-        }
-    }
-}
-private static Boolean hasStudyMaterial(List<LineItemRequest> items) {
-    if (items == null) return false;
-
-    for (LineItemRequest li : items) {
-        if (li != null && li.learningType == 'Study Material') {
-            return true;
+            // Shipping mandatory only for Study Material
+            if (shippingRequired &&
+                !hasCompleteAddress(candidate.Shipping_Street__c, candidate.Shipping_City__c, null, null, null)) {
+                throw new AuraHandledException(
+                    'Shipping address is mandatory for Study Material.'
+                );
+            }
         }
     }
-    return false;
-}
 
+    private static Boolean hasStudyMaterial(List<LineItemRequest> items) {
+        if (items == null) return false;
+
+        for (LineItemRequest li : items) {
+            if (li != null && li.learningType == 'Study Material') {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private static Lead__c fetchLeadIfNeeded(Id leadRecordId) {
         if (leadRecordId == null) return null;
@@ -396,7 +407,7 @@ private static Boolean hasStudyMaterial(List<LineItemRequest> items) {
         }
 
         po.Discount_Amount__c = req.discount;
-        po.Down_Payment__c = req.downPayment;
+        // po.Down_Payment__c = req.downPayment;
         po.Purchase_Order_Date__c = Date.today();
 
         setAddress(po, req.addressType, context, candidate, student);
@@ -511,85 +522,83 @@ private static Boolean hasStudyMaterial(List<LineItemRequest> items) {
     }
 
     @AuraEnabled
-public static AddressStatusDTO checkAddressByRecordId(Id recordId) {
-    if (recordId == null) {
-        throw new AuraHandledException('Record Id is required');
+    public static AddressStatusDTO checkAddressByRecordId(Id recordId) {
+        if (recordId == null) {
+            throw new AuraHandledException('Record Id is required');
+        }
+
+        AddressStatusDTO res = new AddressStatusDTO();
+        Schema.SObjectType sobType = recordId.getSObjectType();
+
+        if (sobType == Lead__c.SObjectType) {
+            Lead__c leadRec = [
+                SELECT Candidate__c
+                FROM Lead__c
+                WHERE Id = :recordId
+                LIMIT 1
+            ];
+
+            Lead candidate = [
+                SELECT
+                    Street, City, State, PostalCode, Country,
+                    Shipping_Street__c, Shipping_City__c,
+                    Shipping_State__c, Shipping_Postal_Code__c,
+                    Shipping_Country__c
+                FROM Lead
+                WHERE Id = :leadRec.Candidate__c
+            ];
+
+            res.hasBilling = hasCompleteAddress(
+                candidate.Street, candidate.City, candidate.State,
+                candidate.PostalCode, candidate.Country
+            );
+
+            res.hasShipping = hasCompleteAddress(
+                candidate.Shipping_Street__c, candidate.Shipping_City__c,
+                candidate.Shipping_State__c, candidate.Shipping_Postal_Code__c,
+                candidate.Shipping_Country__c
+            );
+
+            return res;
+        }
+
+        if (sobType == Course_Enrolled__c.SObjectType) {
+            Course_Enrolled__c ce = [
+                SELECT Student__c
+                FROM Course_Enrolled__c
+                WHERE Id = :recordId
+                LIMIT 1
+            ];
+
+            Account acc = [
+                SELECT
+                    BillingStreet, BillingCity, BillingState, BillingPostalCode, BillingCountry,
+                    ShippingStreet, ShippingCity, ShippingState, ShippingPostalCode, ShippingCountry
+                FROM Account
+                WHERE Id = :ce.Student__c
+            ];
+
+            res.hasBilling = hasCompleteAddress(
+                acc.BillingStreet, acc.BillingCity, acc.BillingState,
+                acc.BillingPostalCode, acc.BillingCountry
+            );
+
+            res.hasShipping = hasCompleteAddress(
+                acc.ShippingStreet, acc.ShippingCity, acc.ShippingState,
+                acc.ShippingPostalCode, acc.ShippingCountry
+            );
+
+            return res;
+        }
+
+        throw new AuraHandledException('Unsupported record type');
     }
 
-    AddressStatusDTO res = new AddressStatusDTO();
-    Schema.SObjectType sobType = recordId.getSObjectType();
-
-    if (sobType == Lead__c.SObjectType) {
-        Lead__c leadRec = [
-            SELECT Candidate__c
-            FROM Lead__c
-            WHERE Id = :recordId
-            LIMIT 1
-        ];
-
-        Lead candidate = [
-            SELECT
-                Street, City, State, PostalCode, Country,
-                Shipping_Street__c, Shipping_City__c,
-                Shipping_State__c, Shipping_Postal_Code__c,
-                Shipping_Country__c
-            FROM Lead
-            WHERE Id = :leadRec.Candidate__c
-        ];
-
-        res.hasBilling = hasCompleteAddress(
-            candidate.Street, candidate.City, candidate.State,
-            candidate.PostalCode, candidate.Country
-        );
-
-        res.hasShipping = hasCompleteAddress(
-            candidate.Shipping_Street__c, candidate.Shipping_City__c,
-            candidate.Shipping_State__c, candidate.Shipping_Postal_Code__c,
-            candidate.Shipping_Country__c
-        );
-
-        return res;
+    private static Boolean hasCompleteAddress(
+        String street, String city, String state, String postalCode, String country
+    ) {
+        return !String.isBlank(street) && !String.isBlank(city);
     }
-
-    if (sobType == Course_Enrolled__c.SObjectType) {
-        Course_Enrolled__c ce = [
-            SELECT Student__c
-            FROM Course_Enrolled__c
-            WHERE Id = :recordId
-            LIMIT 1
-        ];
-
-        Account acc = [
-            SELECT
-                BillingStreet, BillingCity, BillingState, BillingPostalCode, BillingCountry,
-                ShippingStreet, ShippingCity, ShippingState, ShippingPostalCode, ShippingCountry
-            FROM Account
-            WHERE Id = :ce.Student__c
-        ];
-
-        res.hasBilling = hasCompleteAddress(
-            acc.BillingStreet, acc.BillingCity, acc.BillingState,
-            acc.BillingPostalCode, acc.BillingCountry
-        );
-
-        res.hasShipping = hasCompleteAddress(
-            acc.ShippingStreet, acc.ShippingCity, acc.ShippingState,
-            acc.ShippingPostalCode, acc.ShippingCountry
-        );
-
-        return res;
-    }
-
-    throw new AuraHandledException('Unsupported record type');
-}
-
-
-   private static Boolean hasCompleteAddress(
-    String street, String city, String state, String postalCode, String country
-) {
-    return !String.isBlank(street) && !String.isBlank(city);
-}
-
 
     private static Callout_PurchaseOrderService.CalloutResult callExternalPurchaseService( PurchaseOrderRequest req, Lead__c lead, Lead candidate ) {
 
@@ -618,7 +627,7 @@ public static AddressStatusDTO checkAddressByRecordId(Id recordId) {
         extReq.created_by   = 'MPE226';
 
         Callout_PurchaseOrderService.RequestItem item = new Callout_PurchaseOrderService.RequestItem();
-      //  item.program = String.valueOf(lead.Course__c);
+        //  item.program = String.valueOf(lead.Course__c);
         item.program = 'CPA';
         Boolean hasTraining = false;
         Boolean hasStudyMaterial = false;

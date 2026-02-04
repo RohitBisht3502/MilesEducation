@@ -12,12 +12,26 @@ global class LeadInitialQueueAssignmentBatch implements Database.Batchable<SObje
     global Database.QueryLocator start(Database.BatchableContext bc) {
         Datetime timeLimit = Datetime.now().addMinutes(-30);
         
+        // Get active cities
+        List<String> activeCities = new List<String>();
+        for (City__mdt city : [SELECT DeveloperName FROM City__mdt WHERE ON__c = true]) {
+            activeCities.add(city.DeveloperName);
+        }
+        
         String query = 'SELECT Id, OwnerId, Queue_Stage__c, Next_Follow_Up_Date__c ' +
                       'FROM Lead__c ' +
                       'WHERE Queue_Stage__c = null ' +
                       'AND Next_Follow_Up_Date__c = null ' +
                       'AND CreatedDate <= :timeLimit' + 
             		  'AND Source_Bucket__c = \'Bucket 1\'';
+        
+        // Add city filter only if there are active cities
+        if (!activeCities.isEmpty()) {
+            query += ' AND City__c IN :activeCities';
+        } else {
+            // Return empty query if no active cities
+            query += ' AND CreatedDate = null';
+        }
         
         return Database.getQueryLocator(query);
     }

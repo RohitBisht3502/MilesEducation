@@ -19,18 +19,11 @@ import createMeetingWithEvent from '@salesforce/apex/GoogleMeetService.createMee
 import getCurrentUserInfo from '@salesforce/apex/UserController.getCurrentUserInfo';
 import getAvailableUsers from '@salesforce/apex/UserController.getAvailableUsers';
 import { CloseActionScreenEvent } from 'lightning/actions';
+
 const LEAD_EMAIL_FIELD = 'Lead__c.Email__c';
 const LEAD_NAME_FIELD  = 'Lead__c.Name';
 
 const ORG_MEETING_EMAIL = 'meetings@mileseducation.com';
-
-const OFFLINE_TYPE_OPTIONS = [
-    { label: 'Enquiry',     value: 'Enquiry' },
-    { label: 'Enrollment',  value: 'Enrollment' },
-    { label: 'Service',     value: 'Service' },
-    { label: 'Escalation',  value: 'Escalation' },
-    { label: 'Onboarding',  value: 'Onboarding' }
-];
 
 export default class ContactEventCreator extends LightningElement {
     @api recordId;
@@ -42,15 +35,14 @@ export default class ContactEventCreator extends LightningElement {
     endDateTime = '';
     timezone = 'Asia/Kolkata';
 
-    // Meeting type / offline type / duration
+    // Meeting type / duration
     @track meetingType = '';
-    @track offlineType = '';
     duration = '45'; // default 45 minutes
 
     selectedUser = '';
     customEmail = '';
     @track typeOfMeeting = '';
-@track typeOfMeetingOptions = [];
+    @track typeOfMeetingOptions = [];
 
     
     // Data
@@ -64,7 +56,6 @@ export default class ContactEventCreator extends LightningElement {
 
     // picklist options
     @track meetingTypeOptions = [];
-    @track offlineTypeOptions = OFFLINE_TYPE_OPTIONS;
 
     // State
     isLoading = false;
@@ -72,47 +63,34 @@ export default class ContactEventCreator extends LightningElement {
     error = '';
     meetingResult = '';
 
-    // Timezone options
-    timezoneOptions = [
-        { label: 'Asia/Kolkata', value: 'Asia/Kolkata' },
-        { label: 'America/New_York', value: 'America/New_York' },
-        { label: 'America/Los_Angeles', value: 'America/Los_Angeles' },
-        { label: 'Europe/London', value: 'Europe/London' },
-        { label: 'Europe/Paris', value: 'Europe/Paris' },
-        { label: 'Asia/Tokyo', value: 'Asia/Tokyo' },
-        { label: 'Australia/Sydney', value: 'Australia/Sydney' }
-    ];
-
     @wire(getObjectInfo, { objectApiName: EVENT_OBJECT })
-objectInfo;
+    objectInfo;
 
-@wire(getPicklistValuesByRecordType, {
-    objectApiName: EVENT_OBJECT,
-    recordTypeId: '$recordTypeId'
-})
-wiredPicklists({ data, error }) {
-    if (data) {
+    @wire(getPicklistValuesByRecordType, {
+        objectApiName: EVENT_OBJECT,
+        recordTypeId: '$recordTypeId'
+    })
+    wiredPicklists({ data, error }) {
+        if (data) {
+            /* Meeting Type */
+            if (data.picklistFieldValues.Meeting_type__c) {
+                this.meetingTypeOptions =
+                    data.picklistFieldValues.Meeting_type__c.values;
+            }
 
-        /* Meeting Type */
-        if (data.picklistFieldValues.Meeting_type__c) {
-            this.meetingTypeOptions =
-                data.picklistFieldValues.Meeting_type__c.values;
+            /* Type of Meeting */
+            if (data.picklistFieldValues.Type_of_Meeting__c) {
+                this.typeOfMeetingOptions =
+                    data.picklistFieldValues.Type_of_Meeting__c.values;
+            }
+        } else if (error) {
+            console.error('Picklist load error', error);
         }
-
-        /* Type of Meeting ✅ */
-        if (data.picklistFieldValues.Type_of_Meeting__c) {
-            this.typeOfMeetingOptions =
-                data.picklistFieldValues.Type_of_Meeting__c.values;
-        }
-
-    } else if (error) {
-        console.error('Picklist load error', error);
     }
-}
 
-get recordTypeId() {
-    return this.objectInfo?.data?.defaultRecordTypeId;
-}
+    get recordTypeId() {
+        return this.objectInfo?.data?.defaultRecordTypeId;
+    }
 
 
 
@@ -187,10 +165,6 @@ get recordTypeId() {
         return !this.customEmail;
     }
 
-    get showOfflineType() {
-        return this.meetingType === 'Offline';
-    }
-
     get durationOptions() {
         const isOffline = this.meetingType === 'Offline';
         const values = isOffline ? [30, 45, 60, 90] : [30, 45, 60];
@@ -204,7 +178,7 @@ get recordTypeId() {
     connectedCallback() {
         this.loadCurrentUserInfo();
         this.loadAvailableUsers();
-         this.loadActivityPicklists();
+        this.loadActivityPicklists();
     }
 
     @wire(getRecord, { recordId: '$recordId', fields: [LEAD_EMAIL_FIELD, LEAD_NAME_FIELD] })
@@ -222,28 +196,28 @@ get recordTypeId() {
             this.showToast('Error', 'Error loading lead information', 'error');
         }
     }
- loadActivityPicklists() {
 
-    // Meeting Type (Event)
-    getEventPicklistValues({ fieldApiName: 'Meeting_type__c' })
-        .then(data => {
-            console.log('Meeting type options', data);
-            this.meetingTypeOptions = data;
-        })
-        .catch(error => {
-            console.error('Meeting type error', error);
-        });
+    loadActivityPicklists() {
+        // Meeting Type (Event)
+        getEventPicklistValues({ fieldApiName: 'Meeting_type__c' })
+            .then(data => {
+                console.log('Meeting type options', data);
+                this.meetingTypeOptions = data;
+            })
+            .catch(error => {
+                console.error('Meeting type error', error);
+            });
 
-    // Type of Meeting (Event)
-    getEventPicklistValues({ fieldApiName: 'Type_of_Meeting__c' })
-        .then(data => {
-            console.log('Type of meeting options', data);
-            this.typeOfMeetingOptions = data;
-        })
-        .catch(error => {
-            console.error('Type of meeting error', error);
-        });
-}
+        // Type of Meeting (Event)
+        getEventPicklistValues({ fieldApiName: 'Type_of_Meeting__c' })
+            .then(data => {
+                console.log('Type of meeting options', data);
+                this.typeOfMeetingOptions = data;
+            })
+            .catch(error => {
+                console.error('Type of meeting error', error);
+            });
+    }
 
 
 
@@ -305,27 +279,14 @@ get recordTypeId() {
         this.clearError();
     }
 
-    handleTimezoneChange(event) {
-        this.timezone = event.detail.value;
-    }
-
     handleMeetingTypeChange(event) {
         this.meetingType = event.detail.value;
         this.clearError();
-
-        if (this.meetingType !== 'Offline') {
-            this.offlineType = '';
-        }
 
         if (!this.durationOptions.find(o => o.value === this.duration)) {
             this.duration = '45';
         }
         this.updateEndDateTimeFromDuration();
-    }
-
-    handleOfflineTypeChange(event) {
-        this.offlineType = event.detail.value;
-        this.clearError();
     }
 
     handleDurationChange(event) {
@@ -506,8 +467,7 @@ get recordTypeId() {
                 timeZoneId: this.timezone,
                 attendeeEmails: attendeeEmails,
                 meetingType: this.meetingType,
-                   typeOfMeeting: this.typeOfMeeting, 
-                offlineType: this.showOfflineType ? this.offlineType : null,
+                typeOfMeeting: this.typeOfMeeting,
                 durationMinutes: parseInt(this.duration, 10)
             });
 
@@ -539,11 +499,6 @@ get recordTypeId() {
         if (!this.meetingType) {
             // this.error = 'Please select a Meeting Type';
             this.showToast('Error', 'Please select a Meeting Type', 'error');
-            return false;
-        }
-        if (this.showOfflineType && !this.offlineType) {
-            // this.error = 'Please select Type of Offline Gmeet';
-            this.showToast('Error', 'Please select Type of Offline Gmeet', 'error');
             return false;
         }
         if (!this.startDateTime) {
@@ -651,8 +606,8 @@ get recordTypeId() {
     }
 
     handleTypeOfMeetingChange(event) {
-    this.typeOfMeeting = event.detail.value;
-    this.clearError();
-}
+        this.typeOfMeeting = event.detail.value;
+        this.clearError();
+    }
 
 }
