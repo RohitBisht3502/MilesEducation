@@ -14,13 +14,14 @@ export default class RunoAllocationCalls extends LightningElement {
     @api recordId;
     @api isCallLog; 
     @api isQueuePaused;
+    @api isQueueRunning;
 
     // ---------------------------------------------
     // 🔥 ADDED: flag for renderedCallback
     // ---------------------------------------------
     hasRendered = false;
 isStageDisabled = false;
-isQueueRunning = false;
+ 
     // UI / state
     loading = false;
     disableCancel = false;
@@ -386,38 +387,33 @@ handleNotifyChange(event) {
         this.callButtonDisabled = false;
     }
 applyAutoStageLogic() {
-    // ❌ do nothing if user already selected stage
+    // Do nothing if user already selected stage.
     if (this.userChangedStage) {
         return;
     }
 
-    let autoStage = null;
-
     if (this.l1Value === 'Connected') {
-        if (
-            this.l2Value === 'Not Eligible' ||
-            this.l2Value === 'Wrong Number' ||
-            this.l2Value === 'Not Interested (DND)'
-        ) {
-            autoStage = 'M1';
+        const connectedStageMap = {
+            'Not Eligible': 'M1',
+            'Wrong Number': 'M1',
+            'Not Interested (DND)': 'M1',
+            'Language Barrier': 'M1',
+            'Visit Confirmed': 'M3+',
+            'Google Meet Completed': 'M3+',
+            'Gmeet Confirmed': 'M3+',
+            'Postponed': 'M4'
+        };
+
+        const autoStage = connectedStageMap[this.l2Value];
+        if (autoStage) {
+            this.stageValue = autoStage;
         }
-        else if (
-            this.l2Value === 'Visit Confirmed' ||
-            this.l2Value === 'Gmeet Confirmed'
-        ) {
-            autoStage = 'M3+';
-        }
-        else if (this.l2Value === 'Postponed') {
-            autoStage = 'M4';
-        }
-    }
-    else if (this.l1Value === 'Not-Connected') {
-        if (this.l2Value === 'Invalid Number') {
-            autoStage = 'M1';
-        }
+        return;
     }
 
-    this.stageValue = autoStage;
+    if (this.l1Value === 'Not-Connected') {
+        this.stageValue = this.l2Value === 'Invalid Number' ? 'M1' : null;
+    }
 }
 
 
@@ -465,20 +461,20 @@ setAutoDate24() {
     async saveFeedback() {
         if (this.isCommentMandatory && !this.feedback?.trim()) {
             this.toast('Mandatory', 'Feedback comment is required.', 'warning');
-            return;
+            return false;
         }
 
         if (this.l1Value === 'Connected' && !this.stageValue) {
             this.toast('Required', 'Stage and Course are required.', 'warning');
-            return;
+            return false;
         }
          if (!this.l1Value) {
             this.toast('Required', 'L1 is required.', 'warning');
-            return;
+            return false;
         }
          if (!this.l2Value) {
             this.toast('Required', 'l2 is required.', 'warning');
-            return;
+            return false;
         }
         if(this.l1Value === 'Not-Connected'){
             this.stageValue = null;
@@ -498,10 +494,12 @@ setAutoDate24() {
                 nextFollowUpDate: this.nextFollowUpDate,
                 l1: this.l1Value,
                 l2: this.l2Value,
-                stage: this.stageValue || null,
                 level: this.levelValue,
                 notifyMe: this.notifyMe
             };
+            if (this.stageValue && String(this.stageValue).trim()) {
+                payload.stage = this.stageValue;
+            }
              await updateCallFeedback({
                 jsonBody: JSON.stringify(payload)
             });
@@ -545,6 +543,7 @@ setAutoDate24() {
                     composed: true
                 })
             );
+            return true;
 
        } catch (e) {
     console.error('FEEDBACK SAVE ERROR RAW:', JSON.stringify(e));
@@ -556,6 +555,7 @@ setAutoDate24() {
         'Unknown error';
 
     this.toast('Save Failed', err, 'error');
+    return false;
 }
 
     }
@@ -584,7 +584,11 @@ setAutoDate24() {
         }
     }
 
-    handlePauseQueue(){
+    async handlePauseQueue(){
+        const saved = await this.saveFeedback();
+        if (!saved) {
+            return;
+        }
         this.dispatchEvent(
             new CustomEvent('pausequeue', {
                 bubbles : true,
@@ -593,14 +597,18 @@ setAutoDate24() {
             })
         );
     }
-    handleResumeQueue(){
+    async handleResumeQueue(){
+        const saved = await this.saveFeedback();
+        if (!saved) {
+            return;
+        }
         this.dispatchEvent(
             new CustomEvent('resumequeue',{
+                detail: { stopQueue: true },
                 bubbles :true,
                 composed :true
             })
         );
-
     }
 
     setElapsed(ms) {
@@ -697,6 +705,37 @@ setAutoDate24() {
 
 get disablePauseBtn(){
     return !this.isLive;
+}
+
+get disableSaveDispositionBtn() {
+    return this.savingFeedback || !this.showFeedback;
+}
+
+get panelHeader() {
+    return `Calling via Runo | ${this.callStatus} | ${this.elapsedLabel}`;
+}
+
+get statusPillClass() {
+    const status = (this.callStatus || '').toLowerCase();
+    if (status.includes('in call') || status.includes('dialing')) return 'status-pill live';
+    if (status.includes('failed') || status.includes('no response')) return 'status-pill warn';
+    return 'status-pill ended';
+}
+
+get leadNameDisplay() {
+    return this.identity?.name || 'NA';
+}
+
+get cityDisplay() {
+    return this.identity?.city || 'NA';
+}
+
+get companyDisplay() {
+    return this.identity?.source || 'NA';
+}
+
+get stageDisplay() {
+    return this.identity?.stage || 'NA';
 }
 
 

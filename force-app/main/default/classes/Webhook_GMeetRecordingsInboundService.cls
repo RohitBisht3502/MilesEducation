@@ -73,6 +73,10 @@ global without sharing class Webhook_GMeetRecordingsInboundService {
                         ev.put('StartDateTime', startDt);
                         ev.put('EndDateTime', endDt);
                         ev.put('Mutual_Meeting_Seconds__c', p.mutual_meeting_seconds);
+                        ev.put(
+                            'Candidate_Attendance__c',
+                            (p.mutual_meeting_seconds != null && p.mutual_meeting_seconds > 0) ? 'Present' : 'Absent'
+                        );
 
                         String videoPath;
                         String notesPath;

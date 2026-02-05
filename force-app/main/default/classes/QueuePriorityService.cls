@@ -109,8 +109,8 @@ public with sharing class QueuePriorityService {
             }
 
             for (Queue_Priority_Matrix__c row : matrixRows) {
-                String rowPrimary = String.isBlank(row.Primary_tag__c) ? null : row.Primary_tag__c.trim().toUpperCase();
-                if (rowPrimary == null || rowPrimary != dtoPrimary) {
+                Set<String> rowPrimaries = parseMultiPicklistWithAll(row.Primary_tag__c);
+                if (!rowPrimaries.isEmpty() && !rowPrimaries.contains(dtoPrimary)) {
                     continue;
                 }
 

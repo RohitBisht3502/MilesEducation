@@ -1,55 +1,49 @@
 <template>
   <div class="wrap">
     <div class="toolbar">
-      <div>
-        <template if:true={queueRunning}>
-          <span>Auto dial running</span>
-          <template if:true={isWaiting}>
-            <span> • Next call in 
-              <template if:true={decisionCountdown}>{decisionCountdown}s</template>
-              <template if:false={decisionCountdown}>{countdown}s</template>
-            </span>
-          </template>
-        </template>
-      </div>
-
-      <div>
-        <!-- LEAD COUNTERS -->
-        <div class="lead-stats slds-box slds-m-around_small slds-theme_shade">
-          <div class="slds-grid slds-wrap">
-            <div class="slds-col slds-size_1-of-3">
-              <b>Total Leads:</b> {totalLeads}
-            </div>
-            <div class="slds-col slds-size_1-of-3">
-              <b>Called:</b> {callsCompleted}
-            </div>
-            <div class="slds-col slds-size_1-of-3">
-              <b>Remaining:</b> {remainingLeads}
-            </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div>
+            <span class="stat-label">Total Leads</span>
+            <span class="stat-value">{totalLeads}</span>
+          </div>
+          <div class="stat-icon users">
+            <lightning-icon icon-name="utility:groups" size="small"></lightning-icon>
           </div>
         </div>
       </div>
 
       <div class="actions">
-        <button class="btn" onclick={handleStart} disabled={disableStart}>Start</button>
-        <button class="btn ghost" onclick={handlePause} disabled={disablePause}>Pause</button>
+        <button class="btn primary" onclick={handleStart} disabled={disableStart}>Start</button>
         <button class="btn success" onclick={handleResume} disabled={disableResume}>Resume</button>
-        <button class="btn ghost" onclick={handleEnd} disabled={disableEnd}>End</button>
+        <lightning-button-icon
+          class="refresh-btn"
+          icon-name="utility:refresh"
+          alternative-text="Refresh"
+          title="Refresh"
+          onclick={handleRefresh}>
+        </lightning-button-icon>
       </div>
+    </div>
+
+    <div class="table-title-row">
+      <h2 class="table-title">Lead Queue</h2>
+      <span class="table-meta">Showing {remainingLeads} leads</span>
     </div>
 
     <div class="table-scroller">
       <table class="matrix">
         <thead>
           <tr>
-            <th>#</th>
+            <th>S.No</th>
             <th>Lead Name</th>
             <th>Phone Number</th>
             <th>Primary Tag</th>
             <th>Bucket</th>
-            <th>Level</th>  
-            <th>Course</th>          
+            <th>Level</th>
+            <th>Course</th>
             <th>City</th>
+            <th>Next Follow Up Date</th>
           </tr>
         </thead>
         <tbody>
@@ -57,20 +51,32 @@
             <template for:each={leads} for:item="lead">
               <tr key={lead.id}>
                 <td>{lead.rowNumber}</td>
-                <td>{lead.name}</td>
+                <td class="name-cell">{lead.name}</td>
                 <td>{lead.phone}</td>
-                <td>{lead.primaryTag}</td>
-                <td>{lead.source}</td>
-                <td>{lead.stage}</td>
-                <td>{lead.course}</td>
-                <td>{lead.city}</td>
+                <td><span class={lead.primaryTagClass}>{lead.primaryTagLabel}</span></td>
+                <td><span class={lead.bucketClass}>{lead.bucketLabel}</span></td>
+                <td><span class={lead.levelClass}>{lead.levelLabel}</span></td>
+                <td>{lead.courseLabel}</td>
+                <td>{lead.cityLabel}</td>
+                <td>
+                  <template if:true={lead.nextFollowUpDate}>
+                    <lightning-formatted-date-time
+                      value={lead.nextFollowUpDate}
+                      year="numeric"
+                      month="2-digit"
+                      day="2-digit"
+                      hour="2-digit"
+                      minute="2-digit">
+                    </lightning-formatted-date-time>
+                  </template>
+                </td>
               </tr>
             </template>
           </template>
 
           <template if:false={hasLeads}>
             <tr>
-              <td colspan="5" class="no-data">No leads to display.</td>
+              <td colspan="9" class="no-data">No leads to display.</td>
             </tr>
           </template>
         </tbody>
@@ -82,25 +88,24 @@
       <div class="modal-overlay slds-backdrop slds-backdrop_open"></div>
 
       <section class="slds-modal slds-fade-in-open" style="display:block; background:transparent; ">
-        <div class="slds-modal__container runo-section"  style="background:transparent;">
-          <header class="slds-modal__header">
+        <div class="slds-modal__container runo-section" style="background:transparent;">
+          <header class="slds-modal__header modal-header-compact">
             <button class="slds-button slds-button_icon slds-modal__close" onclick={closeModal}>
               <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
             </button>
-           
           </header>
 
-         <div class="slds-modal__content modal-body-fixed">
-  <c-runo-allocation-calls
-    record-id={currentLeadId}
-    is-call-log={currentIsCallLog}
-    is-queue-running={queueRunning}
-    is-queue-paused={isQueuePaused}
-    oncallcomplete={handleCallComplete}
-    onpausequeue={handlePauseFromChild}
-    onresumequeue={handleResumeFromChild}>
-  </c-runo-allocation-calls>
-</div>
+          <!-- <div class="slds-modal__content modal-body-fixed"> -->
+            <c-runo-allocation-calls
+              record-id={currentLeadId}
+              is-call-log={currentIsCallLog}
+              is-queue-running={queueRunning}
+              is-queue-paused={isQueuePaused}
+              oncallcomplete={handleCallComplete}
+              onpausequeue={handlePauseFromChild}
+              onresumequeue={handleResumeFromChild}>
+            </c-runo-allocation-calls>
+          <!-- </div> -->
 
         </div>
       </section>

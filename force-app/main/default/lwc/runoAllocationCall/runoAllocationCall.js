@@ -415,42 +415,33 @@ resolveRecordIdFromPageRef() {
     this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
 }
 applyAutoStageLogic() {
-    // ❌ Do nothing if user already selected stage
+    // Do nothing if user already selected stage.
     if (this.userChangedStage) {
         return;
     }
 
-    let autoStage = null;
-
     if (this.l1Value === 'Connected') {
-        if (
-            this.l2Value === 'Not Eligible' ||
-            this.l2Value === 'Wrong Number' ||
-            this.l2Value === 'Not Interested (DND)' ||
-            this.l2Value === 'Language Barrier'
-        ) {
-            autoStage = 'M1';
+        const connectedStageMap = {
+            'Not Eligible': 'M1',
+            'Wrong Number': 'M1',
+            'Not Interested (DND)': 'M1',
+            'Language Barrier': 'M1',
+            'Visit Confirmed': 'M3+',
+            'Google Meet Completed': 'M3+',
+            'Gmeet Confirmed': 'M3+',
+            'Postponed': 'M4'
+        };
+
+        const autoStage = connectedStageMap[this.l2Value];
+        if (autoStage) {
+            this.stageValue = autoStage;
         }
-        else if (
-            this.l2Value === 'Visit Confirmed' ||
-            this.l2Value === 'Google Meet Completed' ||
-            this.l2Value === 'Gmeet Confirmed'
-        ) {
-            autoStage = 'M3+';
-        }
-        else if (this.l2Value === 'Postponed') {
-            autoStage = 'M4';
-        }
-    }
-    else if (this.l1Value === 'Not-Connected') {
-        if (this.l2Value === 'Invalid Number') {
-            autoStage = 'M1';
-        } else {
-            autoStage = null;
-        }
+        return;
     }
 
-    this.stageValue = autoStage;
+    if (this.l1Value === 'Not-Connected') {
+        this.stageValue = this.l2Value === 'Invalid Number' ? 'M1' : null;
+    }
 }
 
 
@@ -495,10 +486,12 @@ applyAutoStageLogic() {
                 nextFollowUpDate: this.nextFollowUpDate,
                 l1: this.l1Value,
                 l2: this.l2Value,
-                stage: this.stageValue  || null,
                 level: this.levelValue,
                 notifyMe: false
             };
+            if (this.stageValue && String(this.stageValue).trim()) {
+                payload.stage = this.stageValue;
+            }
 
             await updateCallFeedback({
                 jsonBody: JSON.stringify(payload)

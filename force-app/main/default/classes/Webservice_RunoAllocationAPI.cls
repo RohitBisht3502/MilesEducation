@@ -289,7 +289,9 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         logRecord.Next_Follow_Up_Date__c = nextFollowUpDate;
         logRecord.L1__c                  = l1;
         logRecord.L2__c                  = l2;
-        logRecord.Stage__c               = stage;
+        if (!String.isBlank(stage)) {
+            logRecord.Stage__c = stage;
+        }
         logRecord.Notify_Me__c           = notifyMe;
         logRecord.Untracked__c           = FALSE;
 
@@ -308,10 +310,12 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         if (leadIdToUpdate != null) {
             Lead__c leadUpdate = new Lead__c(
                 Id = leadIdToUpdate,
-                Stage__c = stage,
                 Next_Follow_Up_Date__c = nextFollowUpDate,
                 Notify_Me__c = notifyMe
             );
+            if (!String.isBlank(stage)) {
+                leadUpdate.Stage__c = stage;
+            }
             update leadUpdate;
         }
     }
@@ -367,7 +371,9 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         logRecord.Next_Follow_Up_Date__c = nextFollowUpDate;
         logRecord.L1__c                  = l1;
         logRecord.L2__c                  = l2;
-        logRecord.Stage__c               = stage;
+        if (!String.isBlank(stage)) {
+            logRecord.Stage__c = stage;
+        }
         logRecord.Notify_Me__c           = notifyMe;
         logRecord.Untracked__c           = FALSE;
         if (isCallLogRec) {
@@ -385,10 +391,12 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         if (leadIdToUpdate != null) {
             Lead__c leadUpdate = new Lead__c(
                 Id = leadIdToUpdate,
-                Stage__c = stage,
                 Next_Follow_Up_Date__c = nextFollowUpDate,
                 Notify_Me__c = notifyMe
             );
+            if (!String.isBlank(stage)) {
+                leadUpdate.Stage__c = stage;
+            }
             update leadUpdate;
         }
     }
@@ -728,7 +736,9 @@ public static void updateCourseCallFeedback(String jsonBody) {
     logRecord.Next_Follow_Up_Date__c = request.nextFollowUpDate;
     logRecord.L1__c                  = request.l1;
     logRecord.L2__c                  = request.l2;
-    logRecord.Stage__c               = request.stage;
+    if (!String.isBlank(request.stage)) {
+        logRecord.Stage__c = request.stage;
+    }
     logRecord.Notify_Me__c           = request.notifyMe;
     logRecord.Untracked__c           = false;
 
@@ -737,11 +747,13 @@ public static void updateCourseCallFeedback(String jsonBody) {
     // 🔹 Update Course Enrolled
    Course_Enrolled__c ceUpdate = new Course_Enrolled__c(
     Id = recordId,
-    Stages__c = request.stage,
     Due_Date__c = request.nextFollowUpDate != null
         ? request.nextFollowUpDate.date()
         : null
 );
+    if (!String.isBlank(request.stage)) {
+        ceUpdate.Stages__c = request.stage;
+    }
 
 
     update ceUpdate;

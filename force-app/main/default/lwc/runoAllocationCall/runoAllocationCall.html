@@ -100,7 +100,7 @@
                 <div class="info-tile">
                     <lightning-icon icon-name="utility:topic"></lightning-icon>
                     <div>
-                        <small>Company:-</small>
+                        <small>Course:-</small>
                         <strong>{identity.source}</strong>
                     </div>
                 </div>
@@ -202,16 +202,6 @@
                         </lightning-input>
                     </div>
 
-                    <!-- Save -->
-                    <div class="slds-col slds-size_1-of-1 slds-m-top_medium">
-                        <lightning-button
-                            class="full-width"
-                            variant="brand"
-                            label="Save Feedback"
-                            onclick={saveFeedback}
-                            disabled={isSaveDisabled}>
-                        </lightning-button>
-                    </div>
                 </div>
             </div>
         </template>
@@ -231,14 +221,26 @@
                 disabled={disableCancel}>
             </lightning-button> -->
 
-            <lightning-button
-                class="call-btn"
-                data-id="callBtn"
-                variant="brand"
-                label={callButtonLabel}
-                onclick={callApi}
-                disabled={callButtonDisabled}>
-            </lightning-button>
+            <template if:true={showFeedback}>
+                <lightning-button
+                    class="call-btn"
+                    variant="brand"
+                    label="Save Feedback"
+                    onclick={saveFeedback}
+                    disabled={isSaveDisabled}>
+                </lightning-button>
+            </template>
+
+            <template if:false={showFeedback}>
+                <lightning-button
+                    class="call-btn"
+                    data-id="callBtn"
+                    variant="brand"
+                    label={callButtonLabel}
+                    onclick={callApi}
+                    disabled={callButtonDisabled}>
+                </lightning-button>
+            </template>
             
         </div>
 

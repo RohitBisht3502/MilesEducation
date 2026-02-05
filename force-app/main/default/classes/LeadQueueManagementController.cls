@@ -6,28 +6,24 @@ public class LeadQueueManagementController {
 
     @AuraEnabled(cacheable=true)
     public static List<LeadQueueItemDTO> getUserLeads() {
+        Map<Id, String> latestTrackedCallTypeByLeadId = new Map<Id, String>();
+        Set<Id> missedTrackedLeadIds = new Set<Id>();
 
-        List<Lead__c> leads = [
-            SELECT Id, Name, Phone__c, Email__c, Course__c, City__c,
-                   Stage__c, Source__c, CreatedDate,
-                   Primary_tag__c, Source_Bucket__c,
-                   Next_Follow_Up_Date__c,
-                   Candidate__c,Is_ReEnquiry__c
-            FROM Lead__c 
-             WHERE OwnerId = :UserInfo.getUserId()
-             AND Is_DND__c = FALSE
-             AND Is_Spam__c = FALSE
-             AND Is_Merged__c = FALSE
-             AND (Next_Follow_Up_Date__c = NULL OR Next_Follow_Up_Date__c <= :Datetime.now())
-             ORDER BY CreatedDate DESC LIMIT 200 ];
+        for (Call_Log__c cl : [SELECT Lead__c, Type__c, Created_At__c FROM Call_Log__c WHERE OwnerId = :UserInfo.getUserId() AND Lead__c != null ORDER BY Created_At__c DESC LIMIT 500]) {
+            if (cl.Lead__c == null || latestTrackedCallTypeByLeadId.containsKey(cl.Lead__c)) {
+                continue;
+            }
 
-        List<Call_Log__c> enquiries = [
-            SELECT Id, Customer_Name__c, Phone_Number__c,CreatedDate
-            FROM Call_Log__c
-            WHERE (Untracked__c = TRUE)
-            AND OwnerId = :UserInfo.getUserId()
-            AND Lead__c = null
-            ORDER BY CreatedDate DESC LIMIT 200];
+            latestTrackedCallTypeByLeadId.put(cl.Lead__c, cl.Type__c);
+            if (!String.isBlank(cl.Type__c) && cl.Type__c.equalsIgnoreCase('missed')) {
+                missedTrackedLeadIds.add(cl.Lead__c);
+            }
+        }
+
+        List<Lead__c> leads = [SELECT Id, Name, Phone__c, Email__c, Course__c, City__c, Stage__c, Source__c, CreatedDate, Primary_tag__c, Source_Bucket__c, Next_Follow_Up_Date__c, Candidate__c, Is_ReEnquiry__c FROM Lead__c WHERE OwnerId = :UserInfo.getUserId() AND Is_DND__c = FALSE AND Is_Spam__c = FALSE AND Is_Merged__c = FALSE AND (Next_Follow_Up_Date__c = NULL OR Next_Follow_Up_Date__c <= :Datetime.now() OR Id IN :missedTrackedLeadIds) ORDER BY CreatedDate DESC LIMIT 200];
+
+        System.debug('LeadQueueManagementController.getUserLeads: fetched leads count = ' + leads);
+        List<Call_Log__c> enquiries = [SELECT Id, Customer_Name__c, Phone_Number__c, CreatedDate FROM Call_Log__c WHERE (Untracked__c = TRUE) AND OwnerId = :UserInfo.getUserId() AND Lead__c = null ORDER BY CreatedDate DESC LIMIT 200];
 
         User currentUser = [SELECT Id, UserRole.Name FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1 ];
 
@@ -100,6 +96,10 @@ public class LeadQueueManagementController {
         Datetime startOfToday = Datetime.newInstance(todayDate, Time.newInstance(0, 0, 0, 0));
         Datetime startOfTomorrow = startOfToday.addDays(1);
 
+        if (!String.isBlank(callStatus) && callStatus.equalsIgnoreCase('missed')) {
+            return 'Missed calls';
+        }
+                
         if (nextFollowupDate != null) {
             if (nextFollowupDate >= startOfToday && nextFollowupDate < startOfTomorrow) {
                 return 'Todays';
@@ -107,10 +107,6 @@ public class LeadQueueManagementController {
             if (nextFollowupDate < startOfToday) {
                 return 'Delays';
             }
-        }
-
-        if (!String.isBlank(callStatus) && callStatus.equalsIgnoreCase('missed')) {
-            return 'Missed calls';
         }
 
         if (isReEnquiry == true) {

@@ -38,9 +38,30 @@ export default class LeadQueueManagement extends LightningElement {
         const { data, error } = result;
 
         if (data) {
-            this.leads = data.map((item, i) => ({
+            const seenCallLogPhones = new Set();
+            const filtered = data.filter(item => {
+                if (!item.iscallLog) return true;
+
+                const raw = item.phone || '';
+                const normalized = raw.replace(/\D/g, '');
+                const key = normalized || item.id;
+
+                if (seenCallLogPhones.has(key)) return false;
+                seenCallLogPhones.add(key);
+                return true;
+            });
+
+            this.leads = filtered.map((item, i) => ({
                 ...item,
-                rowNumber: i + 1
+                rowNumber: i + 1,
+                primaryTagLabel: item.primaryTag || 'NA',
+                bucketLabel: item.source || 'NA',
+                levelLabel: item.stage || '--',
+                courseLabel: item.course || 'NA',
+                cityLabel: item.city || 'NA',
+                primaryTagClass: this.getPrimaryTagClass(item.primaryTag),
+                bucketClass: this.getBucketClass(item.source),
+                levelClass: this.getLevelClass(item.stage)
             }));
 
             this.totalLeads = this.leads.length;
@@ -63,6 +84,33 @@ export default class LeadQueueManagement extends LightningElement {
 
     get disableEnd() {
         return !this.queueRunning;
+    }
+
+    async handleRefresh() {
+        try {
+            await refreshApex(this.wiredResult);
+            this.remainingLeads = this.leads.length;
+        } catch (e) {
+            console.error('Manual refresh failed', e);
+        }
+    }
+
+    getPrimaryTagClass(tag) {
+        const t = (tag || '').toLowerCase();
+        if (t === 'untracked calls') return 'pill pill-blue';
+        if (t === 'ne' || t === 'mhp') return 'pill pill-cyan';
+        if (t === 'delays') return 'pill pill-amber';
+        return 'pill pill-gray';
+    }
+
+    getBucketClass(bucket) {
+        if (!bucket || bucket === 'NA') return 'pill pill-gray';
+        return 'pill pill-green';
+    }
+
+    getLevelClass(level) {
+        if (!level || level === 'NA' || level === '--') return 'pill pill-gray';
+        return 'pill pill-slate';
     }
 
     // -------------------------------------------------------------------
@@ -223,9 +271,11 @@ get disableResume() {
         this.currentLeadId = null;
         this.currentIsCallLog = false;
 
-        // Continue countdown after refresh
-        this.remainingCountdown = 1;
-        this.startCountdown(this.remainingCountdown);
+        // Continue only if queue is still running
+        if (this.queueRunning) {
+            this.remainingCountdown = 1;
+            this.startCountdown(this.remainingCountdown);
+        }
     }
 
     // -------------------------------------------------------------------
