@@ -1,0 +1,44 @@
+.panel-wrap {
+  border: 1px solid #d8dde6;
+  border-radius: 0.5rem;
+  background: #ffffff;
+}
+
+.panel-header {
+  background: linear-gradient(90deg, #0176d3 0%, #0b5cab 100%);
+  color: #ffffff;
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+}
+
+.panel-header p {
+  color: #eaf5ff;
+}
+
+.table-head-row {
+  background-color: #f3f8fe;
+}
+
+.webinar-table {
+  border-top: 1px solid #d8dde6;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 1rem;
+  background: #eaf5ff;
+  color: #0b5cab;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.modal-header-blue {
+  background: #f3f8fe;
+  border-bottom: 1px solid #d8dde6;
+}
+
+.details-text {
+  white-space: normal;
+  line-height: 1.4;
+}

@@ -3,15 +3,14 @@ import getNavData from '@salesforce/apex/SobjectNavBarController.getNavData';
 import ROADMAP_IMG from '@salesforce/resourceUrl/Roadmap';
 import GMEET_IMG from '@salesforce/resourceUrl/Gmeet';
 import OFFICE_VISIT_IMG from '@salesforce/resourceUrl/OfficeVisitLight';
+import MILES_ONE_IMG from '@salesforce/resourceUrl/MILES_ONE_IMG';
 
-const BLINK_DURATION = 5000; // ⏱ 5 seconds
+const BLINK_DURATION = 5000;
 
 export default class CustomNavBar extends LightningElement {
     @api recordId;
 
     @track enquiryTabs = [];
-    @track webinarTabs = [];
-    @track eventTabs = [];
     @track latestSource = 'Sources';
     @track blinkActive = false;
 
@@ -24,53 +23,51 @@ export default class CustomNavBar extends LightningElement {
         if (data) {
             const latestSource = data.latestSource;
             this.latestSource = this.formatSourceLabel(latestSource || 'Sources');
-
-            // 🔔 Enable blinking only if a real latest source exists
             this.blinkActive = !!latestSource;
 
-            const mapTabs = (arr, type) =>
-                (arr || [])
-                    .filter(i => i && i.source && i.source.trim() !== '')
-                    .map(i => {
-                        const isNew = this.blinkActive && i.source === latestSource;
-                        let label = i.source;
-                        let iconName = 'utility:record';
-                        let iconUrl = null;
-                        if (type === 'event') {
-                            const isOffline = (i.source || '').toLowerCase() === 'offline';
-                            iconName = isOffline ? 'utility:company' : 'utility:video';
-                            iconUrl = isOffline ? OFFICE_VISIT_IMG : GMEET_IMG;
-                            label = isOffline ? 'Office Visit' : 'GMEET';
-                        } else if (type === 'webinar') {
-                            iconName = 'utility:trail';
-                            iconUrl = ROADMAP_IMG;
-                        }
-                        return {
-                            name: i.source,
-                            label,
-                            count: i.count,
-                            iconName,
-                            iconUrl,
-                            useImage: !!iconUrl,
-                            isNew,
-                            tabClass: isNew
-                                ? (iconUrl ? 'tab-icon-only blink-tab' : 'tab-pill blink-tab')
-                                : (iconUrl ? 'tab-icon-only' : 'tab-pill')
-                        };
-                    });
+            this.enquiryTabs = (data.enquiry || [])
+                .filter((item) => item && item.source && item.source.trim() !== '')
+                .map((item) => {
+                    const source = item.source || '';
+                    const normalized = source.toLowerCase();
+                    const isNew = this.blinkActive && source === latestSource;
 
-            this.enquiryTabs = mapTabs(data.enquiry, 'enquiry');
-            this.webinarTabs = mapTabs(data.webinar, 'webinar');
-            this.eventTabs = mapTabs(data.events, 'event');
+                    let label = this.formatSourceLabel(source);
+                    let iconUrl = null;
 
-            // ⏱ Stop blinking after X seconds
+                    if (normalized === 'zoom webinar') {
+                        iconUrl = ROADMAP_IMG;
+                        label = 'Zoom Webinar';
+                    } else if (normalized === 'gmeet online') {
+                        iconUrl = GMEET_IMG;
+                        label = 'Gmeet Online';
+                    } else if (normalized === 'gmeet visit') {
+                        iconUrl = OFFICE_VISIT_IMG;
+                        label = 'Gmeet Visit';
+                    } else if (normalized === 'miles one app') {
+                        iconUrl = MILES_ONE_IMG;
+                        label = 'Miles One App';
+                    }
+
+                    return {
+                        name: source,
+                        label,
+                        count: item.count,
+                        iconUrl,
+                        useImage: !!iconUrl,
+                        isNew,
+                        tabClass: isNew
+                            ? (iconUrl ? 'tab-icon-only blink-tab' : 'tab-pill blink-tab')
+                            : (iconUrl ? 'tab-icon-only' : 'tab-pill')
+                    };
+                });
+
             clearTimeout(this.blinkTimeout);
             if (this.blinkActive) {
                 this.blinkTimeout = setTimeout(() => {
                     this.stopBlinking();
                 }, BLINK_DURATION);
             }
-
         } else if (error) {
             console.error('Apex Error:', error);
         }
@@ -78,66 +75,30 @@ export default class CustomNavBar extends LightningElement {
 
     stopBlinking() {
         this.blinkActive = false;
-
-        const clearBlink = (tabs) =>
-            tabs.map(tab => ({
-                ...tab,
-                isNew: false,
-                tabClass: tab.useImage ? 'tab-icon-only' : 'tab-pill'
-            }));
-
-        this.enquiryTabs = clearBlink(this.enquiryTabs);
-        this.webinarTabs = clearBlink(this.webinarTabs);
-        this.eventTabs = clearBlink(this.eventTabs);
+        this.enquiryTabs = this.enquiryTabs.map((tab) => ({
+            ...tab,
+            isNew: false,
+            tabClass: tab.useImage ? 'tab-icon-only' : 'tab-pill'
+        }));
     }
 
     get navTitleClass() {
         return this.blinkActive ? 'nav-title blink-nav' : 'nav-title';
     }
 
-    get navHeader() {
-        return this.recordId && this.recordId.startsWith('001') ? 'Account Sources' : 'Lead Sources';
-    }
-
     formatSourceLabel(source) {
         const normalized = (source || '').toLowerCase();
         if (normalized === 'online') return 'GMEET';
-        if (normalized === 'offline') return 'Office Visit';
+        if (normalized === 'offline') return 'GVISIT';
         return source;
     }
 
     handleImageError(event) {
-        const group = event.target.dataset.group;
         const tabName = event.target.dataset.name;
-        if (!group || !tabName) return;
+        if (!tabName) return;
 
-        const hideBrokenImage = (tabs) =>
-            tabs.map(tab => (tab.name === tabName ? { ...tab, useImage: false } : tab));
-
-        if (group === 'enquiry') {
-            this.enquiryTabs = hideBrokenImage(this.enquiryTabs);
-        } else if (group === 'webinar') {
-            this.webinarTabs = hideBrokenImage(this.webinarTabs);
-        } else if (group === 'event') {
-            this.eventTabs = hideBrokenImage(this.eventTabs);
-        }
-    }
-
-
-
-
-    renderedCallback() {
-        if (this._hasRenderedOnce) return;
-        this._hasRenderedOnce = true;
-
-        console.log('recordId:', this.recordId);
-
-        const navTitle = this.template.querySelector('.nav-title');
-        if (navTitle && (this.enquiryTabs.length > 0 || this.webinarTabs.length > 0 || this.eventTabs.length > 0)) {
-            navTitle.classList.add('blink-nav');
-        }
-
-        const tabButtons = this.template.querySelectorAll('.tab-pill');
-        tabButtons.forEach((btn) => btn.classList.add('blink-tab'));
+        this.enquiryTabs = this.enquiryTabs.map((tab) =>
+            tab.name === tabName ? { ...tab, useImage: false } : tab
+        );
     }
 }

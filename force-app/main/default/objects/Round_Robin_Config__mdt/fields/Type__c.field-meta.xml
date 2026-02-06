@@ -10,14 +10,19 @@
         <valueSetDefinition>
             <sorted>false</sorted>
             <value>
-                <fullName>Round Robin</fullName>
+                <fullName>CC - Pre Enrollment</fullName>
                 <default>true</default>
-                <label>Round Robin</label>
+                <label>CC - Pre Enrollment</label>
             </value>
             <value>
-                <fullName>Eligibility Criteria</fullName>
+                <fullName>SR - Post Enrollment</fullName>
                 <default>false</default>
-                <label>Eligibility Criteria</label>
+                <label>SR - Post Enrollment</label>
+            </value>
+            <value>
+                <fullName>GP</fullName>
+                <default>false</default>
+                <label>GP</label>
             </value>
             <value>
                 <fullName>MCOM</fullName>

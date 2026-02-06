@@ -9,6 +9,14 @@ public without sharing class RoundRobinHelper {
     public static String normSource(String v) { return String.isBlank(v) ? '(NONE)' : v.trim().toUpperCase(); }
     public static String normCourse(String v) { return String.isBlank(v) ? '(ANY)'  : v.trim().toUpperCase(); }
 
+    public static Boolean usesSource(String typeValue) {
+        return !String.isBlank(typeValue) && typeValue.equalsIgnoreCase('CC - Pre Enrollment');
+    }
+
+    public static Boolean shouldIgnoreSource(String typeValue) {
+        return !usesSource(typeValue);
+    }
+
     public static String keyOf(String obj, String cityUpper, String sourceUpper, String courseUpper, String typeValue) {
         String coursePart = String.isBlank(courseUpper) ? '(ANY)' : courseUpper;
         
@@ -18,7 +26,7 @@ public without sharing class RoundRobinHelper {
         }
         
         String srcPart    = String.isBlank(sourceUpper) ? '(NONE)' : sourceUpper;
-        String typePart   = String.isBlank(typeValue)   ? 'Round Robin' : typeValue;
+        String typePart   = String.isBlank(typeValue)   ? 'CC - Pre Enrollment' : typeValue;
         return obj + '|' + cityUpper + '|' + srcPart + '|' + coursePart + '|' + typePart;
     }
 
@@ -30,7 +38,7 @@ public without sharing class RoundRobinHelper {
         b.cityUpper     = parts.size() > 1 ? parts[1] : '(NONE)';
         b.sourceUpper   = parts.size() > 2 ? parts[2] : '(NONE)';
         b.courseUpper   = parts.size() > 3 ? parts[3] : '(ANY)';
-        b.typeValue     = parts.size() > 4 ? parts[4] : 'Round Robin';
+        b.typeValue     = parts.size() > 4 ? parts[4] : 'CC - Pre Enrollment';
         return b;
     }
 
@@ -44,8 +52,15 @@ public without sharing class RoundRobinHelper {
             sortBySequenceThenId(rows);
             return rows;
         }
+
+        // For GP, ignore source and course; use city + object + type only
+        if (typeValue != null && typeValue.equalsIgnoreCase('GP')) {
+            List<Round_Robin_Pool__c> rows = qGP(obj, cityUpper, typeValue);
+            sortBySequenceThenId(rows);
+            return rows;
+        }
         
-        Boolean ignoreSource = (typeValue != null && typeValue.equalsIgnoreCase('Eligibility Criteria'));
+        Boolean ignoreSource = shouldIgnoreSource(typeValue);
         List<Round_Robin_Pool__c> rows = q(obj, cityUpper, sourceUpper, courseUpper, typeValue, ignoreSource);
         sortBySequenceThenId(rows);
         return rows;
@@ -61,6 +76,21 @@ public without sharing class RoundRobinHelper {
             WHERE Active__c = true
               AND Object_Api_Name__c = :obj
               AND Type__c = 'MCOM'
+            FOR UPDATE
+        ];
+    }
+
+    public static List<Round_Robin_Pool__c> qGP(String obj, String city, String typeValue) {
+        return [
+            SELECT Id, Name, Object_Api_Name__c, City__c, Bucket__c,
+                   Sales_Rep__c, Sequence__c, Max_Weight__c, Assigned_Weight__c,
+                   Max_Leads__c, Total_Assigned__c, Maximum_Weightage__c,
+                   Current_Assigned_Weight__c, Active__c, Course__c, Course_Bucket__c, Type__c
+            FROM Round_Robin_Pool__c
+            WHERE Active__c = true
+              AND Object_Api_Name__c = :obj
+              AND City__c = :city
+              AND Type__c = :typeValue
             FOR UPDATE
         ];
     }

@@ -24,7 +24,7 @@
     <filters>
         <field>Type__c</field>
         <operation>equals</operation>
-        <value>Eligibility Criteria</value>
+        <value>GP</value>
     </filters>
     <filters>
         <field>Course__c</field>

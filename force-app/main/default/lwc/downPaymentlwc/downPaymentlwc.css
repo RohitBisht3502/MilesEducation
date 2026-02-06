@@ -33,6 +33,12 @@
     padding: 24px;
 }
 
+.remaining-amount {
+    margin-bottom: 12px;
+    color: #0b5cab;
+    font-weight: 600;
+}
+
 /* Input styling */
 lightning-input {
     --slds-c-input-radius-border: 12px;
@@ -56,6 +62,16 @@ lightning-input {
     --slds-c-button-brand-text-color: #ffffff;
     --slds-c-button-radius-border: 14px;
     --slds-c-button-shadow: 0 6px 14px rgba(1, 118, 211, 0.35);
+}
+
+.txn-section {
+    margin-top: 18px;
+}
+
+.txn-title {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: #1f2937;
 }
 
 /* Animation */

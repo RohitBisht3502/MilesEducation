@@ -21,8 +21,14 @@
           icon-name="utility:refresh"
           alternative-text="Refresh"
           title="Refresh"
-          onclick={handleRefresh}>
+          onclick={handleRefresh}
+          disabled={isRefreshing}>
         </lightning-button-icon>
+        <template if:true={isRefreshing}>
+          <div class="refresh-spinner-wrap">
+            <lightning-spinner alternative-text="Refreshing" size="small"></lightning-spinner>
+          </div>
+        </template>
       </div>
     </div>
 

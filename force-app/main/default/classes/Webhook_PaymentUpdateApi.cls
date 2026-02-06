@@ -66,6 +66,14 @@ global without sharing class Webhook_PaymentUpdateApi {
             return response;
         }
 
+
+//         if (String.isBlank(paymentReq.createdBy)) {
+//     response.success = false;
+//     response.message = 'Created By username is required';
+//     return response;
+// }
+
+
         try {
             // ️⃣ Fetch Transcation
             Transcation__c txn = [
@@ -75,14 +83,20 @@ global without sharing class Webhook_PaymentUpdateApi {
                 LIMIT 1
             ];
 
-            // ️⃣ Update fields
-            txn.Payment_Received__c = paymentReq.paymentReceived;
-            txn.Status__c = paymentReq.status;
-            update txn;
+
+
+            //Update fields
+          txn.Payment_Received__c = paymentReq.paymentReceived;
+txn.Status__c = 'Received';
+
+txn.Purchase_Orders__c = paymentReq.purchaseId;
+           
+
+update txn;
 
             response.success = true;
             response.message = 'Payment updated successfully';
-            response.recordId = txn.Id;
+            // response.recordId = txn.Id;
 
             IntegrationLogUtil.insertLog(
                 serviceName,
@@ -140,14 +154,17 @@ global without sharing class Webhook_PaymentUpdateApi {
     global class PaymentRequest {
         public String transactionId;
         public Decimal paymentReceived;
-        public String status;
+       
+         public Id purchaseId;
+       
+
     }
 
     // Response Wrapper
     global class ApiResponse {
         public Boolean success;
         public String message;
-        public Id recordId;
+      
     }
 
     private static String truncate(String value) {

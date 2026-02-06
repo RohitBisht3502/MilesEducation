@@ -7,45 +7,126 @@
     background: #f4f6f8;
     font-family: "Salesforce Sans", Arial, sans-serif;
 }
-.address-card {
-    background: #ffffff;
-    border-radius: 10px;
+
+
+/* ===== MODAL CONTAINER ENHANCEMENT ===== */
+.modal-body {
     padding: 20px;
-    margin-bottom: 16px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    animation: modalFadeUp 0.35s ease;
 }
-.address-card .section-title {
-    font-size: 1.1rem;
+
+/* ===== SECTION TITLES ===== */
+.address-title {
+    font-size: 17px;
     font-weight: 600;
-    margin-bottom: 16px;
     color: #1f2937;
+    margin-bottom: 10px;
+    position: relative;
 }
+
+.address-title::after {
+    content: "";
+    width: 42px;
+    height: 3px;
+    background: linear-gradient(90deg,#3b82f6,#6366f1);
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    border-radius: 4px;
+}
+
+/* ===== GRID LAYOUT ===== */
 .address-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
+    
     gap: 14px;
+    margin-top: 14px;
 }
 
-@media (max-width: 768px) {
+/* ===== INPUT HOVER EFFECT ===== */
+.address-grid lightning-input {
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.address-grid lightning-input:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px rgba(59,130,246,.15);
+}
+
+/* ===== CHECKBOX STYLING ===== */
+.same-checkbox {
+    margin: 16px 0;
+    padding: 0;             
+    background: transparent !important;
+    border-radius: 0;
+}
+.same-checkbox:hover {
+    background: transparent !important;
+}
+
+.same-checkbox lightning-input {
+    background: transparent !important;
+}
+
+
+
+/* ===== SHIPPING SECTION ANIMATION ===== */
+.address-title.shipping {
+    margin-top: 26px;
+    padding: 10px 16px;
+
+    background: linear-gradient(90deg, #dbeafe, #e0f2fe);
+    border-radius: 2px;
+
+    color: #0369a1;
+    font-weight: 700;
+
+    box-shadow: 0 0 0 rgba(56,189,248,0.6);
+    animation: softBlink 1.8s infinite ease-in-out;
+}
+
+
+@keyframes softBlink {
+    0%   { box-shadow: 0 0 0 rgba(56,189,248,0.4); }
+    50%  { box-shadow: 0 0 18px rgba(56,189,248,0.8); }
+    100% { box-shadow: 0 0 0 rgba(56,189,248,0.4); }
+}
+
+
+.slide-in {
+    animation: expandSection .35s ease;
+}
+
+
+/* ===== MODAL OPEN ===== */
+@keyframes modalFadeUp {
+    from {opacity: 0; transform: translateY(25px);}
+    to {opacity: 1; transform: translateY(0);}
+}
+
+/* ===== SECTION SLIDE ===== */
+@keyframes expandSection {
+    from {opacity: 0; transform: translateY(-12px);}
+    to {opacity: 1; transform: translateY(0);}
+}
+
+
+
+@media (max-width: 900px) {
+    .custom-modal {
+        width: 96%;
+    }
+
     .address-grid {
         grid-template-columns: 1fr;
+        gap: 16px;
     }
 }
-.address-grid lightning-input {
-    --slds-c-input-radius-border: 6px;
-}
-.address-actions {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 20px;
-}
-.address-actions lightning-button {
-    --slds-c-button-brand-color-background: #2563eb;
-    --slds-c-button-brand-color-border: #2563eb;
-    --slds-c-button-brand-color-background-hover: #1e40af;
-    --slds-c-button-brand-color-border-hover: #1e40af;
-    border-radius: 8px;
-}
+
+
+
+
 /* Backdrop */
 /* Modal Backdrop */
 .modal-backdrop {
@@ -54,9 +135,9 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5); /* semi-transparent black */
+    background: rgba(0, 0, 0, 0.5); 
     z-index: 999;
-    backdrop-filter: blur(2px); /* soft blur for modern effect */
+    backdrop-filter: blur(2px); 
 }
 
 /* Modal Container */
@@ -65,18 +146,24 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 500px;
-    max-width: 90%;
-    background: #ffffff;
-    border-radius: 12px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+    
+    width: 900px;              
+    max-width: 80%;
+    
+ max-height: 75vh; 
+    background: #9bd0ff;
+    border-radius: 16px;
+
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.71);
     z-index: 1000;
+
     display: flex;
     flex-direction: column;
-    font-family: 'Salesforce Sans', Arial, sans-serif;
-    overflow: hidden;
-    animation: fadeIn 0.3s ease-out;
+    overflow:  auto;
+
+    animation: scaleIn 0.35s ease;
 }
+
 
 /* Header */
 .modal-header {
@@ -106,14 +193,40 @@
 /* Body */
 .modal-body {
     padding: 24px;
-    background: #f9f9f9;
+    background: #ffffff;
 }
 
 .address-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    grid-template-columns: repeat(2, minmax(280px, 1fr));
+    gap: 22px;
+
+    width: 100%;
+    max-width: 900px;      
+    margin: 20px auto;   
 }
+
+.address-grid lightning-input {
+    transition: transform .25s ease, box-shadow .25s ease;
+}
+
+.address-grid lightning-input:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 22px rgba(59,130,246,.18);
+}
+
+.shipping-wrapper {
+    margin-top: 24px;
+    padding:  18px 22px;
+
+    background: #f8fbff;
+    border-radius: 6px;
+
+    box-shadow: inset 0 0 0 1px #dbeafe;
+}
+
+
+
 
 /* Footer */
 .modal-footer {
@@ -410,4 +523,103 @@
 
 .back-link:hover {
     text-decoration: underline;
+}
+
+/* Address modal alignment + sober UI */
+.custom-modal {
+    width: 960px;
+    max-width: 96%;
+    background: #ffffff;
+    border: 1px solid #d8dde6;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+    background: #ffffff;
+    color: #0b1f3f;
+    border-bottom: 1px solid #d8dde6;
+}
+
+.close-btn {
+    color: #54698d;
+}
+
+.modal-body {
+    padding: 20px 22px;
+    background: #ffffff;
+}
+
+.address-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+
+.address-panel {
+    min-width: 0;
+}
+
+.address-heading {
+    margin: 0 0 12px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #d8dde6;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #0b1f3f;
+}
+
+.address-heading::after {
+    display: none;
+}
+
+.address-panel .address-grid {
+    margin: 0;
+    max-width: none;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.address-panel .address-grid lightning-input:first-child {
+    grid-column: 1 / -1;
+}
+
+.same-checkbox-card {
+    margin-bottom: 12px;
+    padding: 8px 10px;
+    border: 1px solid #d8dde6;
+    border-radius: 10px;
+    background: #f8f9fb;
+}
+
+.same-checkbox-card.is-selected {
+    border-color: #2f72e8;
+    background: #eef4ff;
+}
+
+.same-billing-info {
+    border: 1px dashed #d8dde6;
+    border-radius: 10px;
+    padding: 18px 12px;
+    text-align: center;
+    color: #54698d;
+    font-weight: 600;
+}
+
+.same-billing-check {
+    color: #2f72e8;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 8px;
+}
+
+.modal-footer {
+    border-top: 1px solid #d8dde6;
+    background: #ffffff;
+}
+
+@media (max-width: 900px) {
+    .address-columns {
+        grid-template-columns: 1fr;
+    }
 }

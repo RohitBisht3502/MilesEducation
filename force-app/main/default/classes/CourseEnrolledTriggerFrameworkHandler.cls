@@ -36,7 +36,7 @@ public without sharing class CourseEnrolledTriggerFrameworkHandler extends BaseT
         RoundRobinAssigner.assignWithStickyAndRoundRobin(
             sobs,
             'Course_Enrolled__c',
-            'Round Robin'
+            'SR - Post Enrollment'
         );        
     }
 

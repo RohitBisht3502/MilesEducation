@@ -10,7 +10,7 @@ import getBusinessVerticals from '@salesforce/apex/RoundRobinMatrixController.ge
 import getCityStatuses from '@salesforce/apex/RoundRobinToggleOnOff.getCityStatuses';
 import updateCityStatuses from '@salesforce/apex/RoundRobinToggleOnOff.updateCityStatuses';
 
-const DEFAULT_TYPE = 'Round Robin';
+const DEFAULT_TYPE = 'CC - Pre Enrollment';
 const DEFAULT_VERTICAL = 'Accounting Vertical';
 const AUTO_BUCKETS = ['Bucket 1', 'Bucket 2'];
 
@@ -127,13 +127,13 @@ wiredCityStatuses(result) {
     this.selectedTypeUi = uiValue;
 
     if (uiValue === 'RR_CC') {
-      this.selectedType = 'Round Robin';
+      this.selectedType = 'CC - Pre Enrollment';
       this.selectedRole = 'CC';
     } else if (uiValue === 'RR_SR') {
-      this.selectedType = 'Round Robin';
+      this.selectedType = 'SR - Post Enrollment';
       this.selectedRole = 'SR';
     } else if (uiValue === 'ELIGIBILITY_GP') {
-      this.selectedType = 'Eligibility criteria';
+      this.selectedType = 'GP';
       this.selectedRole = '';
     } else if (uiValue === 'MCOM') {
       this.selectedType = 'MCOM';
@@ -148,7 +148,12 @@ wiredCityStatuses(result) {
   }
 
   get roundRobinCities() {
-    return (this.cities || []).map((city) => ({
+    const statusKeys = new Set(
+      Object.keys(this.cityRoundRobinState || {}).map((c) => (c || '').trim().toUpperCase())
+    );
+    return (this.cities || [])
+      .filter((c) => statusKeys.has((c || '').trim().toUpperCase()))
+      .map((city) => ({
       name: city,
       enabled: this.cityRoundRobinState[city] !== false
     }));
@@ -330,15 +335,14 @@ wiredCityStatuses(result) {
     }
 
     try {
-      
       await updateCityStatuses({ updatesJson: JSON.stringify(updates) });
 
-      // metadata update is async; keep local toggle state and refresh matrix only
       await Promise.all([
-        this._matrixWire && refreshApex(this._matrixWire)
+        this._matrixWire && refreshApex(this._matrixWire),
+        this._cityStatusWire && refreshApex(this._cityStatusWire)
       ]);
 
-       this.showToast('Success', 'Round Robin updated successfully', 'success');
+      this.showToast('Success', 'Round Robin updated successfully', 'success');
     } catch (e) {
       console.error('UpdateCityStatuses error:', e);
       this.showToast(
@@ -617,7 +621,7 @@ wiredCityStatuses(result) {
       city: this.selectedCity,
       bucket: this.isCityWiseOnlyMode ? null : this.selectedBucket,
       businessVertical: this.isCityWiseOnlyMode ? null : (this.selectedBusinessVertical || null),
-      typeVal: this.selectedType || 'Round Robin',
+      typeVal: this.selectedType || DEFAULT_TYPE,
       role: this.selectedRole,
       updates: payload
     };
@@ -749,7 +753,7 @@ wiredCityStatuses(result) {
           course: 'CMA',
           businessVertical: this.isCityWiseOnlyMode ? null : (this.selectedBusinessVertical || null),
           visibleUserCount: this.displayRows.length,
-          typeVal: this.selectedType || 'Round Robin',
+          typeVal: this.selectedType || DEFAULT_TYPE,
           role: this.selectedRole
         });
       }

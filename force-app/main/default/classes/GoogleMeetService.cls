@@ -31,6 +31,7 @@ public without sharing class GoogleMeetService {
     List<String> attendeeEmails,
     String meetingType,
     String typeOfMeeting,
+    String otherTypeOfMeeting,
     Integer durationMinutes
 )
  {
@@ -73,6 +74,9 @@ public without sharing class GoogleMeetService {
         if (!String.isBlank(typeOfMeeting) && fMap.containsKey('Type_of_Meeting__c')) {
     ev.put('Type_of_Meeting__c', typeOfMeeting);
 }
+        if (!String.isBlank(otherTypeOfMeeting) && fMap.containsKey('Others__c')) {
+            ev.put('Others__c', otherTypeOfMeeting);
+        }
 
         if (durationMinutes != null && fMap.containsKey('Duration__c')) {
             ev.put('Duration__c', durationMinutes);

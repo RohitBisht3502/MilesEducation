@@ -26,6 +26,7 @@ export default class LeadQueueManagement extends LightningElement {
     totalLeads = 0;
     callsCompleted = 0;
     remainingLeads = 0;
+    isRefreshing = false;
 
     wiredResult;
 
@@ -87,11 +88,15 @@ export default class LeadQueueManagement extends LightningElement {
     }
 
     async handleRefresh() {
+        if (this.isRefreshing) return;
+        this.isRefreshing = true;
         try {
             await refreshApex(this.wiredResult);
             this.remainingLeads = this.leads.length;
         } catch (e) {
             console.error('Manual refresh failed', e);
+        } finally {
+            this.isRefreshing = false;
         }
     }
 
@@ -117,11 +122,18 @@ export default class LeadQueueManagement extends LightningElement {
     // QUEUE CONTROL
     // -------------------------------------------------------------------
     handleStart() {
-        debugger;
-        if (!this.queueRunning) {
-            this.queueRunning = true;
-            this.pickNextLead();
-        }
+        if (!this.hasLeads) return;
+        if (this.queueRunning) return;
+
+        // Fresh start should not inherit paused state.
+        this.isQueuePaused = false;
+        this.pausedLeadId = null;
+        this.isWaiting = false;
+        this.remainingCountdown = 0;
+        this.clearCountdown();
+
+        this.queueRunning = true;
+        this.pickNextLead();
     }
 handleEnd() {
     this.queueRunning = false;
@@ -271,8 +283,17 @@ get disableResume() {
         this.currentLeadId = null;
         this.currentIsCallLog = false;
 
+        // Save & Pause flow should stop queue progression.
+        if (detail?.stopQueue) {
+            this.queueRunning = false;
+            this.isQueuePaused = true;
+            this.clearCountdown();
+            this.remainingCountdown = 0;
+            return;
+        }
+
         // Continue only if queue is still running
-        if (this.queueRunning) {
+        if (this.queueRunning && !this.isQueuePaused) {
             this.remainingCountdown = 1;
             this.startCountdown(this.remainingCountdown);
         }

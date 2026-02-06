@@ -4,14 +4,14 @@ import { CloseActionScreenEvent } from 'lightning/actions';
 import getWebinarsByNameOrId from '@salesforce/apex/WebinarController.getWebinarsByNameOrId';
 import createWebinarMember from '@salesforce/apex/WebinarController.createWebinarMember';
 
-export default class zoomRegistrationPanel extends LightningElement {
+export default class ZoomRegistrationPanel extends LightningElement {
   @api recordId;
   @track webinars = [];
   @track selectedWebinar = {};
   @track searchKey = '';
+
   loading = true;
   saving = false;
-
   confirmOpen = false;
   detailsOpen = false;
 
@@ -19,17 +19,17 @@ export default class zoomRegistrationPanel extends LightningElement {
     this.fetchWebinars();
   }
 
-  async fetchWebinars(searchKey) {
+  get hasWebinars() {
+    return Array.isArray(this.webinars) && this.webinars.length > 0;
+  }
+
+  async fetchWebinars(searchKey = '') {
     this.loading = true;
     this.webinars = [];
-    const key = (searchKey || '').trim();
-    if (!key) {
-      this.loading = false;
-      return;
-    }
+
     try {
-      const rows = await getWebinarsByNameOrId({ searchKey: key });
-      this.webinars = (rows || []).map(r => ({ ...r, isRegistered: false }));
+      const rows = await getWebinarsByNameOrId({ searchKey: (searchKey || '').trim() });
+      this.webinars = (rows || []).map((r) => ({ ...r, isRegistered: false }));
     } catch (e) {
       this.toast('Error loading webinars', this.reduceError(e), 'error');
     } finally {
@@ -41,12 +41,6 @@ export default class zoomRegistrationPanel extends LightningElement {
     const value = event?.detail?.value ?? event?.target?.value ?? '';
     this.searchKey = value;
     this.fetchWebinars(this.searchKey);
-  };
-
-  handleCardClick = (event) => {
-    const webinarId = event.currentTarget?.dataset?.id;
-    this.selectWebinar(webinarId);
-    this.confirmOpen = true;
   };
 
   openConfirm = (event) => {
@@ -70,12 +64,11 @@ export default class zoomRegistrationPanel extends LightningElement {
   };
 
   selectWebinar(webinarId) {
-    const found = this.webinars.find(w => w.id === webinarId);
+    const found = this.webinars.find((w) => w.id === webinarId);
     this.selectedWebinar = found ? { ...found } : {};
   }
 
   async confirmRegister() {
-    debugger;
     if (!this.selectedWebinar?.id) {
       this.toast('No webinar selected', 'Please select a webinar and try again.', 'warning');
       return;
@@ -88,15 +81,12 @@ export default class zoomRegistrationPanel extends LightningElement {
         webinarId: this.selectedWebinar.id
       });
 
-      this.toast(
-        'Registered',
-        `Lead has been registered for "${this.selectedWebinar.name}".`,
-        'success'
-      );
+      this.toast('Registered', `Lead has been registered for "${this.selectedWebinar.name}".`, 'success');
 
       this.confirmOpen = false;
       this.detailsOpen = false;
-      const idx = this.webinars.findIndex(w => w.id === this.selectedWebinar.id);
+
+      const idx = this.webinars.findIndex((w) => w.id === this.selectedWebinar.id);
       if (idx > -1) {
         const updated = [...this.webinars];
         updated[idx] = { ...updated[idx], isRegistered: true };
@@ -105,7 +95,6 @@ export default class zoomRegistrationPanel extends LightningElement {
 
       this.dispatchEvent(new CloseActionScreenEvent());
       setTimeout(() => window.location.reload(), 800);
-
     } catch (e) {
       this.toast('Registration failed', this.reduceError(e), 'error');
     } finally {
@@ -120,7 +109,7 @@ export default class zoomRegistrationPanel extends LightningElement {
   reduceError(error) {
     let message = 'Unknown error';
     if (Array.isArray(error?.body)) {
-      message = error.body.map(e => e.message).join(', ');
+      message = error.body.map((e) => e.message).join(', ');
     } else if (error?.body?.message) {
       message = error.body.message;
     } else if (error?.message) {

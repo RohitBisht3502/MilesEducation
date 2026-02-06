@@ -42,6 +42,7 @@ export default class ContactEventCreator extends LightningElement {
     selectedUser = '';
     customEmail = '';
     @track typeOfMeeting = '';
+    @track otherTypeOfMeeting = '';
     @track typeOfMeetingOptions = [];
 
     
@@ -468,6 +469,7 @@ export default class ContactEventCreator extends LightningElement {
                 attendeeEmails: attendeeEmails,
                 meetingType: this.meetingType,
                 typeOfMeeting: this.typeOfMeeting,
+                otherTypeOfMeeting: this.otherTypeOfMeeting,
                 durationMinutes: parseInt(this.duration, 10)
             });
 
@@ -526,6 +528,10 @@ export default class ContactEventCreator extends LightningElement {
             this.showToast('Error', 'Please select Type of Meeting', 'error');
             return false;
         }
+        if (this.showOtherTypeOfMeeting && !this.otherTypeOfMeeting?.trim()) {
+            this.showToast('Error', 'Please enter Other Type of Meeting', 'error');
+            return false;
+        }
 
 
         const start = new Date(this.startDateTime);
@@ -581,6 +587,7 @@ export default class ContactEventCreator extends LightningElement {
         this.selectedUser = '';
         this.customEmail = '';
         this.duration = '45';
+        this.otherTypeOfMeeting = '';
 
         this.participants = this.participants.filter(p => p.isCurrentUser || p.email === this.contactEmail);
         this.prepareParticipantOptions();
@@ -607,7 +614,19 @@ export default class ContactEventCreator extends LightningElement {
 
     handleTypeOfMeetingChange(event) {
         this.typeOfMeeting = event.detail.value;
+        if (!this.showOtherTypeOfMeeting) {
+            this.otherTypeOfMeeting = '';
+        }
         this.clearError();
+    }
+
+    handleOtherTypeOfMeetingChange(event) {
+        this.otherTypeOfMeeting = event.target.value;
+        this.clearError();
+    }
+
+    get showOtherTypeOfMeeting() {
+        return (this.typeOfMeeting || '').toLowerCase() === 'other';
     }
 
 }

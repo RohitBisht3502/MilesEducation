@@ -16,20 +16,17 @@ public with sharing class RoundRobinToggleOnOff {
 
     @AuraEnabled(cacheable=true)
     public static List<CityStatusWrapper> getCityStatuses() {
-        // city -> ON/OFF from City Master CMDT (On__c picklist)
+        // city -> ON/OFF from City CMDT (On__c checkbox)
         Map<String, String> cityStatusFromMdt = new Map<String, String>();
         try {
             List<SObject> cityMdtRows = Database.query(
-                'SELECT MasterLabel, City_Name__c, On__c FROM City_Master__mdt'
+                'SELECT DeveloperName, MasterLabel, Label, On__c FROM City__mdt'
             );
             for (SObject row : cityMdtRows) {
-                String cityName = (String) row.get('City_Name__c');
-                if (String.isBlank(cityName)) {
-                    cityName = (String) row.get('MasterLabel');
-                }
-                if (String.isBlank(cityName)) {
-                    continue;
-                }
+                String cityName = (String) row.get('Label');
+                if (String.isBlank(cityName)) cityName = (String) row.get('MasterLabel');
+                if (String.isBlank(cityName)) cityName = (String) row.get('DeveloperName');
+                if (String.isBlank(cityName)) continue;
 
                 Boolean isOn = (Boolean) row.get('On__c');
                 cityStatusFromMdt.put(
@@ -38,7 +35,7 @@ public with sharing class RoundRobinToggleOnOff {
                 );
             }
         } catch (Exception ex) {
-            System.debug('City_Master__mdt read failed, defaulting status to ON. ' + ex.getMessage());
+            System.debug('City__mdt read failed, defaulting status to ON. ' + ex.getMessage());
         }
 
         List<CityStatusWrapper> res = new List<CityStatusWrapper>();
@@ -75,31 +72,35 @@ public with sharing class RoundRobinToggleOnOff {
 
     if (cityToIsOn.isEmpty()) return;
 
-    List<City_Master__mdt> cityMdtRecs = [
-        SELECT DeveloperName, MasterLabel, City_Name__c
-        FROM City_Master__mdt
+    List<City__mdt> cityMdtRecs = [
+        SELECT DeveloperName, MasterLabel, Label, ON__c
+        FROM City__mdt
     ];
 
     Metadata.DeployContainer container = new Metadata.DeployContainer();
     Integer changed = 0;
 
-    for (City_Master__mdt rec : cityMdtRecs) {
-        String cityByName = String.isNotBlank(rec.City_Name__c) ? rec.City_Name__c.trim().toUpperCase() : null;
+    for (City__mdt rec : cityMdtRecs) {
+        String cityByName = String.isNotBlank(rec.Label) ? rec.Label.trim().toUpperCase() : null;
         String cityByLabel = String.isNotBlank(rec.MasterLabel) ? rec.MasterLabel.trim().toUpperCase() : null;
         Boolean newIsOn = cityByName != null ? cityToIsOn.get(cityByName) : null;
         if (newIsOn == null && cityByLabel != null) {
             newIsOn = cityToIsOn.get(cityByLabel);
+        }
+        if (newIsOn == null && String.isNotBlank(rec.DeveloperName)) {
+            newIsOn = cityToIsOn.get(rec.DeveloperName.trim().toUpperCase());
         }
         if (newIsOn == null) {
             continue;
         }
 
         Metadata.CustomMetadata cmd = new Metadata.CustomMetadata();
-        cmd.fullName = 'City_Master__mdt.' + rec.DeveloperName;
+        cmd.fullName = 'City__mdt.' + rec.DeveloperName;
         cmd.label = rec.MasterLabel;
+        cmd.values = new List<Metadata.CustomMetadataValue>();
 
         Metadata.CustomMetadataValue v = new Metadata.CustomMetadataValue();
-        v.field = 'On__c';
+        v.field = 'ON__c';
         v.value = newIsOn;
         cmd.values.add(v);
 

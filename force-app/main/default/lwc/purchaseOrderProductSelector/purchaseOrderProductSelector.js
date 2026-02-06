@@ -13,18 +13,20 @@ export default class PurchaseOrderProductSelector extends LightningElement {
     @track products = [];
     searchKey = '';
     showCheckout = false;
-    discountType = 'percentage';
+    discountType = 'fixed';
+
     discountValue = 0;
     downPayment = 0;
     selectedAddressType = 'billing';
     recordId;
+   @track sameAsBilling = true; 
 
     hasBillingAddress = false;
     hasShippingAddress = false;
 
     // Modal variables
     @track showAddressModal = false;
-    @track missingAddressType = ''; // 'billing' | 'shipping'
+    @track missingAddressType = ''; 
 
     @wire(CurrentPageReference)
     getStateParameters(currentPageReference) {
@@ -50,6 +52,14 @@ export default class PurchaseOrderProductSelector extends LightningElement {
             this.showToast('Error', error.body?.message || 'Failed to load products', 'error');
         }
     }
+    get isBillingModal() {
+    return this.missingAddressType === 'billing';
+}
+
+handleSameAsBilling(event) {
+    this.sameAsBilling = event.target.checked;
+}
+
 
     get addressOptions() {
         const options = [];
@@ -117,6 +127,35 @@ export default class PurchaseOrderProductSelector extends LightningElement {
     get finalPayable() {
         return Math.max(0, this.subTotal - this.discountAmount);
     }
+
+get showShippingSection() {
+    return !this.sameAsBilling;
+}
+
+get sameBillingBoxClass() {
+    return `same-checkbox-card${this.sameAsBilling ? ' is-selected' : ''}`;
+}
+
+get shouldShowShippingFields() {
+    return !this.isBillingModal || !this.sameAsBilling;
+}
+
+validateAddressFields(address, sectionLabel) {
+    const required = ['street', 'city', 'state', 'postal', 'country'];
+    for (const key of required) {
+        const value = address[key];
+        if (!value || !String(value).trim()) {
+            const fieldLabel = key === 'postal'
+                ? 'ZIP Code'
+                : `${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+            this.showToast('Error', `${sectionLabel} ${fieldLabel} is mandatory.`, 'error');
+            return false;
+        }
+    }
+    return true;
+}
+
+
 
     handleSearch(event) {
         this.searchKey = event.target.value?.toLowerCase() || '';
@@ -218,18 +257,22 @@ export default class PurchaseOrderProductSelector extends LightningElement {
             if (!this.hasBillingAddress) {
                 this.missingAddressType = 'billing';
                 this.showAddressModal = true;
+                this.sameAsBilling = true;
+
                 return;
             }
 
             // Shipping missing (only for study material)
             if (hasStudyMaterial && !this.hasShippingAddress) {
                 this.missingAddressType = 'shipping';
-                this.showAddressModal = true;
+               
                 return;
             }
 
             this.selectedAddressType = 'billing';
             this.showCheckout = true;
+            this.sameAsBilling = false;
+
 
         } catch (error) {
             this.showToast('Error', error.body?.message || error.message, 'error');
@@ -237,30 +280,69 @@ export default class PurchaseOrderProductSelector extends LightningElement {
     }
 
     // ===== SAVE ADDRESS =====
-    saveAddress() {
-        const inputs = this.template.querySelectorAll('lightning-input');
-        const address = {};
+ saveAddress() {
 
-        inputs.forEach(i => {
-            address[i.dataset.field] = i.value;
-        });
+    const inputs = this.template.querySelectorAll('lightning-input[data-field]');
+    const billing = {};
+    const shipping = {};
 
-        saveAddress({
-            recordId: this.recordId,
-            addressType: this.missingAddressType,
-            address
-        })
-            .then(() => {
-                this.showToast('Success', 'Address saved successfully', 'success');
-                this.showAddressModal = false;
+    inputs.forEach(i => {
+        const key = i.dataset.field;
 
-                // Continue checkout automatically after saving
-                this.proceedToCheckout(); 
-            })
-            .catch(err => {
-                this.showToast('Error', err.body?.message || err.message, 'error');
-            });
+        if (key.startsWith('billing_')) {
+            billing[key.replace('billing_', '')] = i.value;
+        }
+
+        if (key.startsWith('shipping_')) {
+            shipping[key.replace('shipping_', '')] = i.value;
+        }
+    });
+
+    if (!this.validateAddressFields(billing, 'Billing')) {
+        return;
     }
+
+    if (this.shouldShowShippingFields && !this.validateAddressFields(shipping, 'Shipping')) {
+        return;
+    }
+
+    // save billing first
+    saveAddress({
+        recordId: this.recordId,
+        addressType: 'billing',
+        address: billing
+    })
+    .then(async () => {
+
+        // auto copy if same as billing
+        if (this.sameAsBilling) {
+            shipping.street  = billing.street;
+            shipping.city    = billing.city;
+            shipping.state   = billing.state;
+            shipping.postal = billing.postal;
+            shipping.country= billing.country;
+        }
+
+        // save shipping only if needed
+        if (this.missingAddressType === 'shipping') {
+            await saveAddress({
+                recordId: this.recordId,
+                addressType: 'shipping',
+                address: shipping
+            });
+        }
+
+        this.showAddressModal = false;
+        this.sameAsBilling = false;
+
+        this.proceedToCheckout();
+
+    })
+    .catch(err => {
+        this.showToast('Error', err.body?.message || err.message, 'error');
+    });
+}
+
 
     confirmPurchase() {
         if (!this.hasSelectedProducts) {

@@ -54,6 +54,18 @@
                             </lightning-combobox>
                         </div>
 
+                        <template if:true={showOtherTypeOfMeeting}>
+                            <div class="form-group">
+                                <lightning-textarea
+                                    label="Other Type of Meeting"
+                                    value={otherTypeOfMeeting}
+                                    onchange={handleOtherTypeOfMeetingChange}
+                                    required
+                                    variant="label-stacked"
+                                    class="custom-textarea">
+                                </lightning-textarea>
+                            </div>
+                        </template>
 
                         <div class="form-group">
                             <lightning-combobox

@@ -6,10 +6,14 @@
         </div>
 
         <div class="content">
+            <div class="remaining-amount">
+                Remaining Amount: <strong>Rs {remainingAmount}</strong>
+            </div>
+
             <lightning-input
                 type="number"
                 label="Generate Payment Link"
-                placeholder="₹ Enter amount"
+                placeholder="Rs Enter amount"
                 onchange={handleDownPayment}>
             </lightning-input>
 
@@ -19,6 +23,28 @@
                 class="save-btn"
                 onclick={handleSave}>
             </lightning-button>
+
+            <template if:true={hasTransactions}>
+                <div class="txn-section">
+                    <h3 class="txn-title">Transactions</h3>
+                    <table class="slds-table slds-table_cell-buffer slds-table_bordered">
+                        <thead>
+                            <tr class="slds-line-height_reset">
+                                <th scope="col"><div class="slds-truncate">Payment</div></th>
+                                <th scope="col"><div class="slds-truncate">Status</div></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template for:each={transactions} for:item="txn">
+                                <tr key={txn.key}>
+                                    <td><div class="slds-truncate">Rs {txn.payment}</div></td>
+                                    <td><div class="slds-truncate">{txn.status}</div></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </template>
         </div>
     </section>
 </template>

@@ -127,19 +127,58 @@
 
     <section class="custom-modal">
         <header class="modal-header">
-            <h2>Add {missingAddressType} Address</h2>
+            <h2>Add Addresses</h2>
             <button class="close-btn" onclick={closeAddressModal}>×</button>
         </header>
 
         <div class="modal-body">
-            <div class="address-grid">
-                <lightning-input label="Street" data-field="street"></lightning-input>
-                <lightning-input label="City" data-field="city"></lightning-input>
-                <lightning-input label="State" data-field="state"></lightning-input>
-                <lightning-input label="Postal Code" data-field="postal"></lightning-input>
-                <lightning-input label="Country" data-field="country"></lightning-input>
+            <div class="address-columns">
+                <div class="address-panel">
+                    <h3 class="address-heading">Billing Address</h3>
+                    <div class="address-grid">
+                        <lightning-input label="Street Address" data-field="billing_street"></lightning-input>
+                        <lightning-input label="City" data-field="billing_city"></lightning-input>
+                        <lightning-input label="State" data-field="billing_state"></lightning-input>
+                        <lightning-input label="ZIP Code" data-field="billing_postal"></lightning-input>
+                        <lightning-input label="Country" data-field="billing_country"></lightning-input>
+                    </div>
+                </div>
+
+                <div class="address-panel">
+                    <h3 class="address-heading">Shipping Address</h3>
+
+                    <template if:true={isBillingModal}>
+                        <div class={sameBillingBoxClass}>
+                            <lightning-input
+                                type="checkbox"
+                                label="Same as billing address"
+                                checked={sameAsBilling}
+                                onchange={handleSameAsBilling}>
+                            </lightning-input>
+                        </div>
+
+                        <template if:true={sameAsBilling}>
+                            <div class="same-billing-info">
+                                <div class="same-billing-check">✓</div>
+                                <div>Shipping address will be the same as billing address</div>
+                            </div>
+                        </template>
+                    </template>
+
+                    <template if:true={shouldShowShippingFields}>
+                        <div class="address-grid slide-in">
+                            <lightning-input label="Street Address" data-field="shipping_street"></lightning-input>
+                            <lightning-input label="Phone Number" data-field="shipping_phone"></lightning-input>
+                            <lightning-input label="City" data-field="shipping_city"></lightning-input>
+                            <lightning-input label="State" data-field="shipping_state"></lightning-input>
+                            <lightning-input label="ZIP Code" data-field="shipping_postal"></lightning-input>
+                            <lightning-input label="Country" data-field="shipping_country"></lightning-input>
+                        </div>
+                    </template>
+                </div>
             </div>
         </div>
+
 
         <footer class="modal-footer">
             <lightning-button
@@ -155,6 +194,10 @@
             </lightning-button>
         </footer>
     </section>
+
+
+ 
+
 </template>
 
 
@@ -204,16 +247,17 @@
                     <h2 class="section-title">Pricing & Discount</h2>
 
                     <div class="radio-group">
-                        <label>
-                            <input type="radio" name="discountType" value="percentage"
-                                   checked={isPercentage} onchange={handleDiscountType}/>
-                            Percentage
-                        </label>
+                       
 
                         <label>
                             <input type="radio" name="discountType" value="fixed"
                                    checked={isFixed} onchange={handleDiscountType}/>
                             Fixed Amount
+                        </label>
+                         <label>
+                            <input type="radio" name="discountType" value="percentage"
+                                   checked={isPercentage} onchange={handleDiscountType}/>
+                            Percentage
                         </label>
                     </div>
 

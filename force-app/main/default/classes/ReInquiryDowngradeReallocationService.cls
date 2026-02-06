@@ -12,7 +12,7 @@
  *
  * Round_Robin_Pool__c Filters:
  *  - Active__c = true
- *  - Type__c = 'Round Robin'
+ *  - Type__c = 'CC - Pre Enrollment'
  *  - Assigned_Weight__c > 0
  *  - City__c = Lead.City__c
  *  - Lead_Source__c = Lead.Source__c   (bucket/source)
@@ -38,7 +38,7 @@ public without sharing class ReInquiryDowngradeReallocationService {
     // =========================
     // CONFIG
     // =========================
-    private static final String RR_TYPE_ROUND_ROBIN = 'Round Robin';
+    private static final String RR_TYPE_ROUND_ROBIN = 'CC - Pre Enrollment';
     private static final String LOG_TYPE_OWNER_ASSIGNMENT = 'Lead Downgraded';
 
     // =========================

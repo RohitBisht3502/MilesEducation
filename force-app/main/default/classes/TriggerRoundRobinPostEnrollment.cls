@@ -10,7 +10,7 @@ public class TriggerRoundRobinPostEnrollment {
             RoundRobinAssigner.assignWithStickyAndRoundRobin(
                 sobs,
                 'Course_Enrolled__c',
-                'Round Robin'
+                'SR - Post Enrollment'
             );
         } catch (Exception e) {
             System.debug(LoggingLevel.ERROR, 'RoundRobin failed in Course_Enrolled before insert: ' + e.getMessage());

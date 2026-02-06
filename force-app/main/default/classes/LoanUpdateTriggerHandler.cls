@@ -1,6 +1,9 @@
 public class LoanUpdateTriggerHandler {
+
     public static void validateBeforeInsert(List<Loan__c> newLoans) {
         if (newLoans == null || newLoans.isEmpty()) return;
+
+        applyCurrentAddressFromPermanent(newLoans);
 
         Map<String, Schema.SObjectField> loanFieldMap =
             Loan__c.SObjectType.getDescribe().fields.getMap();
@@ -80,16 +83,32 @@ public class LoanUpdateTriggerHandler {
         }
     }
 
+    private static void applyCurrentAddressFromPermanent(List<Loan__c> newLoans) {
+        for (Loan__c loan : newLoans) {
+            if (loan.Current_Address_Same_As_Permanent__c == true) {
+                loan.Current_Address__Street__s = loan.Permanent_Address__Street__s;
+                loan.Current_Address__City__s = loan.Permanent_Address__City__s;
+                loan.Current_Address__StateCode__s = loan.Permanent_Address__StateCode__s;
+                loan.Current_Address__PostalCode__s = loan.Permanent_Address__PostalCode__s;
+                loan.Current_Address__CountryCode__s = loan.Permanent_Address__CountryCode__s;
+            }
+        }
+    }
+
     @future(callout=true)
     public static void loanUpdate(List<Id> loanIds) {
 
         List<Loan__c> loans = [
-            SELECT Id, Program_Name__c, First_Name__c,
-                   Email__c, Mobile__c, Amount_Requested__c, Tenure__c,
-                   Gender__c, Marital_Status__c, Earning_Status__c,
-                   Occupation_Type__c, Monthly_Income__c,
-                   Applying_Loan_For__c, Relationship_With_Applicant__c,
-                   Current_Address__c, Current_Address_Same_As_Permanent__c
+            SELECT Id, Program_Name__c, First_Name__c, Email__c, Mobile__c, Amount_Requested__c,
+                   Tenure__c, Gender__c, Marital_Status__c, Earning_Status__c, Occupation_Type__c,
+                   Monthly_Income__c, Applying_Loan_For__c, Relationship_With_Applicant__c,
+                   Current_Address_Same_As_Permanent__c, Current_Address__Street__s,
+                   Current_Address__City__s, Current_Address__StateCode__s,
+                   Current_Address__PostalCode__s, Current_Address__CountryCode__s,
+                   Permanent_Address__Street__s, Permanent_Address__City__s,
+                   Permanent_Address__StateCode__s, Permanent_Address__PostalCode__s,
+                   Permanent_Address__CountryCode__s, PAN_Number__c, Date_of_Birth__c,
+                   RecordType.DeveloperName
             FROM Loan__c
             WHERE Id IN :loanIds
         ];
@@ -97,36 +116,129 @@ public class LoanUpdateTriggerHandler {
         String endpoint = 'https://hn19ywvvng.execute-api.ap-south-1.amazonaws.com/Miles360/loan/create';
         String serviceName = 'Loan Creation API';
 
+        Map<String, Schema.SObjectField> loanFieldMap =
+            Loan__c.SObjectType.getDescribe().fields.getMap();
+
+        String currentFlatField = getFirstExistingField(
+            loanFieldMap,
+            new List<String>{
+                'Current_Flat_No__c',
+                'Current_Flat_Number__c',
+                'Current_House_No__c',
+                'Current_House_Number__c'
+            }
+        );
+        String currentLandmarkField = getFirstExistingField(
+            loanFieldMap,
+            new List<String>{
+                'Current_Landmark__c',
+                'Current_Land_Mark__c',
+                'Current_Landmark_Name__c'
+            }
+        );
+        String permanentFlatField = getFirstExistingField(
+            loanFieldMap,
+            new List<String>{
+                'Permanent_Flat_No__c',
+                'Permanent_Flat_Number__c',
+                'Permanent_House_No__c',
+                'Permanent_House_Number__c'
+            }
+        );
+        String permanentLandmarkField = getFirstExistingField(
+            loanFieldMap,
+            new List<String>{
+                'Permanent_Landmark__c',
+                'Permanent_Land_Mark__c',
+                'Permanent_Landmark_Name__c'
+            }
+        );
+
         for (Loan__c loan : loans) {
 
-            Http http = new Http();
-            HttpRequest req = new HttpRequest();
+            String provider = loan.RecordType.DeveloperName;
 
+            Map<String, Object> body = new Map<String, Object>{
+                'loan_provider' => provider,
+                'sf_id' => loan.Id,
+                'program_name' => loan.Program_Name__c,
+                'first_name' => loan.First_Name__c,
+                'last_name' => loan.First_Name__c,
+                'email' => loan.Email__c,
+                'mobile' => loan.Mobile__c,
+                'amount_requested' => loan.Amount_Requested__c
+            };
+            body.put('tenure', mapTenure(loan.Tenure__c));
+
+            /* ================= AVANSE ================= */
+            if (provider == 'AVANSE') {
+
+                body.put(
+                    'current_address_same_as_permanent',
+                    loan.Current_Address_Same_As_Permanent__c
+                );
+
+                if (loan.Current_Address_Same_As_Permanent__c == true) {
+                    putPermanentAddress(body, loan, permanentFlatField, permanentLandmarkField);
+                } else {
+                    putCurrentAddress(body, loan, currentFlatField, currentLandmarkField);
+                    putPermanentAddress(body, loan, permanentFlatField, permanentLandmarkField);
+                }
+
+                body.put('applying_loan_for', loan.Applying_Loan_For__c);
+
+                body.put(
+                    'earning_status',
+                    mapEarningStatus(loan.Earning_Status__c)
+                );
+
+                body.put(
+                    'occupation_type',
+                    mapOccupation(loan.Occupation_Type__c)
+                );
+
+                body.put('monthly_income', loan.Monthly_Income__c);
+
+                body.put(
+                    'marital_status',
+                    mapMaritalStatus(loan.Marital_Status__c)
+                );
+
+                body.put('gender', loan.Gender__c);
+            }
+
+            /* ================= PROPELLD ================= */
+            else if (provider == 'PROPELLD') {
+
+            }
+
+            /* ================= AKSHAR ================= */
+            else if (provider == 'AKSHAR') {
+
+                body.put('pan_number', loan.PAN_Number__c);
+                body.put('date_of_birth', String.valueOf(loan.Date_of_Birth__c));
+
+                body.put('address', buildAddressLine(loan, currentFlatField, currentLandmarkField));
+                body.put('city', getTextFieldValue(loan, 'Current_Address__City__s'));
+                body.put('state', getTextFieldValue(loan, 'Current_Address__StateCode__s'));
+                body.put('pincode', getTextFieldValue(loan, 'Current_Address__PostalCode__s'));
+
+                body.put('student_first_name', loan.First_Name__c);
+                body.put('student_last_name', loan.First_Name__c);
+            }
+
+            /* ================= SEND ================= */
+
+            HttpRequest req = new HttpRequest();
             req.setEndpoint(endpoint);
             req.setMethod('POST');
             req.setHeader('Content-Type', 'application/json');
             req.setHeader('x-api-key', 'n7yno1N32NaXgZJFLbzf137wCHFf2UsM40j7gSgW');
 
-            Map<String, Object> body = new Map<String, Object>{
-                'program_name' => loan.Program_Name__c,
-                'first_name' => loan.First_Name__c,
-                'email' => loan.Email__c,
-                'mobile' => loan.Mobile__c,
-                'amount_requested' => loan.Amount_Requested__c,
-                'tenure' => loan.Tenure__c,
-                'gender' => loan.Gender__c,
-                'marital_status' => loan.Marital_Status__c,
-                'earning_status' => loan.Earning_Status__c,
-                'occupation_type' => loan.Occupation_Type__c,
-                'monthly_income' => loan.Monthly_Income__c,
-                'applying_loan_for' => loan.Applying_Loan_For__c,
-                'relationship_with_applicant' => loan.Relationship_With_Applicant__c,
-                'current_address' => loan.Current_Address__c,
-                'current_address_same_as_permanent' => loan.Current_Address_Same_As_Permanent__c
-            };
-
             String requestPayload = truncate(JSON.serialize(body));
             req.setBody(requestPayload);
+
+            Http http = new Http();
 
             try {
                 HttpResponse res = http.send(req);
@@ -170,6 +282,84 @@ public class LoanUpdateTriggerHandler {
         return (value != null && value.length() > 3000)
             ? value.substring(0, 3000)
             : value;
+    }
+
+    private static void putCurrentAddress(
+        Map<String, Object> body,
+        Loan__c loan,
+        String flatField,
+        String landmarkField
+    ) {
+        body.put('flat_no', getTextFieldValue(loan, flatField));
+        body.put('street', getTextFieldValue(loan, 'Current_Address__Street__s'));
+        body.put('land_mark', getTextFieldValue(loan, landmarkField));
+        body.put('city', getTextFieldValue(loan, 'Current_Address__City__s'));
+        body.put('state', getTextFieldValue(loan, 'Current_Address__StateCode__s'));
+        body.put('pincode', getTextFieldValue(loan, 'Current_Address__PostalCode__s'));
+    }
+
+    private static void putPermanentAddress(
+        Map<String, Object> body,
+        Loan__c loan,
+        String flatField,
+        String landmarkField
+    ) {
+        body.put('permanent_flat_no', getTextFieldValue(loan, flatField));
+        body.put('permanent_street', getTextFieldValue(loan, 'Permanent_Address__Street__s'));
+        body.put('permanent_land_mark', getTextFieldValue(loan, landmarkField));
+        body.put('permanent_pincode', getTextFieldValue(loan, 'Permanent_Address__PostalCode__s'));
+    }
+
+    private static String buildAddressLine(
+        Loan__c loan,
+        String flatField,
+        String landmarkField
+    ) {
+        List<String> parts = new List<String>();
+        String flat = getTextFieldValue(loan, flatField);
+        String street = getTextFieldValue(loan, 'Current_Address__Street__s');
+        String landmark = getTextFieldValue(loan, landmarkField);
+
+        if (!String.isBlank(flat)) parts.add(flat);
+        if (!String.isBlank(street)) parts.add(street);
+        if (!String.isBlank(landmark)) parts.add(landmark);
+
+        return parts.isEmpty() ? null : String.join(parts, ', ');
+    }
+
+    private static String getTextFieldValue(Loan__c loan, String fieldApi) {
+        if (String.isBlank(fieldApi)) return null;
+        Object value = loan.get(fieldApi);
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private static Integer mapTenure(String tenureVal) {
+        if (tenureVal == null) return null;
+
+        if (tenureVal.contains('3')) return 3;
+        if (tenureVal.contains('6')) return 6;
+
+        return null;
+    }
+
+    private static Integer mapEarningStatus(String val) {
+        if (val == 'Earning') return 1;
+        if (val == 'Not Earning') return 0;
+        return null;
+    }
+
+    private static Integer mapOccupation(String val) {
+        if (val == 'Salaried') return 1;
+        if (val == 'Self Employed') return 2;
+        return null;
+    }
+
+    private static String mapMaritalStatus(String val) {
+        if (val == 'Single') return 'S';
+        if (val == 'Married') return 'M';
+        if (val == 'Divorced') return 'D';
+        if (val == 'Other') return 'O';
+        return null;
     }
 
     private static String getFirstExistingField(

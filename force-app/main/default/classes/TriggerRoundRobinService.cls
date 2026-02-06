@@ -10,7 +10,7 @@ public without sharing class TriggerRoundRobinService {
         if (running || newLeads == null || newLeads.isEmpty()) return;
         running = true;
         try {
-            // Group leads by type (MCOM vs Round Robin)
+            // Group leads by type (MCOM vs CC - Pre Enrollment)
             List<Lead__c> mcomLeads = new List<Lead__c>();
             List<Lead__c> regularLeads = new List<Lead__c>();
             
@@ -36,7 +36,7 @@ public without sharing class TriggerRoundRobinService {
                 RoundRobinAssigner.assignWithStickyAndRoundRobin(
                     (List<SObject>) regularLeads,
                     'Lead__c',
-                    'Round Robin'
+                    'CC - Pre Enrollment'
                 );
             }
         } finally {
@@ -55,7 +55,7 @@ public without sharing class TriggerRoundRobinService {
             if (ol == null) continue;
 
             Boolean isMCOM = 'MCOM'.equalsIgnoreCase(nl.Course__c);
-            String type = isMCOM ? 'MCOM' : 'Round Robin';
+            String type = isMCOM ? 'MCOM' : 'CC - Pre Enrollment';
             
             RoundRobinConfigProvider.Config cfg =
                 RoundRobinConfigProvider.getConfig('Lead__c', type);
@@ -110,7 +110,7 @@ public without sharing class TriggerRoundRobinService {
                 RoundRobinAssigner.assignWithStickyAndRoundRobin(
                     (List<SObject>) regularToProcess,
                     'Lead__c',
-                    'Round Robin'
+                    'CC - Pre Enrollment'
                 );
             }
         } finally {

@@ -1,49 +1,62 @@
-/*
-    Author       : ROHIT SINGH BISHT / Dheeraj Kumar
-    Description  : Controller for Webinar Management with Live Attendee Sync
-    Fixed Issues : Webinar filtering & GM live sync metrics
-*/
 public class WebinarController {
 
     @AuraEnabled(cacheable=true)
     public static List<WebinarDTO> getWebinarsByNameOnly() {
         List<WebinarDTO> out = new List<WebinarDTO>();
         Datetime nowDt = System.now();
-        for (Webinar__c w : [SELECT Id, Name,Webinar_Id__c FROM Webinar__c WHERE IsActive__c = TRUE  ORDER BY Name ASC LIMIT 200 ]) {
-            WebinarDTO d = new WebinarDTO();
-            d.id        = w.Id;
-            d.name      = w.Name;
-            d.webinarId = w.Webinar_Id__c;
-            out.add(d);
+
+        for (Webinar__c w : [
+            SELECT Id, Name, Webinar_Id__c, Topic__c, Agenda__c, Start_Date_Time__c, End_Date_Time__c, Status__c
+            FROM Webinar__c
+            WHERE IsActive__c = TRUE
+                AND Status__c = 'Created'
+                AND Start_Date_Time__c != null
+                AND Start_Date_Time__c >= :nowDt
+            ORDER BY Start_Date_Time__c DESC, Name ASC
+            LIMIT 200
+        ]) {
+            out.add(toWebinarDTO(w));
         }
         return out;
     }
 
     @AuraEnabled(cacheable=true)
     public static List<WebinarDTO> getWebinarsByNameOrId(String searchKey) {
-        // if (String.isBlank(searchKey)) {
-        //     return getWebinarsByNameOnly();
-        // }
-
-        String key = '%' + String.escapeSingleQuotes(searchKey.trim()) + '%';
         List<WebinarDTO> out = new List<WebinarDTO>();
+        Datetime nowDt = System.now();
+        String key = String.isBlank(searchKey) ? null : '%' + String.escapeSingleQuotes(searchKey.trim()) + '%';
 
-        for (Webinar__c w : [
-            SELECT Id, Name, Webinar_Id__c
-            FROM Webinar__c
-            WHERE IsActive__c = TRUE
-            AND (Name LIKE :key OR Webinar_Id__c LIKE :key)
-            AND Status__c = 'Created'
-            ORDER BY Name ASC
-            LIMIT 200
-        ]) {
-            WebinarDTO d = new WebinarDTO();
-            d.id = w.Id;
-            d.name = w.Name;
-            d.webinarId = w.Webinar_Id__c;
-            out.add(d);
+        List<Webinar__c> webinars;
+        if (String.isBlank(key)) {
+            webinars = [
+                SELECT Id, Name, Webinar_Id__c, Topic__c, Agenda__c, Start_Date_Time__c, End_Date_Time__c, Status__c
+                FROM Webinar__c
+                WHERE IsActive__c = TRUE
+                    AND Status__c = 'Created'
+                    AND Start_Date_Time__c != null
+                    AND Start_Date_Time__c >= :nowDt
+                ORDER BY Start_Date_Time__c DESC, Name ASC
+                LIMIT 200
+            ];
+        } else {
+            webinars = [
+                SELECT Id, Name, Webinar_Id__c, Topic__c, Agenda__c, Start_Date_Time__c, End_Date_Time__c, Status__c
+                FROM Webinar__c
+                WHERE IsActive__c = TRUE
+                    AND Status__c = 'Created'
+                    AND Start_Date_Time__c != null
+                    AND Start_Date_Time__c >= :nowDt
+                    AND (Name LIKE :key OR Webinar_Id__c LIKE :key)
+                ORDER BY Start_Date_Time__c DESC, Name ASC
+                LIMIT 200
+            ];
         }
-        System.debug('Webinar search results for key "' + searchKey + '": ' + out);
+
+        for (Webinar__c w : webinars) {
+            out.add(toWebinarDTO(w));
+        }
+
+        System.debug('Webinar search results for key "' + searchKey + '": ' + out.size());
         return out;
     }
 
@@ -61,17 +74,35 @@ public class WebinarController {
         return System.enqueueJob(new LeadZoomRegistrationJob(recordId, webinarId));
     }
 
+    private static WebinarDTO toWebinarDTO(Webinar__c w) {
+        WebinarDTO d = new WebinarDTO();
+        d.id = w.Id;
+        d.name = w.Name;
+        d.webinarId = w.Webinar_Id__c;
+        d.topic = w.Topic__c;
+        d.agenda = w.Agenda__c;
+        d.startDateTime = w.Start_Date_Time__c;
+        d.endDateTime = w.End_Date_Time__c;
+        d.status = w.Status__c;
+        return d;
+    }
+
     public class WebinarDTO {
         @AuraEnabled public String id;
         @AuraEnabled public String name;
         @AuraEnabled public String webinarId;
+        @AuraEnabled public String topic;
+        @AuraEnabled public String agenda;
+        @AuraEnabled public DateTime startDateTime;
+        @AuraEnabled public DateTime endDateTime;
+        @AuraEnabled public String status;
     }
     
     private static final Integer MAX_QUERY_LIMIT = 2000;
     private static final String ERROR_PREFIX = 'WebinarController Error: ';
 
     // -------------------------------------------------------------
-    // MAIN METHOD → GET ACTIVE WEBINAR ATTENDEES FOR CURRENT USER
+    // MAIN METHOD ? GET ACTIVE WEBINAR ATTENDEES FOR CURRENT USER
     // MODIFIED: Added optional webinarId parameter
     // -------------------------------------------------------------
     @AuraEnabled(cacheable=true)
@@ -117,7 +148,7 @@ public class WebinarController {
     }
 
     // -------------------------------------------------------------
-    // AUTHORIZED VERSION → GET FOR A SPECIFIC USER (SPOC / GM)
+    // AUTHORIZED VERSION ? GET FOR A SPECIFIC USER (SPOC / GM)
     // MODIFIED: Added optional webinarId parameter
     // -------------------------------------------------------------
     @AuraEnabled
@@ -281,7 +312,7 @@ public class WebinarController {
     }
 
     // -------------------------------------------------------------
-    // TRANSFORM → DTO
+    // TRANSFORM ? DTO
     // -------------------------------------------------------------
     private static List<WebinarAttendeeDTO> transformToDTO(List<Webinar_Member__c> members) {
         List<WebinarAttendeeDTO> dtoList = new List<WebinarAttendeeDTO>();
@@ -293,7 +324,7 @@ public class WebinarController {
     }
 
     // -------------------------------------------------------------
-    // HELPER → ROLE / PROFILE VALIDATION
+    // HELPER ? ROLE / PROFILE VALIDATION
     // -------------------------------------------------------------
     private static Boolean isCurrentUserGMorAdmin() {
         try {
@@ -314,12 +345,12 @@ public class WebinarController {
     // ERROR LOGGER
     // -------------------------------------------------------------
     private static void logError(String context, Exception e) {
-        System.debug(LoggingLevel.ERROR, context + ' → ' + e.getMessage());
+        System.debug(LoggingLevel.ERROR, context + ' ? ' + e.getMessage());
         System.debug(LoggingLevel.ERROR, e.getStackTraceString());
     }
 
     // -------------------------------------------------------------
-    // DTO → CLEAN DATA FOR LWC
+    // DTO ? CLEAN DATA FOR LWC
     // -------------------------------------------------------------
     public class WebinarAttendeeDTO {
         @AuraEnabled public Id webinarMemberId { get; private set; }

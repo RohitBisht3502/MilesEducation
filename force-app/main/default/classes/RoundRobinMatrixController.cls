@@ -3,6 +3,14 @@
     Description  :
 */
 public without sharing class RoundRobinMatrixController {
+    private static final String TYPE_CC_PRE = 'CC - Pre Enrollment';
+    private static final String TYPE_SR_POST = 'SR - Post Enrollment';
+    private static final String TYPE_GP = 'GP';
+    private static final String TYPE_MCOM = 'MCOM';
+    private static final String PROFILE_CC = 'CC';
+    private static final String PROFILE_SR = 'SR';
+    private static final String PROFILE_GP = 'GP';
+    private static final String PROFILE_MCOM = 'MCOM';
 
     public class FilterInit {
         @AuraEnabled public List<String> cities;
@@ -110,11 +118,17 @@ public static Map<String, Object> getBucketConfiguration(String type) {
 
 
 private static String resolveObjectApiName(String typeVal) {
-    if (String.isBlank(typeVal) || typeVal == 'Round Robin') {
+    if (String.isBlank(typeVal) || typeVal == TYPE_CC_PRE) {
         return 'Lead__c';
     }
-    if (typeVal == 'Eligibility Criteria') {
+    if (typeVal == TYPE_GP) {
         return 'Lead';
+    }
+    if (typeVal == TYPE_SR_POST) {
+        return 'Course_Enrolled__c';
+    }
+    if (typeVal == TYPE_MCOM) {
+        return 'Lead__c';
     }
     throw new AuraHandledException('Invalid Type selected: ' + typeVal);
 }
@@ -177,13 +191,14 @@ public static MatrixResult getMatrix(
     Integer pageSize
 ) {
     String finalType = String.isBlank(typeVal)
-        ? 'Round Robin'
+        ? TYPE_CC_PRE
         : typeVal;
-    if (String.isBlank(role)) {
+    if (String.isBlank(role) && TYPE_CC_PRE.equalsIgnoreCase(finalType)) {
         role = 'CC';
     }
-    String objectApiName = resolveObjectApiNameByRole(role);
+    String objectApiName = resolveObjectApiNameByRoleAndType(role, finalType);
     Boolean cityWiseOnly = isCityWiseOnly(finalType, role);
+    String profileName = resolveProfileNameByType(finalType);
 
 
     System.debug(
@@ -225,7 +240,16 @@ public static MatrixResult getMatrix(
 
         List<User> reps;
      if (!String.isBlank(city)) {
-    if (!String.isBlank(role)) {
+    if (!String.isBlank(profileName)) {
+        reps = [
+            SELECT Id, Name, City__c, Profile.Name
+            FROM User
+            WHERE IsActive = true
+            AND City__c = :city
+            AND Profile.Name = :profileName
+            ORDER BY Name
+        ];
+    } else if (!String.isBlank(role)) {
         reps = [
             SELECT Id, Name, City__c, UserRole.Name
             FROM User
@@ -266,7 +290,7 @@ public static MatrixResult getMatrix(
         System.debug(LoggingLevel.DEBUG, 'getMatrix :: repIds size=' + repIds.size());
 
         if (String.isBlank(typeVal)) {
-            typeVal = 'Round Robin';
+            typeVal = TYPE_CC_PRE;
         }
         System.debug(LoggingLevel.DEBUG, 'getMatrix :: typeVal (final) => ' + typeVal);
 
@@ -415,8 +439,8 @@ private static void validateLeadSourceTotals(List<WeightUpdate> updates) {
             (w.city == null ? '' : w.city) + '|' +
             (w.bucket == null ? '' : w.bucket) + '|' +
             (w.businessVertical == null ? '' : w.businessVertical) + '|' +
-            (String.isBlank(w.typeVal) ? 'Round Robin' : w.typeVal) + '|' +
-            resolveObjectApiNameByRole(w.role) + '|' +
+            (String.isBlank(w.typeVal) ? TYPE_CC_PRE : w.typeVal) + '|' +
+            resolveObjectApiNameByRoleAndType(w.role, w.typeVal) + '|' +
             w.leadSource;
 
         if (!byContext.containsKey(key)) {
@@ -429,8 +453,8 @@ private static void validateLeadSourceTotals(List<WeightUpdate> updates) {
         List<WeightUpdate> groupedUpdates = byContext.get(ctx);
         WeightUpdate sample = groupedUpdates[0];
 
-        String typeVal = String.isBlank(sample.typeVal) ? 'Round Robin' : sample.typeVal;
-        String objectApiName = resolveObjectApiNameByRole(sample.role);
+        String typeVal = String.isBlank(sample.typeVal) ? TYPE_CC_PRE : sample.typeVal;
+        String objectApiName = resolveObjectApiNameByRoleAndType(sample.role, typeVal);
 
         List<Round_Robin_Pool__c> existing;
         if (String.isBlank(sample.businessVertical) && String.isBlank(sample.bucket)) {
@@ -549,7 +573,7 @@ public static void applyUpdates(List<WeightUpdate> updates) {
 
     for (WeightUpdate w : updates) {
         Boolean cityWiseOnly = isCityWiseOnly(w.typeVal, w.role);
-        String finalType = String.isBlank(w.typeVal) ? 'Round Robin' : w.typeVal;
+        String finalType = String.isBlank(w.typeVal) ? TYPE_CC_PRE : w.typeVal;
 
         if (w.poolId != null && existingById.containsKey(w.poolId)) {
             // Update existing record
@@ -559,7 +583,7 @@ public static void applyUpdates(List<WeightUpdate> updates) {
             rr.Bucket__c = cityWiseOnly ? null : w.bucket;
             rr.Course_Bucket__c = cityWiseOnly ? null : w.businessVertical;
             rr.Type__c = finalType;
-            rr.Object_Api_Name__c = resolveObjectApiNameByRole(w.role);
+            rr.Object_Api_Name__c = resolveObjectApiNameByRoleAndType(w.role, finalType);
             rr.Active__c = true;
             toUpdate.add(rr);
         } else {
@@ -572,7 +596,7 @@ public static void applyUpdates(List<WeightUpdate> updates) {
                 Bucket__c = cityWiseOnly ? null : w.bucket,
                 Course_Bucket__c = cityWiseOnly ? null : w.businessVertical,
                 Type__c = finalType,
-                Object_Api_Name__c = resolveObjectApiNameByRole(w.role),
+                Object_Api_Name__c = resolveObjectApiNameByRoleAndType(w.role, finalType),
                 Active__c = true
             ));
         }
@@ -586,18 +610,35 @@ public static void applyUpdates(List<WeightUpdate> updates) {
 }
 
 private static String resolveObjectApiNameByRole(String role) {
+    return resolveObjectApiNameByRoleAndType(role, null);
+}
+
+private static String resolveObjectApiNameByRoleAndType(String role, String typeVal) {
+    String finalType = String.isBlank(typeVal) ? null : typeVal;
+
+    if (TYPE_GP.equalsIgnoreCase(finalType)) return 'Lead';
+    if (TYPE_SR_POST.equalsIgnoreCase(finalType)) return 'Course_Enrolled__c';
+    if (TYPE_MCOM.equalsIgnoreCase(finalType)) return 'Lead__c';
+    if (TYPE_CC_PRE.equalsIgnoreCase(finalType)) return 'Lead__c';
+
     if (String.isBlank(role) || role == 'CC') return 'Lead__c';
     if (role == 'SR') return 'Course_Enrolled__c';
     throw new AuraHandledException('Invalid role: ' + role);
 }
 
 private static Boolean isCityWiseOnly(String typeVal, String role) {
-    String finalType = String.isBlank(typeVal) ? 'Round Robin' : typeVal;
+    String finalType = String.isBlank(typeVal) ? TYPE_CC_PRE : typeVal;
 
-    if ('MCOM'.equalsIgnoreCase(finalType)) return true;
-    if ('Eligibility Criteria'.equalsIgnoreCase(finalType)) return true;
+    if (TYPE_CC_PRE.equalsIgnoreCase(finalType)) return false;
+    return true;
+}
 
-    return 'Round Robin'.equalsIgnoreCase(finalType) && 'SR'.equalsIgnoreCase(role);
+private static String resolveProfileNameByType(String typeVal) {
+    if (TYPE_CC_PRE.equalsIgnoreCase(typeVal)) return PROFILE_CC;
+    if (TYPE_SR_POST.equalsIgnoreCase(typeVal)) return PROFILE_SR;
+    if (TYPE_GP.equalsIgnoreCase(typeVal)) return PROFILE_GP;
+    if (TYPE_MCOM.equalsIgnoreCase(typeVal)) return PROFILE_MCOM;
+    return null;
 }
 
 
@@ -653,7 +694,7 @@ public static void saveSequences(String updatesJson) {
         throw new AuraHandledException('No sequence updates provided.');
     }
 
-    String finalType = String.isBlank(p.typeVal) ? 'Round Robin' : p.typeVal;
+    String finalType = String.isBlank(p.typeVal) ? TYPE_CC_PRE : p.typeVal;
     Boolean cityWiseOnly = isCityWiseOnly(finalType, p.role);
 
     if (!cityWiseOnly && String.isBlank(p.leadSource)) {
@@ -688,7 +729,7 @@ public static void saveSequences(String updatesJson) {
     /* ================================
        STEP 2: RESOLVE CONTEXT
        ================================ */
-    String objectApiName = resolveObjectApiNameByRole(p.role);
+    String objectApiName = resolveObjectApiNameByRoleAndType(p.role, finalType);
 
     System.debug('resolved context -> finalType=' + finalType + ', role=' + p.role + ', cityWiseOnly=' + cityWiseOnly + ', objectApiName=' + objectApiName);
 
@@ -967,20 +1008,21 @@ public static void createRoundRobinEntry(
         objectApiName = 'Lead__c';
     }
 
-    if (String.isBlank(city) || String.isBlank(leadSource) || salesRepId == null) {
+    String finalType = String.isBlank(typeVal) ? TYPE_CC_PRE : typeVal;
+    Boolean cityWiseOnly = isCityWiseOnly(finalType, null);
+
+    if (String.isBlank(city) || salesRepId == null || (!cityWiseOnly && String.isBlank(leadSource))) {
         throw new AuraHandledException('Required fields are missing');
     }
 
     Round_Robin_Pool__c rr = new Round_Robin_Pool__c();
     rr.City__c = city;
-    rr.Lead_Source__c = leadSource;
+    rr.Lead_Source__c = cityWiseOnly ? null : leadSource;
     rr.Sales_Rep__c = salesRepId;
     rr.Course__c = course != null ? course : 'CMA';
-    rr.Type__c = 'Round Robin';String finalType = String.isBlank(typeVal) ? 'Round Robin' : typeVal;
-
-rr.Type__c = finalType;
-rr.Object_Api_Name__c = resolveObjectApiName(finalType);
-  rr.Assigned_Weight__c = weight;
+    rr.Type__c = finalType;
+    rr.Object_Api_Name__c = resolveObjectApiName(finalType);
+    rr.Assigned_Weight__c = weight;
     rr.Active__c = true;
     rr.Course_Bucket__c = businessVertical;  // fixed
   

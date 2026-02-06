@@ -23,7 +23,7 @@ public without sharing class RoundRobinConfigProvider {
     public static Config getConfig(String objectApiName, String typeValue) {
         if (String.isBlank(objectApiName)) return null;
 
-        String normType = String.isBlank(typeValue) ? 'Round Robin' : typeValue.trim();
+        String normType = String.isBlank(typeValue) ? 'CC - Pre Enrollment' : typeValue.trim();
 
         List<Round_Robin_Config__mdt> rows = [
             SELECT Object_Api_Name__c, Type__c, Phone_Field__c, Source_Field__c, City_Field__c, Course_Field__c,
@@ -47,6 +47,12 @@ public without sharing class RoundRobinConfigProvider {
 
         c.enableSticky     = m.Enable_Sticky__c;
         c.ignoreSource     = m.Ignore_Source__c;
+        // Only CC - Pre Enrollment should use sources; all other types are city-wise.
+        if (!String.isBlank(c.typeValue) && c.typeValue.equalsIgnoreCase('CC - Pre Enrollment')) {
+            c.ignoreSource = false;
+        } else if (!String.isBlank(c.typeValue)) {
+            c.ignoreSource = true;
+        }
 
         return c;
     }

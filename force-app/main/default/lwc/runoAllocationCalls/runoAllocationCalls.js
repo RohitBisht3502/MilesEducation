@@ -458,7 +458,7 @@ setAutoDate24() {
     
 
     // -------------- SAVE FEEDBACK ----------
-    async saveFeedback() {
+    async saveFeedback(options = {}) {
         if (this.isCommentMandatory && !this.feedback?.trim()) {
             this.toast('Mandatory', 'Feedback comment is required.', 'warning');
             return false;
@@ -516,7 +516,8 @@ setAutoDate24() {
                 l1: this.l1Value || '',
                 l2: this.l2Value || '',
                 stage: this.stageValue || '',
-                level: this.levelValue || ''
+                level: this.levelValue || '',
+                stopQueue: options.stopQueue === true
             };
 
             this.clearFeedbackTimers();
@@ -585,7 +586,7 @@ setAutoDate24() {
     }
 
     async handlePauseQueue(){
-        const saved = await this.saveFeedback();
+        const saved = await this.saveFeedback({ stopQueue: true });
         if (!saved) {
             return;
         }

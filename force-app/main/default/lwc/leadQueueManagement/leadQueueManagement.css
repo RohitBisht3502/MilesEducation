@@ -119,6 +119,14 @@
   --slds-c-icon-color-foreground-default: #0176d3;
 }
 
+.refresh-spinner-wrap {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .table-title-row {
   display: flex;
   justify-content: space-between;
