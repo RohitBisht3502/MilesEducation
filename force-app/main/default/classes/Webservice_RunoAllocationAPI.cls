@@ -19,6 +19,17 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         public List<Object> userFields;
     }
 
+    public class CallHistoryDTO {
+        @AuraEnabled public Id id;
+        @AuraEnabled public Datetime startTime;
+        @AuraEnabled public Datetime createdDate;
+        @AuraEnabled public Integer durationSeconds;
+        @AuraEnabled public String status;
+        @AuraEnabled public String l1;
+        @AuraEnabled public String l2;
+        @AuraEnabled public String stage;
+    }
+
     @AuraEnabled(cacheable=true)
     public static Map<String, List<String>> getL1L2Values() {
         Map<String, List<String>> mapValues = new Map<String, List<String>>();
@@ -51,6 +62,36 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         });
 
         return mapValues;
+    }
+
+    @AuraEnabled(cacheable=true)
+    public static List<CallHistoryDTO> getCallHistory(Id recordId) {
+        if (recordId == null) return new List<CallHistoryDTO>();
+
+        List<Call_Log__c> logs = new List<Call_Log__c>();
+        if (recordId.getSObjectType() == Lead__c.SObjectType) {
+            logs = [SELECT Id, Start_Time__c, CreatedDate, Duration_Seconds__c, Status__c, L1__c, L2__c, Stage__c FROM Call_Log__c WHERE Lead__c = :recordId ORDER BY Start_Time__c DESC NULLS LAST, CreatedDate DESC LIMIT 10];
+        } else if (recordId.getSObjectType() == Course_Enrolled__c.SObjectType) {
+            logs = [SELECT Id, Start_Time__c, CreatedDate, Duration_Seconds__c, Status__c, L1__c, L2__c, Stage__c FROM Call_Log__c WHERE Course_Enrolled__c = :recordId ORDER BY Start_Time__c DESC NULLS LAST, CreatedDate DESC LIMIT 10];
+        } else {
+            return new List<CallHistoryDTO>();
+        }
+
+        List<CallHistoryDTO> res = new List<CallHistoryDTO>();
+        for (Call_Log__c cl : logs) {
+            CallHistoryDTO dto = new CallHistoryDTO();
+            dto.id = cl.Id;
+            dto.startTime = cl.Start_Time__c;
+            dto.createdDate = cl.CreatedDate;
+            dto.durationSeconds = cl.Duration_Seconds__c != null ? Integer.valueOf(cl.Duration_Seconds__c) : 0;
+            dto.status = cl.Status__c;
+            dto.l1 = cl.L1__c;
+            dto.l2 = cl.L2__c;
+            dto.stage = cl.Stage__c;
+            res.add(dto);
+        }
+
+        return res;
     }
 
     @AuraEnabled
@@ -588,7 +629,7 @@ public static Call_Log__c findCallLog(Id recordId, String callId) {
 
 
     @AuraEnabled(cacheable=true)
-    public static Map<String, List<String>> getStageLevelValues() {
+    public static Map<String, List<String>> getStageLevelValues(Id recordId) {
         Map<String, List<String>> result = new Map<String, List<String>>();
         List<String> stageValues = new List<String>();
         List<String> levelValues = new List<String>();

@@ -22,15 +22,15 @@ global class LeadInitialQueueAssignmentBatch implements Database.Batchable<SObje
                       'FROM Lead__c ' +
                       'WHERE Queue_Stage__c = null ' +
                       'AND Next_Follow_Up_Date__c = null ' +
-                      'AND CreatedDate <= :timeLimit' + 
-            		  'AND Source_Bucket__c = \'Bucket 1\'';
+                      'AND CreatedDate <= :timeLimit ' + 
+            		  'AND Source_Bucket__c = \'Bucket 1\' ';
         
         // Add city filter only if there are active cities
         if (!activeCities.isEmpty()) {
-            query += ' AND City__c IN :activeCities';
+            query += 'AND City__c IN :activeCities ';
         } else {
             // Return empty query if no active cities
-            query += ' AND CreatedDate = null';
+            query += 'AND CreatedDate = null ';
         }
         
         return Database.getQueryLocator(query);

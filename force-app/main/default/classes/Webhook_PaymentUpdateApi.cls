@@ -94,6 +94,42 @@ txn.Purchase_Orders__c = paymentReq.purchaseId;
 
 update txn;
 
+
+// Fetch Purchase Order amounts
+Purchase_Order__c poData = [
+    SELECT Id, Lead__c, Net_Payable_Amount__c, Total_Payment_Received__c
+    FROM Purchase_Order__c
+    WHERE Id = :paymentReq.purchaseId
+    LIMIT 1
+];
+
+// Fetch Lead to update picklist
+Lead__c ld = [
+    SELECT Id, Payment_Received__c
+    FROM Lead__c
+    WHERE Id = :poData.Lead__c
+    LIMIT 1
+];
+
+Decimal netPayable = poData.Net_Payable_Amount__c == null ? 0 : poData.Net_Payable_Amount__c;
+Decimal totalReceived = poData.Total_Payment_Received__c == null ? 0 : poData.Total_Payment_Received__c;
+
+
+// Decide picklist value
+if (totalReceived == 0) {
+    ld.Payment_Received__c = 'Not Received';
+}
+else if (totalReceived < netPayable) {
+    ld.Payment_Received__c = 'Partially Received';
+}
+else if (totalReceived >= netPayable) {
+    ld.Payment_Received__c = 'Fully Received';
+}
+
+// ️ Update Lead
+update ld;
+
+
             response.success = true;
             response.message = 'Payment updated successfully';
             // response.recordId = txn.Id;

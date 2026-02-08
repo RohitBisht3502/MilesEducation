@@ -42,40 +42,58 @@ public without sharing class PurchaseOrderService {
     public static List<ProductDTO> getActiveProducts(Id recordId) {
         List<ProductDTO> products = new List<ProductDTO>();
         String familyFilter = null;
+        Boolean isConvertedStudent = false;
+
+        Boolean isCairaRecordType = false;
 
         if (recordId != null && recordId.getSObjectType() == Lead__c.SObjectType) {
-            Lead__c leadRec = [
-                SELECT Course__c
-                FROM Lead__c
-                WHERE Id = :recordId
-                LIMIT 1
-            ];
-            familyFilter = leadRec.Course__c;
+            Lead__c leadRec = [SELECT Course__c, RecordTypeId, Student__c FROM Lead__c WHERE Id = :recordId LIMIT 1];
+            isConvertedStudent = (leadRec.Student__c != null);
+            String recordTypeName;
+            if (leadRec.RecordTypeId != null) {
+                Schema.RecordTypeInfo rti =
+                    Schema.SObjectType.Lead__c.getRecordTypeInfosById().get(leadRec.RecordTypeId);
+                if (rti != null) {
+                    recordTypeName = rti.getName();
+                }
+            }
+
+            Set<String> allowedRecordTypes = new Set<String>{
+                'CAIRA', 'CMA', 'CPA', 'MCOM', 'US Pathway'
+            };
+
+            if (!String.isBlank(recordTypeName) && allowedRecordTypes.contains(recordTypeName)) {
+                familyFilter = recordTypeName;
+            } else {
+                familyFilter = leadRec.Course__c;
+            }
+
+            isCairaRecordType = (recordTypeName == 'CAIRA');
         }
 
         List<PricebookEntry> entries;
         if (String.isBlank(familyFilter)) {
-            entries = [
-                SELECT Product2Id, Product2.Name, Product2.ProductCode, Product2.Family, Product2.type__c, UnitPrice
-                FROM PricebookEntry
-                WHERE IsActive = true
-            ];
+            entries = [SELECT Product2Id, Product2.Name, Product2.ProductCode, Product2.Family, Product2.type__c, Product2.CAIRA_Level__c, UnitPrice FROM PricebookEntry WHERE IsActive = true];
         } else {
-            entries = [
-                SELECT Product2Id, Product2.Name, Product2.ProductCode, Product2.Family, Product2.type__c, UnitPrice
-                FROM PricebookEntry
-                WHERE IsActive = true
-                AND Product2.Family = :familyFilter
-            ];
+            entries = [SELECT Product2Id, Product2.Name, Product2.ProductCode, Product2.Family, Product2.type__c, Product2.CAIRA_Level__c, UnitPrice FROM PricebookEntry WHERE IsActive = true AND Product2.Family = :familyFilter];
         }
 
         for (PricebookEntry pbe : entries) {
+            Decimal unitPrice = pbe.UnitPrice;
+
+            if (isConvertedStudent && isCairaRecordType &&
+                pbe.Product2 != null &&
+                pbe.Product2.Family == 'CAIRA' &&
+                pbe.Product2.CAIRA_Level__c == 'Level 1') {
+                unitPrice = 0;
+            }
+
             products.add(new ProductDTO(
                 pbe.Product2Id,
                 pbe.Product2.Name,
                 pbe.Product2.ProductCode,
                 pbe.Product2.Family,
-                pbe.UnitPrice,
+                unitPrice,
                 pbe.Product2.type__c
             ));
         }
@@ -101,6 +119,10 @@ public without sharing class PurchaseOrderService {
             Lead candidate = fetchCandidateIfNeeded(lead);
             Account student = fetchStudentIfNeeded(context.studentAccountId);
 
+            if (student == null && lead != null && lead.Student__c != null) {
+                student = fetchStudentIfNeeded(lead.Student__c);
+            }
+
             // api callout to miles
            // Callout_PurchaseOrderService.CalloutResult calloutRes = callExternalPurchaseService(req, lead, candidate);
 
@@ -111,6 +133,7 @@ public without sharing class PurchaseOrderService {
             insert po;
 
             createLineItems(po.Id, req.items);
+            updateCairaLevelIfNeeded(context, lead, req.items);
             createTransaction(po.Id, req.downPayment, req.leadId);
 
             return po.Id;
@@ -130,48 +153,52 @@ public without sharing class PurchaseOrderService {
     ) {
         if (recordId.getSObjectType() == Lead__c.SObjectType) {
 
-            Lead__c leadRec = [
-                SELECT Candidate__c
-                FROM Lead__c
-                WHERE Id = :recordId
-            ];
+            Lead__c leadRec = [SELECT Candidate__c, Student__c FROM Lead__c WHERE Id = :recordId];
 
-            Lead candidate = [
-                SELECT Id
-                FROM Lead
-                WHERE Id = :leadRec.Candidate__c
-            ];
+            if (leadRec.Student__c != null) {
+                Account acc = [SELECT Id FROM Account WHERE Id = :leadRec.Student__c];
 
-            if (addressType == 'billing') {
-                candidate.Street = address.get('street');
-                candidate.City = address.get('city');
-                candidate.State = address.get('state');
-                candidate.PostalCode = address.get('postal');
-                candidate.Country = address.get('country');
+                if (addressType == 'billing') {
+                    acc.BillingStreet = address.get('street');
+                    acc.BillingCity = address.get('city');
+                    acc.BillingState = address.get('state');
+                    acc.BillingPostalCode = address.get('postal');
+                    acc.BillingCountry = address.get('country');
+                } else {
+                    acc.ShippingStreet = address.get('street');
+                    acc.ShippingCity = address.get('city');
+                    acc.ShippingState = address.get('state');
+                    acc.ShippingPostalCode = address.get('postal');
+                    acc.ShippingCountry = address.get('country');
+                }
+
+                update acc;
             } else {
-                candidate.Shipping_Street__c = address.get('street');
-                candidate.Shipping_City__c = address.get('city');
-                candidate.Shipping_State__c = address.get('state');
-                candidate.Shipping_Postal_Code__c = address.get('postal');
-                candidate.Shipping_Country__c = address.get('country');
-            }
+                Lead candidate = [SELECT Id FROM Lead WHERE Id = :leadRec.Candidate__c];
 
-            update candidate;
+                if (addressType == 'billing') {
+                    candidate.Street = address.get('street');
+                    candidate.City = address.get('city');
+                    candidate.State = address.get('state');
+                    candidate.PostalCode = address.get('postal');
+                    candidate.Country = address.get('country');
+                } else {
+                    candidate.Shipping_Street__c = address.get('street');
+                    candidate.Shipping_City__c = address.get('city');
+                    candidate.Shipping_State__c = address.get('state');
+                    candidate.Shipping_Postal_Code__c = address.get('postal');
+                    candidate.Shipping_Country__c = address.get('country');
+                }
+
+                update candidate;
+            }
         }
 
         if (recordId.getSObjectType() == Course_Enrolled__c.SObjectType) {
 
-            Course_Enrolled__c ce = [
-                SELECT Student__c
-                FROM Course_Enrolled__c
-                WHERE Id = :recordId
-            ];
+            Course_Enrolled__c ce = [SELECT Student__c FROM Course_Enrolled__c WHERE Id = :recordId];
 
-            Account acc = [
-                SELECT Id
-                FROM Account
-                WHERE Id = :ce.Student__c
-            ];
+            Account acc = [SELECT Id FROM Account WHERE Id = :ce.Student__c];
 
             if (addressType == 'billing') {
                 acc.BillingStreet = address.get('street');
@@ -240,12 +267,7 @@ public without sharing class PurchaseOrderService {
             context.leadRecordId = recordId;
         } else if (sobType == Course_Enrolled__c.SObjectType) {
             context.courseEnrolledId = recordId;
-            Course_Enrolled__c ce = [
-                SELECT Id, Student__c
-                FROM Course_Enrolled__c
-                WHERE Id = :recordId
-                LIMIT 1
-            ];
+            Course_Enrolled__c ce = [SELECT Id, Student__c FROM Course_Enrolled__c WHERE Id = :recordId LIMIT 1];
             context.studentAccountId = ce.Student__c;
         } else {
             throw new AuraHandledException('Unsupported record type for Purchase Order creation');
@@ -264,14 +286,7 @@ public without sharing class PurchaseOrderService {
                 throw new AuraHandledException('Student (Account) is not linked.');
             }
 
-            Account acc = [
-                SELECT
-                    BillingStreet, BillingCity,
-                    ShippingStreet, ShippingCity
-                FROM Account
-                WHERE Id = :context.studentAccountId
-                LIMIT 1
-            ];
+            Account acc = [SELECT BillingStreet, BillingCity, ShippingStreet, ShippingCity FROM Account WHERE Id = :context.studentAccountId LIMIT 1];
 
             // Billing is ALWAYS mandatory
             if (!hasCompleteAddress(acc.BillingStreet, acc.BillingCity, null, null, null)) {
@@ -290,35 +305,38 @@ public without sharing class PurchaseOrderService {
 
         } else {
 
-            Lead__c leadRec = [
-                SELECT Candidate__c
-                FROM Lead__c
-                WHERE Id = :context.leadRecordId
-                LIMIT 1
-            ];
+            Lead__c leadRec = [SELECT Candidate__c, Student__c FROM Lead__c WHERE Id = :context.leadRecordId LIMIT 1];
 
-            Lead candidate = [
-                SELECT
-                    Street, City,
-                    Shipping_Street__c, Shipping_City__c
-                FROM Lead
-                WHERE Id = :leadRec.Candidate__c
-                LIMIT 1
-            ];
+            if (leadRec.Student__c != null) {
+                Account acc = [SELECT BillingStreet, BillingCity, ShippingStreet, ShippingCity FROM Account WHERE Id = :leadRec.Student__c LIMIT 1];
 
-            // Billing mandatory
-            if (!hasCompleteAddress(candidate.Street, candidate.City, null, null, null)) {
-                throw new AuraHandledException(
-                    'Billing address is mandatory before creating Purchase Order.'
-                );
-            }
+                if (!hasCompleteAddress(acc.BillingStreet, acc.BillingCity, null, null, null)) {
+                    throw new AuraHandledException(
+                        'Billing address is mandatory before creating Purchase Order.'
+                    );
+                }
 
-            // Shipping mandatory only for Study Material
-            if (shippingRequired &&
-                !hasCompleteAddress(candidate.Shipping_Street__c, candidate.Shipping_City__c, null, null, null)) {
-                throw new AuraHandledException(
-                    'Shipping address is mandatory for Study Material.'
-                );
+                if (shippingRequired &&
+                    !hasCompleteAddress(acc.ShippingStreet, acc.ShippingCity, null, null, null)) {
+                    throw new AuraHandledException(
+                        'Shipping address is mandatory for Study Material.'
+                    );
+                }
+            } else {
+                Lead candidate = [SELECT Street, City, Shipping_Street__c, Shipping_City__c FROM Lead WHERE Id = :leadRec.Candidate__c LIMIT 1];
+
+                if (!hasCompleteAddress(candidate.Street, candidate.City, null, null, null)) {
+                    throw new AuraHandledException(
+                        'Billing address is mandatory before creating Purchase Order.'
+                    );
+                }
+
+                if (shippingRequired &&
+                    !hasCompleteAddress(candidate.Shipping_Street__c, candidate.Shipping_City__c, null, null, null)) {
+                    throw new AuraHandledException(
+                        'Shipping address is mandatory for Study Material.'
+                    );
+                }
             }
         }
     }
@@ -337,12 +355,7 @@ public without sharing class PurchaseOrderService {
     private static Lead__c fetchLeadIfNeeded(Id leadRecordId) {
         if (leadRecordId == null) return null;
 
-        Lead__c lead = [
-            SELECT Id, Candidate__c, Course__c
-            FROM Lead__c
-            WHERE Id = :leadRecordId
-            LIMIT 1
-        ];
+        Lead__c lead = [SELECT Id, Candidate__c, Course__c, Student__c, RecordTypeId FROM Lead__c WHERE Id = :leadRecordId LIMIT 1];
 
         if (lead.Candidate__c == null) {
             throw new AuraHandledException('Candidate is not linked to this Lead');
@@ -354,15 +367,7 @@ public without sharing class PurchaseOrderService {
     private static Lead fetchCandidateIfNeeded(Lead__c lead) {
         if (lead == null) return null;
 
-        List<Lead> candidates = [
-            SELECT
-                Street, City, State, PostalCode, Country,
-                Shipping_Street__c, Shipping_City__c,
-                Shipping_State__c, Shipping_Postal_Code__c,
-                Shipping_Country__c,UUID__c
-            FROM Lead
-            WHERE Id = :lead.Candidate__c
-        ];
+        List<Lead> candidates = [SELECT Street, City, State, PostalCode, Country, Shipping_Street__c, Shipping_City__c, Shipping_State__c, Shipping_Postal_Code__c, Shipping_Country__c,UUID__c FROM Lead WHERE Id = :lead.Candidate__c];
 
         if (candidates.isEmpty()) {
             throw new AuraHandledException('Candidate Lead not found');
@@ -374,14 +379,7 @@ public without sharing class PurchaseOrderService {
     private static Account fetchStudentIfNeeded(Id studentAccountId) {
         if (studentAccountId == null) return null;
 
-        return [
-            SELECT
-                BillingStreet, BillingCity, BillingState, BillingPostalCode, BillingCountry,
-                ShippingStreet, ShippingCity, ShippingState, ShippingPostalCode, ShippingCountry
-            FROM Account
-            WHERE Id = :studentAccountId
-            LIMIT 1
-        ];
+        return [SELECT BillingStreet, BillingCity, BillingState, BillingPostalCode, BillingCountry, ShippingStreet, ShippingCity, ShippingState, ShippingPostalCode, ShippingCountry FROM Account WHERE Id = :studentAccountId LIMIT 1];
     }
 
     private static Purchase_Order__c createPurchaseOrder(
@@ -422,7 +420,7 @@ public without sharing class PurchaseOrderService {
         Lead candidate,
         Account student
     ) {
-        if (context.courseEnrolledId != null && student != null) {
+        if (student != null && (context.courseEnrolledId != null || context.leadRecordId != null)) {
             if (addressType == 'billing') {
                 po.Shipping_Street__c = student.BillingStreet;
                 po.Shipping_City__c = student.BillingCity;
@@ -470,27 +468,13 @@ public without sharing class PurchaseOrderService {
 
     @AuraEnabled
     public static Boolean checkLeadAddress(Id leadRecordId) {
-        Lead__c leadRec = [
-            SELECT Candidate__c
-            FROM Lead__c
-            WHERE Id = :leadRecordId
-            LIMIT 1
-        ];
+        Lead__c leadRec = [SELECT Candidate__c FROM Lead__c WHERE Id = :leadRecordId LIMIT 1];
 
         if (leadRec.Candidate__c == null) {
             throw new AuraHandledException('Candidate is not linked to this Lead');
         }
 
-        Lead candidate = [
-            SELECT
-                Street, City, State, PostalCode, Country,
-                Shipping_Street__c, Shipping_City__c,
-                Shipping_State__c, Shipping_Postal_Code__c,
-                Shipping_Country__c
-            FROM Lead
-            WHERE Id = :leadRec.Candidate__c
-            LIMIT 1
-        ];
+        Lead candidate = [SELECT Street, City, State, PostalCode, Country, Shipping_Street__c, Shipping_City__c, Shipping_State__c, Shipping_Postal_Code__c, Shipping_Country__c FROM Lead WHERE Id = :leadRec.Candidate__c LIMIT 1];
 
         return hasCompleteAddress(
             candidate.Street, candidate.City, candidate.State, 
@@ -503,14 +487,7 @@ public without sharing class PurchaseOrderService {
     }
 
     public static Boolean checkStudentAccountAddress(Id accountId) {
-        Account acc = [
-            SELECT
-                BillingStreet, BillingCity, BillingState, BillingPostalCode, BillingCountry,
-                ShippingStreet, ShippingCity, ShippingState, ShippingPostalCode, ShippingCountry
-            FROM Account
-            WHERE Id = :accountId
-            LIMIT 1
-        ];
+        Account acc = [SELECT BillingStreet, BillingCity, BillingState, BillingPostalCode, BillingCountry, ShippingStreet, ShippingCity, ShippingState, ShippingPostalCode, ShippingCountry FROM Account WHERE Id = :accountId LIMIT 1];
 
         return hasCompleteAddress(
             acc.BillingStreet, acc.BillingCity, acc.BillingState, 
@@ -531,52 +508,42 @@ public without sharing class PurchaseOrderService {
         Schema.SObjectType sobType = recordId.getSObjectType();
 
         if (sobType == Lead__c.SObjectType) {
-            Lead__c leadRec = [
-                SELECT Candidate__c
-                FROM Lead__c
-                WHERE Id = :recordId
-                LIMIT 1
-            ];
+            Lead__c leadRec = [SELECT Candidate__c, Student__c FROM Lead__c WHERE Id = :recordId LIMIT 1];
 
-            Lead candidate = [
-                SELECT
-                    Street, City, State, PostalCode, Country,
-                    Shipping_Street__c, Shipping_City__c,
-                    Shipping_State__c, Shipping_Postal_Code__c,
-                    Shipping_Country__c
-                FROM Lead
-                WHERE Id = :leadRec.Candidate__c
-            ];
+            if (leadRec.Student__c != null) {
+                Account acc = [SELECT BillingStreet, BillingCity, BillingState, BillingPostalCode, BillingCountry, ShippingStreet, ShippingCity, ShippingState, ShippingPostalCode, ShippingCountry FROM Account WHERE Id = :leadRec.Student__c];
 
-            res.hasBilling = hasCompleteAddress(
-                candidate.Street, candidate.City, candidate.State,
-                candidate.PostalCode, candidate.Country
-            );
+                res.hasBilling = hasCompleteAddress(
+                    acc.BillingStreet, acc.BillingCity, acc.BillingState,
+                    acc.BillingPostalCode, acc.BillingCountry
+                );
 
-            res.hasShipping = hasCompleteAddress(
-                candidate.Shipping_Street__c, candidate.Shipping_City__c,
-                candidate.Shipping_State__c, candidate.Shipping_Postal_Code__c,
-                candidate.Shipping_Country__c
-            );
+                res.hasShipping = hasCompleteAddress(
+                    acc.ShippingStreet, acc.ShippingCity, acc.ShippingState,
+                    acc.ShippingPostalCode, acc.ShippingCountry
+                );
+            } else {
+                Lead candidate = [SELECT Street, City, State, PostalCode, Country, Shipping_Street__c, Shipping_City__c, Shipping_State__c, Shipping_Postal_Code__c, Shipping_Country__c FROM Lead WHERE Id = :leadRec.Candidate__c];
+
+                res.hasBilling = hasCompleteAddress(
+                    candidate.Street, candidate.City, candidate.State,
+                    candidate.PostalCode, candidate.Country
+                );
+
+                res.hasShipping = hasCompleteAddress(
+                    candidate.Shipping_Street__c, candidate.Shipping_City__c,
+                    candidate.Shipping_State__c, candidate.Shipping_Postal_Code__c,
+                    candidate.Shipping_Country__c
+                );
+            }
 
             return res;
         }
 
         if (sobType == Course_Enrolled__c.SObjectType) {
-            Course_Enrolled__c ce = [
-                SELECT Student__c
-                FROM Course_Enrolled__c
-                WHERE Id = :recordId
-                LIMIT 1
-            ];
+            Course_Enrolled__c ce = [SELECT Student__c FROM Course_Enrolled__c WHERE Id = :recordId LIMIT 1];
 
-            Account acc = [
-                SELECT
-                    BillingStreet, BillingCity, BillingState, BillingPostalCode, BillingCountry,
-                    ShippingStreet, ShippingCity, ShippingState, ShippingPostalCode, ShippingCountry
-                FROM Account
-                WHERE Id = :ce.Student__c
-            ];
+            Account acc = [SELECT BillingStreet, BillingCity, BillingState, BillingPostalCode, BillingCountry, ShippingStreet, ShippingCity, ShippingState, ShippingPostalCode, ShippingCountry FROM Account WHERE Id = :ce.Student__c];
 
             res.hasBilling = hasCompleteAddress(
                 acc.BillingStreet, acc.BillingCity, acc.BillingState,
@@ -610,11 +577,7 @@ public without sharing class PurchaseOrderService {
 
         Map<Id, Product2> prodMap = new Map<Id, Product2>();
         if (!prodIds.isEmpty()) {
-            prodMap = new Map<Id, Product2>([
-                SELECT Id, Name, ProductCode
-                FROM Product2
-                WHERE Id IN :prodIds
-            ]);
+            prodMap = new Map<Id, Product2>([SELECT Id, Name, ProductCode FROM Product2 WHERE Id IN :prodIds]);
         }
 
         Callout_PurchaseOrderService.Request extReq = new Callout_PurchaseOrderService.Request();
@@ -697,5 +660,65 @@ public without sharing class PurchaseOrderService {
         public Id leadRecordId;
         public Id courseEnrolledId;
         public Id studentAccountId;
+    }
+
+    private static void updateCairaLevelIfNeeded(
+        RecordContext context,
+        Lead__c lead,
+        List<LineItemRequest> items
+    ) {
+        if (context == null || context.leadRecordId == null || lead == null) return;
+        if (items == null || items.isEmpty()) return;
+
+        String recordTypeName;
+        if (lead.RecordTypeId != null) {
+            Schema.RecordTypeInfo rti =
+                Schema.SObjectType.Lead__c.getRecordTypeInfosById().get(lead.RecordTypeId);
+            if (rti != null) {
+                recordTypeName = rti.getName();
+            }
+        }
+        if (recordTypeName != 'CAIRA') return;
+
+        Set<Id> prodIds = new Set<Id>();
+        for (LineItemRequest li : items) {
+            if (li != null && li.productId != null) {
+                prodIds.add(li.productId);
+            }
+        }
+        if (prodIds.isEmpty()) return;
+
+        Map<Id, Product2> prodMap = new Map<Id, Product2>([SELECT Id, Family, CAIRA_Level__c, Is_Bundle__c FROM Product2 WHERE Id IN :prodIds]);
+
+        Boolean hasLevel1 = false;
+        Boolean hasLevel2 = false;
+        Boolean hasLevel3 = false;
+        for (LineItemRequest li : items) {
+            Product2 p = prodMap.get(li.productId);
+            if (p == null) continue;
+
+            if (p.Is_Bundle__c) {
+                hasLevel1 = true;
+                hasLevel2 = true;
+                hasLevel3 = true;
+                continue;
+            }
+
+            if (p.CAIRA_Level__c == 'Level 1') hasLevel1 = true;
+            if (p.CAIRA_Level__c == 'Level 2') hasLevel2 = true;
+            if (p.CAIRA_Level__c == 'Level 3') hasLevel3 = true;
+        }
+
+        List<String> levels = new List<String>();
+        if (hasLevel1) levels.add('Level 1');
+        if (hasLevel2) levels.add('Level 2');
+        if (hasLevel3) levels.add('Level 3');
+        if (levels.isEmpty()) return;
+
+        Lead__c upd = new Lead__c(
+            Id = context.leadRecordId,
+            Caira_Level__c = String.join(levels, ';')
+        );
+        update upd;
     }
 }

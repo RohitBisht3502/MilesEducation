@@ -113,12 +113,55 @@
                     </div>
                 </div>
 
+                <template if:true={identity.canId}>
+                    <div class="info-tile">
+                        <lightning-icon icon-name="utility:tag"></lightning-icon>
+                        <div>
+                            <small>CAN ID :-</small>
+                            <strong>{identity.canId}</strong>
+                        </div>
+                    </div>
+                </template>
+
 <template if:true={showPopup}>
                 <div class="call-popup">
                     Call Successfully sent
                 </div>
             </template>
             </div>
+        </div>
+
+        <div class="section-card">
+            <div class="section-header">
+                <lightning-icon icon-name="utility:call" size="small"></lightning-icon>
+                <span>Call History</span>
+            </div>
+
+            <template if:true={hasCallHistory}>
+                <div class="call-history-list">
+                    <template for:each={callHistory} for:item="row">
+                        <div class="call-history-item" key={row.id}>
+                            <div class="call-history-left">
+                                <div class="call-history-date">{row.dateLabel}</div>
+                                <div class="call-history-time">{row.timeLabel}</div>
+                            </div>
+                            <div class="call-history-right">
+                                <div class="call-history-duration">{row.durationLabel}</div>
+                                <div class="call-history-status">{row.status}</div>
+                            </div>
+                            <div class="call-history-meta">
+                                <span>{row.l1}</span>
+                                <span>{row.l2}</span>
+                                <span>{row.stage}</span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
+
+            <template if:false={hasCallHistory}>
+                <div class="call-history-empty">No call history found.</div>
+            </template>
         </div>
     </div>
 

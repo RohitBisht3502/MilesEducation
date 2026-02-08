@@ -139,6 +139,9 @@ global without sharing class MilesWebService {
 
             Lead__c leadToReturn;
 
+            Id leadRecordTypeId = getLeadRecordTypeId(inputData.course);
+            String leadDefaultStage = getDefaultStageForCourse(inputData.course);
+
             /* =====================================================
                CASE 0: PHONE NOT EXIST 
                Not Exist -> Create Candidate -> Create Lead -> Create Phone Number -> Email Associations
@@ -163,12 +166,13 @@ global without sharing class MilesWebService {
                     Name                     = inputData.first_name,
                     Phone__c                 = inputData.phone,
                     Email__c                 = inputData.email,
-                    Stage__c                 = 'M3',
+                    Stage__c                 = leadDefaultStage,
                     Course__c                = inputData.course,
                     Source__c                = inputData.coming_from,
                     Register_for_Webinar__c  = inputData.register_for_webinar,
                     Interested_Webinar_ID__c = inputData.interested_webinar_id,
-                    Candidate__c             = candidate.Id
+                    Candidate__c             = candidate.Id,
+                    RecordTypeId             = leadRecordTypeId
                 );
                 insert newLead;
 
@@ -220,8 +224,23 @@ global without sharing class MilesWebService {
                    - Else: search by Candidate__c + Course
                    ===================================================== */
                 Lead__c existingLeadC;
-                List<Lead__c> leadCs = [SELECT Id, Stage__c, Is_ReEnquiry__c, OwnerId FROM Lead__c WHERE Candidate__c = :candidate.Id AND Course__c = :inputData.course LIMIT 1];
-                if (!leadCs.isEmpty()) existingLeadC = leadCs[0];
+                if (isConvertedStudent && studentAccountId != null) {
+                    List<Lead__c> leadCs = [
+                        SELECT Id, Stage__c, Is_ReEnquiry__c, OwnerId
+                        FROM Lead__c
+                        WHERE Student__c = :studentAccountId AND Course__c = :inputData.course
+                        LIMIT 1
+                    ];
+                    if (!leadCs.isEmpty()) existingLeadC = leadCs[0];
+                } else if (candidate != null && candidate.Id != null) {
+                    List<Lead__c> leadCs = [
+                        SELECT Id, Stage__c, Is_ReEnquiry__c, OwnerId
+                        FROM Lead__c
+                        WHERE Candidate__c = :candidate.Id AND Course__c = :inputData.course
+                        LIMIT 1
+                    ];
+                    if (!leadCs.isEmpty()) existingLeadC = leadCs[0];
+                }
 
                 /* ------------------- LEAD EXISTS (same course) ------------------- */
                 if (existingLeadC != null) {
@@ -251,13 +270,14 @@ global without sharing class MilesWebService {
                         Name                     = inputData.first_name,
                         Phone__c                 = inputData.phone,
                         Email__c                 = inputData.email,
-                        Stage__c                 = 'M3',
+                        Stage__c                 = leadDefaultStage,
                         Course__c                = inputData.course,
                         Source__c                = inputData.coming_from,
                         Register_for_Webinar__c  = inputData.register_for_webinar,
                         Interested_Webinar_ID__c = inputData.interested_webinar_id,
-                        Candidate__c             = (enquiryCandidateId != null ? enquiryCandidateId : null)
-                       // Student__c               = (studentAccountId != null ? studentAccountId : null)
+                        Candidate__c             = (enquiryCandidateId != null ? enquiryCandidateId : null),
+                        RecordTypeId             = leadRecordTypeId,
+                        Student__c               = (studentAccountId != null ? studentAccountId : null)
                     );
                     insert newLead2;
 
@@ -282,7 +302,7 @@ global without sharing class MilesWebService {
                     EmailDecision ed = handleEmailAssociation(inputData.email, newLead2.Id, enquiryCandidateId, enquiry.Id,studentAccountId);
 
                     if (ed == EmailDecision.DIFFERENT_LEAD) {
-                        System.debug('Email exists with different Lead. Not associating (as per flow).');
+                        System.debug('Email exists with different Lead. Not associating.');
                     }
                 }
             }
@@ -387,6 +407,40 @@ global without sharing class MilesWebService {
         } catch (Exception e) {
             System.debug('ReEnquiry marking failed: ' + e.getMessage());
         }
+    }
+
+    private static Id getLeadRecordTypeId(String course) {
+        if (String.isBlank(course)) return null;
+        String courseKey = course.trim().toUpperCase();
+        String rtName;
+        if (courseKey.contains('US PATHWAY')) {
+            rtName = 'US Pathway';
+        } else if (courseKey.contains('CPA')) {
+            rtName = 'CPA';
+        } else if (courseKey.contains('CMA')) {
+            rtName = 'CMA';
+        } else if (courseKey.contains('CAIRA')) {
+            rtName = 'CAIRA';
+        } else if (courseKey.contains('MCOM')) {
+            rtName = 'MCOM';
+        } else {
+            return null;
+        }
+
+        Map<String, Schema.RecordTypeInfo> rtByName = Schema.SObjectType.Lead__c.getRecordTypeInfosByName();
+        if (rtByName != null && rtByName.containsKey(rtName)) {
+            return rtByName.get(rtName).getRecordTypeId();
+        }
+        return null;
+    }
+
+    private static String getDefaultStageForCourse(String course) {
+        if (String.isBlank(course)) return 'M3';
+        String courseKey = course.trim().toUpperCase();
+        if (courseKey.contains('US PATHWAY')) return 'U3';
+        if (courseKey.contains('MCOM')) return 'B3';
+        if (courseKey.contains('CPA') || courseKey.contains('CMA') || courseKey.contains('CAIRA')) return 'M3';
+        return 'M3';
     }
 
     /* ------------ WRAPPERS ------------- */

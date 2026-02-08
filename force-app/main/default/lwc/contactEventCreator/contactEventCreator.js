@@ -493,6 +493,15 @@ export default class ContactEventCreator extends LightningElement {
 
     // ===== validation / utils =====
     validateForm() {
+
+         if (!this.contactEmail || this.contactEmail.trim() === '') {
+        this.showToast(
+            'Error',
+            'Lead email is required before scheduling a meeting. Please update Lead email first.',
+            'error'
+        );
+        return false;
+    }
         if (!this.subject) {
             // this.error = 'Please enter a meeting subject';
             this.showToast('Error', 'Please enter a meeting subject', 'error');

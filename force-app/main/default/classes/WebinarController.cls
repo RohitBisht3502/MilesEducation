@@ -66,6 +66,19 @@ public class WebinarController {
             throw new AuraHandledException('Record and Webinar are required.');
         }
 
+          Lead__c leadRec = [
+        SELECT Id, Email__c 
+        FROM Lead__c 
+        WHERE Id = :recordId 
+        LIMIT 1
+    ];
+
+    if (String.isBlank(leadRec.Email__c)) {
+        throw new AuraHandledException(
+            'This Lead does not have an email address. Please add an email before registering for webinar.'
+        );
+    }
+
         List<Webinar_Member__c> wmList = [SELECT Id, Lead__c, Enquiry__c, Webinar__c FROM Webinar_Member__c WHERE Webinar__c = :webinarId AND (Lead__c = :recordId OR Enquiry__c = :recordId) LIMIT 1];
         if (!wmList.isEmpty()) {
             throw new AuraHandledException('This record is already registered for this webinar.');

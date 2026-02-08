@@ -74,6 +74,25 @@ public without sharing class GoogleMeetService {
         if (!String.isBlank(typeOfMeeting) && fMap.containsKey('Type_of_Meeting__c')) {
     ev.put('Type_of_Meeting__c', typeOfMeeting);
 }
+
+
+//  Validate Lead email from lookup
+if (recordId != null) {
+
+    Lead__c leadRec = [
+        SELECT Id, Email__c 
+        FROM Lead__c 
+        WHERE Id = :recordId
+        LIMIT 1
+    ];
+
+    if (String.isBlank(leadRec.Email__c)) {
+        throw new AuraHandledException(
+            'Lead email is required before registering meeting.'
+        );
+    }
+}
+
         if (!String.isBlank(otherTypeOfMeeting) && fMap.containsKey('Others__c')) {
             ev.put('Others__c', otherTypeOfMeeting);
         }

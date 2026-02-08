@@ -83,17 +83,18 @@ public class LoanUpdateTriggerHandler {
         }
     }
 
-    private static void applyCurrentAddressFromPermanent(List<Loan__c> newLoans) {
-        for (Loan__c loan : newLoans) {
-            if (loan.Current_Address_Same_As_Permanent__c == true) {
-                loan.Current_Address__Street__s = loan.Permanent_Address__Street__s;
-                loan.Current_Address__City__s = loan.Permanent_Address__City__s;
-                loan.Current_Address__StateCode__s = loan.Permanent_Address__StateCode__s;
-                loan.Current_Address__PostalCode__s = loan.Permanent_Address__PostalCode__s;
-                loan.Current_Address__CountryCode__s = loan.Permanent_Address__CountryCode__s;
-            }
+   private static void applyCurrentAddressFromPermanent(List<Loan__c> newLoans) {
+    for (Loan__c loan : newLoans) {
+        if (loan.Current_Address_Same_As_Permanent__c == true) {
+
+            loan.flat_no__c = loan.permanent_flat_no__c;
+            loan.street__c = loan.permanent_street__c;
+            loan.land_mark__c = loan.permanent_land_mark__c;
+            loan.pincode__c = loan.permanent_pincode__c;
         }
     }
+}
+
 
     @future(callout=true)
     public static void loanUpdate(List<Id> loanIds) {
@@ -102,12 +103,14 @@ public class LoanUpdateTriggerHandler {
             SELECT Id, Program_Name__c, First_Name__c, Email__c, Mobile__c, Amount_Requested__c,
                    Tenure__c, Gender__c, Marital_Status__c, Earning_Status__c, Occupation_Type__c,
                    Monthly_Income__c, Applying_Loan_For__c, Relationship_With_Applicant__c,
-                   Current_Address_Same_As_Permanent__c, Current_Address__Street__s,
-                   Current_Address__City__s, Current_Address__StateCode__s,
-                   Current_Address__PostalCode__s, Current_Address__CountryCode__s,
-                   Permanent_Address__Street__s, Permanent_Address__City__s,
-                   Permanent_Address__StateCode__s, Permanent_Address__PostalCode__s,
-                   Permanent_Address__CountryCode__s, PAN_Number__c, Date_of_Birth__c,
+                   Current_Address_Same_As_Permanent__c, flat_no__c,
+street__c,
+land_mark__c,
+pincode__c,
+permanent_flat_no__c,
+permanent_street__c,
+permanent_land_mark__c,
+permanent_pincode__c, PAN_Number__c, Date_of_Birth__c, State__c, City__c,
                    RecordType.DeveloperName
             FROM Loan__c
             WHERE Id IN :loanIds
@@ -178,12 +181,13 @@ public class LoanUpdateTriggerHandler {
                     loan.Current_Address_Same_As_Permanent__c
                 );
 
-                if (loan.Current_Address_Same_As_Permanent__c == true) {
-                    putPermanentAddress(body, loan, permanentFlatField, permanentLandmarkField);
-                } else {
-                    putCurrentAddress(body, loan, currentFlatField, currentLandmarkField);
-                    putPermanentAddress(body, loan, permanentFlatField, permanentLandmarkField);
-                }
+             if (loan.Current_Address_Same_As_Permanent__c == true) {
+    putPermanentAddress(body, loan);
+} else {
+    putCurrentAddress(body, loan);
+    putPermanentAddress(body, loan);
+}
+
 
                 body.put('applying_loan_for', loan.Applying_Loan_For__c);
 
@@ -218,10 +222,20 @@ public class LoanUpdateTriggerHandler {
                 body.put('pan_number', loan.PAN_Number__c);
                 body.put('date_of_birth', String.valueOf(loan.Date_of_Birth__c));
 
-                body.put('address', buildAddressLine(loan, currentFlatField, currentLandmarkField));
-                body.put('city', getTextFieldValue(loan, 'Current_Address__City__s'));
-                body.put('state', getTextFieldValue(loan, 'Current_Address__StateCode__s'));
-                body.put('pincode', getTextFieldValue(loan, 'Current_Address__PostalCode__s'));
+                body.put(
+    'address',
+    String.join(
+        new List<String>{
+            loan.flat_no__c,
+            loan.street__c
+            
+        },
+        ', '
+    )
+);
+ body.put('city', String.valueOf(loan.City__C));
+  body.put('state', String.valueOf(loan.State__c));
+body.put('pincode', loan.pincode__c);
 
                 body.put('student_first_name', loan.First_Name__c);
                 body.put('student_last_name', loan.First_Name__c);
@@ -285,30 +299,26 @@ public class LoanUpdateTriggerHandler {
     }
 
     private static void putCurrentAddress(
-        Map<String, Object> body,
-        Loan__c loan,
-        String flatField,
-        String landmarkField
-    ) {
-        body.put('flat_no', getTextFieldValue(loan, flatField));
-        body.put('street', getTextFieldValue(loan, 'Current_Address__Street__s'));
-        body.put('land_mark', getTextFieldValue(loan, landmarkField));
-        body.put('city', getTextFieldValue(loan, 'Current_Address__City__s'));
-        body.put('state', getTextFieldValue(loan, 'Current_Address__StateCode__s'));
-        body.put('pincode', getTextFieldValue(loan, 'Current_Address__PostalCode__s'));
-    }
+    Map<String, Object> body,
+    Loan__c loan
+) {
+    body.put('flat_no', loan.flat_no__c);
+    body.put('street', loan.street__c);
+    body.put('land_mark', loan.land_mark__c);
+    body.put('pincode', loan.pincode__c);
+}
 
-    private static void putPermanentAddress(
-        Map<String, Object> body,
-        Loan__c loan,
-        String flatField,
-        String landmarkField
-    ) {
-        body.put('permanent_flat_no', getTextFieldValue(loan, flatField));
-        body.put('permanent_street', getTextFieldValue(loan, 'Permanent_Address__Street__s'));
-        body.put('permanent_land_mark', getTextFieldValue(loan, landmarkField));
-        body.put('permanent_pincode', getTextFieldValue(loan, 'Permanent_Address__PostalCode__s'));
-    }
+
+   private static void putPermanentAddress(
+    Map<String, Object> body,
+    Loan__c loan
+) {
+    body.put('permanent_flat_no', loan.permanent_flat_no__c);
+    body.put('permanent_street', loan.permanent_street__c);
+    body.put('permanent_land_mark', loan.permanent_land_mark__c);
+    body.put('permanent_pincode', loan.permanent_pincode__c);
+}
+
 
     private static String buildAddressLine(
         Loan__c loan,

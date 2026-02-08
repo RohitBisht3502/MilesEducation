@@ -4,12 +4,17 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import allocateLeadNow from '@salesforce/apex/Webservice_RunoAllocationAPI.allocateLeadNow';
 import updateCallFeedback from '@salesforce/apex/Webservice_RunoAllocationAPI.updateCallFeedback';
 import getL1L2Values from '@salesforce/apex/Webservice_RunoAllocationAPI.getL1L2Values';
+import getCallHistory from '@salesforce/apex/Webservice_RunoAllocationAPI.getCallHistory';
 import getIdentity from '@salesforce/apex/RunoCallIdentityService.getIdentity';
 import getStageLevelValues from '@salesforce/apex/Webservice_RunoAllocationAPI.getStageLevelValues';
 import { CurrentPageReference } from 'lightning/navigation';
 import { NavigationMixin } from 'lightning/navigation';
 import { CloseActionScreenEvent } from 'lightning/actions';
 import { subscribe, unsubscribe, onError } from 'lightning/empApi';
+import { getRecord } from 'lightning/uiRecordApi';
+import { getObjectInfo, getPicklistValuesByRecordType } from 'lightning/uiObjectInfoApi';
+import LEAD_OBJECT from '@salesforce/schema/Lead__c';
+import LEAD_RECORDTYPE_FIELD from '@salesforce/schema/Lead__c.RecordTypeId';
 
 
 export default class RunoAllocationCall extends NavigationMixin(LightningElement) {
@@ -44,10 +49,11 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     levelValue = '';
     stageOptions = [];
     levelOptions = [];
+    leadRecordTypeId = null;
 
     // auto call start from lead url 
     autoCall = false;
-hasAutoCalled = false;
+    hasAutoCalled = false;
 
 
     // Toast / error
@@ -62,8 +68,11 @@ hasAutoCalled = false;
         city: '',
         source: '',
         stage: '',
-        level: ''
+        level: '',
+        canId: ''
     };
+
+    callHistory = [];
 
     // call state
     isLive = false;
@@ -129,69 +138,101 @@ hasAutoCalled = false;
             this.errorText = error?.body?.message || 'Failed to load identity';
         }
     }
+
+    @wire(getObjectInfo, { objectApiName: LEAD_OBJECT })
+    objectInfo;
+
+    get recordTypeId() {
+        return this.leadRecordTypeId || this.objectInfo?.data?.defaultRecordTypeId;
+    }
+
+    @wire(getRecord, { recordId: '$recordId', fields: [LEAD_RECORDTYPE_FIELD] })
+    wiredLeadRecordType({ data }) {
+        if (data) {
+            this.leadRecordTypeId = data.fields.RecordTypeId?.value;
+        }
+    }
+
+    @wire(getPicklistValuesByRecordType, {
+        objectApiName: LEAD_OBJECT,
+        recordTypeId: '$recordTypeId'
+    })
+    wiredStagePicklists({ data, error }) {
+        if (data && data.picklistFieldValues && data.picklistFieldValues.Stage__c) {
+            this.stageOptions = data.picklistFieldValues.Stage__c.values.map(v => ({
+                label: v.label,
+                value: v.value
+            }));
+        } else if (error) {
+            console.error('Stage picklist load failed:', error);
+        }
+    }
     // -------------- PAGE REFERENCE (URL SAFE) --------------
 
-@wire(CurrentPageReference)
-wiredPageRef(pageRef) {
-    this.pageRef = pageRef;
+    @wire(CurrentPageReference)
+    wiredPageRef(pageRef) {
+        this.pageRef = pageRef;
 
-    const state = pageRef?.state;
-    if (!state) return;
+        const state = pageRef?.state;
+        if (!state) return;
 
-    // resolve recordId (already your logic)
-    this.resolveRecordIdFromPageRef();
+        // resolve recordId (already your logic)
+        this.resolveRecordIdFromPageRef();
 
-    // ✅ AUTO CALL FLAG
-    if (state.c__autoCall === 'true') {
-        this.autoCall = true;
-    }
-}
-
-
-
-
-
-
-// -------------- URL RECORD ID (SAFE FALLBACK) --------------
-resolveRecordIdFromPageRef() {
-    if (this.recordId) {
-        return; // already provided (Quick Action / Record Page)
+        // ✅ AUTO CALL FLAG
+        if (state.c__autoCall === 'true') {
+            this.autoCall = true;
+        }
     }
 
-    const state = this.pageRef?.state;
-    if (!state) return;
 
-    const recId =
+
+
+
+
+    // -------------- URL RECORD ID (SAFE FALLBACK) --------------
+    resolveRecordIdFromPageRef() {
+        if (this.recordId) {
+            return; // already provided (Quick Action / Record Page)
+        }
+
+        const state = this.pageRef?.state;
+        if (!state) return;
+
+        const recId =
         state.recordId ||
         state.c__recordId ||
         state.id ||
         state.c__id;
 
-    if (recId && (recId.length === 15 || recId.length === 18)) {
-        this.recordId = recId;
-        console.log('RecordId resolved from pageRef:', this.recordId);
+        if (recId && (recId.length === 15 || recId.length === 18)) {
+            this.recordId = recId;
+            console.log('RecordId resolved from pageRef:', this.recordId);
+            this.loadStageLevel();
+            this.loadCallHistory();
+        }
     }
-}
 
 
     // --------------- LIFECYCLE -------------
 
-   connectedCallback() {
+    connectedCallback() {
 
-    
-    this.resolveRecordIdFromPageRef();
-    this.loadPicklists();
-    this.loadStageLevel();
-    this.subscribeToEvents();
-    onError(err => console.warn('EMP API Error:', JSON.stringify(err)));
 
-    setTimeout(() => {
-        if (this.autoCall && this.recordId && !this.hasAutoCalled) {
-            this.hasAutoCalled = true;
-            this.startCall();
-        }
-    }, 500);
-}
+        this.resolveRecordIdFromPageRef();
+        this.loadPicklists();
+        this.loadStageLevel();
+        this.loadCallHistory();
+        this.subscribeToEvents();
+        onError(err => console.warn('EMP API Error:', JSON.stringify(err)));
+
+        setTimeout(() => {
+            if (this.autoCall && this.recordId && !this.hasAutoCalled) {
+                this.hasAutoCalled = true;
+                this.startCall();
+            }
+        }, 500);
+    }
 
 
     disconnectedCallback() {
@@ -219,11 +260,7 @@ resolveRecordIdFromPageRef() {
 
     async loadStageLevel() {
         try {
-            const mapData = await getStageLevelValues();
-            this.stageOptions = (mapData.stage || []).map(v => ({
-                label: v,
-                value: v
-            }));
+            const mapData = await getStageLevelValues({ recordId: this.recordId });
             this.levelOptions = (mapData.level || []).map(v => ({
                 label: v,
                 value: v
@@ -231,6 +268,38 @@ resolveRecordIdFromPageRef() {
         } catch (e) {
             console.error('Stage/Level load failed:', e);
         }
+    }
+
+    async loadCallHistory() {
+        if (!this.recordId) return;
+        try {
+            const rows = await getCallHistory({ recordId: this.recordId });
+            const dateFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+            const timeFmt = new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit' });
+            this.callHistory = (rows || []).map(r => {
+                const dt = r.startTime || r.createdDate;
+                const d = dt ? new Date(dt) : null;
+                const totalSec = Number(r.durationSeconds || 0);
+                const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+                const ss = String(totalSec % 60).padStart(2, '0');
+                return {
+                    id: r.id,
+                    dateLabel: d ? dateFmt.format(d) : 'NA',
+                    timeLabel: d ? timeFmt.format(d) : '',
+                    durationLabel: `${mm}:${ss}`,
+                    status: r.status || 'NA',
+                    l1: r.l1 || '',
+                    l2: r.l2 || '',
+                    stage: r.stage || ''
+                };
+            });
+        } catch (e) {
+            console.error('Call history load failed:', e);
+        }
+    }
+
+    get hasCallHistory() {
+        return (this.callHistory || []).length > 0;
     }
 
     // -------------- HANDLERS ---------------
@@ -242,7 +311,7 @@ resolveRecordIdFromPageRef() {
 
     handleL1Change(e) {
         this.l1Value = e.target.value;
-         this.userChangedStage = false;
+        this.userChangedStage = false;
         this.l2Options = (this.fullMap[this.l1Value] || []).map(v => ({
             label: v,
             value: v
@@ -251,10 +320,10 @@ resolveRecordIdFromPageRef() {
         this.l2Value = '';
 
 
-        if(this.l1Value === 'Not-Connected'){
-          this.isStageDisabled = true;
-        }else{
-          this.isStageDisabled = false;
+        if (this.l1Value === 'Not-Connected') {
+            this.isStageDisabled = true;
+        } else {
+            this.isStageDisabled = false;
         }
 
         this.updateCommentVisibility();
@@ -263,10 +332,10 @@ resolveRecordIdFromPageRef() {
     handleL2Change(e) {
         this.l2Value = e.target.value;
         this.updateCommentVisibility();
-         if (this.l2Value) {
-    this.applyAutoStageLogic();
-         }
-}
+        if (this.l2Value) {
+            this.applyAutoStageLogic();
+        }
+    }
 
 
     handleStageChange(e) {
@@ -403,46 +472,46 @@ resolveRecordIdFromPageRef() {
     }
 
     // 🔥 NEW: helper to set nextFollowUpDate = now + 24h in ISO format
- setAutoDate24() {
-    const next = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    setAutoDate24() {
+        const next = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    const yyyy = next.getFullYear();
-    const mm = String(next.getMonth() + 1).padStart(2, '0');
-    const dd = String(next.getDate()).padStart(2, '0');
-    const hh = String(next.getHours()).padStart(2, '0');
-    const mi = String(next.getMinutes()).padStart(2, '0');
+        const yyyy = next.getFullYear();
+        const mm = String(next.getMonth() + 1).padStart(2, '0');
+        const dd = String(next.getDate()).padStart(2, '0');
+        const hh = String(next.getHours()).padStart(2, '0');
+        const mi = String(next.getMinutes()).padStart(2, '0');
 
-    this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-}
-applyAutoStageLogic() {
-    // Do nothing if user already selected stage.
-    if (this.userChangedStage) {
-        return;
+        this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
     }
-
-    if (this.l1Value === 'Connected') {
-        const connectedStageMap = {
-            'Not Eligible': 'M1',
-            'Wrong Number': 'M1',
-            'Not Interested (DND)': 'M1',
-            'Language Barrier': 'M1',
-            'Visit Confirmed': 'M3+',
-            'Google Meet Completed': 'M3+',
-            'Gmeet Confirmed': 'M3+',
-            'Postponed': 'M4'
-        };
-
-        const autoStage = connectedStageMap[this.l2Value];
-        if (autoStage) {
-            this.stageValue = autoStage;
+    applyAutoStageLogic() {
+        // Do nothing if user already selected stage.
+        if (this.userChangedStage) {
+            return;
         }
-        return;
-    }
 
-    if (this.l1Value === 'Not-Connected') {
-        this.stageValue = this.l2Value === 'Invalid Number' ? 'M1' : null;
+        if (this.l1Value === 'Connected') {
+            const connectedStageMap = {
+                'Not Eligible': 'M1',
+                'Wrong Number': 'M1',
+                'Not Interested (DND)': 'M1',
+                'Language Barrier': 'M1',
+                'Visit Confirmed': 'M3+',
+                'Google Meet Completed': 'M3+',
+                'Gmeet Confirmed': 'M3+',
+                'Postponed': 'M4'
+            };
+
+            const autoStage = connectedStageMap[this.l2Value];
+            if (autoStage) {
+                this.stageValue = autoStage;
+            }
+            return;
+        }
+
+        if (this.l1Value === 'Not-Connected') {
+            this.stageValue = this.l2Value === 'Invalid Number' ? 'M1' : null;
+        }
     }
-}
 
 
 
@@ -472,7 +541,7 @@ applyAutoStageLogic() {
             );
             return;
         }
-        if(this.l1Value === 'Not-Connected'){
+        if (this.l1Value === 'Not-Connected') {
             this.stageValue = null;
         }
 
@@ -522,8 +591,8 @@ applyAutoStageLogic() {
             this.nextFollowUpDate = null;
             sessionStorage.setItem('RUNO_REFRESH_ON_BACK', 'true');
 
-        //    this.dispatchEvent(new CloseActionScreenEvent());
-this.navigateAfterSave();
+           this.dispatchEvent(new CloseActionScreenEvent());
+                // this.navigateAfterSave();
 
         } catch (e) {
             let message = 'Failed to save feedback.';
@@ -562,41 +631,41 @@ this.navigateAfterSave();
         }
     }
 
- navigateAfterSave() {
-    const state = this.pageRef?.state || {};
-    const recordIdFromUrl =
+    navigateAfterSave() {
+        const state = this.pageRef?.state || {};
+        const recordIdFromUrl =
         state.c__recordId ||
         state.recordId ||
         state.id ||
         state.c__id;
 
-    // CASE 1: Opened from URL / Utility / Nav item
-    if (recordIdFromUrl) {
-        this[NavigationMixin.Navigate]({
-            type: 'standard__objectPage',
-            attributes: {
-                objectApiName: 'Lead__c',
-                actionName: 'list'
-            },
-            state: {
-                filterName: 'All'
-            }
-        });
+        // CASE 1: Opened from URL / Utility / Nav item
+        if (recordIdFromUrl) {
+            this[NavigationMixin.Navigate]({
+                type: 'standard__objectPage',
+                attributes: {
+                    objectApiName: 'Lead__c',
+                    actionName: 'list'
+                },
+                state: {
+                    filterName: 'All'
+                }
+            });
 
-        // 🔥 FORCE HARD RELOAD AFTER NAVIGATION
-        setTimeout(() => {
-            window.location.href = window.location.href;
-        }, 600);
-    }
-    // CASE 2: Opened as Quick Action
-    else {
-        this.dispatchEvent(new CloseActionScreenEvent());
+            // 🔥 FORCE HARD RELOAD AFTER NAVIGATION
+            setTimeout(() => {
+                window.location.href = window.location.href;
+            }, 600);
+        }
+        // CASE 2: Opened as Quick Action
+        else {
+            this.dispatchEvent(new CloseActionScreenEvent());
 
-        setTimeout(() => {
-            window.location.reload();
-        }, 300);
+            setTimeout(() => {
+                window.location.reload();
+            }, 300);
+        }
     }
-}
 
 
 

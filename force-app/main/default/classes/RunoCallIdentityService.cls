@@ -8,6 +8,7 @@ public without sharing class RunoCallIdentityService {
         @AuraEnabled public String city;
         @AuraEnabled public String source;
         @AuraEnabled public String stage;
+        @AuraEnabled public String canId;
     }
 
     @AuraEnabled(cacheable=true)
@@ -20,7 +21,7 @@ public without sharing class RunoCallIdentityService {
         /* ===================== LEAD ===================== */
         if (sObjType == Lead__c.SObjectType) {
             Lead__c l = [
-                SELECT Id, Name, Email__c, Phone__c, City__c, Course__c, Stage__c
+                SELECT Id, Name, Email__c, Phone__c, City__c, Course__c, Stage__c, CAN_ID__c
                 FROM Lead__c
                 WHERE Id = :recordId
                 LIMIT 1
@@ -33,6 +34,7 @@ public without sharing class RunoCallIdentityService {
             dto.city   = l.City__c;
             dto.source = l.Course__c;
             dto.stage  = l.Stage__c;
+            dto.canId  = l.CAN_ID__c;
 
             return dto;
         }
@@ -59,6 +61,7 @@ public without sharing class RunoCallIdentityService {
             dto.city   = ce.City__c;
             dto.source = ce.Course__c;
             dto.stage  = ce.Stages__c;
+            dto.canId  = null;
 
             return dto;
         }
@@ -79,6 +82,7 @@ public without sharing class RunoCallIdentityService {
             dto.city   = 'NA';
             dto.source = 'NA';
             dto.stage  = 'NA';
+            dto.canId  = null;
 
             return dto;
         }
