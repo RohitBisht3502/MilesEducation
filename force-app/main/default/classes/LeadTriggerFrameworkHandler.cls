@@ -32,7 +32,7 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         List<Lead__c> newLeads = getNewLeads();
         Map<Id, Lead__c> oldMapLead = getOldLeadMap();
 
-       // EnquiryStageService.validateStageTransitions(newLeads, oldMapLead); COMMENTED FOR DEMO ONLY
+      //  EnquiryStageService.validateStageTransitions(newLeads, oldMapLead);// COMMENTED FOR DEMO ONLY
         LeadTriggerHelperClass.updateLevelSequence(newLeads, oldMapLead);
         LeadTriggerHelperClass.handleBeforeUpdate(newLeads, oldMapLead);
         // If you want M1 owner logic on update:

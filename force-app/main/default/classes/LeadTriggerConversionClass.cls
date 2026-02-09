@@ -11,12 +11,19 @@ public class LeadTriggerConversionClass {
         
         Set<Id> leadCIdsToProcess = new Set<Id>();
         Set<Id> candidateLeadIds = new Set<Id>();
+        Set<String> allowedRecordTypes = new Set<String>{ 'CPA', 'CMA', 'USP Pathway' };
         
         for (Lead__c n : newLeads) {
             Lead__c o = oldMap != null ? oldMap.get(n.Id) : null;
             
             if (n.Candidate__c == null) {
                 System.debug('Skip Lead__c Id=' + n.Id + ' because Candidate__c is NULL');
+                continue;
+            }
+
+            String rtName = getLeadRecordTypeName(n.RecordTypeId);
+            if (String.isBlank(rtName) || !allowedRecordTypes.contains(rtName)) {
+                System.debug('Skip Lead__c Id=' + n.Id + ' because RecordType not allowed: ' + rtName);
                 continue;
             }
             
@@ -145,6 +152,7 @@ public class LeadTriggerConversionClass {
         
         List<Lead__c> leadCToUpdate = new List<Lead__c>();
         List<Course_Enrolled__c> ceToInsert = new List<Course_Enrolled__c>();
+        Map<String, Id> ceRecordTypeByName = getCourseRecordTypeIdsByName();
         
         for (Lead__c n : newLeads) {
             if (!leadCIdsToProcess.contains(n.Id)) {
@@ -153,6 +161,11 @@ public class LeadTriggerConversionClass {
             
             Id accId = candidateToAccount.get(n.Candidate__c);
             if (accId == null) {
+                continue;
+            }
+
+            String rtName = getLeadRecordTypeName(n.RecordTypeId);
+            if (String.isBlank(rtName) || !allowedRecordTypes.contains(rtName)) {
                 continue;
             }
             
@@ -170,6 +183,15 @@ public class LeadTriggerConversionClass {
                 ce.Course__c = n.Course__c;
                 ce.City__c = n.City__c;
                 ce.Course_Bucket__c = n.Course_Bucket__c;
+                if (rtName == 'USP Pathway') {
+                    ce.Stages__c = 'U3';
+                } else {
+                    ce.Stages__c = 'M3';
+                }
+                Id ceRtId = ceRecordTypeByName.get(rtName);
+                if (ceRtId != null) {
+                    ce.RecordTypeId = ceRtId;
+                }
                 Lead candidateLead = candMap.get(n.Candidate__c);
                 if (candidateLead != null) {
                     ce.GP_SPOC__c = candidateLead.GP_User__c != null
@@ -274,5 +296,23 @@ public class LeadTriggerConversionClass {
 
     private static String buildStudentCourseKey(Id studentId, String course) {
         return String.valueOf(studentId) + '|' + String.valueOf(course);
+    }
+
+    private static String getLeadRecordTypeName(Id recordTypeId) {
+        if (recordTypeId == null) return null;
+        Schema.RecordTypeInfo rti = Schema.SObjectType.Lead__c.getRecordTypeInfosById().get(recordTypeId);
+        return rti != null ? rti.getName() : null;
+    }
+
+    private static Map<String, Id> getCourseRecordTypeIdsByName() {
+        Map<String, Id> mapRt = new Map<String, Id>();
+        Map<String, Schema.RecordTypeInfo> byName = Schema.SObjectType.Course_Enrolled__c.getRecordTypeInfosByName();
+        for (String key : byName.keySet()) {
+            Schema.RecordTypeInfo rti = byName.get(key);
+            if (rti != null && rti.isAvailable()) {
+                mapRt.put(key, rti.getRecordTypeId());
+            }
+        }
+        return mapRt;
     }
 }

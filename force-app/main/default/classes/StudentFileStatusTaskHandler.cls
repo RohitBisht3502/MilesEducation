@@ -114,7 +114,7 @@ public class StudentFileStatusTaskHandler {
                 WhatId       = ce.Id,
                 ActivityDate = Date.today(),
                 Status       = 'Not Started',
-                Priority     = 'Normal',
+                Priority     = 'High',
                 Description  = 'Auto-created from Student File Status update. Level=' + sfs.Level__c +
                                ', FileType=' + sfs.File_Type__c + ', Status=' + sfs.Status__c +
                                ', StudentFileStatusId=' + sfs.Id

@@ -6,21 +6,25 @@
 global without sharing class Webservice_RunoCallRecordingWebhook {
     private static final String VENDOR_TOKEN = '4f029d1bcee05d32cdc8a3d32b0fcda7';
 
-    public class RecordingDTO {
+    global class RecordingDTO {
         public String callId;
         public String recordingUrl;
     }
 
+    global class ApiResponse {
+        public Boolean success;
+        public String message;
+    }
+
     @HttpPost
-    global static void handleRunoWebhook() {
+    global static ApiResponse handleRunoWebhook() {
         RestRequest req = RestContext.request;
         RestResponse res = RestContext.response;
 
         String requestBody = '';
-        String responseBody = '';
-        String status = 'Failed';
         Integer statusCode = 500;
-        String errorMessage = '';
+        ApiResponse out = new ApiResponse();
+        out.success = false;
 
         try {
             String token = req.headers.get('x-vendor-token');
@@ -38,24 +42,20 @@ global without sharing class Webservice_RunoCallRecordingWebhook {
 
             if (String.isBlank(requestBody)) {
                 statusCode = 400;
-                responseBody = '{"error":"Missing request body"}';
-                res.statusCode = statusCode;
-                res.responseBody = Blob.valueOf(responseBody);
-
-                IntegrationLogUtil.insertLog('Runo → Miles Force', null, responseBody, 'Empty request body received','Failed', statusCode );
-                return;
+                out.message = 'Missing request body';
+                IntegrationLogUtil.insertLog('Runo → Miles Force', null, null, out.message, 'Failed', statusCode );
+                if (res != null) res.statusCode = statusCode;
+                return out;
             }
 
             RecordingDTO dto = (RecordingDTO)JSON.deserialize(requestBody, RecordingDTO.class);
 
             if (String.isBlank(dto.callId) || String.isBlank(dto.recordingUrl)) {
                 statusCode = 400;
-                responseBody = '{"error":"Missing callId or recordingUrl"}';
-                res.statusCode = statusCode;
-                res.responseBody = Blob.valueOf(responseBody);
-
-                IntegrationLogUtil.insertLog('Runo → Miles Force', requestBody, responseBody, 'Missing required fields (callId/recordingUrl)', 'Failed', statusCode );
-                return;
+                out.message = 'Missing callId or recordingUrl';
+                IntegrationLogUtil.insertLog('Runo → Miles Force', requestBody, null, out.message, 'Failed', statusCode );
+                if (res != null) res.statusCode = statusCode;
+                return out;
             }
 
             System.debug('dto.callId   '+dto.callId);
@@ -64,11 +64,10 @@ global without sharing class Webservice_RunoCallRecordingWebhook {
 
             if (logs.isEmpty()) {
                 statusCode = 404;
-                responseBody = '{"status":"failed","message":"Call log not found for callId"}';
-                res.statusCode = statusCode;
-                res.responseBody = Blob.valueOf(responseBody);
-                IntegrationLogUtil.insertLog('Runo → Miles Force', requestBody, responseBody, 'Call log not found', 'Failed', statusCode );
-                return;
+                out.message = 'Call log not found for callId';
+                IntegrationLogUtil.insertLog('Runo → Miles Force', requestBody, null, out.message, 'Failed', statusCode );
+                if (res != null) res.statusCode = statusCode;
+                return out;
             }
 
             update new Call_Log__c(
@@ -76,43 +75,38 @@ global without sharing class Webservice_RunoCallRecordingWebhook {
                 Recording_Url__c = dto.recordingUrl
             );
 
-            status = 'Success';
             statusCode = 200;
-            responseBody = '{"status":"success","message":"Recording received and processed successfully"}';
-            res.statusCode = statusCode;
-            res.responseBody = Blob.valueOf(responseBody);
-
-            IntegrationLogUtil.insertLog( 'Runo → Miles Force', requestBody, responseBody, 'Runo webhook processed successfully', status, statusCode );
+            out.success = true;
+            out.message = 'Recording received and processed successfully';
+            IntegrationLogUtil.insertLog( 'Runo → Miles Force', requestBody, JSON.serialize(out), out.message, 'Success', statusCode );
+            if (res != null) res.statusCode = statusCode;
+            return out;
            //RunoCallLogHandler.ApiResponse apiResponse = RunoCallLogHandler.processCallLog(requestBody);
 
            
 
         } catch (QueryException qe) {
             statusCode = 404;
-            responseBody = '{"error":"Call log not found for callId"}';
-            res.statusCode = statusCode;
-            res.responseBody = Blob.valueOf(responseBody);
-
-            IntegrationLogUtil.insertLog( 'Runo → Miles Force',  requestBody, responseBody, 'Call log not found', 'Failed', statusCode );
+            out.message = 'Call log not found for callId';
+            IntegrationLogUtil.insertLog( 'Runo → Miles Force',  requestBody, null, out.message, 'Failed', statusCode );
+            if (res != null) res.statusCode = statusCode;
+            return out;
 
         } catch (Exception ex) {
-    errorMessage = ex.getMessage();
-    statusCode = 500;
-
-    
-    res.statusCode = statusCode;
-    res.responseBody = Blob.valueOf('');
-
-    // Log full details internally
-    IntegrationLogUtil.insertLog(
-        'Runo → Miles Force',
-        requestBody,
-        responseBody,       
-        errorMessage,
-        'Failed',
-        statusCode
-    );
-}
+            statusCode = 500;
+            out.message = 'Unhandled error: ' + ex.getMessage();
+            IntegrationLogUtil.insertLog(
+                'Runo → Miles Force',
+                requestBody,
+                null,
+                out.message,
+                'Failed',
+                statusCode
+            );
+            if (res != null) res.statusCode = statusCode;
+            return out;
+        }
 
     }
 }
+

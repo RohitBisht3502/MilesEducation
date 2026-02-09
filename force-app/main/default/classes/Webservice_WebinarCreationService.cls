@@ -11,7 +11,8 @@ global without sharing class Webservice_WebinarCreationService {
         public String start_time;
         public Boolean auto_register;
         public Integer duration;
-        public String webinar_name;     
+        public String webinar_name;
+        public String type_of_webinar;
     }
 
     global class WebinarUpsertResponse {
@@ -56,9 +57,7 @@ global without sharing class Webservice_WebinarCreationService {
             Webinar__c wb;
 
             try {
-                wb = [
-                    SELECT Id, Name, Webinar_Id__c, IsActive__c, Topic__c, Agenda__c, Start_Date_Time__c, Auto_Register__c, Duration__c
-                    FROM Webinar__c WHERE Webinar_Id__c = :input.id LIMIT 1];
+                wb = [SELECT Id, Name, Webinar_Id__c, IsActive__c, Topic__c, Agenda__c, Start_Date_Time__c, Auto_Register__c, Duration__c, Type_Of_Webinar__c FROM Webinar__c WHERE Webinar_Id__c = :input.id LIMIT 1];
                 resp.success = false;
                 resp.webinarRecordId = wb.Id;
                 resp.message = 'Webinar already exists';
@@ -77,6 +76,7 @@ global without sharing class Webservice_WebinarCreationService {
             if (input.auto_register != null) wb.Auto_Register__c = input.auto_register;
             if (input.webinar_name != null) wb.Name = input.webinar_name;
             if (input.duration != null) wb.Duration__c = input.duration;
+            if (input.type_of_webinar != null) wb.Type_Of_Webinar__c = input.type_of_webinar;
 
             wb.IsActive__c = true;
             insert wb;

@@ -17,7 +17,7 @@ global without sharing class MilesWebService {
     }
 
     @HttpPost
-    global static String doPost() {
+    global static ApiResponse doPost() {
         RestRequest req = RestContext.request;
         RestResponse res = RestContext.response;
 
@@ -29,14 +29,14 @@ global without sharing class MilesWebService {
                     IntegrationLogUtil.buildLog('Enquiry', null, null, 'Missing required header: securityCode', 'FAILED', null)
                 });
                 res.statusCode = 400;
-                return 'Missing required header: securityCode';
+                return new ApiResponse(false, 'Missing required header: securityCode', null);
             }
             if (securityCode != EXPECTED_SECURITY_CODE) {
                 IntegrationLogUtil.insertLogs(new List<Integration_Log__c>{
                     IntegrationLogUtil.buildLog('Enquiry', null, null, 'Unauthorized: Invalid security code. Provided=' + securityCode, 'FAILED', null)
                 });                
                 res.statusCode = 401;
-                return 'Unauthorized: Invalid security code';
+                return new ApiResponse(false, 'Unauthorized: Invalid security code', null);
             }
 
             /* ------------ BODY CHECK ------------- */
@@ -46,7 +46,7 @@ global without sharing class MilesWebService {
                     IntegrationLogUtil.buildLog('Enquiry', null, null, 'Request body is empty', 'FAILED', null)
                 });                
                 res.statusCode = 400;
-                return 'Request body is empty';
+                return new ApiResponse(false, 'Request body is empty', null);
             }
 
             System.debug('MilesWebService RequestBody => ' + requestBody);
@@ -76,7 +76,7 @@ global without sharing class MilesWebService {
                     IntegrationLogUtil.buildLog('Enquiry', requestBody, null, 'Missing required fields: first_name or phone', 'FAILED', null)
                 });                
                 res.statusCode = 400;
-                return 'Missing required fields: first_name or phone';
+                return new ApiResponse(false, 'Missing required fields: first_name or phone', null);
             }
 
             Boolean whatsappAllow = (inputData.whatsappAllow != null && inputData.whatsappAllow == 1);
@@ -317,9 +317,7 @@ global without sharing class MilesWebService {
             // Task t = MilesExistingEnquiryWebService.createFollowUpTask(enquiry, taskSubject);
 
             res.statusCode = 201;
-            return JSON.serialize(
-                new ApiResponse(true, 'Enquiry processed as per flow.', leadToReturn != null ? leadToReturn.Id : null)
-            );
+            return new ApiResponse(true, 'Enquiry processed as per flow.', leadToReturn != null ? leadToReturn.Id : null);
 
         } catch (Exception ex) {
             System.debug('MilesWebService Error => ' + ex.getMessage() + ' :: ' + ex.getStackTraceString());
@@ -329,7 +327,7 @@ global without sharing class MilesWebService {
                 IntegrationLogUtil.buildLog('Enquiry', null, null, 'Error: ' + ex.getMessage(), 'FAILED', null)
             });
 
-            return JSON.serialize(new ApiResponse(false, 'Error: ' + ex.getMessage(), null));
+            return new ApiResponse(false, 'Error: ' + ex.getMessage(), null);
         }
     }
 
