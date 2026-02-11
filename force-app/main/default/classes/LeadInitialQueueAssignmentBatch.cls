@@ -68,6 +68,12 @@ global class LeadInitialQueueAssignmentBatch implements Database.Batchable<SObje
     
     // Schedulable execute method
     global void execute(SchedulableContext sc) {
+        if (!BatchExecutionWindowUtil.canRun('LeadInitialQueueAssignmentBatch')) {
+            return;
+        }
+        if (BatchExecutionWindowUtil.isBatchAlreadyRunning('LeadInitialQueueAssignmentBatch')) {
+            return;
+        }
         Database.executeBatch(new LeadInitialQueueAssignmentBatch(), 100);
     }
 }

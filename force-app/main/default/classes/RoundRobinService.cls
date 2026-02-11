@@ -24,7 +24,7 @@ public without sharing class RoundRobinService {
             for (SObject s : records) {
                 String city   = RoundRobinHelper.normCity(cfg.cityField != null ? String.valueOf(s.get(cfg.cityField)) : null);
                 String source = cfg.ignoreSource ? '(ANY)' : RoundRobinHelper.normSource(cfg.sourceField != null ? String.valueOf(s.get(cfg.sourceField)) : null);
-                String course = RoundRobinHelper.normCourse(cfg.courseField != null ? String.valueOf(s.get(cfg.courseField)) : null);
+                String course = cfg.ignoreCourseBucket ? '(ANY)' : RoundRobinHelper.normCourse(cfg.courseField != null ? String.valueOf(s.get(cfg.courseField)) : null);
                 System.debug('course >> '+course);
                 String key = RoundRobinHelper.keyOf(cfg.objectApiName, city, source, course, cfg.typeValue);
 
@@ -41,7 +41,7 @@ public without sharing class RoundRobinService {
                 System.debug('b >>> '+b);
 
                 List<Round_Robin_Pool__c> pool =
-                    RoundRobinHelper.lockPoolMembers(b.objectApiName, b.cityUpper, b.sourceUpper, b.courseUpper, b.typeValue);
+                    RoundRobinHelper.lockPoolMembers(b.objectApiName, b.cityUpper, b.sourceUpper, b.courseUpper, b.typeValue, cfg.ignoreSource, cfg.ignoreCourseBucket);
 
                     System.debug('RoundRobinHelper.lockPoolMembers >>> '+pool);
 

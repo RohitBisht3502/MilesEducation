@@ -1,4 +1,12 @@
 public without sharing class EnquiryTriggerHandler {
+    
+    public static void handleBeforeInsert(List<Enquiry__c> newLeads) { 
+        BucketAssignmentService.assignBucket((List<SObject>)newLeads, null);
+    }
+    
+    public static void handleBeforeUpdate(List<Enquiry__c> newLeads, Map<Id, Enquiry__c> oldMap) {
+        BucketAssignmentService.assignBucket((List<SObject>)newLeads,(Map<Id, SObject>)oldMap); 
+    }
 
     public static void handleReEnquiryUpgrade(List<Enquiry__c> newEnquiries) {
 

@@ -18,6 +18,7 @@ public without sharing class RoundRobinConfigProvider {
 
         public Boolean enableSticky;
         public Boolean ignoreSource;
+        public Boolean ignoreCourseBucket;
     }
 
     public static Config getConfig(String objectApiName, String typeValue) {
@@ -27,7 +28,8 @@ public without sharing class RoundRobinConfigProvider {
 
         List<Round_Robin_Config__mdt> rows = [
             SELECT Object_Api_Name__c, Type__c, Phone_Field__c, Source_Field__c, City_Field__c, Course_Field__c,
-                   Assign_To_Field__c, Sticky_User_Field__c, Enable_Sticky__c, Ignore_Source__c FROM Round_Robin_Config__mdt
+                   Assign_To_Field__c, Sticky_User_Field__c, Enable_Sticky__c, Ignore_Source__c, Ignore_Course_Bucket__c
+            FROM Round_Robin_Config__mdt
             WHERE Object_Api_Name__c = :objectApiName AND Type__c = :normType LIMIT 1 ];
 
         if (rows.isEmpty()) return null;
@@ -47,11 +49,13 @@ public without sharing class RoundRobinConfigProvider {
 
         c.enableSticky     = m.Enable_Sticky__c;
         c.ignoreSource     = m.Ignore_Source__c;
+        c.ignoreCourseBucket = m.Ignore_Course_Bucket__c;
         // Only CC - Pre Enrollment should use sources; all other types are city-wise.
         if (!String.isBlank(c.typeValue) && c.typeValue.equalsIgnoreCase('CC - Pre Enrollment')) {
             c.ignoreSource = false;
         } else if (!String.isBlank(c.typeValue)) {
             c.ignoreSource = true;
+            c.ignoreCourseBucket = true;
         }
 
         return c;

@@ -83,17 +83,16 @@ public class LoanUpdateTriggerHandler {
         }
     }
 
-   private static void applyCurrentAddressFromPermanent(List<Loan__c> newLoans) {
-    for (Loan__c loan : newLoans) {
-        if (loan.Current_Address_Same_As_Permanent__c == true) {
-
-            loan.flat_no__c = loan.permanent_flat_no__c;
-            loan.street__c = loan.permanent_street__c;
-            loan.land_mark__c = loan.permanent_land_mark__c;
-            loan.pincode__c = loan.permanent_pincode__c;
+    private static void applyCurrentAddressFromPermanent(List<Loan__c> newLoans) {
+        for (Loan__c loan : newLoans) {
+            if (loan.Current_Address_Same_As_Permanent__c == true) {
+                loan.flat_no__c = loan.permanent_flat_no__c;
+                loan.street__c = loan.permanent_street__c;
+                loan.land_mark__c = loan.permanent_land_mark__c;
+                loan.pincode__c = loan.permanent_pincode__c;
+            }
         }
     }
-}
 
 
     @future(callout=true)
@@ -103,21 +102,52 @@ public class LoanUpdateTriggerHandler {
             SELECT Id, Program_Name__c, First_Name__c, Email__c, Mobile__c, Amount_Requested__c,
                    Tenure__c, Gender__c, Marital_Status__c, Earning_Status__c, Occupation_Type__c,
                    Monthly_Income__c, Applying_Loan_For__c, Relationship_With_Applicant__c,
-                   Current_Address_Same_As_Permanent__c, flat_no__c,
-street__c,
-land_mark__c,
-pincode__c,
-permanent_flat_no__c,
-permanent_street__c,
-permanent_land_mark__c,
-permanent_pincode__c, PAN_Number__c, Date_of_Birth__c, State__c, City__c,
+                   Current_Address_Same_As_Permanent__c, flat_no__c, street__c,
+                   land_mark__c, pincode__c, permanent_flat_no__c,
+                   permanent_street__c, permanent_land_mark__c,
+                   permanent_pincode__c, PAN_Number__c, Date_of_Birth__c, State__c, City__c,Candidate__c,
                    RecordType.DeveloperName
             FROM Loan__c
             WHERE Id IN :loanIds
         ];
 
-        String endpoint = 'https://hn19ywvvng.execute-api.ap-south-1.amazonaws.com/Miles360/loan/create';
         String serviceName = 'Loan Creation API';
+
+        External_Service_Config__mdt cfg;
+        try {
+            cfg = [
+                SELECT Endpoint_URL__c, Http_Method__c, Api_Key__c, Api_Key_Header__c, Is_Active__c
+                FROM External_Service_Config__mdt
+                WHERE DeveloperName = 'Loan_Process_API'
+                LIMIT 1
+            ];
+        } catch (Exception e) {
+            IntegrationLogUtil.insertLog(
+                serviceName,
+                null,
+                null,
+                'Metadata load error: ' + e.getMessage(),
+                'Failed',
+                null
+            );
+            return;
+        }
+
+        if (cfg == null || !cfg.Is_Active__c || String.isBlank(cfg.Endpoint_URL__c)) {
+            IntegrationLogUtil.insertLog(
+                serviceName,
+                null,
+                null,
+                'Inactive or missing endpoint',
+                'Failed',
+                null
+            );
+            return;
+        }
+
+        String method = String.isBlank(cfg.Http_Method__c)
+            ? 'POST'
+            : cfg.Http_Method__c.trim().toUpperCase();
 
         Map<String, Schema.SObjectField> loanFieldMap =
             Loan__c.SObjectType.getDescribe().fields.getMap();
@@ -157,13 +187,15 @@ permanent_pincode__c, PAN_Number__c, Date_of_Birth__c, State__c, City__c,
             }
         );
 
+        List<Loan__c> loansToUpdate = new List<Loan__c>();
+
         for (Loan__c loan : loans) {
 
             String provider = loan.RecordType.DeveloperName;
 
             Map<String, Object> body = new Map<String, Object>{
                 'loan_provider' => provider,
-                'sf_id' => loan.Id,
+                'sf_id' => loan.Candidate__c,
                 'program_name' => loan.Program_Name__c,
                 'first_name' => loan.First_Name__c,
                 'last_name' => loan.First_Name__c,
@@ -181,12 +213,12 @@ permanent_pincode__c, PAN_Number__c, Date_of_Birth__c, State__c, City__c,
                     loan.Current_Address_Same_As_Permanent__c
                 );
 
-             if (loan.Current_Address_Same_As_Permanent__c == true) {
-    putPermanentAddress(body, loan);
-} else {
-    putCurrentAddress(body, loan);
-    putPermanentAddress(body, loan);
-}
+                if (loan.Current_Address_Same_As_Permanent__c == true) {
+                    putPermanentAddress(body, loan);
+                } else {
+                    putCurrentAddress(body, loan);
+                    putPermanentAddress(body, loan);
+                }
 
 
                 body.put('applying_loan_for', loan.Applying_Loan_For__c);
@@ -223,19 +255,18 @@ permanent_pincode__c, PAN_Number__c, Date_of_Birth__c, State__c, City__c,
                 body.put('date_of_birth', String.valueOf(loan.Date_of_Birth__c));
 
                 body.put(
-    'address',
-    String.join(
-        new List<String>{
-            loan.flat_no__c,
-            loan.street__c
-            
-        },
-        ', '
-    )
-);
- body.put('city', String.valueOf(loan.City__C));
-  body.put('state', String.valueOf(loan.State__c));
-body.put('pincode', loan.pincode__c);
+                    'address',
+                    String.join(
+                        new List<String>{
+                            loan.flat_no__c,
+                            loan.street__c
+                        },
+                        ', '
+                    )
+                );
+                body.put('city', String.valueOf(loan.City__C));
+                body.put('state', String.valueOf(loan.State__c));
+                body.put('pincode', loan.pincode__c);
 
                 body.put('student_first_name', loan.First_Name__c);
                 body.put('student_last_name', loan.First_Name__c);
@@ -244,13 +275,18 @@ body.put('pincode', loan.pincode__c);
             /* ================= SEND ================= */
 
             HttpRequest req = new HttpRequest();
-            req.setEndpoint(endpoint);
-            req.setMethod('POST');
+            req.setEndpoint(cfg.Endpoint_URL__c);
+            req.setMethod(method);
             req.setHeader('Content-Type', 'application/json');
-            req.setHeader('x-api-key', 'n7yno1N32NaXgZJFLbzf137wCHFf2UsM40j7gSgW');
+
+            if (!String.isBlank(cfg.Api_Key__c) && !String.isBlank(cfg.Api_Key_Header__c)) {
+                req.setHeader(cfg.Api_Key_Header__c, cfg.Api_Key__c);
+            }
 
             String requestPayload = truncate(JSON.serialize(body));
-            req.setBody(requestPayload);
+            if (method != 'GET') {
+                req.setBody(requestPayload);
+            }
 
             Http http = new Http();
 
@@ -259,7 +295,38 @@ body.put('pincode', loan.pincode__c);
 
                 String responsePayload = truncate(res.getBody());
 
-                if (res.getStatusCode() == 200) {
+                if (res.getStatusCode() >= 200 && res.getStatusCode() < 300) {
+                    if (!String.isBlank(responsePayload)) {
+                        try {
+                            Map<String, Object> resp = (Map<String, Object>) JSON.deserializeUntyped(responsePayload);
+                            Object ok = resp != null ? resp.get('success') : null;
+                            Map<String, Object> data = resp != null ? (Map<String, Object>) resp.get('data') : null;
+                            Map<String, Object> result = resp != null ? (Map<String, Object>) resp.get('result') : null;
+                            if (result != null) {
+                                Object ok2 = result.get('success');
+                                if (ok2 instanceof Boolean) ok = ok2;
+                                Map<String, Object> data2 = (Map<String, Object>) result.get('data');
+                                if (data2 != null) data = data2;
+                            }
+
+                            if (ok instanceof Boolean && (Boolean) ok && data != null) {
+                                loan.miles_loan_code__c = (String) data.get('miles_loan_code');
+                                loan.application_id__c = (String) data.get('application_id');
+                                loan.loan_status__c = (String) data.get('loan_status');
+                                loan.redirection_url__c = (String) data.get('redirection_url');
+                                loansToUpdate.add(loan);
+                            }
+                        } catch (Exception ex) {
+                            IntegrationLogUtil.insertLog(
+                                serviceName,
+                                requestPayload,
+                                responsePayload,
+                                'Response parse error: ' + ex.getMessage(),
+                                'Failed',
+                                500
+                            );
+                        }
+                    }
                     IntegrationLogUtil.insertLog(
                         serviceName,
                         requestPayload,
@@ -290,6 +357,10 @@ body.put('pincode', loan.pincode__c);
                 );
             }
         }
+
+        if (!loansToUpdate.isEmpty()) {
+            update loansToUpdate;
+        }
     }
 
     private static String truncate(String value) {
@@ -299,25 +370,24 @@ body.put('pincode', loan.pincode__c);
     }
 
     private static void putCurrentAddress(
-    Map<String, Object> body,
-    Loan__c loan
-) {
-    body.put('flat_no', loan.flat_no__c);
-    body.put('street', loan.street__c);
-    body.put('land_mark', loan.land_mark__c);
-    body.put('pincode', loan.pincode__c);
-}
+        Map<String, Object> body,
+        Loan__c loan
+    ) {
+        body.put('flat_no', loan.flat_no__c);
+        body.put('street', loan.street__c);
+        body.put('land_mark', loan.land_mark__c);
+        body.put('pincode', loan.pincode__c);
+    }
 
-
-   private static void putPermanentAddress(
-    Map<String, Object> body,
-    Loan__c loan
-) {
-    body.put('permanent_flat_no', loan.permanent_flat_no__c);
-    body.put('permanent_street', loan.permanent_street__c);
-    body.put('permanent_land_mark', loan.permanent_land_mark__c);
-    body.put('permanent_pincode', loan.permanent_pincode__c);
-}
+    private static void putPermanentAddress(
+        Map<String, Object> body,
+        Loan__c loan
+    ) {
+        body.put('permanent_flat_no', loan.permanent_flat_no__c);
+        body.put('permanent_street', loan.permanent_street__c);
+        body.put('permanent_land_mark', loan.permanent_land_mark__c);
+        body.put('permanent_pincode', loan.permanent_pincode__c);
+    }
 
 
     private static String buildAddressLine(

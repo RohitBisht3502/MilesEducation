@@ -1,0 +1,79 @@
+<template>
+    <lightning-card title="New Lead">
+        <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+            <template if:true={errorMessage}>
+                <div class="slds-notify slds-notify_alert slds-theme_error slds-m-bottom_small" role="alert">
+                    <span class="slds-assistive-text">Error</span>
+                    <h2>{errorMessage}</h2>
+                </div>
+            </template>
+
+            <lightning-layout multiple-rows="true">
+                <lightning-layout-item size="6" small-device-size="12" padding="around-small">
+                    <lightning-combobox
+                        name="course"
+                        label="Course"
+                        value={course}
+                        options={courseOptions}
+                        required
+                        onchange={handleInputChange}>
+                    </lightning-combobox>
+                </lightning-layout-item>
+
+                <lightning-layout-item size="6" small-device-size="12" padding="around-small">
+                    <lightning-input
+                        name="firstName"
+                        label="First Name"
+                        value={firstName}
+                        onchange={handleInputChange}>
+                    </lightning-input>
+                </lightning-layout-item>
+
+                <lightning-layout-item size="6" small-device-size="12" padding="around-small">
+                    <lightning-input
+                        name="lastName"
+                        label="Last Name"
+                        value={lastName}
+                        required
+                        onchange={handleInputChange}>
+                    </lightning-input>
+                </lightning-layout-item>
+
+                <lightning-layout-item size="6" small-device-size="12" padding="around-small">
+                    <lightning-input
+                        name="phone"
+                        type="tel"
+                        label="Phone"
+                        value={phone}
+                        required
+                        onchange={handleInputChange}>
+                    </lightning-input>
+                </lightning-layout-item>
+
+                <lightning-layout-item size="6" small-device-size="12" padding="around-small">
+                    <lightning-input
+                        name="email"
+                        type="email"
+                        label="Email"
+                        value={email}
+                        required
+                        onchange={handleInputChange}>
+                    </lightning-input>
+                </lightning-layout-item>
+            </lightning-layout>
+
+            <div class="slds-m-top_medium">
+                <lightning-button
+                    variant="brand"
+                    label={saveLabel}
+                    onclick={handleCreate}
+                    disabled={isLoading}>
+                </lightning-button>
+            </div>
+        </div>
+
+        <template if:true={isLoading}>
+            <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+        </template>
+    </lightning-card>
+</template>

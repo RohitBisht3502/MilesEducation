@@ -30,6 +30,23 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         @AuraEnabled public String stage;
     }
 
+ public class WebinarMemberDTO {
+    @AuraEnabled public Id id;
+    @AuraEnabled public String name;
+    @AuraEnabled public String webinarName;
+    @AuraEnabled public String attendanceStatus;
+    @AuraEnabled public Datetime createdDate;
+}
+
+
+public class EventDTO {
+    @AuraEnabled public Id id;
+    @AuraEnabled public String subject;
+    @AuraEnabled public String attendance;
+}
+
+
+
     @AuraEnabled(cacheable=true)
     public static Map<String, List<String>> getL1L2Values() {
         Map<String, List<String>> mapValues = new Map<String, List<String>>();
@@ -93,6 +110,85 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
 
         return res;
     }
+
+    
+@AuraEnabled(cacheable=true)
+public static List<EventDTO> getLeadEvents(Id recordId) {
+
+    if (recordId == null) return new List<EventDTO>();
+
+    List<Event> events = [
+        SELECT Id,
+               Subject,
+               Candidate_Attendance__c
+        FROM Event
+        WHERE WhatId = :recordId
+        ORDER BY ActivityDateTime DESC
+        LIMIT 20
+    ];
+
+    List<EventDTO> res = new List<EventDTO>();
+
+    for (Event e : events) {
+        EventDTO dto = new EventDTO();
+        dto.id = e.Id;
+        dto.subject = e.Subject;
+        dto.attendance = e.Candidate_Attendance__c;
+        res.add(dto);
+    }
+
+    return res;
+}
+
+
+
+
+
+
+
+
+@AuraEnabled(cacheable=true)
+public static List<WebinarMemberDTO> getWebinarMembers(Id recordId) {
+
+    if (recordId == null) return new List<WebinarMemberDTO>();
+
+  
+
+    List<Webinar_Member__c> members = [
+        SELECT Id,
+               Name,
+               Attendance_Status__c,
+               Meeting_Details__c,
+               Webinar__c,
+               Webinar__r.Name,
+               Lead_Owner_at_Registration__c,
+               Lead_Owner_During_Webinar__c,
+               Lead_Stage_at_Registration__c,
+               Lead_Stage_During_Webinar__c,
+               CreatedDate
+        FROM Webinar_Member__c
+        WHERE Lead__c = :recordId
+        ORDER BY CreatedDate DESC
+        LIMIT 10
+    ];
+
+    List<WebinarMemberDTO> res = new List<WebinarMemberDTO>();
+
+    for (Webinar_Member__c wm : members) {
+        WebinarMemberDTO dto = new WebinarMemberDTO();
+        dto.id = wm.Id;
+        dto.name = wm.Name;
+        dto.webinarName = wm.Webinar__r != null ? wm.Webinar__r.Name : '';
+        dto.attendanceStatus = wm.Attendance_Status__c;
+        dto.createdDate = wm.CreatedDate;
+        res.add(dto);
+    }
+
+    return res;
+}
+
+
+
 
     @AuraEnabled
     public static String allocateLeadNow(Id recordId) {

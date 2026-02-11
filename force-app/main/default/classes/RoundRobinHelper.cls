@@ -19,14 +19,14 @@ public without sharing class RoundRobinHelper {
 
     public static String keyOf(String obj, String cityUpper, String sourceUpper, String courseUpper, String typeValue) {
         String coursePart = String.isBlank(courseUpper) ? '(ANY)' : courseUpper;
-        
+        String typePart   = String.isBlank(typeValue)   ? 'CC - Pre Enrollment' : typeValue;
+
         // For MCOM, ignore city and source in the key
-        if ('MCOM'.equalsIgnoreCase(coursePart)) {
+        if (!String.isBlank(typePart) && typePart.equalsIgnoreCase('MCOM')) {
             return obj + '|MCOM|(NONE)|MCOM|MCOM';
         }
         
         String srcPart    = String.isBlank(sourceUpper) ? '(NONE)' : sourceUpper;
-        String typePart   = String.isBlank(typeValue)   ? 'CC - Pre Enrollment' : typeValue;
         return obj + '|' + cityUpper + '|' + srcPart + '|' + coursePart + '|' + typePart;
     }
 
@@ -42,11 +42,19 @@ public without sharing class RoundRobinHelper {
         return b;
     }
 
-    public static List<Round_Robin_Pool__c> lockPoolMembers(String obj, String cityUpper, String sourceUpper, String courseUpper, String typeValue) {
+    public static List<Round_Robin_Pool__c> lockPoolMembers(
+        String obj,
+        String cityUpper,
+        String sourceUpper,
+        String courseUpper,
+        String typeValue,
+        Boolean ignoreSource,
+        Boolean ignoreCourseBucket
+    ) {
         System.debug('obj >> '+obj);
         System.debug('courseUpper >> '+courseUpper);
         // For MCOM, use special query
-        if ('MCOM'.equalsIgnoreCase(courseUpper)) {
+        if (typeValue != null && typeValue.equalsIgnoreCase('MCOM')) {
             System.debug('courseUpper >> '+courseUpper);
             List<Round_Robin_Pool__c> rows = qMCOM(obj, courseUpper);
             sortBySequenceThenId(rows);
@@ -60,8 +68,7 @@ public without sharing class RoundRobinHelper {
             return rows;
         }
         
-        Boolean ignoreSource = shouldIgnoreSource(typeValue);
-        List<Round_Robin_Pool__c> rows = q(obj, cityUpper, sourceUpper, courseUpper, typeValue, ignoreSource);
+        List<Round_Robin_Pool__c> rows = q(obj, cityUpper, sourceUpper, courseUpper, typeValue, ignoreSource, ignoreCourseBucket);
         sortBySequenceThenId(rows);
         return rows;
     }
@@ -95,8 +102,29 @@ public without sharing class RoundRobinHelper {
         ];
     }
 
-    public static List<Round_Robin_Pool__c> q(String obj, String city, String src, String courseUpper, String typeValue, Boolean ignoreSource) {
-        if (ignoreSource) {
+    public static List<Round_Robin_Pool__c> q(
+        String obj,
+        String city,
+        String src,
+        String courseUpper,
+        String typeValue,
+        Boolean ignoreSource,
+        Boolean ignoreCourseBucket
+    ) {
+        if (ignoreSource && ignoreCourseBucket) {
+            return [
+                SELECT Id, Name, Object_Api_Name__c, City__c, Bucket__c,
+                       Sales_Rep__c, Sequence__c, Max_Weight__c, Assigned_Weight__c,
+                       Max_Leads__c, Total_Assigned__c, Maximum_Weightage__c,
+                       Current_Assigned_Weight__c, Active__c, Course__c, Course_Bucket__c, Type__c
+                FROM Round_Robin_Pool__c
+                WHERE Active__c = true
+                  AND Object_Api_Name__c = :obj
+                  AND City__c = :city
+                  AND Type__c = :typeValue
+                FOR UPDATE
+            ];
+        } else if (ignoreSource && !ignoreCourseBucket) {
             return [
                 SELECT Id, Name, Object_Api_Name__c, City__c, Bucket__c,
                        Sales_Rep__c, Sequence__c, Max_Weight__c, Assigned_Weight__c,
@@ -108,6 +136,20 @@ public without sharing class RoundRobinHelper {
                   AND City__c = :city
                   AND Course_Bucket__c = :courseUpper
                   AND Type__c = :typeValue
+                FOR UPDATE
+            ];
+        } else if (!ignoreSource && ignoreCourseBucket) {
+            return [
+                SELECT Id, Name, Object_Api_Name__c, City__c, Bucket__c, Lead_Source__c,
+                       Sales_Rep__c, Sequence__c, Max_Weight__c, Assigned_Weight__c,
+                       Max_Leads__c, Total_Assigned__c, Maximum_Weightage__c,
+                       Current_Assigned_Weight__c, Active__c, Course__c, Course_Bucket__c, Type__c
+                FROM Round_Robin_Pool__c
+                WHERE Active__c = true
+                  AND Object_Api_Name__c = :obj
+                  AND City__c = :city
+                  AND Type__c = :typeValue
+                  AND Lead_Source__c = :src
                 FOR UPDATE
             ];
         } else {

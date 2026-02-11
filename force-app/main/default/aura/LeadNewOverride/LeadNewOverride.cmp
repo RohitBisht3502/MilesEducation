@@ -1,0 +1,6 @@
+<aura:component
+    implements="flexipage:availableForAllPageTypes,force:lightningQuickAction,lightning:actionOverride,force:hasSObjectName,force:appHostable"
+    access="global">
+    <aura:handler name="init" value="{!this}" action="{!c.startFlow}"/>
+    <lightning:flow aura:id="leadFlow"/>
+</aura:component>

@@ -54,6 +54,12 @@ global class LeadFollowUpAssignmentBatch implements Database.Batchable<SObject>,
     
     // Schedulable execute method
     global void execute(SchedulableContext sc) {
+        if (!BatchExecutionWindowUtil.canRun('LeadFollowUpAssignmentBatch')) {
+            return;
+        }
+        if (BatchExecutionWindowUtil.isBatchAlreadyRunning('LeadFollowUpAssignmentBatch')) {
+            return;
+        }
         Database.executeBatch(new LeadFollowUpAssignmentBatch(), 100);
     }
 }

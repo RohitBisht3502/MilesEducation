@@ -78,8 +78,8 @@ public without sharing class TriggerRoundRobinService {
                 if (nSrc != oSrc) changed = true;
             }
 
-            // Check course change
-            if (!String.isBlank(cfg.courseField)) {
+            // Check course bucket change
+            if (!cfg.ignoreCourseBucket && !String.isBlank(cfg.courseField)) {
                 String nCourse = String.valueOf(nl.get(cfg.courseField));
                 String oCourse = String.valueOf(ol.get(cfg.courseField));
                 if (nCourse != oCourse) changed = true;

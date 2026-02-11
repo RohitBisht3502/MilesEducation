@@ -15,7 +15,8 @@ public without sharing class RoundRobinAssigner {
             System.debug(LoggingLevel.WARN, 'RoundRobinAssigner.assignWithStickyAndRoundRobin: config not found for object=' + objectApiName + ', type=' + type);
             return;
         }
-        System.debug(LoggingLevel.INFO, 'RoundRobinAssigner.assignWithStickyAndRoundRobin: start, records=' + records.size() + ', object=' + objectApiName);
+        System.debug(LoggingLevel.INFO, 'RoundRobinAssigner.assignWithStickyAndRoundRobin: start, records=' + records.size() + ', object=' + objectApiName + ', type=' + type);
+        System.debug(LoggingLevel.INFO, 'RoundRobinAssigner config: enableSticky=' + cfg.enableSticky + ', ignoreSource=' + cfg.ignoreSource + ', assignTo=' + cfg.assignToField + ', phoneField=' + cfg.phoneField + ', sourceField=' + cfg.sourceField + ', courseField=' + cfg.courseField);
 
         Boolean isMCOM = 'MCOM'.equalsIgnoreCase(type);
         
@@ -44,13 +45,9 @@ public without sharing class RoundRobinAssigner {
         }
 
         Map<String, Id> phoneSourceToUser = new Map<String, Id>();
-        Map<String, Id> phoneToLeadOwner = new Map<String, Id>();
-        Map<String, Id> phoneToStudentOwner = new Map<String, Id>();
-        Map<String, Id> phoneToCandidateOwner = new Map<String, Id>();
-        Map<String, Id> emailToStudentOwner = new Map<String, Id>();
-        Map<String, Id> emailToCandidateOwner = new Map<String, Id>();
-        Map<String, Id> emailToLeadOwner = new Map<String, Id>();
         Datetime cutoff = System.now().addSeconds(-30);
+        Boolean skipLeadOwnerCheck = (type != null && (type.equalsIgnoreCase('GP') || type.equalsIgnoreCase('MCOM')));
+        System.debug(LoggingLevel.INFO, 'RoundRobinAssigner: sticky cutoff=' + cutoff);
 
         if (cfg.enableSticky && !phones.isEmpty() && (cfg.ignoreSource || !sources.isEmpty())) {
             String soql =
@@ -61,7 +58,9 @@ public without sharing class RoundRobinAssigner {
                 (cfg.ignoreSource ? '' : (' AND ' + sourceField + ' IN :sources')) +
                 ' AND CreatedDate <= :cutoff';
 
+            System.debug(LoggingLevel.INFO, 'RoundRobinAssigner sticky SOQL=' + soql);
             List<SObject> existing = Database.query(soql);
+            System.debug(LoggingLevel.INFO, 'RoundRobinAssigner sticky matches=' + existing.size());
 
             for (SObject ex : existing) {
                 String phone = (phoneField != null) ? String.valueOf(ex.get(phoneField)) : null;
@@ -78,127 +77,105 @@ public without sharing class RoundRobinAssigner {
             }
         }
 
-        if (objectApiName == 'Lead__c' && !phones.isEmpty()) {
+        Map<String, Id> phoneToStudentOwner = new Map<String, Id>();
+        Map<String, Id> phoneToLeadOwner = new Map<String, Id>();
+        Map<String, Id> emailToStudentOwner = new Map<String, Id>();
+        Map<String, Id> emailToLeadOwner = new Map<String, Id>();
+
+        if (objectApiName == 'Lead__c' && !skipLeadOwnerCheck && (!phones.isEmpty() || !emails.isEmpty())) {
+            Set<Id> currentLeadIds = new Set<Id>();
+            for (SObject s : records) {
+                Id rid = (Id) s.get('Id');
+                if (rid != null) currentLeadIds.add(rid);
+            }
+
+            List<String> whereParts = new List<String>();
+            if (!phones.isEmpty()) {
+                whereParts.add(phoneField + ' IN :phones');
+            }
+            if (!emails.isEmpty()) {
+                whereParts.add('Email__c IN :emails');
+            }
+
             String leadSoql =
-                'SELECT Id, OwnerId, Student__c, Student__r.OwnerId, Candidate__c, Candidate__r.OwnerId, ' + phoneField +
-                ' FROM Lead__c WHERE ' + phoneField + ' IN :phones';
-            List<Lead__c> leadsByPhone = Database.query(leadSoql);
-            for (Lead__c exLead : leadsByPhone) {
+                'SELECT Id, OwnerId, ' + phoneField + ', Email__c, Payment_Received__c, Student__r.OwnerId ' +
+                'FROM Lead__c ' +
+                'WHERE (' + String.join(whereParts, ' OR ') + ')';
+            if (!currentLeadIds.isEmpty()) {
+                leadSoql += ' AND Id NOT IN :currentLeadIds';
+            }
+
+            List<Lead__c> existingLeads = Database.query(leadSoql);
+            for (Lead__c exLead : existingLeads) {
                 String phone = (phoneField != null) ? String.valueOf(exLead.get(phoneField)) : null;
-                if (String.isBlank(phone)) continue;
-                String key = phone.trim();
-                if (exLead.Student__c != null && exLead.Student__r != null && exLead.Student__r.OwnerId != null) {
-                    if (!phoneToStudentOwner.containsKey(key)) {
-                        phoneToStudentOwner.put(key, exLead.Student__r.OwnerId);
+                String email = exLead.Email__c;
+
+                if (exLead.Payment_Received__c == 'Fully Received' && exLead.Student__r != null && exLead.Student__r.OwnerId != null) {
+                    if (!String.isBlank(phone) && !phoneToStudentOwner.containsKey(phone.trim())) {
+                        phoneToStudentOwner.put(phone.trim(), exLead.Student__r.OwnerId);
                     }
-                } else if (exLead.Candidate__c != null && exLead.Candidate__r != null && exLead.Candidate__r.OwnerId != null) {
-                    if (!phoneToCandidateOwner.containsKey(key)) {
-                        phoneToCandidateOwner.put(key, exLead.Candidate__r.OwnerId);
+                    if (!String.isBlank(email)) {
+                        String eKey = email.trim().toLowerCase();
+                        if (!emailToStudentOwner.containsKey(eKey)) {
+                            emailToStudentOwner.put(eKey, exLead.Student__r.OwnerId);
+                        }
                     }
                 } else if (exLead.OwnerId != null) {
-                    if (!phoneToLeadOwner.containsKey(key)) {
-                        phoneToLeadOwner.put(key, exLead.OwnerId);
+                    if (!String.isBlank(phone) && !phoneToLeadOwner.containsKey(phone.trim())) {
+                        phoneToLeadOwner.put(phone.trim(), exLead.OwnerId);
+                    }
+                    if (!String.isBlank(email)) {
+                        String eKey = email.trim().toLowerCase();
+                        if (!emailToLeadOwner.containsKey(eKey)) {
+                            emailToLeadOwner.put(eKey, exLead.OwnerId);
+                        }
                     }
                 }
             }
-        }
-
-        if (objectApiName == 'Lead__c' && !phones.isEmpty()) {
-            List<Phone_Number__c> phoneLinks = [
-                SELECT Phone__c, Candidate__r.OwnerId, Student__r.OwnerId, Lead__r.OwnerId
-                FROM Phone_Number__c
-                WHERE Phone__c IN :phones
-            ];
-            for (Phone_Number__c pn : phoneLinks) {
-                if (String.isBlank(pn.Phone__c)) continue;
-                String key = pn.Phone__c.trim();
-                if (pn.Student__r != null && pn.Student__r.OwnerId != null) {
-                    if (!phoneToStudentOwner.containsKey(key)) {
-                        phoneToStudentOwner.put(key, pn.Student__r.OwnerId);
-                    }
-                } else if (pn.Candidate__r != null && pn.Candidate__r.OwnerId != null) {
-                    if (!phoneToCandidateOwner.containsKey(key)) {
-                        phoneToCandidateOwner.put(key, pn.Candidate__r.OwnerId);
-                    }
-                } else if (pn.Lead__r != null && pn.Lead__r.OwnerId != null) {
-                    if (!phoneToLeadOwner.containsKey(key)) {
-                        phoneToLeadOwner.put(key, pn.Lead__r.OwnerId);
-                    }
-                }
-            }
-        }
-
-        if (objectApiName == 'Lead__c' && !emails.isEmpty()) {
-            List<Email__c> emailLinks = [
-                SELECT Email__c, Candidate__r.OwnerId, Student__r.OwnerId, Lead__r.OwnerId
-                FROM Email__c
-                WHERE Email__c IN :emails
-            ];
-            for (Email__c em : emailLinks) {
-                if (String.isBlank(em.Email__c)) continue;
-                String key = em.Email__c.trim().toLowerCase();
-                if (em.Student__r != null && em.Student__r.OwnerId != null) {
-                    if (!emailToStudentOwner.containsKey(key)) {
-                        emailToStudentOwner.put(key, em.Student__r.OwnerId);
-                    }
-                } else if (em.Candidate__r != null && em.Candidate__r.OwnerId != null) {
-                    if (!emailToCandidateOwner.containsKey(key)) {
-                        emailToCandidateOwner.put(key, em.Candidate__r.OwnerId);
-                    }
-                } else if (em.Lead__r != null && em.Lead__r.OwnerId != null) {
-                    if (!emailToLeadOwner.containsKey(key)) {
-                        emailToLeadOwner.put(key, em.Lead__r.OwnerId);
-                    }
-                }
-            }
+            System.debug(LoggingLevel.INFO, 'RoundRobinAssigner existing lead owners: studentPhone=' + phoneToStudentOwner.size() + ', leadPhone=' + phoneToLeadOwner.size() + ', studentEmail=' + emailToStudentOwner.size() + ', leadEmail=' + emailToLeadOwner.size());
         }
 
         List<SObject> forRoundRobin = new List<SObject>();
         Integer stickyAssigned = 0;
+        Integer preAssigned = 0;
 
         for (SObject s : records) {
             Boolean assigned = false;
 
-            if (objectApiName == 'Lead__c') {
-                String courseVal = (courseField != null) ? String.valueOf(s.get(courseField)) : null;
-                Boolean skipStudentOwner = (!String.isBlank(courseVal) && 'MCOM'.equalsIgnoreCase(courseVal));
+            if (objectApiName == 'Lead__c' && !skipLeadOwnerCheck) {
                 String phone = (phoneField != null) ? String.valueOf(s.get(phoneField)) : null;
                 String email = String.valueOf(s.get('Email__c'));
 
-                if (!skipStudentOwner && !String.isBlank(phone)) {
+                if (!String.isBlank(phone)) {
                     String key = phone.trim();
                     Id studentOwner = phoneToStudentOwner.get(key);
                     if (studentOwner != null) {
                         setAssignee(s, cfg.assignToField, studentOwner);
                         assigned = true;
+                        preAssigned++;
                     } else {
-                        Id candidateOwner = phoneToCandidateOwner.get(key);
                         Id leadOwner = phoneToLeadOwner.get(key);
-                        if (candidateOwner != null) {
-                            setAssignee(s, cfg.assignToField, candidateOwner);
-                            assigned = true;
-                        } else if (leadOwner != null) {
+                        if (leadOwner != null) {
                             setAssignee(s, cfg.assignToField, leadOwner);
                             assigned = true;
+                            preAssigned++;
                         }
                     }
                 }
 
-                if (!assigned && !skipStudentOwner && !String.isBlank(email)) {
+                if (!assigned && !String.isBlank(email)) {
                     String eKey = email.trim().toLowerCase();
                     Id studentOwner = emailToStudentOwner.get(eKey);
                     if (studentOwner != null) {
                         setAssignee(s, cfg.assignToField, studentOwner);
                         assigned = true;
+                        preAssigned++;
                     } else {
-                        Id candidateOwner = emailToCandidateOwner.get(eKey);
                         Id leadOwner = emailToLeadOwner.get(eKey);
-                        if (candidateOwner != null) {
-                            setAssignee(s, cfg.assignToField, candidateOwner);
-                            assigned = true;
-                        } else if (leadOwner != null) {
+                        if (leadOwner != null) {
                             setAssignee(s, cfg.assignToField, leadOwner);
                             assigned = true;
+                            preAssigned++;
                         }
                     }
                 }
@@ -225,7 +202,7 @@ public without sharing class RoundRobinAssigner {
         if (!forRoundRobin.isEmpty()) {
             RoundRobinService.assignForRecords(forRoundRobin, cfg);
         }
-        System.debug(LoggingLevel.INFO, 'RoundRobinAssigner.assignWithStickyAndRoundRobin: done, stickyAssigned=' + stickyAssigned + ', roundRobinQueued=' + forRoundRobin.size());
+        System.debug(LoggingLevel.INFO, 'RoundRobinAssigner.assignWithStickyAndRoundRobin: done, preAssigned=' + preAssigned + ', stickyAssigned=' + stickyAssigned + ', roundRobinQueued=' + forRoundRobin.size());
     }
 
     private static void setAssignee(SObject s, String assignToField, Id userId) {

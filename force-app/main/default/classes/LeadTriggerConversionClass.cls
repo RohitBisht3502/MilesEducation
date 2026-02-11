@@ -1,8 +1,5 @@
 public class LeadTriggerConversionClass {
-    public static void convertCandidateOnFullPayment(
-        List<Lead__c> newLeads,
-        Map<Id, Lead__c> oldMap
-    ) {
+    public static void convertCandidateOnFullPayment( List<Lead__c> newLeads, Map<Id, Lead__c> oldMap) {
         System.debug('=== LeadTriggerConversionClass.convertCandidateOnFullPayment START ===');
         System.debug(
             'Incoming newLeads size=' + (newLeads == null ? 0 : newLeads.size()) +
@@ -152,6 +149,7 @@ public class LeadTriggerConversionClass {
         
         List<Lead__c> leadCToUpdate = new List<Lead__c>();
         List<Course_Enrolled__c> ceToInsert = new List<Course_Enrolled__c>();
+        Map<Id, Id> leadToAccount = new Map<Id, Id>();
         Map<String, Id> ceRecordTypeByName = getCourseRecordTypeIdsByName();
         
         for (Lead__c n : newLeads) {
@@ -172,6 +170,7 @@ public class LeadTriggerConversionClass {
             if (n.Student__c != accId) {
                 leadCToUpdate.add(new Lead__c(Id = n.Id, Student__c = accId));
             }
+            leadToAccount.put(n.Id, accId);
             
             String studentCourseKey = buildStudentCourseKey(accId, n.Course__c);
             if (!studentCourseKeysHavingCourseEnrolled.contains(studentCourseKey)) {
@@ -183,11 +182,6 @@ public class LeadTriggerConversionClass {
                 ce.Course__c = n.Course__c;
                 ce.City__c = n.City__c;
                 ce.Course_Bucket__c = n.Course_Bucket__c;
-                if (rtName == 'USP Pathway') {
-                    ce.Stages__c = 'U3';
-                } else {
-                    ce.Stages__c = 'M3';
-                }
                 Id ceRtId = ceRecordTypeByName.get(rtName);
                 if (ceRtId != null) {
                     ce.RecordTypeId = ceRtId;
@@ -209,6 +203,24 @@ public class LeadTriggerConversionClass {
         
         if (!leadCToUpdate.isEmpty()) {
             update leadCToUpdate;
+        }
+
+        if (!leadToAccount.isEmpty()) {
+            List<Purchase_Order__c> poToUpdate = new List<Purchase_Order__c>();
+            for (Purchase_Order__c po : [
+                SELECT Id, Lead__c, Student__c
+                FROM Purchase_Order__c
+                WHERE Lead__c IN :leadToAccount.keySet()
+            ]) {
+                Id accId = leadToAccount.get(po.Lead__c);
+                if (accId != null && po.Student__c != accId) {
+                    po.Student__c = accId;
+                    poToUpdate.add(po);
+                }
+            }
+            if (!poToUpdate.isEmpty()) {
+                update poToUpdate;
+            }
         }
         
         syncAccountAddressesFromCandidate(candidateToAccount);
