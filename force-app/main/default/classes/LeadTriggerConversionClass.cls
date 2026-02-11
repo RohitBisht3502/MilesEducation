@@ -132,6 +132,12 @@ public class LeadTriggerConversionClass {
         
         Set<Id> studentAccountIds = new Set<Id>(candidateToAccount.values());
         Set<String> studentCourseKeysHavingCourseEnrolled = new Set<String>();
+
+        Map<Id, Account> accMap = new Map<Id, Account>([
+            SELECT Id, OwnerId
+            FROM Account
+            WHERE Id IN :studentAccountIds
+        ]);
         
         List<Course_Enrolled__c> existingCE = [
             SELECT Id, Student__c, Course__c
@@ -161,6 +167,7 @@ public class LeadTriggerConversionClass {
             if (accId == null) {
                 continue;
             }
+            Account studentAcc = accMap.get(accId);
 
             String rtName = getLeadRecordTypeName(n.RecordTypeId);
             if (String.isBlank(rtName) || !allowedRecordTypes.contains(rtName)) {
@@ -176,6 +183,9 @@ public class LeadTriggerConversionClass {
             if (!studentCourseKeysHavingCourseEnrolled.contains(studentCourseKey)) {
                 Course_Enrolled__c ce = new Course_Enrolled__c();
                 ce.Student__c = accId;
+                if (studentAcc != null && studentAcc.OwnerId != null) {
+                    ce.OwnerId = studentAcc.OwnerId;
+                }
                 ce.CC_Spoc__c = n.OwnerId;
                 ce.Source__c = n.Source__c;
                 ce.Phone__c = n.Phone__c;

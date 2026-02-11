@@ -45,10 +45,11 @@ public without sharing class CourseEnrolledTriggerFrameworkHandler extends BaseT
     }
 
     public override void afterInsert() {
-
+        syncStudentOwner(getNewCourses(), null);
     }
 
     public override void afterUpdate() {
+        syncStudentOwner(getNewCourses(), getOldCourseMap());
         //CourseEnrolledTriggerHandler.afterUpdate(getNewCourses(), getOldCourseMap());
     }
 
@@ -62,5 +63,41 @@ public without sharing class CourseEnrolledTriggerFrameworkHandler extends BaseT
 
     public override void afterUndelete() {
 
+    }
+
+    private static void syncStudentOwner(
+        List<Course_Enrolled__c> newRecs,
+        Map<Id, Course_Enrolled__c> oldMap
+    ) {
+        if (newRecs == null || newRecs.isEmpty()) return;
+
+        Map<Id, Id> studentToOwner = new Map<Id, Id>();
+        for (Course_Enrolled__c ce : newRecs) {
+            if (ce.Student__c == null || ce.OwnerId == null) continue;
+            if (oldMap != null) {
+                Course_Enrolled__c oldRec = oldMap.get(ce.Id);
+                if (oldRec != null && oldRec.OwnerId == ce.OwnerId) continue;
+            }
+            studentToOwner.put(ce.Student__c, ce.OwnerId);
+        }
+
+        if (studentToOwner.isEmpty()) return;
+
+        List<Account> toUpdate = new List<Account>();
+        for (Account acc : [
+            SELECT Id, OwnerId
+            FROM Account
+            WHERE Id IN :studentToOwner.keySet()
+        ]) {
+            Id newOwnerId = studentToOwner.get(acc.Id);
+            if (newOwnerId != null && acc.OwnerId != newOwnerId) {
+                acc.OwnerId = newOwnerId;
+                toUpdate.add(acc);
+            }
+        }
+
+        if (!toUpdate.isEmpty()) {
+            update toUpdate;
+        }
     }
 }

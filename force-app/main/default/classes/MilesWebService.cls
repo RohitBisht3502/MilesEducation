@@ -181,7 +181,8 @@ global without sharing class MilesWebService {
                     Name        = inputData.phone,
                     Phone__c    = inputData.phone,
                     Candidate__c= candidate.Id,
-                    Lead__c     = newLead.Id
+                    Lead__c     = newLead.Id,
+                    Is_Primary__c = true
                 );
                 insert phoneRec;
 
@@ -217,6 +218,7 @@ global without sharing class MilesWebService {
 
                 // For enquiry linking
                 enquiryCandidateId = (candidate != null ? candidate.Id : null);
+                Id candidateIdForLead = (enquiryCandidateId != null ? enquiryCandidateId : candidateIdFromPhone);
 
                 /* =====================================================
                    Next: Check Lead exist with same course
@@ -247,6 +249,10 @@ global without sharing class MilesWebService {
 
                     enquiryLeadId = existingLeadC.Id;
                     leadToReturn  = existingLeadC;
+                    if (existingLeadC.Candidate__c == null && candidateIdForLead != null) {
+                        existingLeadC.Candidate__c = candidateIdForLead;
+                        update existingLeadC;
+                    }
 
                     // Email Associations
                     EmailDecision ed = handleEmailAssociation(inputData.email, existingLeadC.Id, enquiryCandidateId, enquiry.Id,studentAccountId);
@@ -275,7 +281,7 @@ global without sharing class MilesWebService {
                         Source__c                = inputData.coming_from,
                         Register_for_Webinar__c  = inputData.register_for_webinar,
                         Interested_Webinar_ID__c = inputData.interested_webinar_id,
-                        Candidate__c             = (enquiryCandidateId != null ? enquiryCandidateId : null),
+                        Candidate__c             = (candidateIdForLead != null ? candidateIdForLead : null),
                         RecordTypeId             = leadRecordTypeId,
                         Student__c               = (studentAccountId != null ? studentAccountId : null)
                     );
@@ -371,7 +377,8 @@ global without sharing class MilesWebService {
             Email__c         = email,
             Lead__c          = leadId,
             Candidate__c     = candidateId,
-            Student__c       = (studentAccountId != null ? studentAccountId : null)
+            Student__c       = (studentAccountId != null ? studentAccountId : null),
+            Is_Primary__c    = true
         );
         insert newEmail;
 
