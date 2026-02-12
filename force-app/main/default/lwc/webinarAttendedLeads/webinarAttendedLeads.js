@@ -20,7 +20,8 @@ import getWebinarsByNameOnly from '@salesforce/apex/WebinarController.getWebinar
 const STATUS = {
     ALL: 'All',
     PRESENT: 'Present',
-    ABSENT: 'Absent'
+    ABSENT: 'Absent',
+     SCHEDULED: 'Scheduled'
 };
 
 const STATUS_OPTIONS = [
@@ -38,7 +39,9 @@ const TOAST_VARIANT = {
 
 const STATUS_BADGE_MAP = {
     [STATUS.PRESENT]: 'status-badge status-badge--success',
-    [STATUS.ABSENT]: 'status-badge status-badge--error'
+    [STATUS.ABSENT]: 'status-badge status-badge--error',
+   [STATUS.SCHEDULED]: 'status-badge status-badge--info'
+
 };
 
 export default class WebinarAttendedLeads extends LightningElement {
@@ -283,27 +286,35 @@ export default class WebinarAttendedLeads extends LightningElement {
                 const data = this.allWebinarData.filter(item => item.spocId === this.selectedSpocId);
                 this.processWebinarData(data);
             } else if (!this.isGM) {
-                // For non-GM users, reprocess their data
-                const data = this.webinarData.map(item => {
-                    const emailLower = item.email ? item.email.toLowerCase().trim() : '';
-                    const isLiveAttendee = this.liveAttendeeEmails.has(emailLower);
+    // For non-GM users — SAFE status handling (keeps Scheduled)
 
-                    return {
-                        ...item,
-                        status: this.hasLiveSyncOccurred
-                            ? (isLiveAttendee ? STATUS.PRESENT : STATUS.ABSENT)
-                            : item.status,
-                        statusBadgeClass: this.getStatusBadgeClass(
-                            this.hasLiveSyncOccurred
-                                ? (isLiveAttendee ? STATUS.PRESENT : STATUS.ABSENT)
-                                : item.status
-                        ),
-                        showCallButton: true
-                    };
-                });
-                this.webinarData = data;
-                this.applyFilters();
-            }
+    const data = this.webinarData.map(item => {
+        const emailLower = item.email ? item.email.toLowerCase().trim() : '';
+        const isLiveAttendee = this.liveAttendeeEmails.has(emailLower);
+
+        let finalStatus;
+
+        if (item.status) {
+            finalStatus = item.status;   // Present/Absent from DB
+        } 
+        else if (this.hasLiveSyncOccurred) {
+            finalStatus = isLiveAttendee ? STATUS.PRESENT : STATUS.ABSENT;
+        } 
+        else {
+            finalStatus = STATUS.SCHEDULED;   
+        }
+
+        return {
+            ...item,
+            status: finalStatus,
+            statusBadgeClass: this.getStatusBadgeClass(finalStatus),
+            showCallButton: true
+        };
+    });
+
+    this.webinarData = data;
+    this.applyFilters();
+}
 
             this.showToast(
                 'Success',
@@ -341,28 +352,36 @@ export default class WebinarAttendedLeads extends LightningElement {
     // -------------------------
     // APPLY LIVE ATTENDEE STATUS
     // -------------------------
-    applyLiveAttendeeStatus() {
-        if (!this.allWebinarData || this.allWebinarData.length === 0 || !this.hasLiveSyncOccurred) {
-            return;
+applyLiveAttendeeStatus() {
+    if (!this.allWebinarData.length || !this.hasLiveSyncOccurred) return;
+
+    this.allWebinarData = this.allWebinarData.map(item => {
+        const emailLower = item.email ? item.email.toLowerCase().trim() : '';
+        const isLiveAttendee = this.liveAttendeeEmails.has(emailLower);
+
+        let finalStatus;
+
+        if (item.status) {
+            finalStatus = item.status;   // from DB only
+        } else {
+            finalStatus = isLiveAttendee 
+                ? STATUS.PRESENT 
+                : STATUS.SCHEDULED;   
         }
+        if (webinarEnded) {
+   finalStatus = STATUS.ABSENT;
+}
 
-        // Update status for all items based on live attendee emails
-        // If email is in live list → Present, otherwise → Absent
-        this.allWebinarData = this.allWebinarData.map(item => {
-            const emailLower = item.email ? item.email.toLowerCase().trim() : '';
-            const isLiveAttendee = this.liveAttendeeEmails.has(emailLower);
 
-            // Frontend-only status override
-            const liveStatus = isLiveAttendee ? STATUS.PRESENT : STATUS.ABSENT;
+        return {
+            ...item,
+            status: finalStatus,
+            statusBadgeClass: this.getStatusBadgeClass(finalStatus),
+            showCallButton: true
+        };
+    });
+}
 
-            return {
-                ...item,
-                status: liveStatus,
-                statusBadgeClass: this.getStatusBadgeClass(liveStatus),
-                showCallButton: true
-            };
-        });
-    }
 
     // -------------------------
     // SPOC TABLE HANDLERS
@@ -504,31 +523,34 @@ export default class WebinarAttendedLeads extends LightningElement {
         }
     }
 
-    enrichWebinarItem(item) {
-        const emailLower = item.email ? item.email.toLowerCase().trim() : '';
-        const isLiveAttendee = this.liveAttendeeEmails.has(emailLower);
+   enrichWebinarItem(item) {
+    const emailLower = item.email ? item.email.toLowerCase().trim() : '';
+    const isLiveAttendee = this.liveAttendeeEmails.has(emailLower);
 
-        // If sync has occurred, override status based on live attendees
-        // If not in live list → mark as Absent
-        const frontendStatus = this.hasLiveSyncOccurred
-            ? (isLiveAttendee ? STATUS.PRESENT : STATUS.ABSENT)
-            : item.status;
+    let finalStatus;
 
-        return {
-            ...item,
-            studentInitials: this.generateInitials(item.leadName),
-            studentName: item.leadName,
-            email: item.email,
-            phone: item.phone,
-            formattedDate: this.formatDate(item.createdDate),
-            registrationDate: item.createdDate,
-            status: frontendStatus,
-            statusBadgeClass: this.getStatusBadgeClass(frontendStatus),
-            spocName: item.spocName || 'Not Assigned',
-            spocId: item.spocId,
-            showCallButton: true
-        };
+    // If attendance not marked yet
+    if (!item.status) {
+        if (this.hasLiveSyncOccurred) {
+            finalStatus = isLiveAttendee ? STATUS.PRESENT : STATUS.ABSENT;
+        } else {
+            finalStatus = STATUS.SCHEDULED;   // ✅ THIS IS YOUR REQUIREMENT
+        }
+    } else {
+        finalStatus = item.status; // Present or Absent from DB
     }
+
+    return {
+        ...item,
+        studentInitials: this.generateInitials(item.leadName),
+        formattedDate: this.formatDate(item.createdDate),
+        status: finalStatus,
+        statusBadgeClass: this.getStatusBadgeClass(finalStatus),
+        spocName: item.spocName || 'Not Assigned',
+        spocId: item.spocId,
+        showCallButton: true
+    };
+}
 
     handleError(error) {
         this.logError('Error fetching webinar data', error);

@@ -9,6 +9,11 @@ public without sharing class RunoCallIdentityService {
         @AuraEnabled public String source;
         @AuraEnabled public String stage;
         @AuraEnabled public String canId;
+ @AuraEnabled public Datetime createdDate;
+    @AuraEnabled public String highestLevel;
+    @AuraEnabled public String mhpTag;
+    @AuraEnabled public String leadOwner;
+
     }
 
     @AuraEnabled(cacheable=true)
@@ -21,7 +26,11 @@ public without sharing class RunoCallIdentityService {
         /* ===================== LEAD ===================== */
         if (sObjType == Lead__c.SObjectType) {
             Lead__c l = [
-                SELECT Id, Name, Email__c, Phone__c, City__c, Course__c, Stage__c, CAN_ID__c
+                SELECT Id, Name, Email__c, Phone__c, City__c, Course__c, Stage__c, CAN_ID__c,
+                CreatedDate,
+   
+       Is_ReEnquiry__c,
+       Owner.Name
                 FROM Lead__c
                 WHERE Id = :recordId
                 LIMIT 1
@@ -35,36 +44,55 @@ public without sharing class RunoCallIdentityService {
             dto.source = l.Course__c;
             dto.stage  = l.Stage__c;
             dto.canId  = l.CAN_ID__c;
+               dto.createdDate  = l.CreatedDate;
+    // dto.highestLevel = l.Highest_Level__c;
 
-            return dto;
+    
+    dto.mhpTag = l.Is_ReEnquiry__c ? 'Yes' : 'No';
+
+    dto.leadOwner = l.Owner.Name;
+
+    return dto;
+
+           
         }
 
         /* ===================== COURSE ENROLLED ===================== */
-        if (sObjType == Course_Enrolled__c.SObjectType) {
-            Course_Enrolled__c ce = [
-                SELECT
-                    Id,
-                    Name,
-                    Phone__c,
-                    City__c,
-                    Course__c,
-                    Stages__c
-                FROM Course_Enrolled__c
-                WHERE Id = :recordId
-                LIMIT 1
-            ];
+      if (sObjType == Course_Enrolled__c.SObjectType) {
 
-            IdentityDTO dto = new IdentityDTO();
-            dto.name   = ce.Name;          // Auto Number
-            dto.email  = 'NA';             // Not available
-            dto.phone  = ce.Phone__c;
-            dto.city   = ce.City__c;
-            dto.source = ce.Course__c;
-            dto.stage  = ce.Stages__c;
-            dto.canId  = null;
+    Course_Enrolled__c ce = [
+        SELECT
+            Id,
+            Name,
+            Phone__c,
+            City__c,
+            Course__c,
+            Stages__c,
+            CreatedDate,
+            // MHP_Tag__c,
+            Owner.Name
+        FROM Course_Enrolled__c
+        WHERE Id = :recordId
+        LIMIT 1
+    ];
 
-            return dto;
-        }
+    IdentityDTO dto = new IdentityDTO();
+
+    dto.name        = ce.Name;
+    dto.email       = 'NA';
+    dto.phone       = ce.Phone__c;
+    dto.city        = ce.City__c;
+    dto.source      = ce.Course__c;
+    dto.stage       = ce.Stages__c;
+    dto.canId       = null;
+
+  
+    dto.createdDate = ce.CreatedDate;
+    // dto.mhpTag      = ce.MHP_Tag__c;
+    dto.leadOwner   = ce.Owner.Name;
+
+    return dto;
+}
 
         /* ===================== CALL LOG ===================== */
         if (sObjType == Call_Log__c.SObjectType) {

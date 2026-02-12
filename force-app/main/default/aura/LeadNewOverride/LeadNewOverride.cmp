@@ -1,6 +1,67 @@
 <aura:component
     implements="flexipage:availableForAllPageTypes,force:lightningQuickAction,lightning:actionOverride,force:hasSObjectName,force:appHostable"
+    controller="LeadNewOverrideController"
     access="global">
-    <aura:handler name="init" value="{!this}" action="{!c.startFlow}"/>
-    <lightning:flow aura:id="leadFlow"/>
+    <aura:attribute name="courseOptions" type="List" default="[]"/>
+    <aura:attribute name="course" type="String" default=""/>
+    <aura:attribute name="firstName" type="String" default=""/>
+    <aura:attribute name="lastName" type="String" default=""/>
+    <aura:attribute name="phone" type="String" default=""/>
+    <aura:attribute name="email" type="String" default=""/>
+    <aura:attribute name="isLoading" type="Boolean" default="false"/>
+    <aura:attribute name="errorMessage" type="String" default=""/>
+
+    <aura:handler name="init" value="{!this}" action="{!c.doInit}"/>
+
+    <lightning:card title="New Lead">
+        <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+            <aura:if isTrue="{!not(empty(v.errorMessage))}">
+                <div class="slds-notify slds-notify_alert slds-theme_error slds-m-bottom_small" role="alert">
+                    <span class="slds-assistive-text">Error</span>
+                    <h2>{!v.errorMessage}</h2>
+                </div>
+            </aura:if>
+
+            <lightning:layout multipleRows="true">
+                <!-- First Name -->
+                <lightning:layoutItem size="3" smallDeviceSize="6" padding="around-small">
+                    <lightning:input name="firstName" label="First Name" value="{!v.firstName}" onchange="{!c.handleInputChange}"/>
+           </lightning:layoutItem>
+                
+                <!-- Last Name -->
+                <lightning:layoutItem size="3" smallDeviceSize="6" padding="around-small">     
+                    <lightning:input name="lastName" label="Last Name" required="true" value="{!v.lastName}" onchange="{!c.handleInputChange}"/>
+                </lightning:layoutItem>
+                
+                <!-- Email -->
+                <lightning:layoutItem size="3" smallDeviceSize="6" padding="around-small">
+                    <lightning:input name="email" type="email" label="Email" required="true" value="{!v.email}" onchange="{!c.handleInputChange}"/>
+                </lightning:layoutItem>
+                
+                <!-- Phone -->
+                <lightning:layoutItem size="3" smallDeviceSize="6" padding="around-small">
+                    <lightning:input name="phone" type="tel" label="Phone" required="true" value="{!v.phone}" onchange="{!c.handleInputChange}"/>
+                </lightning:layoutItem>
+                
+                <!-- Course -->
+                <lightning:layoutItem size="3" smallDeviceSize="6" padding="around-small">
+                    <lightning:select name="course" label="Course" value="{!v.course}" required="true" onchange="{!c.handleInputChange}">
+                        <option value="">--None--</option>
+                        <aura:iteration items="{!v.courseOptions}" var="opt">
+                            <option value="{!opt.value}">{!opt.label}</option>
+                        </aura:iteration>
+                    </lightning:select>
+                </lightning:layoutItem>
+            </lightning:layout>
+
+            <div class="slds-m-top_medium">
+                <lightning:button variant="brand" label="{!v.isLoading ? 'Saving...' : 'Save'}" onclick="{!c.handleCreate}" disabled="{!v.isLoading}"/>
+                <lightning:button class="slds-m-left_small" variant="neutral" label="Cancel" onclick="{!c.handleCancel}" disabled="{!v.isLoading}"/>
+            </div>
+        </div>
+
+        <aura:if isTrue="{!v.isLoading}">
+            <lightning:spinner alternativeText="Loading" size="medium"/>
+        </aura:if>
+    </lightning:card>
 </aura:component>

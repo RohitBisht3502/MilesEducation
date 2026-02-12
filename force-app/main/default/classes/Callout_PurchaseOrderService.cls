@@ -150,6 +150,8 @@ public without sharing class Callout_PurchaseOrderService {
 
         Integer sc = httpRes.getStatusCode();
         String resBody = httpRes.getBody();
+        System.debug('Create Enrolment API Response Status: ' + sc);
+        System.debug('Create Enrolment API Response Body: ' + resBody);
 
         if (sc < 200 || sc >= 300 || String.isBlank(resBody)) {
             IntegrationLogUtil.insertLog(

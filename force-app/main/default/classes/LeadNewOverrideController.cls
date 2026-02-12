@@ -72,41 +72,40 @@ public with sharing class LeadNewOverrideController {
 
     @AuraEnabled
     public static Result createLeadByCourse(String course, String firstName, String lastName, String phone, String email) {
-        Result res = new Result();
         try {
             if (String.isBlank(course)) {
-                throw new AuraHandledException('Course is required.');
+                return errorResult('Course is required.');
             }
             if (String.isBlank(lastName) || String.isBlank(phone) || String.isBlank(email)) {
-                throw new AuraHandledException('Last Name, Phone, and Email are required.');
+                return errorResult('Last Name, Phone, and Email are required.');
             }
 
             Id recordTypeId = getRecordTypeIdForCourse(course);
             if (recordTypeId == null) {
-                throw new AuraHandledException('Record Type not found for Course: ' + course);
+                return errorResult('Record Type not found for Course: ' + course);
             }
             String stage = getDefaultStageForCourse(course);
 
             Lead__c existingLead = findExistingLeadByPhone(phone);
             if (existingLead != null) {
-                throw new AuraHandledException('Lead already exists with this phone number.');
+                return errorResult('Lead already exists with this phone number.');
             }
 
             Phone_Number__c existingPhone = findExistingPhone(phone);
             if (existingPhone != null && existingPhone.Lead__c != null) {
-                throw new AuraHandledException('Phone number already exists with another Lead.');
+                return errorResult('Phone number already exists with another Lead.');
             }
 
             Email__c existingEmail = findExistingEmail(email);
             if (existingEmail != null && existingEmail.Lead__c != null) {
-                throw new AuraHandledException('Email already exists with another Lead.');
+                return errorResult('Email already exists with another Lead.');
             }
 
             Id candidateIdFromPhone = (existingPhone != null ? existingPhone.Candidate__c : null);
             Id candidateIdFromEmail = (existingEmail != null ? existingEmail.Candidate__c : null);
             if (candidateIdFromPhone != null && candidateIdFromEmail != null
                 && candidateIdFromPhone != candidateIdFromEmail) {
-                throw new AuraHandledException('Phone and Email belong to different candidates.');
+                return errorResult('Phone and Email belong to different candidates.');
             }
 
             Lead candidate = null;
@@ -134,6 +133,7 @@ public with sharing class LeadNewOverrideController {
                 Email__c     = email,
                 Stage__c     = stage,
                 Course__c    = course,
+                Source__c    = 'Referral',
                 RecordTypeId = recordTypeId,
                 Candidate__c = candidate.Id
             );
@@ -190,31 +190,24 @@ public with sharing class LeadNewOverrideController {
                 if (emailChanged) update existingEmail;
             }
 
+            Result res = new Result();
             res.success = true;
             res.message = 'Lead created.';
             res.leadId = newLead.Id;
             return res;
-
-        } catch (AuraHandledException ahe) {
-            res.success = false;
-            res.message = ahe.getMessage();
-            return res;
         } catch (Exception e) {
-            res.success = false;
-            res.message = e.getMessage();
-            return res;
+            return errorResult(e.getMessage());
         }
     }
 
     @AuraEnabled
     public static Result createLead(Id recordTypeId, String firstName, String lastName, String phone, String email) {
-        Result res = new Result();
         try {
             if (recordTypeId == null) {
-                throw new AuraHandledException('Record Type is required.');
+                return errorResult('Record Type is required.');
             }
             if (String.isBlank(lastName) || String.isBlank(phone) || String.isBlank(email)) {
-                throw new AuraHandledException('Last Name, Phone, and Email are required.');
+                return errorResult('Last Name, Phone, and Email are required.');
             }
 
             RecordType rt = [
@@ -226,25 +219,25 @@ public with sharing class LeadNewOverrideController {
 
             String course = getCourseFromRecordType(rt.Name);
             if (String.isBlank(course)) {
-                throw new AuraHandledException('Course mapping not found for Record Type: ' + rt.Name);
+                return errorResult('Course mapping not found for Record Type: ' + rt.Name);
             }
             String stage = getDefaultStageForCourse(course);
 
             Phone_Number__c existingPhone = findExistingPhone(phone);
             if (existingPhone != null && existingPhone.Lead__c != null) {
-                throw new AuraHandledException('Phone number already exists with another Lead.');
+                return errorResult('Phone number already exists with another Lead.');
             }
 
             Email__c existingEmail = findExistingEmail(email);
             if (existingEmail != null && existingEmail.Lead__c != null) {
-                throw new AuraHandledException('Email already exists with another Lead.');
+                return errorResult('Email already exists with another Lead.');
             }
 
             Id candidateIdFromPhone = (existingPhone != null ? existingPhone.Candidate__c : null);
             Id candidateIdFromEmail = (existingEmail != null ? existingEmail.Candidate__c : null);
             if (candidateIdFromPhone != null && candidateIdFromEmail != null
                 && candidateIdFromPhone != candidateIdFromEmail) {
-                throw new AuraHandledException('Phone and Email belong to different candidates.');
+                return errorResult('Phone and Email belong to different candidates.');
             }
 
             Lead candidate = null;
@@ -272,6 +265,7 @@ public with sharing class LeadNewOverrideController {
                 Email__c     = email,
                 Stage__c     = stage,
                 Course__c    = course,
+                Source__c    = 'Referral',
                 RecordTypeId = rt.Id,
                 Candidate__c = candidate.Id
             );
@@ -328,20 +322,21 @@ public with sharing class LeadNewOverrideController {
                 if (emailChanged) update existingEmail;
             }
 
+            Result res = new Result();
             res.success = true;
             res.message = 'Lead created.';
             res.leadId = newLead.Id;
             return res;
-
-        } catch (AuraHandledException ahe) {
-            res.success = false;
-            res.message = ahe.getMessage();
-            return res;
         } catch (Exception e) {
-            res.success = false;
-            res.message = e.getMessage();
-            return res;
+            return errorResult(e.getMessage());
         }
+    }
+
+    private static Result errorResult(String message) {
+        Result res = new Result();
+        res.success = false;
+        res.message = String.isBlank(message) ? 'Unexpected error.' : message;
+        return res;
     }
 
     private static String buildFullName(String firstName, String lastName) {

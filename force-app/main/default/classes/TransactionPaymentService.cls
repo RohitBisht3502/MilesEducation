@@ -26,7 +26,7 @@ public without sharing class TransactionPaymentService {
         Purchase_Order__c po = (Purchase_Order__c) Database.query(soql);
 
         List<Transcation__c> txns = [
-            SELECT Payment__c, Payment_Received__c, Status__c, CreatedDate
+            SELECT Payment__c, Status__c, CreatedDate
             FROM Transcation__c
             WHERE Purchase_Orders__c = :purchaseOrderId
             ORDER BY CreatedDate DESC
@@ -34,8 +34,8 @@ public without sharing class TransactionPaymentService {
         ];
 
         Decimal receivedTotal = 0;
-        if (!txns.isEmpty() && txns[0].Payment_Received__c != null) {
-            receivedTotal = txns[0].Payment_Received__c;
+        if (!txns.isEmpty() && txns[0].Payment__c != null) {
+            receivedTotal = txns[0].Payment__c;
         }
 
         Decimal netPayable = po.Net_Payable_Amount__c == null ? 0 : po.Net_Payable_Amount__c;
@@ -113,7 +113,7 @@ public without sharing class TransactionPaymentService {
 
         // Get Purchase Order Net Payable Amount
         Purchase_Order__c po = [
-            SELECT Id, Net_Payable_Amount__c
+            SELECT Id, Net_Payable_Amount__c, Purchase_Order_Id__c
             FROM Purchase_Order__c
             WHERE Id = :purchaseOrderId
             LIMIT 1
@@ -125,7 +125,7 @@ public without sharing class TransactionPaymentService {
 
         //  Get last transaction to calculate running total
         List<Transcation__c> lastTxn = [
-            SELECT Payment_Received__c
+            SELECT Payment__c
             FROM Transcation__c
             WHERE Purchase_Orders__c = :purchaseOrderId
             ORDER BY CreatedDate DESC
@@ -133,8 +133,8 @@ public without sharing class TransactionPaymentService {
         ];
 
         Decimal previousTotal = 0;
-        if (!lastTxn.isEmpty() && lastTxn[0].Payment_Received__c != null) {
-            previousTotal = lastTxn[0].Payment_Received__c;
+        if (!lastTxn.isEmpty() && lastTxn[0].Payment__c != null) {
+            previousTotal = lastTxn[0].Payment__c;
         }
 
         Decimal newTotal = previousTotal + amount;
@@ -147,20 +147,27 @@ public without sharing class TransactionPaymentService {
             );
         }
 
+        // Call API before creating transaction
+        Callout_PaymentUpdateApi.PaymentUpdateResponse apiRes =
+            Callout_PaymentUpdateApi.sendPaymentUpdateSync(
+                po.Purchase_Order_Id__c,
+                amount
+            );
+
+        if (apiRes == null || apiRes.status != true || apiRes.result == null) {
+            throw new AuraHandledException('Payment link API failed.');
+        }
+
         //  Always create NEW transaction
         Transcation__c newTxn = new Transcation__c();
         newTxn.Purchase_Orders__c  = purchaseOrderId;
         newTxn.Payment__c          = amount;          
         // newTxn.Payment_Received__c = newTotal;        
         newTxn.Status__c           = 'Initiated';
+        newTxn.Is_Down_Payment__c  = apiRes.result.is_down_payment;
+        newTxn.Link__c             = apiRes.result.link;
+        newTxn.Link_Status__c      = apiRes.result.link_status;
 
         insert newTxn;
-
-        Callout_PaymentUpdateApi.sendPaymentUpdate
-            (
-            purchaseOrderId,
-            amount
-        );
-        
     }
 }

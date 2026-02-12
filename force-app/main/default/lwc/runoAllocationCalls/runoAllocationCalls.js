@@ -6,22 +6,27 @@ import updateCallFeedback from '@salesforce/apex/Webservice_RunoAllocationAPI.up
 import getL1L2Values from '@salesforce/apex/Webservice_RunoAllocationAPI.getL1L2Values';
 import getIdentity from '@salesforce/apex/RunoCallIdentityService.getIdentity';
 import getStageLevelValues from '@salesforce/apex/Webservice_RunoAllocationAPI.getStageLevelValues';
+import getCallHistory from '@salesforce/apex/Webservice_RunoAllocationAPI.getCallHistory';
+import getWebinarMembers from '@salesforce/apex/Webservice_RunoAllocationAPI.getWebinarMembers';
+import getLeadEvents from '@salesforce/apex/Webservice_RunoAllocationAPI.getLeadEvents';
+import { NavigationMixin } from 'lightning/navigation';
+
 
 import { CloseActionScreenEvent } from 'lightning/actions';
 import { subscribe, unsubscribe, onError } from 'lightning/empApi';
 
-export default class RunoAllocationCalls extends LightningElement {
+export default class RunoAllocationCalls extends NavigationMixin(LightningElement) {
+
     @api recordId;
-    @api isCallLog; 
+    @api isCallLog;
     @api isQueuePaused;
     @api isQueueRunning;
+    // isHistoryTab = true;
 
-    // ---------------------------------------------
-    // 🔥 ADDED: flag for renderedCallback
-    // ---------------------------------------------
+
     hasRendered = false;
-isStageDisabled = false;
- 
+    isStageDisabled = false;
+
     // UI / state
     loading = false;
     disableCancel = false;
@@ -34,7 +39,7 @@ isStageDisabled = false;
     showCallPopup = false;
 
 
-userChangedStage = false;
+    userChangedStage = false;
 
     // L1/L2
     l1Value = '';
@@ -43,11 +48,19 @@ userChangedStage = false;
     l2Options = [];
     fullMap = {};
     isL2Disabled = true;
-   
-autoSetFollowUp = true;
+
+    autoSetFollowUp = true;
+    callHistory = [];
 
 
-    // Stage / Course
+activeTab = 'lead';
+
+webinarHistory = [];
+webinarLoaded = false;
+
+eventHistory = [];
+eventLoaded = false;
+
     stageValue = '';
     levelValue = '';
     stageOptions = [];
@@ -65,7 +78,10 @@ autoSetFollowUp = true;
         city: '',
         source: '',
         stage: '',
-        level: ''
+       canId: '',
+        createdDate: '',
+    mhpTag: '',
+    leadOwner: ''
     };
 
     // call state
@@ -76,6 +92,7 @@ autoSetFollowUp = true;
     elapsedMs = 0;
     elapsedLabel = '00:00';
     timerId = null;
+  
 
 
 
@@ -84,11 +101,11 @@ autoSetFollowUp = true;
     savingFeedback = false;
     feedback = '';
     nextFollowUpDate = null;
-    notifyMe = false; 
+    notifyMe = false;
 
-handleNotifyChange(event) {
-    this.notifyMe = event.target.checked;
-}
+    handleNotifyChange(event) {
+        this.notifyMe = event.target.checked;
+    }
 
 
     lastCallId = null;
@@ -144,6 +161,7 @@ handleNotifyChange(event) {
     connectedCallback() {
         this.loadPicklists();
         this.loadStageLevel();
+        this.loadCallHistory();
         this.subscribeToEvents();
         onError(err => console.warn('EMP API Error:', JSON.stringify(err)));
     }
@@ -153,7 +171,7 @@ handleNotifyChange(event) {
         this.clearFeedbackTimers();
         if (this.subscription) {
             try {
-                unsubscribe(this.subscription, () => {});
+                unsubscribe(this.subscription, () => { });
             } catch (e) {
                 console.warn('unsubscribe failed', e);
             }
@@ -162,10 +180,51 @@ handleNotifyChange(event) {
     }
 
 
+get isLeadTab() { return this.activeTab === 'lead'; }
+get isHistoryTab() { return this.activeTab === 'history'; }
+get isWebinarTab() { return this.activeTab === 'webinar'; }
+get isEventTab() { return this.activeTab === 'event'; }
 
-    // ---------------------------------------------
-    // 🔥 ADDED: renderedCallback to notify parent
-    // ---------------------------------------------
+get hasWebinarHistory() {
+    return (this.webinarHistory || []).length > 0;
+}
+
+get hasEvents() {
+    return (this.eventHistory || []).length > 0;
+}
+
+
+
+    handleViewMoreLead() {
+        if (!this.recordId) return;
+
+        this[NavigationMixin.GenerateUrl]({
+            type: 'standard__recordPage',
+            attributes: {
+                recordId: this.recordId,
+                objectApiName: 'Lead',
+                actionName: 'view'
+            }
+        }).then(url => {
+            window.open(url, '_blank');
+        });
+    }
+
+    handleTabClick(event) {
+    this.activeTab = event.target.dataset.tab;
+
+
+
+    if (this.activeTab === 'webinar' && !this.webinarLoaded) {
+        this.loadWebinarHistory();
+    }
+    if (this.activeTab === 'event' && !this.eventLoaded) {
+        this.loadEventHistory();
+    }
+}
+
+
+
     renderedCallback() {
         if (!this.hasRendered) {
             this.hasRendered = true;
@@ -181,21 +240,18 @@ handleNotifyChange(event) {
             }
         }
     }
-  handleAutoSetChange(e) {
-    this.autoSetFollowUp = e.target.checked;
+    handleAutoSetChange(e) {
+        this.autoSetFollowUp = e.target.checked;
 
-    if (this.autoSetFollowUp) {
-        this.setAutoDate24();
-    } else {
-        // ✅ Allow manual entry without override
-        this.nextFollowUpDate = null;
+        if (this.autoSetFollowUp) {
+            this.setAutoDate24();
+        } else {
+
+            this.nextFollowUpDate = null;
+        }
     }
-}
 
 
-    // ---------------------------------------------
-
-    // -------------- DATA LOAD --------------
     async loadPicklists() {
         try {
             const map = await getL1L2Values();
@@ -225,32 +281,114 @@ handleNotifyChange(event) {
         }
     }
 
-    // -------------- HANDLERS ---------------
+
+    async loadEventHistory() {
+        if (!this.recordId) return;
+
+        const rows = await getLeadEvents({ recordId: this.recordId });
+
+        this.eventHistory = (rows || []).map(r => ({
+            id: r.id,
+            subject: r.subject,
+            attendance: r.attendance || 'NA'
+        }));
+
+        this.eventLoaded = true;
+    }
+
+
+
+    async loadWebinarHistory() {
+        if (!this.recordId) return;
+
+        const rows = await getWebinarMembers({ recordId: this.recordId });
+
+        const dateFmt = new Intl.DateTimeFormat('en-IN', {
+            day: '2-digit', month: 'short', year: 'numeric'
+        });
+
+        this.webinarHistory = (rows || []).map(r => ({
+            id: r.id,
+           
+            webinar: r.webinarName,
+            status: r.attendanceStatus || 'NA',
+            createdDate: r.createdDate ? dateFmt.format(new Date(r.createdDate)) : 'NA'
+        }));
+
+        this.webinarLoaded = true;
+    }
+
+
+    get hasCallHistory() {
+        return (this.callHistory || []).length > 0;
+    }
+
+//     get leadTabClass() {
+//     return `tab-item ${this.activeTab === 'lead' ? 'active' : ''}`;
+// }
+
+// get historyTabClass() {
+//     return `tab-item ${this.activeTab === 'history' ? 'active' : ''}`;
+// }
+
+  get leadTabClass() {
+        return this.isHistoryTab ? 'tab-item' : 'tab-item active';
+    }
+
+    get historyTabClass() {
+        return this.isHistoryTab ? 'tab-item active' : 'tab-item';
+    }
+
+get webinarTabClass() {
+    return `tab-item ${this.activeTab === 'webinar' ? 'active' : ''}`;
+}
+
+get eventTabClass() {
+    return `tab-item ${this.activeTab === 'event' ? 'active' : ''}`;
+}
+
+get formattedCreatedDate() {
+    if (!this.identity.createdDate) return '';
+
+    const date = new Date(this.identity.createdDate);
+
+    return new Intl.DateTimeFormat('en-IN', {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    }).format(date);
+}
+
+
+
+
     updateCommentVisibility() {
         const key = `${this.l1Value}:${this.l2Value}`;
         this.isCommentMandatory = this.mandatoryCommentRules[key] === true;
     }
 
-   handleL1Change(e) {
-    this.l1Value = e.target.value;
-    this.userChangedStage = false; // 👈 reset
+    handleL1Change(e) {
+        this.l1Value = e.target.value;
+        this.userChangedStage = false; // 👈 reset
 
-    this.l2Options = (this.fullMap[this.l1Value] || []).map(v => ({
-        label: v,
-        value: v
-    }));
-    this.isL2Disabled = this.l2Options.length === 0;
-    this.l2Value = '';
+        this.l2Options = (this.fullMap[this.l1Value] || []).map(v => ({
+            label: v,
+            value: v
+        }));
+        this.isL2Disabled = this.l2Options.length === 0;
+        this.l2Value = '';
 
-    if (this.l1Value === 'Not-Connected') {
-        this.isStageDisabled = true;
-        this.stageValue = null;
-    } else {
-        this.isStageDisabled = false;
+        if (this.l1Value === 'Not-Connected') {
+            this.isStageDisabled = true;
+            this.stageValue = null;
+        } else {
+            this.isStageDisabled = false;
+        }
+
+        this.updateCommentVisibility();
     }
-
-    this.updateCommentVisibility();
-}
 
     handleL2Change(e) {
         this.l2Value = e.target.value;
@@ -260,7 +398,7 @@ handleNotifyChange(event) {
 
     handleStageChange(e) {
         this.stageValue = e.target.value;
-          this.userChangedStage = true;
+        this.userChangedStage = true;
     }
 
     handleLevelChange(e) {
@@ -271,11 +409,11 @@ handleNotifyChange(event) {
         this.feedback = e.target.value;
     }
 
- handleNextFollowUpDateChange(e) {
-    if (!this.autoSetFollowUp) {
-        this.nextFollowUpDate = e.target.value;
+    handleNextFollowUpDateChange(e) {
+        if (!this.autoSetFollowUp) {
+            this.nextFollowUpDate = e.target.value;
+        }
     }
-}
 
 
 
@@ -386,37 +524,50 @@ handleNotifyChange(event) {
         this.showFeedbackSection();
         this.callButtonDisabled = false;
     }
-applyAutoStageLogic() {
-    // Do nothing if user already selected stage.
-    if (this.userChangedStage) {
-        return;
-    }
-
-    if (this.l1Value === 'Connected') {
-        const connectedStageMap = {
-            'Not Eligible': 'M1',
-            'Wrong Number': 'M1',
-            'Not Interested (DND)': 'M1',
-            'Language Barrier': 'M1',
-            'Visit Confirmed': 'M3+',
-            'Google Meet Completed': 'M3+',
-            'Gmeet Confirmed': 'M3+',
-            'Postponed': 'M4'
-        };
-
-        const autoStage = connectedStageMap[this.l2Value];
-        if (autoStage) {
-            this.stageValue = autoStage;
+    applyAutoStageLogic() {
+        // Do nothing if user already selected stage.
+        if (this.userChangedStage) {
+            return;
         }
-        return;
+
+        if (this.l1Value === 'Connected') {
+            const connectedStageMap = {
+                'Not Eligible': 'M1',
+                'Wrong Number': 'M1',
+                'Not Interested (DND)': 'M1',
+                'Language Barrier': 'M1',
+                'Visit Confirmed': 'M3+',
+                'Google Meet Completed': 'M3+',
+                'Gmeet Confirmed': 'M3+',
+                'Postponed': 'M4'
+            };
+
+            const autoStage = connectedStageMap[this.l2Value];
+            if (autoStage) {
+                this.stageValue = autoStage;
+            }
+            return;
+        }
+
+        if (this.l1Value === 'Not-Connected') {
+            this.stageValue = this.l2Value === 'Invalid Number' ? 'M1' : null;
+        }
     }
 
-    if (this.l1Value === 'Not-Connected') {
-        this.stageValue = this.l2Value === 'Invalid Number' ? 'M1' : null;
-    }
-}
+
+  
 
 
+
+    // showLeadTab() {
+    //     this.isLeadTab = true;
+    //     this.isHistoryTab = false;
+    // }
+
+    // showHistoryTab() {
+    //     this.isLeadTab = false;
+    //     this.isHistoryTab = true;
+    // }
 
 
 
@@ -425,37 +576,37 @@ applyAutoStageLogic() {
     //     return this.savingFeedback || !this.showFeedback;
     // }
 
-  showFeedbackSection() {
-    this.showFeedback = true;
-    this.disableCancel = false;
+    showFeedbackSection() {
+        this.showFeedback = true;
+        this.disableCancel = false;
 
-    // ✅ Only auto-set if:
-    // 1) autoSetFollowUp is true
-    // 2) user has NOT already selected a date
-    if (this.autoSetFollowUp && !this.nextFollowUpDate) {
-        this.setAutoDate24();
+        // ✅ Only auto-set if:
+        // 1) autoSetFollowUp is true
+        // 2) user has NOT already selected a date
+        if (this.autoSetFollowUp && !this.nextFollowUpDate) {
+            this.setAutoDate24();
+        }
     }
-}
 
 
 
-setAutoDate24() {
-    const next = new Date();
-    next.setHours(next.getHours() + 24);
+    setAutoDate24() {
+        const next = new Date();
+        next.setHours(next.getHours() + 24);
 
-    const yyyy = next.getFullYear();
-    const mm = String(next.getMonth() + 1).padStart(2, '0');
-    const dd = String(next.getDate()).padStart(2, '0');
-    const hh = String(next.getHours()).padStart(2, '0');
-    const mi = String(next.getMinutes()).padStart(2, '0');
+        const yyyy = next.getFullYear();
+        const mm = String(next.getMonth() + 1).padStart(2, '0');
+        const dd = String(next.getDate()).padStart(2, '0');
+        const hh = String(next.getHours()).padStart(2, '0');
+        const mi = String(next.getMinutes()).padStart(2, '0');
 
-    // datetime-local format (NO timezone issues)
-    this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-}
+        // datetime-local format (NO timezone issues)
+        this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+    }
 
 
 
-    
+
 
     // -------------- SAVE FEEDBACK ----------
     async saveFeedback(options = {}) {
@@ -468,15 +619,15 @@ setAutoDate24() {
             this.toast('Required', 'Stage and Course are required.', 'warning');
             return false;
         }
-         if (!this.l1Value) {
+        if (!this.l1Value) {
             this.toast('Required', 'L1 is required.', 'warning');
             return false;
         }
-         if (!this.l2Value) {
+        if (!this.l2Value) {
             this.toast('Required', 'l2 is required.', 'warning');
             return false;
         }
-        if(this.l1Value === 'Not-Connected'){
+        if (this.l1Value === 'Not-Connected') {
             this.stageValue = null;
         }
 
@@ -485,9 +636,9 @@ setAutoDate24() {
 
 
         try {
-            
-            const payload ={
-                
+
+            const payload = {
+
                 recordId: this.recordId,
                 callId: this.lastCallId,
                 feedback: this.feedback?.trim(),
@@ -500,11 +651,13 @@ setAutoDate24() {
             if (this.stageValue && String(this.stageValue).trim()) {
                 payload.stage = this.stageValue;
             }
-             await updateCallFeedback({
+            await updateCallFeedback({
                 jsonBody: JSON.stringify(payload)
             });
 
             this.toast('Saved', 'Feedback saved successfully.', 'success');
+
+            await this.loadCallHistory();
 
 
 
@@ -546,18 +699,18 @@ setAutoDate24() {
             );
             return true;
 
-       } catch (e) {
-    console.error('FEEDBACK SAVE ERROR RAW:', JSON.stringify(e));
+        } catch (e) {
+            console.error('FEEDBACK SAVE ERROR RAW:', JSON.stringify(e));
 
-    const err =
-        e?.body?.message ||
-        e?.body?.exceptionMessage ||
-        e?.message ||
-        'Unknown error';
+            const err =
+                e?.body?.message ||
+                e?.body?.exceptionMessage ||
+                e?.message ||
+                'Unknown error';
 
-    this.toast('Save Failed', err, 'error');
-    return false;
-}
+            this.toast('Save Failed', err, 'error');
+            return false;
+        }
 
     }
 
@@ -585,29 +738,72 @@ setAutoDate24() {
         }
     }
 
-    async handlePauseQueue(){
+
+    async loadCallHistory() {
+        if (!this.recordId) return;
+
+        try {
+            const rows = await getCallHistory({ recordId: this.recordId });
+
+            const dateFmt = new Intl.DateTimeFormat('en-IN', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            });
+
+            const timeFmt = new Intl.DateTimeFormat('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            this.callHistory = (rows || []).map(r => {
+                const dt = r.startTime || r.createdDate;
+                const d = dt ? new Date(dt) : null;
+
+                const totalSec = Number(r.durationSeconds || 0);
+                const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+                const ss = String(totalSec % 60).padStart(2, '0');
+
+                return {
+                    id: r.id,
+                    dateLabel: d ? dateFmt.format(d) : 'NA',
+                    timeLabel: d ? timeFmt.format(d) : '',
+                    durationLabel: `${mm}:${ss}`,
+                    status: r.status || 'NA',
+                    l1: r.l1 || '',
+                    l2: r.l2 || '',
+                    stage: r.stage || ''
+                };
+            });
+
+        } catch (e) {
+            console.error('Call history load failed:', e);
+        }
+    }
+
+    async handlePauseQueue() {
         const saved = await this.saveFeedback({ stopQueue: true });
         if (!saved) {
             return;
         }
         this.dispatchEvent(
             new CustomEvent('pausequeue', {
-                bubbles : true,
-                composed :true
+                bubbles: true,
+                composed: true
 
             })
         );
     }
-    async handleResumeQueue(){
+    async handleResumeQueue() {
         const saved = await this.saveFeedback();
         if (!saved) {
             return;
         }
         this.dispatchEvent(
-            new CustomEvent('resumequeue',{
+            new CustomEvent('resumequeue', {
                 detail: { stopQueue: true },
-                bubbles :true,
-                composed :true
+                bubbles: true,
+                composed: true
             })
         );
     }
@@ -679,6 +875,8 @@ setAutoDate24() {
 
         try {
             this.showFeedbackSection();
+            this.loadCallHistory();
+
         } catch (e) {
             console.error('showFeedbackSection failed', e);
         }
@@ -702,42 +900,42 @@ setAutoDate24() {
             console.error('toast dispatch failed', e);
         }
     }
-//// disable pause button 
+    //// disable pause button 
 
-get disablePauseBtn(){
-    return !this.isLive;
-}
+    get disablePauseBtn() {
+        return !this.isLive;
+    }
 
-get disableSaveDispositionBtn() {
-    return this.savingFeedback || !this.showFeedback;
-}
+    get disableSaveDispositionBtn() {
+        return this.savingFeedback || !this.showFeedback;
+    }
 
-get panelHeader() {
-    return `Calling via Runo | ${this.callStatus} | ${this.elapsedLabel}`;
-}
+    get panelHeader() {
+        return `Calling via Runo | ${this.callStatus} | ${this.elapsedLabel}`;
+    }
 
-get statusPillClass() {
-    const status = (this.callStatus || '').toLowerCase();
-    if (status.includes('in call') || status.includes('dialing')) return 'status-pill live';
-    if (status.includes('failed') || status.includes('no response')) return 'status-pill warn';
-    return 'status-pill ended';
-}
+    get statusPillClass() {
+        const status = (this.callStatus || '').toLowerCase();
+        if (status.includes('in call') || status.includes('dialing')) return 'status-pill live';
+        if (status.includes('failed') || status.includes('no response')) return 'status-pill warn';
+        return 'status-pill ended';
+    }
 
-get leadNameDisplay() {
-    return this.identity?.name || 'NA';
-}
+    get leadNameDisplay() {
+        return this.identity?.name || 'NA';
+    }
 
-get cityDisplay() {
-    return this.identity?.city || 'NA';
-}
+    get cityDisplay() {
+        return this.identity?.city || 'NA';
+    }
 
-get companyDisplay() {
-    return this.identity?.source || 'NA';
-}
+    get companyDisplay() {
+        return this.identity?.source || 'NA';
+    }
 
-get stageDisplay() {
-    return this.identity?.stage || 'NA';
-}
+    get stageDisplay() {
+        return this.identity?.stage || 'NA';
+    }
 
 
 

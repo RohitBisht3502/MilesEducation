@@ -98,20 +98,20 @@ public class CourseEnrolledTriggerHandlerService {
             Id assigneeId = enrolledObj.OwnerId;
 
             if (enrolledObj.Stages__c == 'M7+')  taskList.add(createTask('Complete Onboarding', enrolledObj.Id, 0, assigneeId));
-            if (enrolledObj.Stages__c == 'M7#')  taskList.add(createTask('Assist on IMA Customer ID Generation', enrolledObj.Id, 0, assigneeId));
-            if (enrolledObj.Stages__c == 'M7##') taskList.add(createTask('Visit in IMA Membership Selection and Coupon Code redemption', enrolledObj.Id, 0, assigneeId));
-            if (enrolledObj.Stages__c == 'M8')   taskList.add(createTask('Pay for membership', enrolledObj.Id, 0, assigneeId));
-            if (enrolledObj.Stages__c == 'M9')   taskList.add(createTask('Schedule Exam', enrolledObj.Id, 0, assigneeId));
-            if (enrolledObj.Stages__c == 'M12')  taskList.add(createTask('Check for Exam prep and Appearance', enrolledObj.Id, 0, assigneeId));
-            if (enrolledObj.Stages__c == 'M13')  taskList.add(createTask('Schedule/Reschedule for next exam and check for result', enrolledObj.Id, 0, assigneeId));
-            if (enrolledObj.Stages__c == 'M14')  taskList.add(createTask('Schedule/Reschedule for next exam', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M7#')  taskList.add(createTask('Assist on IMA Registration', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M7##') taskList.add(createTask('Assist on IMA Registration', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M8')   taskList.add(createTask('Assisit in IMA Memebership Seletion and Coupon Code redemption', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M9')   taskList.add(createTask('Schedule Exam and upload pro-metric', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M12')  taskList.add(createTask('Check for reschedule or Postpone of Exam ', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M13')  taskList.add(createTask('Exam experience and Result Check ', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M14')  taskList.add(createTask('Schedule/Reschedule for Failed  Exam and upload pro-metric', enrolledObj.Id, 0, assigneeId));
             if (enrolledObj.Stages__c == 'M14#') taskList.add(createTask('Check for Exam prep and Appearance', enrolledObj.Id, 0, assigneeId));
-            if (enrolledObj.Stages__c == 'M15')  taskList.add(createTask('Schedule/Reschedule for next exam and check for result', enrolledObj.Id, 0, assigneeId));
-            if (enrolledObj.Stages__c == 'M15#') taskList.add(createTask('Check for Exam prep and Appearance', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M15')  taskList.add(createTask('Schedule 2nd Exam  and Upload pro-metric', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M15#') taskList.add(createTask('Check for reschedule or Postpone of Exam ', enrolledObj.Id, 0, assigneeId));
             if (enrolledObj.Stages__c == 'M18')  taskList.add(createTask('Share certification Advice', enrolledObj.Id, 0, assigneeId));
             if (enrolledObj.Stages__c == 'M18+') taskList.add(createTask('Complete Certification Advice', enrolledObj.Id, 0, assigneeId));
-            if (enrolledObj.Stages__c == 'M18-') taskList.add(createTask('Reshare Certification Advice', enrolledObj.Id, 0, assigneeId));
-            if (enrolledObj.Stages__c == 'M18#') taskList.add(createTask('Apply for Certification Application', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M18-') taskList.add(createTask('Reshare Certification Advice ', enrolledObj.Id, 0, assigneeId));
+            if (enrolledObj.Stages__c == 'M18#') taskList.add(createTask('Support in Certification Application', enrolledObj.Id, 0, assigneeId));
         }
 
         if (!taskList.isEmpty()) {

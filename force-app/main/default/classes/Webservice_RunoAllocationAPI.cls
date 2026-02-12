@@ -1,7 +1,3 @@
-/*
-    Author       : ROHIT SINGH BISHT
-    Description  : 
-*/
 public without sharing class Webservice_RunoAllocationAPI implements Database.AllowsCallouts {
 
     public class CustomerDTO {
@@ -111,7 +107,7 @@ public class EventDTO {
         return res;
     }
 
-    
+
 @AuraEnabled(cacheable=true)
 public static List<EventDTO> getLeadEvents(Id recordId) {
 
@@ -177,7 +173,7 @@ public static List<WebinarMemberDTO> getWebinarMembers(Id recordId) {
     for (Webinar_Member__c wm : members) {
         WebinarMemberDTO dto = new WebinarMemberDTO();
         dto.id = wm.Id;
-        dto.name = wm.Name;
+        // dto.name = wm.Name;
         dto.webinarName = wm.Webinar__r != null ? wm.Webinar__r.Name : '';
         dto.attendanceStatus = wm.Attendance_Status__c;
         dto.createdDate = wm.CreatedDate;

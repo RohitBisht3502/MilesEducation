@@ -165,10 +165,11 @@
                         </template>
                     </template>
 
+                    <lightning-input label="Phone Number" data-field="shipping_phone"></lightning-input>
+
                     <template if:true={shouldShowShippingFields}>
                         <div class="address-grid slide-in">
                             <lightning-input label="Street Address" data-field="shipping_street"></lightning-input>
-                            <lightning-input label="Phone Number" data-field="shipping_phone"></lightning-input>
                             <lightning-input label="City" data-field="shipping_city"></lightning-input>
                             <lightning-input label="State" data-field="shipping_state"></lightning-input>
                             <lightning-input label="ZIP Code" data-field="shipping_postal"></lightning-input>
@@ -262,6 +263,7 @@
                     </div>
 
                     <lightning-input
+                        data-id="discount"
                         type="number"
                         label={discountLabel}
                         value={discountValue}
@@ -272,10 +274,10 @@
                         type="number"
                         label="Down Payment (₹)"
                         value={downPayment}
-                        min="0"
+                        min={minimumDownPayment}
                         max={finalPayable}
                         message-when-range-overflow="Down payment cannot exceed total payable."
-                        message-when-range-underflow="Down payment cannot be negative."
+                        message-when-range-underflow={downPaymentMinMessage}
                         onchange={handleDownPaymentChange}>
                     </lightning-input>
 

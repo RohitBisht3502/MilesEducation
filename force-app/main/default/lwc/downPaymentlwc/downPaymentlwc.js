@@ -67,19 +67,26 @@ export default class DownPaymentlwc extends LightningElement {
         }
 
         // ✅ Minimum down payment validation using Custom Label
-        if (this.downPayment < parseFloat(MINIMUM_DOWNPAYMENT)) {
-            this.showToast(
-                'Error',
-                `Minimum down payment should be ₹${MINIMUM_DOWNPAYMENT}`,
-                'error'
-            );
-            return;
-        }
+        const minDownPayment = parseFloat(MINIMUM_DOWNPAYMENT) || 0;
+        const remainingAmount = Number(this.remainingAmount) || 0;
+     
+if (
+    remainingAmount > minDownPayment &&
+    this.downPayment < minDownPayment
+) {
+    this.showToast(
+        'Error',
+        `Minimum down payment should be ₹${minDownPayment}`,
+        'error'
+    );
+    return;
+}
 
-        if (this.downPayment > this.remainingAmount) {
+
+        if (this.downPayment > remainingAmount) {
             this.showToast(
                 'Error',
-                `Payment cannot be greater than remaining amount (₹${this.remainingAmount}).`,
+                `Payment cannot be greater than remaining amount (₹${remainingAmount}).`,
                 'error'
             );
             return;

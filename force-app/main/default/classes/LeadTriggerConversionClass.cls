@@ -173,13 +173,15 @@ public class LeadTriggerConversionClass {
             if (String.isBlank(rtName) || !allowedRecordTypes.contains(rtName)) {
                 continue;
             }
+
+            String courseValue = resolveCourseForLead(n, rtName);
             
             if (n.Student__c != accId) {
                 leadCToUpdate.add(new Lead__c(Id = n.Id, Student__c = accId));
             }
             leadToAccount.put(n.Id, accId);
             
-            String studentCourseKey = buildStudentCourseKey(accId, n.Course__c);
+            String studentCourseKey = buildStudentCourseKey(accId, courseValue);
             if (!studentCourseKeysHavingCourseEnrolled.contains(studentCourseKey)) {
                 Course_Enrolled__c ce = new Course_Enrolled__c();
                 ce.Student__c = accId;
@@ -189,7 +191,7 @@ public class LeadTriggerConversionClass {
                 ce.CC_Spoc__c = n.OwnerId;
                 ce.Source__c = n.Source__c;
                 ce.Phone__c = n.Phone__c;
-                ce.Course__c = n.Course__c;
+                ce.Course__c = courseValue;
                 ce.City__c = n.City__c;
                 ce.Course_Bucket__c = n.Course_Bucket__c;
                 Id ceRtId = ceRecordTypeByName.get(rtName);
@@ -336,5 +338,12 @@ public class LeadTriggerConversionClass {
             }
         }
         return mapRt;
+    }
+
+    private static String resolveCourseForLead(Lead__c leadRec, String recordTypeName) {
+        if (leadRec != null && !String.isBlank(leadRec.Course__c)) {
+            return leadRec.Course__c;
+        }
+        return recordTypeName;
     }
 }

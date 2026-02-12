@@ -90,6 +90,26 @@ export default class LeadNewOverrideLwc extends NavigationMixin(LightningElement
             });
     }
 
+    handleCancel() {
+        this[NavigationMixin.Navigate]({
+            type: 'standard__objectPage',
+            attributes: {
+                objectApiName: 'Lead__c',
+                actionName: 'list'
+            },
+            state: {
+                filterName: 'Recent'
+            }
+        });
+    }
+
+    errorCallback(error, stack) {
+        this.isLoading = false;
+        this.errorMessage = this.extractError(error);
+        // eslint-disable-next-line no-console
+        console.error('LeadNewOverrideLwc error:', error, stack);
+    }
+
     extractError(error) {
         if (!error) return 'Unexpected error.';
         if (Array.isArray(error.body)) {

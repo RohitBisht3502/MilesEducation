@@ -43,6 +43,7 @@ public without sharing class LeadTriggerHandler {
         /* ================= OWNER CHANGE ================= */
 
         if (!isInsert && ownerChanged) {
+              log.Activity_Type__c = 'Owner Change';
             log.Previous_Owner__c = oldRec.OwnerId;
             log.New_Owner__c      = ld.OwnerId;
         }
@@ -192,6 +193,7 @@ public without sharing class LeadTriggerHandler {
             //  OWNER TRACKING FOR MERGED LEAD
             Lead__c oldMergedLead = oldMap.get(mergedLead.Id);
             if (oldMergedLead != null && oldMergedLead.OwnerId != mergedLead.OwnerId) {
+                mergedLeadLog.Activity_Type__c       = 'Owner Change';
                 mergedLeadLog.Previous_Owner__c = oldMergedLead.OwnerId;
                 mergedLeadLog.New_Owner__c      = mergedLead.OwnerId;
             }

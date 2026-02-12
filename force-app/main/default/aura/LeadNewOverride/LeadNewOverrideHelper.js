@@ -1,11 +1,12 @@
 ({
-    loadRecordTypes: function(component) {
+    loadCourses: function(component) {
         component.set("v.isLoading", true);
-        var action = component.get("c.getLeadRecordTypes");
+        component.set("v.errorMessage", "");
+        var action = component.get("c.getLeadCourses");
         action.setCallback(this, function(resp) {
             component.set("v.isLoading", false);
             if (resp.getState() === "SUCCESS") {
-                component.set("v.recordTypes", resp.getReturnValue());
+                component.set("v.courseOptions", resp.getReturnValue() || []);
             } else {
                 component.set("v.errorMessage", this.extractError(resp));
             }
@@ -13,22 +14,22 @@
         $A.enqueueAction(action);
     },
 
-    createLead: function(component) {
+    createLeadByCourse: function(component) {
         component.set("v.errorMessage", "");
+        var course = component.get("v.course");
         var lastName = component.get("v.lastName");
         var phone = component.get("v.phone");
         var email = component.get("v.email");
-        var recordTypeId = component.get("v.recordTypeId");
 
-        if (!recordTypeId || !lastName || !phone || !email) {
-            component.set("v.errorMessage", "Last Name, Phone, and Email are required.");
+        if (!course || !lastName || !phone || !email) {
+            component.set("v.errorMessage", "Course, Last Name, Phone, and Email are required.");
             return;
         }
 
         component.set("v.isLoading", true);
-        var action = component.get("c.createLead");
+        var action = component.get("c.createLeadByCourse");
         action.setParams({
-            recordTypeId: recordTypeId,
+            course: course,
             firstName: component.get("v.firstName"),
             lastName: lastName,
             phone: phone,
@@ -58,14 +59,34 @@
         $A.enqueueAction(action);
     },
 
-    extractError: function(resp) {
-        var errors = resp.getError();
-        if (errors && errors.length > 0) {
-            if (errors[0].message) return errors[0].message;
-            if (errors[0].pageErrors && errors[0].pageErrors.length > 0) {
-                return errors[0].pageErrors[0].message;
-            }
+    handleCancel: function(component) {
+        var navUrl = "/lightning/o/Lead__c/list?filterName=Recent";
+        var navEvt = $A.get("e.force:navigateToURL");
+        if (navEvt) {
+            navEvt.setParams({ url: navUrl });
+            navEvt.fire();
         }
-        return "Unexpected error.";
+        var closeEvt = $A.get("e.force:closeQuickAction");
+        if (closeEvt) {
+            closeEvt.fire();
+        }
+    },
+
+    extractError: function(resp) {
+        try {
+            if (!resp || typeof resp.getError !== "function") {
+                return "Unexpected error.";
+            }
+            var errors = resp.getError();
+            if (errors && errors.length > 0) {
+                if (errors[0].message) return errors[0].message;
+                if (errors[0].pageErrors && errors[0].pageErrors.length > 0) {
+                    return errors[0].pageErrors[0].message;
+                }
+            }
+            return "Unexpected error.";
+        } catch (e) {
+            return "Unexpected error.";
+        }
     }
 })

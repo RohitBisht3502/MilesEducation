@@ -32,6 +32,18 @@ global without sharing class Webhook_PaymentUpdateApi {
             return response;
         }
 
+        String purchaseKey = !String.isBlank(paymentReq.purchaseId)
+            ? paymentReq.purchaseId
+            : paymentReq.purchase_id;
+
+        if (String.isBlank(purchaseKey)) {
+            response.success = false;
+            response.message = 'Purchase Order Id is required';
+
+            IntegrationLogUtil.insertLog(serviceName, requestPayload, null, response.message, 'Failed', 400);
+            return response;
+        }
+
         if (String.isBlank(paymentReq.transactionId)) {
             response.success = false;
             response.message = 'Transaction Id is required';
@@ -42,54 +54,56 @@ global without sharing class Webhook_PaymentUpdateApi {
 
         try {
             Transcation__c txn = [
-                SELECT Id, Payment_Received__c, Status__c, Transcation_Id__c,
+                SELECT Id, Payment__c, Status__c, Transcation_Id__c,
                     Purchase_Orders__c,
+                    Purchase_Orders__r.Purchase_Order_Id__c,
                     Purchase_Orders__r.Net_Payable_Amount__c,
                     Purchase_Orders__r.Total_Payment_Received__c,
                     Purchase_Orders__r.Lead__c,
                     Purchase_Orders__r.Lead__r.Payment_Received__c
                 FROM Transcation__c
-                WHERE Transcation_Id__c = :paymentReq.transactionId
+                WHERE Purchase_Orders__r.Purchase_Order_Id__c = :purchaseKey
+                AND Status__c != 'Received'
+                AND Transcation_Id__c = null
+                AND Payment__c = :paymentReq.paymentReceived
                 LIMIT 1
             ];
 
-            txn.Payment_Received__c = paymentReq.paymentReceived;
+            txn.Payment__c = paymentReq.paymentReceived;
             txn.Status__c = 'Received';
+            txn.Transcation_Id__c = paymentReq.transactionId;
             update txn;
 
-            Id poId = txn.Purchase_Orders__c != null ? txn.Purchase_Orders__c : paymentReq.purchaseId;
-            if (poId != null) {
-                Purchase_Order__c po = [
-                    SELECT Id, Net_Payable_Amount__c, Lead__c, Lead__r.Payment_Received__c
-                    FROM Purchase_Order__c
-                    WHERE Id = :poId
-                    LIMIT 1
-                ];
+            Purchase_Order__c po = [
+                SELECT Id, Net_Payable_Amount__c, Lead__c, Lead__r.Payment_Received__c
+                FROM Purchase_Order__c
+                WHERE Purchase_Order_Id__c = :purchaseKey
+                LIMIT 1
+            ];
 
-                AggregateResult ar = [
-                    SELECT SUM(Payment_Received__c) totalReceived
-                    FROM Transcation__c
-                    WHERE Purchase_Orders__c = :poId
-                ];
+            AggregateResult ar = [
+                SELECT SUM(Payment__c) totalReceived
+                FROM Transcation__c
+                WHERE Purchase_Orders__c = :po.Id
+            ];
 
-                Decimal netPayable = po.Net_Payable_Amount__c == null ? 0 : po.Net_Payable_Amount__c;
-                Decimal totalReceived = (Decimal) ar.get('totalReceived');
-                totalReceived = totalReceived == null ? 0 : totalReceived;
+            Decimal netPayable = po.Net_Payable_Amount__c == null ? 0 : po.Net_Payable_Amount__c;
+            Decimal totalReceived = (Decimal) ar.get('totalReceived');
+            totalReceived = totalReceived == null ? 0 : totalReceived;
 
-                String leadStatus;
-                if (netPayable > 0 && totalReceived >= netPayable) {
-                    leadStatus = 'Fully Received';
-                } else if (totalReceived > 0) {
-                    leadStatus = 'Partially Received';
-                }
+            String leadStatus;
+            if (netPayable > 0 && totalReceived >= netPayable) {
+                leadStatus = 'Fully Received';
+            } else if (totalReceived > 0) {
+                leadStatus = 'Partially Received';
+            }
 
-                if (po.Lead__c != null && leadStatus != null) {
-                    if (!(leadStatus == 'Partially Received' && po.Lead__r.Payment_Received__c == 'Partially Received')) {
-                        update new Lead__c(
-                            Id = po.Lead__c,
-                            Payment_Received__c = leadStatus
-                        );
-                    }
+            if (po.Lead__c != null && leadStatus != null) {
+                if (!(leadStatus == 'Partially Received' && po.Lead__r.Payment_Received__c == 'Partially Received')) {
+                    update new Lead__c(
+                        Id = po.Lead__c,
+                        Payment_Received__c = leadStatus
+                    );
                 }
             }
 
@@ -106,7 +120,7 @@ global without sharing class Webhook_PaymentUpdateApi {
             );
         } catch (QueryException qe) {
             response.success = false;
-            response.message = 'No transaction found for given Transaction Id';
+            response.message = 'No transaction found for given Purchase Id';
 
             IntegrationLogUtil.insertLog(serviceName, requestPayload, null, response.message, 'Failed', 404);
         } catch (DmlException de) {
@@ -127,7 +141,8 @@ global without sharing class Webhook_PaymentUpdateApi {
     global class PaymentRequest {
         public String transactionId;
         public Decimal paymentReceived;
-        public Id purchaseId;
+        public String purchaseId;
+        public String purchase_id;
     }
 
     global class ApiResponse {

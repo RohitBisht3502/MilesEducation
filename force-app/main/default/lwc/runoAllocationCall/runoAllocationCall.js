@@ -15,6 +15,10 @@ import { getRecord } from 'lightning/uiRecordApi';
 import { getObjectInfo, getPicklistValuesByRecordType } from 'lightning/uiObjectInfoApi';
 import LEAD_OBJECT from '@salesforce/schema/Lead__c';
 import LEAD_RECORDTYPE_FIELD from '@salesforce/schema/Lead__c.RecordTypeId';
+import getWebinarMembers from '@salesforce/apex/Webservice_RunoAllocationAPI.getWebinarMembers';
+import getLeadEvents from '@salesforce/apex/Webservice_RunoAllocationAPI.getLeadEvents';
+
+
 
 
 export default class RunoAllocationCall extends NavigationMixin(LightningElement) {
@@ -31,6 +35,8 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     // Call popup overlay (Calling Runo...)
     showCallPopup = false;
     isStageDisabled = false;
+
+    activeTab = 'lead';
 
     // L1/L2
     l1Value = '';
@@ -69,10 +75,17 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         source: '',
         stage: '',
         level: '',
-        canId: ''
+        canId: '',
+        createdDate: '',
+    mhpTag: '',
+    leadOwner: ''
     };
 
     callHistory = [];
+
+    eventHistory = [];
+eventLoaded = false;
+
 
     // call state
     isLive = false;
@@ -82,6 +95,9 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     elapsedMs = 0;
     elapsedLabel = '00:00';
     timerId = null;
+    webinarHistory = [];
+webinarLoaded = false;
+
 
     // feedback
     showFeedback = false;
@@ -186,7 +202,96 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     }
 
 
+get showFeedbackInLeadTab() {
+    return this.isLeadTab && this.showFeedback;
+}
 
+
+
+get isLeadTab() {
+    return this.activeTab === 'lead';
+}
+
+get isHistoryTab() {
+    return this.activeTab === 'history';
+}
+
+handleTabClick(event) {
+    this.activeTab = event.target.dataset.tab;
+      if (this.activeTab === 'webinar' && !this.webinarLoaded) {
+        this.loadWebinarHistory();
+    }
+    if (this.activeTab === 'event' && !this.eventLoaded) {
+    this.loadEventHistory();
+}
+
+}
+
+
+get leadTabClass() {
+    return `tab-item ${this.activeTab === 'lead' ? 'active' : ''}`;
+}
+
+get historyTabClass() {
+    return `tab-item ${this.activeTab === 'history' ? 'active' : ''}`;
+}
+
+
+get isWebinarTab() {
+    return this.activeTab === 'webinar';
+}
+
+get hasWebinarHistory() {
+    return (this.webinarHistory || []).length > 0;
+}
+get webinarTabClass() {
+    return `tab-item ${this.activeTab === 'webinar' ? 'active' : ''}`;
+}
+
+get eventTabClass() {
+    return `tab-item ${this.activeTab === 'event' ? 'active' : ''}`;
+}
+
+get isEventTab() {
+    return this.activeTab === 'event';
+}
+
+get hasEvents() {
+    return (this.eventHistory || []).length > 0;
+}
+
+
+handleViewMoreLead() {
+    if (!this.recordId) return;
+
+    this[NavigationMixin.GenerateUrl]({
+        type: 'standard__recordPage',
+        attributes: {
+            recordId: this.recordId,
+            objectApiName: 'Lead',
+            actionName: 'view'
+        }
+    }).then(url => {
+        window.open(url, '_blank'); 
+    });
+}
+
+
+
+
+get formattedCreatedDate() {
+    if (!this.identity.createdDate) return '';
+
+    const date = new Date(this.identity.createdDate);
+
+    return new Intl.DateTimeFormat('en-IN', {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    }).format(date);
+}
 
 
 
@@ -270,6 +375,31 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         }
     }
 
+async loadEventHistory() {
+    if (!this.recordId) return;
+
+    try {
+        const rows = await getLeadEvents({ recordId: this.recordId });
+
+        console.log('Event rows => ', rows);
+
+        this.eventHistory = (rows || []).map(r => ({
+            id: r.id,
+            subject: r.subject,
+            attendance: r.attendance || 'NA'
+        }));
+
+        this.eventLoaded = true;
+
+    } catch (e) {
+        console.error('Event load failed:', e);
+    }
+}
+
+
+
+
+
     async loadCallHistory() {
         if (!this.recordId) return;
         try {
@@ -302,7 +432,47 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         return (this.callHistory || []).length > 0;
     }
 
-    // -------------- HANDLERS ---------------
+
+async loadWebinarHistory() {
+    if (!this.recordId) return;
+
+    try {
+        const rows = await getWebinarMembers({ recordId: this.recordId });
+
+        const dateFmt = new Intl.DateTimeFormat('en-US', {
+            month: 'short',
+            day: '2-digit',
+            year: 'numeric'
+        });
+
+        this.webinarHistory = (rows || []).map(r => {
+            return {
+                id: r.id,
+                name: r.name,
+                webinar: r.webinarName,
+                status: r.attendanceStatus || 'NA',
+                createdDate: r.createdDate
+                    ? dateFmt.format(new Date(r.createdDate))
+                    : 'NA'
+            };
+        });
+
+        this.webinarLoaded = true;
+
+        console.log('Webinar rows => ', rows);
+
+    } catch (e) {
+        console.error('Webinar load failed:', e);
+    }
+}
+
+
+
+
+
+
+
+  
 
     updateCommentVisibility() {
         const key = `${this.l1Value}:${this.l2Value}`;
@@ -375,6 +545,52 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     startCall() {
         this.callApi();
     }
+
+
+
+
+    async loadCallHistory() {
+    if (!this.recordId) return;
+
+    try {
+        const rows = await getCallHistory({ recordId: this.recordId });
+
+        const dateFmt = new Intl.DateTimeFormat('en-US', {
+            month: 'short',
+            day: '2-digit',
+            year: 'numeric'
+        });
+
+        const timeFmt = new Intl.DateTimeFormat('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        this.callHistory = (rows || []).map(r => {
+            const dt = r.startTime || r.createdDate;
+            const d = dt ? new Date(dt) : null;
+
+            const totalSec = Number(r.durationSeconds || 0);
+            const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+            const ss = String(totalSec % 60).padStart(2, '0');
+
+            return {
+                id: r.id,
+                dateLabel: d ? dateFmt.format(d) : 'NA',
+                timeLabel: d ? timeFmt.format(d) : '',
+                durationLabel: `${mm}:${ss}`,
+                status: r.status || 'NA',
+                l1: r.l1 || '',
+                l2: r.l2 || '',
+                stage: r.stage || ''
+            };
+        });
+
+    } catch (e) {
+        console.error('Call history load failed:', e);
+    }
+}
+
 
     // -------------- CALL API ---------------
 
@@ -666,6 +882,8 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
             }, 300);
         }
     }
+
+
 
 
 

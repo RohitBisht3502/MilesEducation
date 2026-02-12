@@ -16,6 +16,139 @@
   border-radius: 6px;
 }
 
+.tab-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.tab-item {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    background: #f1f5f9;
+    color: #334155;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.tab-item:hover {
+    background: #e2e8f0;
+}
+
+.tab-item.active {
+    background: #ffffff;
+    border: 1px solid #1e3a5f;
+    color: #1e3a5f;
+    font-weight: 600;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+
+.view-more-link {
+    color: #1b96ff;
+    cursor: pointer;
+    font-weight: 600;
+     margin-top: 10px;
+
+margin-left: 150px;
+}
+.view-more-link:hover {
+    text-decoration: underline;
+}
+
+
+
+
+
+.content-row {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.left-panel {
+    flex: 1;
+    max-width: 520px;
+}
+
+.right-panel {
+    flex: 1;
+    max-width: 520px;
+}
+
+.section-card {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+/* .info-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+} */
+
+
+.two-col-layout {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 16px;
+    align-items: start;
+}
+
+.left-panel,
+.right-panel {
+    width: 100%;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.feedback-grid.two-column {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.feedback-grid .full-row {
+    grid-column: span 2;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .two-col-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+.info-tile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f6f8fb;
+    padding: 12px 14px;
+    border-radius: 12px;
+    min-width: 160px;
+}
+
+.tab-bar div {
+    padding: 8px 16px;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+.tab-bar .active {
+    background: #1b4b82;
+    color: white;
+}
+
 .header-title {
   font-weight: 600;
   margin-left: 6px;
@@ -32,6 +165,91 @@
 .timer {
   font-weight: 600;
 }
+
+.feedback-grid.two-column {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px 18px;
+}
+
+.full-row {
+    grid-column: 1 / -1;
+}
+
+.stage-note {
+    grid-column: 1 / -1;
+    font-size: 12px;
+    color: #7a7a7a;
+    margin-top: -6px;
+}
+
+.body-wrapper::-webkit-scrollbar {
+    width: 6px;
+}
+
+.body-wrapper::-webkit-scrollbar-thumb {
+    background: #c9c9c9;
+    border-radius: 6px;
+}
+
+
+.content-row {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+
+.left-panel {
+    flex: 1;
+}
+
+
+.right-panel {
+    flex: 1;
+}
+
+
+.feedback-card.full-width {
+    width: 100%;
+}
+
+
+
+
+
+.panel-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 75vh; 
+}
+
+
+.custom-header {
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 5;
+    padding-bottom: 8px;
+}
+
+/* SCROLL AREA */
+.body-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 6px;
+}
+
+.footer-actions {
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    background: white;
+    padding-top: 10px;
+    z-index: 5;
+}
+
 
 
 /* CRITICAL: Remove all default padding and overflow from panel */
@@ -141,7 +359,7 @@
 
 .info-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
     gap: 8px;
 }
 

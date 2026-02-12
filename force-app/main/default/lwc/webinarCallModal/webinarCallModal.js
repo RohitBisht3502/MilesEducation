@@ -1,10 +1,3 @@
-/**
- * @File Name          : webinarCallModal.js
- * @Description        : Runo Call Modal for Webinar Attendees
- * @Author             : Dheeraj Kumar
- * @Created            : Nov 27, 2025
- **/
-
 import { LightningElement, api, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { subscribe, unsubscribe, onError } from 'lightning/empApi';
@@ -14,6 +7,9 @@ import updateCallFeedback from '@salesforce/apex/Webservice_RunoAllocationAPI.up
 import getL1L2Values from '@salesforce/apex/Webservice_RunoAllocationAPI.getL1L2Values';
 import getStageLevelValues from '@salesforce/apex/Webservice_RunoAllocationAPI.getStageLevelValues';
 import getIdentity from '@salesforce/apex/RunoCallIdentityService.getIdentity';
+import getWebinarMembers from '@salesforce/apex/Webservice_RunoAllocationAPI.getWebinarMembers';
+import getLeadEvents from '@salesforce/apex/Webservice_RunoAllocationAPI.getLeadEvents';
+import getCallHistory from '@salesforce/apex/Webservice_RunoAllocationAPI.getCallHistory';
 
 const STATUS = {
     IDLE: 'Idle',
@@ -45,6 +41,17 @@ export default class WebinarCallModal extends LightningElement {
     @track fullMap = {};
     @track isL2Disabled = true;
 
+
+
+    @track callHistory = [];
+@track webinarMembers = [];
+@track eventHistory = [];
+
+@track historyLoaded = false;
+@track webinarLoaded = false;
+@track eventLoaded = false;
+
+
     // Stage/Level Picklists
     @track stageValue = '';
     @track levelValue = '';
@@ -59,8 +66,14 @@ export default class WebinarCallModal extends LightningElement {
         city: '',
         source: '',
         stage: '',
-        level: ''
+        level: '',
+         canId: '',
+        createdDate: '',
+    mhpTag: '',
+    leadOwner: ''
     };
+
+    @track activeTab = 'lead';
 
     // Call State
     @track isLive = false;
@@ -135,9 +148,21 @@ export default class WebinarCallModal extends LightningElement {
         }
     }
 
-    // -------------------------
-    // DATA LOAD
-    // -------------------------
+
+get formattedCreatedDate() {
+    if (!this.identity.createdDate) return '';
+
+    const date = new Date(this.identity.createdDate);
+
+    return new Intl.DateTimeFormat('en-IN', {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    }).format(date);
+}
+ 
     async loadIdentity() {
         try {
             const data = await getIdentity({ recordId: this.leadId });
@@ -179,9 +204,6 @@ export default class WebinarCallModal extends LightningElement {
         }
     }
 
-    // -------------------------
-    // HANDLERS
-    // -------------------------
     updateCommentVisibility() {
         const key = `${this.l1Value}:${this.l2Value}`;
         this.isCommentMandatory = this.mandatoryCommentRules[key] === true;
@@ -223,9 +245,139 @@ export default class WebinarCallModal extends LightningElement {
         this.dispatchEvent(new CustomEvent('close'));
     }
 
-    // -------------------------
-    // CALL API
-    // -------------------------
+    
+ get isLeadTab() {
+    return this.activeTab === 'lead';
+}
+get isHistoryTab() {
+    return this.activeTab === 'history';
+}
+get isWebinarTab() {
+    return this.activeTab === 'webinar';
+}
+get isEventTab() {
+    return this.activeTab === 'event';
+}
+
+get leadTabClass() {
+    return `tab ${this.activeTab === 'lead' ? 'active' : ''}`;
+}
+
+get historyTabClass() {
+    return `tab ${this.activeTab === 'history' ? 'active' : ''}`;
+}
+
+get webinarTabClass() {
+    return `tab ${this.activeTab === 'webinar' ? 'active' : ''}`;
+}
+
+get eventTabClass() {
+    return `tab ${this.activeTab === 'event' ? 'active' : ''}`;
+}
+
+
+get hasEvents() {
+    return this.eventHistory.length > 0;
+}
+
+get hasCallHistory() {
+    return this.callHistory.length > 0;
+}
+
+
+
+async handleTabClick(event) {
+    const tab = event.currentTarget.dataset.tab;
+    this.activeTab = tab;
+
+    if (tab === 'history' && !this.historyLoaded) {
+        await this.loadCallHistory();
+    }
+
+    if (tab === 'webinar' && !this.webinarLoaded) {
+        await this.loadWebinars();
+    }
+
+    if (tab === 'event' && !this.eventLoaded) {
+        await this.loadEventHistory();
+    }
+}
+
+async loadCallHistory() {
+    try {
+        const rows = await getCallHistory({ recordId: this.leadId });
+
+        this.callHistory = (rows || []).map(r => {
+            const dt = new Date(r.startTime || r.createdDate);
+
+            return {
+                id: r.id,
+                dateLabel: dt.toLocaleDateString('en-IN'),
+                timeLabel: dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+                durationLabel: `${Math.floor((r.durationSeconds || 0) / 60)}m ${(r.durationSeconds || 0) % 60}s`,
+                status: r.status,
+                l1: r.l1,
+                l2: r.l2,
+                stage: r.stage
+            };
+        });
+
+        this.historyLoaded = true;
+    } catch (e) {
+        console.error('History load failed', e);
+    }
+}
+
+
+
+async loadWebinars() {
+    try {
+        const rows = await getWebinarMembers({ recordId: this.leadId });
+
+        this.webinarMembers = (rows || []).map(r => ({
+            id: r.id,
+            webinar: r.webinarName,
+            attendance: r.attendanceStatus,
+            date: r.createdDate
+        }));
+
+        this.webinarLoaded = true;
+    } catch (e) {
+        console.error('Webinar load failed', e);
+    }
+}
+
+
+async loadEventHistory() {
+    try {
+        const rows = await getLeadEvents({ recordId: this.leadId });
+
+        this.eventHistory = (rows || []).map(r => ({
+            id: r.id,
+            subject: r.subject,
+            attendance: r.attendance || 'NA'
+        }));
+
+        this.eventLoaded = true;
+    } catch (e) {
+        console.error('Event load failed', e);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+handleViewMoreLead() {
+    window.open('/' + this.leadId, '_blank');
+}
+
+
     async handleCall() {
         this.loading = true;
         this.errorText = null;
@@ -347,9 +499,7 @@ export default class WebinarCallModal extends LightningElement {
         }
     }
 
-    // -------------------------
-    // TIMER
-    // -------------------------
+ 
     startTimer() {
         if (this.timerId) return;
         const start = Date.now() - this.elapsedMs;

@@ -6,6 +6,7 @@ import updateCourseCallFeedback from '@salesforce/apex/Webservice_RunoAllocation
 import getL1L2Values from '@salesforce/apex/Webservice_RunoAllocationAPI.getL1L2Values';
 import getIdentity from '@salesforce/apex/RunoCallIdentityService.getIdentity';
 import getStageLevelValues from '@salesforce/apex/Webservice_RunoAllocationAPI.getStageLevelValues';
+import getCallHistory from '@salesforce/apex/Webservice_RunoAllocationAPI.getCallHistory';
 
 import { CurrentPageReference } from 'lightning/navigation';
 import { NavigationMixin } from 'lightning/navigation';
@@ -33,6 +34,8 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     l2Options = [];
     fullMap = {};
     isL2Disabled = true;
+    activeTab = 'lead';
+
 
     stageValue = '';
     levelValue = '';
@@ -41,7 +44,11 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     autoSetFollowUp = true;
 
     // Identity
-    identity = { name:'', email:'', phone:'', city:'', source:'', stage:'' };
+    identity = { name:'', email:'', phone:'', city:'', source:'', stage:'',canId: '',
+        createdDate: '',
+    mhpTag: '',
+    leadOwner: ''
+ };
 
     // Auto-call
     autoCall = false;
@@ -50,6 +57,8 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     // Follow-up
     nextFollowUpDate = null;
 
+
+ callHistory = [];
     // Call
     isLive = false;
     callStatus = 'Idle';
@@ -102,6 +111,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         this.resolveRecordIdFromPageRef();
         this.loadPicklists();
         this.loadStageLevel();
+        this.loadCallHistory();
         this.subscribeToEvents();
         onError(err => console.warn('EMP API Error:', JSON.stringify(err)));
 
@@ -133,6 +143,22 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     this.feedback = event.target.value;
 }
 
+get formattedCreatedDate() {
+    if (!this.identity.createdDate) return '';
+
+    const date = new Date(this.identity.createdDate);
+
+    return new Intl.DateTimeFormat('en-IN', {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    }).format(date);
+}
+
+
+
 
     handleL1Change(event) {
         const val = event?.detail?.value || '';
@@ -145,6 +171,11 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     handleL2Change(event) {
         this.l2Value = event?.detail?.value || '';
     }
+
+
+get showFeedbackInLeadTab() {
+    return this.isLeadTab && this.showFeedback;
+}
 
     async loadStageLevel() {
         try {
@@ -333,4 +364,66 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     toast(title, message, variant) {
         this.dispatchEvent(new ShowToastEvent({ title, message, variant }));
     }
+
+    get isLeadTab() {
+    return this.activeTab === 'lead';
+}
+
+get isHistoryTab() {
+    return this.activeTab === 'history';
+}
+
+handleTabClick(event) {
+    this.activeTab = event.target.dataset.tab;
+}
+
+
+get leadTabClass() {
+    return `tab-item ${this.activeTab === 'lead' ? 'active' : ''}`;
+}
+
+get historyTabClass() {
+    return `tab-item ${this.activeTab === 'history' ? 'active' : ''}`;
+}
+
+handleTabClick(event) {
+    const tab = event.currentTarget.dataset.tab;
+    this.activeTab = tab;
+}
+
+
+ async loadCallHistory() {
+        if (!this.recordId) return;
+        try {
+            const rows = await getCallHistory({ recordId: this.recordId });
+            const dateFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+            const timeFmt = new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit' });
+            this.callHistory = (rows || []).map(r => {
+                const dt = r.startTime || r.createdDate;
+                const d = dt ? new Date(dt) : null;
+                const totalSec = Number(r.durationSeconds || 0);
+                const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+                const ss = String(totalSec % 60).padStart(2, '0');
+                return {
+                    id: r.id,
+                    dateLabel: d ? dateFmt.format(d) : 'NA',
+                    timeLabel: d ? timeFmt.format(d) : '',
+                    durationLabel: `${mm}:${ss}`,
+                    status: r.status || 'NA',
+                    l1: r.l1 || '',
+                    l2: r.l2 || '',
+                    stage: r.stage || ''
+                };
+            });
+        } catch (e) {
+            console.error('Call history load failed:', e);
+        }
+    }
+
+    get hasCallHistory() {
+        return (this.callHistory || []).length > 0;
+    }
+
+    
+
 }

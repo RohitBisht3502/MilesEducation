@@ -7,7 +7,10 @@ import getActiveProducts from '@salesforce/apex/PurchaseOrderService.getActivePr
 import savePurchaseOrder from '@salesforce/apex/PurchaseOrderService.save';
 import checkAddressByRecordId from '@salesforce/apex/PurchaseOrderService.checkAddressByRecordId';
 import saveAddress from '@salesforce/apex/PurchaseOrderService.saveAddress';
+import getMinimumDownPayment from '@salesforce/apex/PurchaseOrderService.getMinimumDownPayment';
 import MINIMUM_DOWNPAYMENT from '@salesforce/label/c.Minimum_Downpayment';
+
+const MAX_DISCOUNT_PERCENT = 5;
 
 export default class PurchaseOrderProductSelector extends LightningElement {
     @track products = [];
@@ -19,7 +22,9 @@ export default class PurchaseOrderProductSelector extends LightningElement {
     downPayment = 0;
     selectedAddressType = 'billing';
     recordId;
-   @track sameAsBilling = true; 
+    @track sameAsBilling = false;
+    minimumDownPayment = 0;
+    shippingPhone = '';
 
     hasBillingAddress = false;
     hasShippingAddress = false;
@@ -32,6 +37,15 @@ export default class PurchaseOrderProductSelector extends LightningElement {
     getStateParameters(currentPageReference) {
         if (currentPageReference?.state) {
             this.recordId = currentPageReference.state.recordId;
+        }
+    }
+
+    @wire(getMinimumDownPayment, { recordId: '$recordId' })
+    wiredMinimumDownPayment({ data, error }) {
+        if (data !== undefined && data !== null) {
+            this.minimumDownPayment = Number(data) || 0;
+        } else if (error) {
+            this.minimumDownPayment = Number(MINIMUM_DOWNPAYMENT) || 0;
         }
     }
 
@@ -140,6 +154,13 @@ get shouldShowShippingFields() {
     return !this.isBillingModal || !this.sameAsBilling;
 }
 
+get downPaymentMinMessage() {
+    if (this.minimumDownPayment > 0) {
+        return `Minimum down payment should be ₹${this.minimumDownPayment}`;
+    }
+    return 'Down payment cannot be negative.';
+}
+
 validateAddressFields(address, sectionLabel) {
     const required = ['street', 'city', 'state', 'postal', 'country'];
     for (const key of required) {
@@ -204,33 +225,14 @@ validateAddressFields(address, sectionLabel) {
     }
 
     handleDiscountValue(event) {
-        let value = Number(event.target.value) || 0;
-
-        if (this.discountType === 'percentage') value = Math.min(value, 100);
-        if (this.discountType === 'fixed') value = Math.min(value, this.subTotal);
-
+        const value = Number(event.target.value) || 0;
         this.discountValue = value;
+        this.validateDiscount(event.target);
         this.syncDownPayment();
     }
-
     handleDownPaymentChange(event) {
-        let value = Number(event.target.value) || 0;
-        const max = this.finalPayable;
-
-        if (value > max) {
-            event.target.setCustomValidity('Down payment cannot exceed total payable.');
-            event.target.reportValidity();
-            value = max;
-            event.target.setCustomValidity('');
-        } else if (value < 0) {
-            value = 0;
-            event.target.setCustomValidity('Down payment cannot be negative.');
-        } else {
-            event.target.setCustomValidity('');
-        }
-
-        event.target.value = value;
-        event.target.reportValidity();
+        const value = Number(event.target.value) || 0;
+        this.validateDownPayment(event.target, value);
         this.downPayment = value;
     }
 
@@ -257,7 +259,7 @@ validateAddressFields(address, sectionLabel) {
             if (!this.hasBillingAddress) {
                 this.missingAddressType = 'billing';
                 this.showAddressModal = true;
-                this.sameAsBilling = true;
+                this.sameAsBilling = false;
 
                 return;
             }
@@ -302,9 +304,16 @@ validateAddressFields(address, sectionLabel) {
         return;
     }
 
+    if (!shipping.phone || !String(shipping.phone).trim()) {
+        this.showToast('Error', 'Shipping Phone Number is mandatory.', 'error');
+        return;
+    }
+
     if (this.shouldShowShippingFields && !this.validateAddressFields(shipping, 'Shipping')) {
         return;
     }
+
+    this.shippingPhone = shipping.phone;
 
     // save billing first
     saveAddress({
@@ -350,15 +359,25 @@ validateAddressFields(address, sectionLabel) {
             return;
         }
 
+        if (!this.validateDiscount()) {
+            this.showToast('Error', 'Please correct the discount value.', 'error');
+            return;
+        }
+
+        if (!this.validateDownPayment()) {
+            this.showToast('Error', 'Please correct the down payment value.', 'error');
+            return;
+        }
+
         if (this.downPayment > this.finalPayable) {
             this.showToast('Warning', 'Down payment cannot exceed total payable.', 'warning');
             return;
         }
 
-        if (this.downPayment < parseFloat(MINIMUM_DOWNPAYMENT)) {
+        if (this.downPayment < Number(this.minimumDownPayment || 0)) {
             this.showToast(
                 'Error',
-                `Minimum down payment should be ₹${MINIMUM_DOWNPAYMENT}`,
+                `Minimum down payment should be ₹${this.minimumDownPayment || 0}`,
                 'error'
             );
             return;
@@ -373,6 +392,7 @@ validateAddressFields(address, sectionLabel) {
             leadId: this.recordId,
             discount: this.discountAmount,
             downPayment: this.downPayment,
+            phoneNumber: this.shippingPhone,
             addressType: this.selectedAddressType,
             items: this.selectedProducts.map(p => ({
                 productId: p.id,
@@ -404,6 +424,8 @@ validateAddressFields(address, sectionLabel) {
         this.discountType = 'percentage';
         this.selectedAddressType = 'billing';
         this.downPayment = 0;
+        this.minimumDownPayment = 0;
+        this.shippingPhone = '';
     }
 
     showToast(title, message, variant) {
@@ -413,18 +435,52 @@ validateAddressFields(address, sectionLabel) {
     closeAddressModal() {
         this.showAddressModal = false;
     }
+    validateDiscount(inputEl) {
+        const input = inputEl || this.template.querySelector('lightning-input[data-id="discount"]');
+        if (!input) return true;
 
-    syncDownPayment() {
-        const max = this.finalPayable;
-        const clamped = Math.min(Math.max(this.downPayment || 0, 0), max);
-        if (clamped !== this.downPayment) {
-            this.downPayment = clamped;
+        const value = Number(this.discountValue) || 0;
+        let message = '';
+
+        if (this.discountType === 'percentage') {
+            if (value < 0 || value > MAX_DISCOUNT_PERCENT) {
+                message = `Discount must be between 0% and ${MAX_DISCOUNT_PERCENT}%`;
+            }
+        } else {
+            const maxFixed = Math.round((this.subTotal * MAX_DISCOUNT_PERCENT) / 100);
+            if (value < 0 || value > maxFixed) {
+                message = `Discount must be between â‚¹0 and â‚¹${maxFixed}`;
+            } else if (value > this.subTotal) {
+                message = 'Discount cannot exceed total amount.';
+            }
         }
+
+        input.setCustomValidity(message);
+        input.reportValidity();
+        return !message;
+    }
+    validateDownPayment(inputEl, rawValue) {
+        const input = inputEl || this.template.querySelector('lightning-input[data-id="downPayment"]');
+        if (!input) return true;
+
+        const value = rawValue !== undefined ? rawValue : Number(this.downPayment) || 0;
+        const min = Math.max(0, Number(this.minimumDownPayment) || 0);
+        let message = '';
+
+        if (value < min) {
+            message = `Minimum down payment should be â‚¹${min}`;
+        } else if (value > this.finalPayable) {
+            message = 'Down payment cannot exceed total payable.';
+        }
+
+        input.setCustomValidity(message);
+        input.reportValidity();
+        return !message;
+    }
+    syncDownPayment() {
         const input = this.template.querySelector('lightning-input[data-id="downPayment"]');
         if (input) {
-            input.setCustomValidity('');
-            input.value = clamped;
-            input.reportValidity();
+            this.validateDownPayment(input);
         }
     }
 }

@@ -1,19 +1,15 @@
 <template>
-    <lightning-quick-action-panel
-        header=""
-        class="panel-wrapper">
+    <lightning-quick-action-panel class="panel-wrapper">
 
-        <!-- ================= TOP HEADER BAR ================= -->
-        <div class="top-header">
-            <div class="top-left">
+        <!-- ===== HEADER ===== -->
+        <div class="custom-header">
+            <div class="header-left">
                 <lightning-icon icon-name="utility:call" size="small"></lightning-icon>
-                <span class="top-title">Calling via Runo</span>
+                <span class="header-title">Calling via Runo</span>
             </div>
 
-            <div class="top-right">
-                <span class="status-label">Status:</span>
-                <span class="status-pill ended">{callStatus}</span>
-
+            <div class="header-right">
+                <span class="status-pill">{callStatus}</span>
                 <span class="duration">
                     <lightning-icon icon-name="utility:clock" size="x-small"></lightning-icon>
                     {elapsedLabel}
@@ -21,18 +17,19 @@
             </div>
         </div>
 
-        <!-- ================= LOADING STATE ================= -->
+        <!-- ===== LOADER ===== -->
         <template if:true={loading}>
             <div class="loading-state">
-                <lightning-spinner alternative-text="Sending..." size="small"></lightning-spinner>
-                <div class="loading-text">Calling Runo Allocation API…</div>
+                <lightning-spinner size="small"></lightning-spinner>
+                <div>Calling Runo Allocation API…</div>
             </div>
         </template>
 
-        <!-- ================= CALL POPUP ================= -->
+        <!-- ===== CALL POPUP ===== -->
         <template if:true={showCallPopup}>
             <div class="call-overlay">
                 <div class="popup-inner wave-container">
+
                     <div class="popup-call-icon pulse-icon">
                         <lightning-icon icon-name="utility:call" size="large"></lightning-icon>
                     </div>
@@ -44,185 +41,216 @@
                     </div>
 
                     <template if:true={canEndCall}>
-                        <div class="slds-m-top_medium">
-                            <lightning-button
-                                variant="destructive"
-                                label="End Call"
-                                onclick={handleEndCall}>
-                            </lightning-button>
+                        <lightning-button variant="destructive" label="End Call" onclick={handleEndCall}>
+                        </lightning-button>
+                    </template>
+
+                </div>
+            </div>
+        </template>
+
+        <!-- ===== BODY ===== -->
+        <div class="body-wrapper">
+
+            <!-- TABS -->
+            <div class="tab-bar">
+                <div class={leadTabClass} data-tab="lead" onclick={handleTabClick}>
+                    Lead Information
+                </div>
+                <div class={historyTabClass} data-tab="history" onclick={handleTabClick}>
+                    Call History
+                </div>
+            </div>
+
+            <!-- TWO COLUMN LAYOUT -->
+            <div class="content-row two-col-layout">
+
+                <!-- LEFT SIDE -->
+                <div class="left-panel">
+                    <template if:true={isLeadTab}>
+                        <div class="section-card">
+                            <div class="section-header">
+                                <lightning-icon icon-name="standard:lead" size="small"></lightning-icon>
+                                <span>Lead Information</span>
+                            </div>
+
+                            <div class="info-grid">
+
+                                <template if:true={identity.canId}>
+                                    <div class="info-tile">
+                                        <lightning-icon icon-name="utility:tag"></lightning-icon>
+                                        <div>
+                                            <small>CAN ID:-</small>
+                                            <strong>{identity.canId}</strong>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <div class="info-tile">
+                                    <lightning-icon icon-name="utility:user"></lightning-icon>
+                                    <div>
+                                        <small>Name</small>
+                                        <strong>{identity.name}</strong>
+                                    </div>
+                                </div>
+
+                                <div class="info-tile">
+                                    <lightning-icon icon-name="utility:location"></lightning-icon>
+                                    <div>
+                                        <small>Location</small>
+                                        <strong>{identity.city}</strong>
+                                    </div>
+                                </div>
+
+                                <div class="info-tile">
+                                    <lightning-icon icon-name="utility:topic"></lightning-icon>
+                                    <div>
+                                        <small>Company</small>
+                                        <strong>{identity.source}</strong>
+                                    </div>
+                                </div>
+
+                                <div class="info-tile">
+                                    <lightning-icon icon-name="utility:collection"></lightning-icon>
+                                    <div>
+                                        <small>Stage</small>
+                                        <strong>{identity.stage}</strong>
+                                    </div>
+                                </div>
+
+
+                                <div class="info-tile">
+                                    <lightning-icon icon-name="utility:event"></lightning-icon>
+                                    <div>
+                                        <small>Created Date:-</small>
+                                        <strong>{formattedCreatedDate}</strong>
+
+                                    </div>
+                                </div>
+
+                                <div class="info-tile">
+                                    <lightning-icon icon-name="utility:check"></lightning-icon>
+                                    <div>
+                                        <small>MHP:-</small>
+                                        <strong>{identity.mhpTag}</strong>
+                                    </div>
+                                </div>
+
+                                <div class="info-tile">
+                                    <lightning-icon icon-name="utility:user_role"></lightning-icon>
+                                    <div>
+                                        <small>Lead Owner:-</small>
+                                        <strong>{identity.leadOwner}</strong>
+                                    </div>
+                                </div>
+
+                                <template if:true={showPopup}>
+                                    <div class="call-popup">Call Successfully sent</div>
+                                </template>
+
+                            </div>
                         </div>
                     </template>
                 </div>
-            </div>
-        </template>
 
-        <!-- ================= ERROR ================= -->
-        <template if:true={errorText}>
-            <div class="error-box">
-                <div class="error-inner">
-                    <lightning-icon icon-name="utility:error" size="x-small"></lightning-icon>
-                    <div class="error-message">{errorText}</div>
-                </div>
-            </div>
-        </template>
+                <!-- RIGHT SIDE -->
+                <template if:true={showFeedbackInLeadTab}>
+                    <div class="right-panel">
+                        <div class="section-card feedback-card">
 
-        <!-- ================= BODY ================= -->
-        <div class="body-wrapper">
-            <div class="slds-grid slds-gutters slds-wrap">
+                            <div class="section-header">
+                                <lightning-icon icon-name="utility:feedback" size="small"></lightning-icon>
+                                <span>Call Feedback</span>
+                            </div>
 
-                <!-- ================= LEFT CARD : LEAD INFO ================= -->
-                <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-2">
-                    <div class="section-card">
+                            <div class="feedback-grid two-column">
 
-                        <div class="section-header">
-                            <lightning-icon icon-name="standard:lead" size="small"></lightning-icon>
-                            <span>Lead Information</span>
+                                <lightning-combobox label="Call Status (L1)" value={l1Value} options={l1Options}
+                                    onchange={handleL1Change}>
+                                </lightning-combobox>
+
+                                <lightning-combobox label="Sub Status (L2)" value={l2Value} options={l2Options}
+                                    onchange={handleL2Change} disabled={isL2Disabled}>
+                                </lightning-combobox>
+
+                                <lightning-textarea class="full-row" label="Feedback Comment" value={feedback}
+                                    onchange={handleFeedbackChange}>
+                                </lightning-textarea>
+
+                                <lightning-input type="datetime-local" label="Next Follow Up" value={nextFollowUpDate}
+                                    onchange={handleNextFollowUpDateChange} disabled={autoSetFollowUp}>
+                                </lightning-input>
+
+                                <lightning-input type="checkbox" label="Auto set next follow up (+24 hrs)"
+                                    checked={autoSetFollowUp} onchange={handleAutoSetChange}>
+                                </lightning-input>
+
+                            </div>
                         </div>
+                    </div>
+                </template>
 
-                        <div class="info-grid">
+            </div>
 
-                            <div class="info-tile">
-                                <lightning-icon icon-name="utility:user"></lightning-icon>
-                                <div>
-                                    <small>Name</small>
-                                    <strong>{identity.name}</strong>
+            <!-- CALL HISTORY ONLY TAB -->
+            <template if:true={isHistoryTab}>
+                <div class="section-card history-card">
+
+                    <div class="section-header">
+                        <lightning-icon icon-name="utility:call" size="small"></lightning-icon>
+                        <span>Call History</span>
+                    </div>
+
+                    <template if:true={hasCallHistory}>
+                        <div class="call-history-list">
+                            <template for:each={callHistory} for:item="row">
+                                <div key={row.id} class="call-history-item">
+
+                                    <div class="call-history-left">
+                                        <div>{row.dateLabel}</div>
+                                        <div>{row.timeLabel}</div>
+                                    </div>
+
+                                    <div class="call-history-right">
+                                        <div>{row.durationLabel}</div>
+                                        <div>{row.status}</div>
+                                    </div>
+
+                                    <div class="call-history-meta">
+                                        <span>{row.l1}</span>
+                                        <span>{row.l2}</span>
+                                        <span>{row.stage}</span>
+                                    </div>
+
                                 </div>
-                            </div>
+                            </template>
+                        </div>
+                    </template>
 
-                            <div class="info-tile">
-                                <lightning-icon icon-name="utility:location"></lightning-icon>
-                                <div>
-                                    <small>Location</small>
-                                    <strong>{identity.city}</strong>
-                                </div>
-                            </div>
+                    <template if:false={hasCallHistory}>
+                        <div class="call-history-empty">No call history found</div>
+                    </template>
 
-                            <div class="info-tile">
-                                <lightning-icon icon-name="utility:topic"></lightning-icon>
-                                <div>
-                                    <small>Company</small>
-                                    <strong>{identity.source}</strong>
-                                </div>
-                            </div>
-
-                            <div class="info-tile">
-                                <lightning-icon icon-name="utility:collection"></lightning-icon>
-                                <div>
-                                    <small>Stage</small>
-                                    <strong>{identity.stage}</strong>
-                                </div>
-                            </div>
-
-                            <template if:true={showPopup}>
-                <div class="call-popup">
-                    Call Successfully sent
                 </div>
             </template>
 
-                        </div>
-                    </div>
-                </div>
-<template if:true={showFeedback}>
-                <!-- ================= RIGHT CARD : CALL FEEDBACK ================= -->
-                <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-2">
-                    <div class="section-card">
-
-                        <div class="section-header">
-                            <lightning-icon icon-name="utility:feedback" size="small"></lightning-icon>
-                            <span>Call Feedback</span>
-                        </div>
-
-                        <div class="section-content slds-grid slds-wrap slds-gutters">
-
-                            <div class="slds-col slds-size_1-of-2">
-                                <lightning-combobox
-                                    label="Call Status (L1)"
-                                    value={l1Value}
-                                    options={l1Options}
-                                    onchange={handleL1Change}>
-                                </lightning-combobox>
-                            </div>
-
-                            <div class="slds-col slds-size_1-of-2">
-                                <lightning-combobox
-                                    label="Sub Status (L2)"
-                                    value={l2Value}
-                                    options={l2Options}
-                                    onchange={handleL2Change}
-                                    disabled={isL2Disabled}>
-                                </lightning-combobox>
-                            </div>
-
-                            <div class="slds-col slds-size_1-of-1">
-                                <lightning-textarea
-                                    label="Feedback Comment"
-                                    value={feedback}
-                                    onchange={handleFeedbackChange}
-                                    placeholder="Enter your feedback...">
-                                </lightning-textarea>
-                            </div>
-
-                            <div class="slds-col slds-size_1-of-2">
-                                <lightning-input
-                                    type="date"
-                                    label="Next Follow Up"
-                                    value={nextFollowUpDate}
-                                    onchange={handleNextFollowUpDateChange}
-                                    disabled={autoSetFollowUp}>
-                                </lightning-input>
-                            </div>
-
-                            <div class="slds-col slds-size_1-of-2">
-                                <lightning-input
-                                    type="time"
-                                    label="Time"
-                                    value={nextFollowUpTime}
-                                    onchange={handleNextFollowUpTimeChange}
-                                    disabled={autoSetFollowUp}>
-                                </lightning-input>
-                            </div>
-
-                            <div class="slds-col slds-size_1-of-1 slds-m-top_small">
-                                <lightning-input
-                                    type="checkbox"
-                                    label="Auto set next follow up (+24 hrs)"
-                                    checked={autoSetFollowUp}
-                                    onchange={handleAutoSetChange}>
-                                </lightning-input>
-                            </div>
-
-                            <div class="slds-col slds-size_1-of-1 slds-m-top_medium">
-                                <lightning-button
-                                    variant="brand"
-                                    class="full-width"
-                                    label="Save Feedback"
-                                    onclick={saveFeedback}
-                                    disabled={isSaveDisabled}>
-                                </lightning-button>
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- SMALL SUCCESS POPUP -->
-            
-  </template>
         </div>
-        </div>
-      
 
-        <!-- ================= FOOTER ================= -->
+        <!-- ===== FOOTER ===== -->
         <div slot="footer" class="footer-actions">
-            <lightning-button
-                class="call-btn"
-                variant="brand"
-                label={callButtonLabel}
-                onclick={callApi}
-                disabled={callButtonDisabled}>
-            </lightning-button>
+
+            <template if:true={showFeedback}>
+                <lightning-button variant="brand" label="Save Feedback" onclick={saveFeedback}
+                    disabled={isSaveDisabled}>
+                </lightning-button>
+            </template>
+
+            <template if:false={showFeedback}>
+                <lightning-button variant="brand" label={callButtonLabel} onclick={callApi}
+                    disabled={callButtonDisabled}>
+                </lightning-button>
+            </template>
+
         </div>
 
     </lightning-quick-action-panel>

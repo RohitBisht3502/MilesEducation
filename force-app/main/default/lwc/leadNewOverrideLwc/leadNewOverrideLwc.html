@@ -8,8 +8,8 @@
                 </div>
             </template>
 
-            <lightning-layout multiple-rows="true">
-                <lightning-layout-item size="6" small-device-size="12" padding="around-small">
+            <div class="slds-grid slds-wrap">
+                <div class="slds-col slds-size_1-of-2 slds-small-size_1-of-1 slds-p-around_small">
                     <lightning-combobox
                         name="course"
                         label="Course"
@@ -18,18 +18,18 @@
                         required
                         onchange={handleInputChange}>
                     </lightning-combobox>
-                </lightning-layout-item>
+                </div>
 
-                <lightning-layout-item size="6" small-device-size="12" padding="around-small">
+                <div class="slds-col slds-size_1-of-2 slds-small-size_1-of-1 slds-p-around_small">
                     <lightning-input
                         name="firstName"
                         label="First Name"
                         value={firstName}
                         onchange={handleInputChange}>
                     </lightning-input>
-                </lightning-layout-item>
+                </div>
 
-                <lightning-layout-item size="6" small-device-size="12" padding="around-small">
+                <div class="slds-col slds-size_1-of-2 slds-small-size_1-of-1 slds-p-around_small">
                     <lightning-input
                         name="lastName"
                         label="Last Name"
@@ -37,9 +37,9 @@
                         required
                         onchange={handleInputChange}>
                     </lightning-input>
-                </lightning-layout-item>
+                </div>
 
-                <lightning-layout-item size="6" small-device-size="12" padding="around-small">
+                <div class="slds-col slds-size_1-of-2 slds-small-size_1-of-1 slds-p-around_small">
                     <lightning-input
                         name="phone"
                         type="tel"
@@ -48,9 +48,9 @@
                         required
                         onchange={handleInputChange}>
                     </lightning-input>
-                </lightning-layout-item>
+                </div>
 
-                <lightning-layout-item size="6" small-device-size="12" padding="around-small">
+                <div class="slds-col slds-size_1-of-2 slds-small-size_1-of-1 slds-p-around_small">
                     <lightning-input
                         name="email"
                         type="email"
@@ -59,14 +59,21 @@
                         required
                         onchange={handleInputChange}>
                     </lightning-input>
-                </lightning-layout-item>
-            </lightning-layout>
+                </div>
+            </div>
 
             <div class="slds-m-top_medium">
                 <lightning-button
                     variant="brand"
                     label={saveLabel}
                     onclick={handleCreate}
+                    disabled={isLoading}>
+                </lightning-button>
+                <lightning-button
+                    class="slds-m-left_small"
+                    variant="neutral"
+                    label="Cancel"
+                    onclick={handleCancel}
                     disabled={isLoading}>
                 </lightning-button>
             </div>

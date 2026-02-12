@@ -4,6 +4,7 @@ public without sharing class PurchaseOrderService {
         @AuraEnabled public Id leadId;
         @AuraEnabled public Decimal discount;
         @AuraEnabled public Decimal downPayment;
+        @AuraEnabled public String phoneNumber;
         @AuraEnabled public String addressType;
         @AuraEnabled public List<LineItemRequest> items;
     }
@@ -101,6 +102,37 @@ public without sharing class PurchaseOrderService {
         return products;
     }
 
+    @AuraEnabled(cacheable=true)
+    public static Decimal getMinimumDownPayment(Id recordId) {
+        if (recordId == null) return 0;
+
+        String course;
+        Schema.SObjectType sobType = recordId.getSObjectType();
+
+        if (sobType == Lead__c.SObjectType) {
+            Lead__c leadRec = [SELECT Course__c FROM Lead__c WHERE Id = :recordId LIMIT 1];
+            course = leadRec.Course__c;
+        } else if (sobType == Course_Enrolled__c.SObjectType) {
+            Course_Enrolled__c ce = [SELECT Course__c FROM Course_Enrolled__c WHERE Id = :recordId LIMIT 1];
+            course = ce.Course__c;
+        } else {
+            return 0;
+        }
+
+        if (String.isBlank(course)) return 0;
+
+        List<Course_Down_Payment_Detail__mdt> rows = [
+            SELECT Amount__c
+            FROM Course_Down_Payment_Detail__mdt
+            WHERE Course__c = :course
+            LIMIT 1
+        ];
+
+        System.debug('Course Down Payment Detail: ' +  rows[0].Amount__c);
+
+        return rows.isEmpty() || rows[0].Amount__c == null ? 0 : rows[0].Amount__c;
+    }
+
     @AuraEnabled
     public static Id save(String requestJson) {
         try {
@@ -124,12 +156,12 @@ public without sharing class PurchaseOrderService {
             }
 
             // api callout to miles
-           // Callout_PurchaseOrderService.CalloutResult calloutRes = callExternalPurchaseService(req, lead, candidate);
+            Callout_PurchaseOrderService.CalloutResult calloutRes = callExternalPurchaseService(req, lead, candidate);
 
             Purchase_Order__c po    = createPurchaseOrder(req, context, lead, candidate, student);
-            po.Purchase_Order_Id__c = 'Testing 123';
-            //  po.Purchase_Order_Id__c = String.valueOf(calloutRes.purchaseId);
-            // po.Response_Payload__c  = calloutRes.responseBody;
+           // po.Purchase_Order_Id__c = 'Testing 123';
+             po.Purchase_Order_Id__c = String.valueOf(calloutRes.purchaseId);
+            po.Response_Payload__c  = calloutRes.responseBody;
             insert po;
 
             createLineItems(po.Id, req.items);
@@ -405,6 +437,7 @@ public without sharing class PurchaseOrderService {
         }
 
         po.Discount_Amount__c = req.discount;
+        po.Phone_Number__c = req.phoneNumber;
         // po.Down_Payment__c = req.downPayment;
         po.Purchase_Order_Date__c = Date.today();
 
@@ -585,13 +618,12 @@ public without sharing class PurchaseOrderService {
         extReq.sf_id        = String.valueOf(lead.Id);
         extReq.sf_lead_id   = String.valueOf(req.leadId);
         extReq.uuid         = candidate.UUID__c;
-        extReq.down_payment = req.discount;
+        extReq.down_payment = req.downPayment;
         //extReq.created_by   = UserInfo.getName();
         extReq.created_by   = 'MPE226';
 
         Callout_PurchaseOrderService.RequestItem item = new Callout_PurchaseOrderService.RequestItem();
-        //  item.program = String.valueOf(lead.Course__c);
-        item.program = 'CPA';
+        item.program = (lead != null ? String.valueOf(lead.Course__c) : null);
         Boolean hasTraining = false;
         Boolean hasStudyMaterial = false;
 
