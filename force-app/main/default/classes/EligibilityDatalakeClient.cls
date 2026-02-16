@@ -30,6 +30,14 @@ public without sharing class EligibilityDatalakeClient {
         public FilesPayload files;
     }
 
+    public class FlatEligibilityResponsePayload {
+        public String sf_id;
+        public String qualification_title;
+        public String qualification_comment;
+        public String qualification_status;
+        public List<FilePayload> files;
+    }
+
     public class CalloutResult {
         public Integer statusCode;
         public String body;
@@ -104,6 +112,23 @@ public without sharing class EligibilityDatalakeClient {
         }
 
         String requestBody = JSON.serialize(payload);
+        return postEligibilityResponseInternal(requestBody, cr);
+    }
+
+    public static CalloutResult postEligibilityResponseFlat(FlatEligibilityResponsePayload payload) {
+        CalloutResult cr = new CalloutResult();
+        cr.success = false;
+
+        if (payload == null || String.isBlank(payload.sf_id)) {
+            cr.message = 'Missing sf_id in payload.';
+            return cr;
+        }
+
+        String requestBody = JSON.serialize(payload);
+        return postEligibilityResponseInternal(requestBody, cr);
+    }
+
+    private static CalloutResult postEligibilityResponseInternal(String requestBody, CalloutResult cr) {
         IntegrationLogService.LogParams logParams = new IntegrationLogService.LogParams();
         logParams.integrationType = 'Outbound status file';
         logParams.requestPayload = requestBody;

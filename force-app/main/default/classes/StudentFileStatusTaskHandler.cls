@@ -32,66 +32,78 @@ public class StudentFileStatusTaskHandler {
         addRule(m, 'M7#-', 'Educational documents at eligibility', 'Under Review',    'Approve docs needed to release Evaluation advice', AssigneeType.GP_SPOC);
         addRule(m, 'M7##', 'Educational documents at eligibility', 'Approved',        'Release Evaluation Advice', AssigneeType.GP_SPOC);
 
-        addRule(m, 'M8', 'FAQs Payment status', 'Not paid',     'Follow up for payment to Evaluation Agency', AssigneeType.SR_SPOC);
+        addRule(m, 'M8', 'FACs Payment status', 'Not paid',     'Follow up for payment to Evaluation Agency', AssigneeType.SR_SPOC);
         addRule(m, 'M8', 'NIES Receipt',        'Yet to upload','Follow up for payment to Evaluation Agency', AssigneeType.SR_SPOC);
+        addRule(m, 'M8', 'NIES Receipt',        'Re-upload',    'Re-upload proof of payment to Evaluation Agency', AssigneeType.SR_SPOC);
+        addRule(m, 'M8', 'NIES Receipt',        'Under Review', 'Review NIES payment receipt', AssigneeType.SR_SPOC);
 
         addRule(m, 'M9',  'Evaluation report', 'Yet to upload', 'Follow up for Evaluation report', AssigneeType.SR_SPOC);
         addRule(m, 'M9+', 'Evaluation report', 'Re-upload',     'Follow up for Evaluation report', AssigneeType.SR_SPOC);
-        addRule(m, 'M9+', 'Evaluation report', 'Under review',  'Approve the Evaluation report',   AssigneeType.GP_SPOC);
+        addRule(m, 'M9+', 'Evaluation report', 'Under Review',  'Approve the Evaluation report',   AssigneeType.GP_SPOC);
         addRule(m, 'M10', 'Evaluation report', 'Approved',      'Release NTS Advice',              AssigneeType.GP_SPOC);
 
         addRule(m, 'M11',  'NTS document', 'Yet to upload', 'Follow up for NTS', AssigneeType.SR_SPOC);
         addRule(m, 'M11',  'NTS document', 'Re-upload',     'Follow up for NTS', AssigneeType.SR_SPOC);
-        addRule(m, 'M11',  'NTS document', 'Under review',  'Approve NTS',       AssigneeType.GP_SPOC);
+        addRule(m, 'M11',  'NTS document', 'Under Review',  'Approve NTS',       AssigneeType.GP_SPOC);
         addRule(m, 'M11+', 'NTS document', 'Approved',      'Exam Scheduling Advice to be released', AssigneeType.GP_SPOC);
 
         addRule(m, 'M11#', 'Pro-metric', 'Yet to upload', 'Schedule Exam and upload pro-metric', AssigneeType.SR_SPOC);
         addRule(m, 'M11#', 'Pro-metric', 'Re-upload',     'Schedule Exam and upload pro-metric', AssigneeType.SR_SPOC);
-        addRule(m, 'M11#', 'Pro-metric', 'Under review',  'Verify Pro-metric',                   AssigneeType.GP_SPOC);
+        addRule(m, 'M11#', 'Pro-metric', 'Under Review',  'Verify Pro-metric',                   AssigneeType.GP_SPOC);
 
         addRule(m, 'M12', 'Pro-metric', 'Approved', 'Follow up for exam prep and exam completion', AssigneeType.SR_SPOC);
 
         return m;
     }
 
+    public static void handleAfterInsert(List<Student_File_Status__c> newList) {
+        if (newList == null || newList.isEmpty()) return;
+        createTasks(newList, true, null);
+    }
+
     public static void handleAfterUpdate(List<Student_File_Status__c> newList, Map<Id, Student_File_Status__c> oldMap) {
         if (newList == null || newList.isEmpty() || oldMap == null) return;
+        createTasks(newList, false, oldMap);
+    }
 
+    private static void createTasks(List<Student_File_Status__c> newList,Boolean isInsert, Map<Id, Student_File_Status__c> oldMap) {
         Set<Id> courseIds = new Set<Id>();
-        List<Student_File_Status__c> changed = new List<Student_File_Status__c>();
+        List<Student_File_Status__c> toProcess = new List<Student_File_Status__c>();
 
         for (Student_File_Status__c sfs : newList) {
+            if (sfs.Course_Enrolled__c == null) continue;
+            if (String.isBlank(sfs.Status__c)) continue;
+
+            if (isInsert) {
+                toProcess.add(sfs);
+                courseIds.add(sfs.Course_Enrolled__c);
+                continue;
+            }
+
             Student_File_Status__c oldRec = oldMap.get(sfs.Id);
             if (oldRec == null) continue;
+            if (sfs.Status__c == oldRec.Status__c) continue;
 
-            if (sfs.Status__c != oldRec.Status__c) {
-                if (sfs.Course_Enrolled__c != null) {
-                    changed.add(sfs);
-                    courseIds.add(sfs.Course_Enrolled__c);
-                }
-            }
+            toProcess.add(sfs);
+            courseIds.add(sfs.Course_Enrolled__c);
         }
-        if (changed.isEmpty()) return;
+
+        if (toProcess.isEmpty()) return;
+
+        completePreviousTasks(courseIds);
 
         Map<Id, Course_Enrolled__c> courseMap = new Map<Id, Course_Enrolled__c>([
-            SELECT Id, OwnerId, GP_Spoc__c, CC_Spoc__c
-            FROM Course_Enrolled__c
-            WHERE Id IN :courseIds
+            SELECT Id, OwnerId, GP_Spoc__c, CC_Spoc__c FROM Course_Enrolled__c WHERE Id IN :courseIds
         ]);
 
         Map<String, Task> existingOpenByCourseAndSubject = new Map<String, Task>();
-        for (Task t : [
-            SELECT Id, WhatId, Subject, Status
-            FROM Task
-            WHERE WhatId IN :courseIds
-            AND Status != 'Completed'
-        ]) {
+        for (Task t : [SELECT Id, WhatId, Subject, Status FROM Task WHERE WhatId IN :courseIds AND Status != 'Completed']) {
             existingOpenByCourseAndSubject.put(String.valueOf(t.WhatId) + '||' + norm(t.Subject), t);
         }
 
         List<Task> toInsert = new List<Task>();
 
-        for (Student_File_Status__c sfs : changed) {
+        for (Student_File_Status__c sfs : toProcess) {
             Course_Enrolled__c ce = courseMap.get(sfs.Course_Enrolled__c);
             if (ce == null) continue;
 
@@ -108,6 +120,7 @@ public class StudentFileStatusTaskHandler {
             String dupKey = String.valueOf(ce.Id) + '||' + norm(r.taskSubject);
             if (existingOpenByCourseAndSubject.containsKey(dupKey)) continue;
 
+            String source = isInsert ? 'insert' : 'update';
             Task t = new Task(
                 Subject      = r.taskSubject,
                 OwnerId      = ownerId,
@@ -115,7 +128,7 @@ public class StudentFileStatusTaskHandler {
                 ActivityDate = Date.today(),
                 Status       = 'Not Started',
                 Priority     = 'High',
-                Description  = 'Auto-created from Student File Status update. Level=' + sfs.Level__c +
+                Description  = 'Auto-created from Student File Status ' + source + '. Level=' + sfs.Level__c +
                                ', FileType=' + sfs.File_Type__c + ', Status=' + sfs.Status__c +
                                ', StudentFileStatusId=' + sfs.Id
             );
@@ -125,5 +138,25 @@ public class StudentFileStatusTaskHandler {
         }
 
         if (!toInsert.isEmpty()) insert toInsert;
+    }
+
+    private static void completePreviousTasks(Set<Id> courseIds) {
+        if (courseIds == null || courseIds.isEmpty()) return;
+
+        List<Task> taskToUpdate = new List<Task>();
+        Set<Id> processedWhatIds = new Set<Id>();
+
+        for (Task taskObj : [
+            SELECT Id, WhatId, Status FROM Task WHERE WhatId IN :courseIds AND Status != 'Completed' ORDER BY WhatId, CreatedDate DESC]) {
+            if (!processedWhatIds.contains(taskObj.WhatId)) {
+                taskObj.Status = 'Completed';
+                taskToUpdate.add(taskObj);
+                processedWhatIds.add(taskObj.WhatId);
+            }
+        }
+
+        if (!taskToUpdate.isEmpty()) {
+            update taskToUpdate;
+        }
     }
 }

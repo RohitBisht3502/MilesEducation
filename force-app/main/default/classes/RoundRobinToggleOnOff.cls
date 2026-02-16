@@ -109,7 +109,10 @@ public with sharing class RoundRobinToggleOnOff {
     }
 
     if (changed > 0) {
+  
+    if (!Test.isRunningTest()) {
         Metadata.Operations.enqueueDeployment(container, new CityMasterDeployCallback());
+    }
     }
     }
 

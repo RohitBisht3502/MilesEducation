@@ -16,19 +16,50 @@ public without sharing class EligibilityResponseService {
         if (file.Candidate__c == null || file.Folder__c == null) return;
 
         // Get category + degree folders
-        Eligibility_Folder__c categoryFolder = [
-            SELECT Id, Name, Folder_Type__c, Parent_Folder__c
+        Eligibility_Folder__c fileFolder = [
+            SELECT Id, Name, Folder_Type__c, Parent_Folder__c, Qualification_Type__c, Degree_Title__c, Status__c, Comments__c
             FROM Eligibility_Folder__c
             WHERE Id = :file.Folder__c
             LIMIT 1
         ];
 
+        String flatKey = resolveFlatFolderKey(fileFolder);
+        if (String.isNotBlank(flatKey)) {
+            EligibilityDatalakeClient.FlatEligibilityResponsePayload payload = new EligibilityDatalakeClient.FlatEligibilityResponsePayload();
+            payload.sf_id = String.valueOf(file.Candidate__c);
+            payload.qualification_title = flatKey;
+            payload.qualification_comment = fileFolder.Comments__c;
+            payload.qualification_status = fileFolder.Status__c;
+
+            EligibilityDatalakeClient.FilePayload fp = mapFileToPayload(file);
+            payload.files = new List<EligibilityDatalakeClient.FilePayload>{ fp };
+
+            IntegrationLogService.LogParams logParams = new IntegrationLogService.LogParams();
+            logParams.integrationType = 'Outbound status file';
+            logParams.requestPayload = JSON.serialize(payload);
+
+            try {
+                EligibilityDatalakeClient.CalloutResult result =
+                    EligibilityDatalakeClient.postEligibilityResponseFlat(payload);
+                logParams.status = result.success ? 'Success' : 'failed';
+                logParams.responsePayload = result.body;
+                logParams.statusCode = result.statusCode;
+                logParams.errorMessage = result.success ? null : result.message;
+            } catch (Exception e) {
+                logParams.status = 'failed';
+                logParams.errorMessage = e.getMessage();
+            } finally {
+                IntegrationLogService.log(logParams);
+            }
+            return;
+        }
+
         Eligibility_Folder__c degreeFolder = null;
-        if (categoryFolder.Parent_Folder__c != null) {
+        if (fileFolder.Parent_Folder__c != null) {
             degreeFolder = [
                 SELECT Id, Name, Degree_Title__c, Status__c, Comments__c
                 FROM Eligibility_Folder__c
-                WHERE Id = :categoryFolder.Parent_Folder__c
+                WHERE Id = :fileFolder.Parent_Folder__c
                 LIMIT 1
             ];
         }
@@ -44,7 +75,7 @@ public without sharing class EligibilityResponseService {
         EligibilityDatalakeClient.FilePayload fp = mapFileToPayload(file);
 
         payload.files = new EligibilityDatalakeClient.FilesPayload();
-        if (isCertificate(categoryFolder)) {
+        if (isCertificate(fileFolder)) {
             payload.files.certificates = new List<EligibilityDatalakeClient.FilePayload>{ fp };
             payload.files.mark_sheets = new List<EligibilityDatalakeClient.FilePayload>();
         } else {
@@ -164,5 +195,14 @@ public without sharing class EligibilityResponseService {
             }
         }
         return null;
+    }
+
+    private static String resolveFlatFolderKey(Eligibility_Folder__c folder) {
+        if (folder == null) return null;
+        String key = EligibilityPathParser.normalizeFlatFolderKey(folder.Folder_Type__c);
+        if (String.isBlank(key)) key = EligibilityPathParser.normalizeFlatFolderKey(folder.Name);
+        if (String.isBlank(key)) key = EligibilityPathParser.normalizeFlatFolderKey(folder.Qualification_Type__c);
+        if (String.isBlank(key)) key = EligibilityPathParser.normalizeFlatFolderKey(folder.Degree_Title__c);
+        return key;
     }
 }

@@ -11,7 +11,8 @@ public without sharing class WebinarAutoRegisterDispatcher {
         if (leadIds == null || leadIds.isEmpty()) return;
 
         //List<Webinar__c> autoWebinars = [SELECT Id, Webinar_Id__c FROM Webinar__c WHERE Auto_Register__c = true AND (IsActive__c = true OR IsActive__c = null)];
-        List<Webinar__c> autoWebinars = [SELECT Id, Webinar_Id__c FROM Webinar__c WHERE Auto_Register__c = true AND (IsActive__c = true OR IsActive__c = null) AND Status__c = 'Created'];
+        List<Webinar__c> autoWebinars = [
+            SELECT Id, Webinar_Id__c FROM Webinar__c WHERE Auto_Register__c = true AND (IsActive__c = true OR IsActive__c = null) AND Status__c = 'Created' AND Start_Date_Time__c >= :System.now() ];
         if (autoWebinars.isEmpty()) return;
 
         Set<Id> webinarIds = new Set<Id>();

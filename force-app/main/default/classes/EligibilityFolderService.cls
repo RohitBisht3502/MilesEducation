@@ -125,6 +125,57 @@ public without sharing class EligibilityFolderService {
         return cs.isEmpty() ? null : cs[0];
     }
 
+    public static Eligibility_Folder__c findMainFolderForFlatType(
+        Id leadId,
+        String flatFolderKey,
+        String flatFolderLabel
+    ) {
+        if (leadId == null) return null;
+        String key = EligibilityPathParser.normalizeFlatFolderKey(flatFolderKey);
+        if (String.isBlank(key)) return null;
+
+        List<Eligibility_Folder__c> candidates = [
+            SELECT Id, Name, Folder_Type__c, Qualification_Type__c, Degree_Title__c, Parent_Folder__c, Level__c
+            FROM Eligibility_Folder__c
+            WHERE Candidate__c = :leadId
+        ];
+
+        Integer bestScore = -1;
+        Eligibility_Folder__c best = null;
+
+        for (Eligibility_Folder__c f : candidates) {
+            Integer score = -1;
+            if (EligibilityPathParser.normalizeFlatFolderKey(f.Name) == key) {
+                score = 100;
+            } else if (EligibilityPathParser.normalizeFlatFolderKey(f.Folder_Type__c) == key) {
+                score = 90;
+            } else if (EligibilityPathParser.normalizeFlatFolderKey(f.Degree_Title__c) == key) {
+                score = 80;
+            } else if (EligibilityPathParser.normalizeFlatFolderKey(f.Qualification_Type__c) == key) {
+                score = 70;
+            }
+
+            if (score >= 0) {
+                if (f.Parent_Folder__c == null) {
+                    score += 5;
+                }
+                if (f.Level__c == '1') {
+                    score += 3;
+                } else if (f.Level__c == '2') {
+                    score += 2;
+                } else if (f.Level__c == '3') {
+                    score += 1;
+                }
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = f;
+                }
+            }
+        }
+
+        return best;
+    }
+
     public static Eligibility_Folder__c createDynamicDegreeFolders(
         Id leadId,
         String qualificationType,

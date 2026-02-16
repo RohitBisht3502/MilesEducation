@@ -626,12 +626,18 @@ async loadWebinarHistory() {
 
             // 30s no-response timer → show End Call option
             this.clearFeedbackTimers();
-            this.noResponseTimer = setTimeout(() => {
-                if (this.isLive && this.callStatus !== 'Ended') {
-                    this.canEndCall = true;
-                    this.callStatus = 'No Response';
-                }
-            }, this.CALL_NO_RESPONSE_MS);
+           
+this.noResponseTimer = setTimeout(() => {
+    if (this.isLive && this.callStatus !== 'Ended') {
+        this.canEndCall = true;
+        this.callStatus = 'No Response';
+
+        // ✅ Automatically show feedback after 30s
+        this.showFeedbackSection();
+        this.callButtonDisabled = true; // optional, disable call button
+    }
+}, this.CALL_NO_RESPONSE_MS);
+
         } catch (e) {
             this.errorText = e?.body?.message || e?.message || 'Failed to dial';
             this.callStatus = 'Failed';

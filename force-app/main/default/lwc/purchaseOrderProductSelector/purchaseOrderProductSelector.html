@@ -281,6 +281,17 @@
                         onchange={handleDownPaymentChange}>
                     </lightning-input>
 
+                    <template if:true={isApprovalRequired}>
+                        <div class="approval-note">
+                            Discount exceeds allowed {discountThreshold}% for this course. Approval required.
+                        </div>
+                        <lightning-textarea
+                            label="Approval Comments"
+                            value={approvalComments}
+                            onchange={handleApprovalComments}>
+                        </lightning-textarea>
+                    </template>
+
                     <div class="price-row">
                         <span>Subtotal</span>
                         <span>₹{subTotal}</span>
@@ -299,7 +310,7 @@
                     <lightning-button
                         class="confirm-btn"
                         variant="brand"
-                        label="Confirm Purchase"
+                        label={confirmButtonLabel}
                         onclick={confirmPurchase}
                         disabled={disableConfirmPurchase}>
                     </lightning-button>

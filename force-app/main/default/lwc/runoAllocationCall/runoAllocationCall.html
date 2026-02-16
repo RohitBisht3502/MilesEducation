@@ -25,7 +25,7 @@
             </div>
         </template>
 
-        <template if:true={showCallPopup}>
+        <!-- <template if:true={showCallPopup}>
             <div class="call-overlay">
                 <div class="popup-inner wave-container">
 
@@ -46,7 +46,7 @@
 
                 </div>
             </div>
-        </template>
+        </template> -->
 
 
         <!-- ===== BODY ===== -->
@@ -205,7 +205,7 @@
                                     checked={autoSetFollowUp} onchange={handleAutoSetChange}>
                                 </lightning-input>
 
-                                <lightning-textarea class="full-row" label="Feedback Comment" value={feedback}    required={isCommentMandatory}
+                                <lightning-textarea class="full-row" label="Comments" value={feedback}    required={isCommentMandatory}
                                     onchange={handleFeedbackChange}>
                                 </lightning-textarea>
                             </div>

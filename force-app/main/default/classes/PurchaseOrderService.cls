@@ -6,6 +6,7 @@ public without sharing class PurchaseOrderService {
         @AuraEnabled public Decimal downPayment;
         @AuraEnabled public String phoneNumber;
         @AuraEnabled public String addressType;
+        @AuraEnabled public String approvalComments;
         @AuraEnabled public List<LineItemRequest> items;
     }
 
@@ -133,6 +134,35 @@ public without sharing class PurchaseOrderService {
         return rows.isEmpty() || rows[0].Amount__c == null ? 0 : rows[0].Amount__c;
     }
 
+    @AuraEnabled(cacheable=true)
+    public static Decimal getDiscountThreshold(Id recordId) {
+        if (recordId == null) return 0;
+
+        String course;
+        Schema.SObjectType sobType = recordId.getSObjectType();
+
+        if (sobType == Lead__c.SObjectType) {
+            Lead__c leadRec = [SELECT Course__c FROM Lead__c WHERE Id = :recordId LIMIT 1];
+            course = leadRec.Course__c;
+        } else if (sobType == Course_Enrolled__c.SObjectType) {
+            Course_Enrolled__c ce = [SELECT Course__c FROM Course_Enrolled__c WHERE Id = :recordId LIMIT 1];
+            course = ce.Course__c;
+        } else {
+            return 0;
+        }
+
+        if (String.isBlank(course)) return 0;
+
+        List<Course_Down_Payment_Detail__mdt> rows = [
+            SELECT Discount__c
+            FROM Course_Down_Payment_Detail__mdt
+            WHERE Course__c = :course
+            LIMIT 1
+        ];
+
+        return rows.isEmpty() || rows[0].Discount__c == null ? 0 : rows[0].Discount__c;
+    }
+
     @AuraEnabled
     public static Id save(String requestJson) {
         try {
@@ -154,19 +184,34 @@ public without sharing class PurchaseOrderService {
             if (student == null && lead != null && lead.Student__c != null) {
                 student = fetchStudentIfNeeded(lead.Student__c);
             }
+            if (context != null && lead != null) {
+                context.course = lead.Course__c;
+            }
 
-            // api callout to miles
-            Callout_PurchaseOrderService.CalloutResult calloutRes = callExternalPurchaseService(req, lead, candidate);
+            Boolean requiresApproval = isDiscountApprovalRequired(context, lead, req);
+            Callout_PurchaseOrderService.CalloutResult calloutRes;
+            if (!requiresApproval) {
+                // api callout to miles
+               // calloutRes = callExternalPurchaseService(req, lead, candidate);
+            }
 
             Purchase_Order__c po    = createPurchaseOrder(req, context, lead, candidate, student);
-           // po.Purchase_Order_Id__c = 'Testing 123';
-             po.Purchase_Order_Id__c = String.valueOf(calloutRes.purchaseId);
-            po.Response_Payload__c  = calloutRes.responseBody;
+            po.Purchase_Order_Id__c = 'Testing 123';
+            // if (calloutRes != null) {
+            //     po.Purchase_Order_Id__c = String.valueOf(calloutRes.purchaseId);
+            //     po.Response_Payload__c  = calloutRes.responseBody;
+            // }
+            if (requiresApproval) {
+                po.Approval_Status__c = 'Pending';
+            }
             insert po;
 
             createLineItems(po.Id, req.items);
             updateCairaLevelIfNeeded(context, lead, req.items);
             createTransaction(po.Id, req.downPayment, req.leadId);
+            if (requiresApproval) {
+                submitDiscountApprovalIfNeeded(po.Id, context, lead, req);
+            }
 
             return po.Id;
 
@@ -265,7 +310,7 @@ public without sharing class PurchaseOrderService {
 
         txn.Payment__c = amountReceived;
         txn.Status__c  = 'Initiated';
-
+        txn.Is_Down_Payment__c = true;
         insert txn;
     }
 
@@ -299,8 +344,9 @@ public without sharing class PurchaseOrderService {
             context.leadRecordId = recordId;
         } else if (sobType == Course_Enrolled__c.SObjectType) {
             context.courseEnrolledId = recordId;
-            Course_Enrolled__c ce = [SELECT Id, Student__c FROM Course_Enrolled__c WHERE Id = :recordId LIMIT 1];
+            Course_Enrolled__c ce = [SELECT Id, Student__c, Course__c FROM Course_Enrolled__c WHERE Id = :recordId LIMIT 1];
             context.studentAccountId = ce.Student__c;
+            context.course = ce.Course__c;
         } else {
             throw new AuraHandledException('Unsupported record type for Purchase Order creation');
         }
@@ -692,6 +738,7 @@ public without sharing class PurchaseOrderService {
         public Id leadRecordId;
         public Id courseEnrolledId;
         public Id studentAccountId;
+        public String course;
     }
 
     private static void updateCairaLevelIfNeeded(
@@ -752,5 +799,290 @@ public without sharing class PurchaseOrderService {
             Caira_Level__c = String.join(levels, ';')
         );
         update upd;
+    }
+
+    private static void submitDiscountApprovalIfNeeded(
+        Id purchaseOrderId,
+        RecordContext context,
+        Lead__c lead,
+        PurchaseOrderRequest req
+    ) {
+        if (purchaseOrderId == null || req == null) return;
+
+        String course = context != null ? context.course : null;
+        if (String.isBlank(course) && lead != null) {
+            course = lead.Course__c;
+        }
+        if (String.isBlank(course)) return;
+
+        Decimal thresholdPercent = getDiscountThreshold(course);
+        if (thresholdPercent == null) return;
+
+        Decimal subtotal = calculateSubTotal(req.items);
+        if (subtotal <= 0) return;
+
+        Decimal discountAmount = req.discount == null ? 0 : req.discount;
+        Decimal discountPercent = (discountAmount / subtotal) * 100;
+
+        if (discountPercent <= thresholdPercent) return;
+
+        String comment = req.approvalComments;
+        if (String.isBlank(comment)) {
+            comment = 'Discount ' + discountPercent.setScale(2) + '% exceeds allowed ' +
+                thresholdPercent.setScale(2) + '%';
+        } else {
+            comment = comment.trim() + ' | Discount ' + discountPercent.setScale(2) + '% exceeds allowed ' +
+                thresholdPercent.setScale(2) + '%';
+        }
+
+        Id approverId = getLeadOwnersManagerManager(req.leadId);
+
+        Approval.ProcessSubmitRequest approvalReq = new Approval.ProcessSubmitRequest();
+        approvalReq.setObjectId(purchaseOrderId);
+        approvalReq.setProcessDefinitionNameOrId('Purchase_Order_Discount_Approval');
+        if (approverId != null) {
+            approvalReq.setNextApproverIds(new Id[] { approverId });
+        }
+        approvalReq.setComments(comment);
+
+        Approval.process(approvalReq);
+    }
+
+    private static Id getLeadOwnersManagerManager(Id leadId) {
+        if (leadId == null) return null;
+
+        Lead__c leadRec = [
+            SELECT OwnerId
+            FROM Lead__c
+            WHERE Id = :leadId
+            LIMIT 1
+        ];
+
+        User ownerUser = [
+            SELECT ManagerId, Manager.ManagerId
+            FROM User
+            WHERE Id = :leadRec.OwnerId
+            LIMIT 1
+        ];
+
+        if (ownerUser.Manager != null && ownerUser.Manager.ManagerId != null) {
+            return ownerUser.Manager.ManagerId;
+        }
+
+        return null;
+    }
+
+    private static Boolean isDiscountApprovalRequired(
+        RecordContext context,
+        Lead__c lead,
+        PurchaseOrderRequest req
+    ) {
+        if (req == null) return false;
+
+        String course = context != null ? context.course : null;
+        if (String.isBlank(course) && lead != null) {
+            course = lead.Course__c;
+        }
+        if (String.isBlank(course)) return false;
+
+        Decimal thresholdPercent = getDiscountThreshold(course);
+        if (thresholdPercent == null || thresholdPercent <= 0) return false;
+
+        Decimal subtotal = calculateSubTotal(req.items);
+        if (subtotal <= 0) return false;
+
+        Decimal discountAmount = req.discount == null ? 0 : req.discount;
+        Decimal discountPercent = (discountAmount / subtotal) * 100;
+
+        return discountPercent > thresholdPercent;
+    }
+
+    public static void enqueuePurchaseOrderCallout(Set<Id> purchaseOrderIds) {
+        if (purchaseOrderIds == null || purchaseOrderIds.isEmpty()) return;
+        System.enqueueJob(new PurchaseOrderApprovalCalloutQueueable(new List<Id>(purchaseOrderIds)));
+    }
+
+    public class PurchaseOrderApprovalCalloutQueueable implements Queueable, Database.AllowsCallouts {
+        private List<Id> purchaseOrderIds;
+
+        public PurchaseOrderApprovalCalloutQueueable(List<Id> purchaseOrderIds) {
+            this.purchaseOrderIds = purchaseOrderIds;
+        }
+
+        public void execute(QueueableContext context) {
+            if (purchaseOrderIds == null || purchaseOrderIds.isEmpty()) return;
+
+            List<Purchase_Order__c> pos = [
+                SELECT Id, Lead__c, Candidate__c, Discount_Amount__c,
+                       Purchase_Order_Id__c, Response_Payload__c, Approval_Status__c
+                FROM Purchase_Order__c
+                WHERE Id IN :purchaseOrderIds
+            ];
+
+            Set<Id> leadIds = new Set<Id>();
+            Set<Id> candidateIds = new Set<Id>();
+            for (Purchase_Order__c po : pos) {
+                if (po.Lead__c != null) leadIds.add(po.Lead__c);
+                if (po.Candidate__c != null) candidateIds.add(po.Candidate__c);
+            }
+
+            Map<Id, Lead__c> leadMap = leadIds.isEmpty()
+                ? new Map<Id, Lead__c>()
+                : new Map<Id, Lead__c>([
+                    SELECT Id, Course__c
+                    FROM Lead__c
+                    WHERE Id IN :leadIds
+                ]);
+
+            Map<Id, Lead> candidateMap = candidateIds.isEmpty()
+                ? new Map<Id, Lead>()
+                : new Map<Id, Lead>([
+                    SELECT Id, UUID__c
+                    FROM Lead
+                    WHERE Id IN :candidateIds
+                ]);
+
+            List<Purchase_Order_Line_Item__c> lines = [
+                SELECT Id, Purchase_Order__c, Product__c, Quantity__c, Unit_Price__c
+                FROM Purchase_Order_Line_Item__c
+                WHERE Purchase_Order__c IN :purchaseOrderIds
+            ];
+
+            Map<Id, List<Purchase_Order_Line_Item__c>> linesByPo = new Map<Id, List<Purchase_Order_Line_Item__c>>();
+            Set<Id> productIds = new Set<Id>();
+            for (Purchase_Order_Line_Item__c line : lines) {
+                if (!linesByPo.containsKey(line.Purchase_Order__c)) {
+                    linesByPo.put(line.Purchase_Order__c, new List<Purchase_Order_Line_Item__c>());
+                }
+                linesByPo.get(line.Purchase_Order__c).add(line);
+                if (line.Product__c != null) productIds.add(line.Product__c);
+            }
+
+            Map<Id, Product2> productMap = productIds.isEmpty()
+                ? new Map<Id, Product2>()
+                : new Map<Id, Product2>([
+                    SELECT Id, Name, ProductCode, Type__c
+                    FROM Product2
+                    WHERE Id IN :productIds
+                ]);
+
+            Map<Id, Decimal> downPayments = new Map<Id, Decimal>();
+            for (AggregateResult ar : [
+                SELECT Purchase_Orders__c poId, SUM(Payment__c) total
+                FROM Transcation__c
+                WHERE Purchase_Orders__c IN :purchaseOrderIds
+                AND Is_Down_Payment__c = true
+                GROUP BY Purchase_Orders__c
+            ]) {
+                downPayments.put((Id) ar.get('poId'), (Decimal) ar.get('total'));
+            }
+
+            List<Purchase_Order__c> toUpdate = new List<Purchase_Order__c>();
+
+            for (Purchase_Order__c po : pos) {
+                if (po.Approval_Status__c != 'Approved') continue;
+                if (po.Purchase_Order_Id__c != null) continue;
+
+                Lead__c lead = leadMap.get(po.Lead__c);
+                Lead candidate = candidateMap.get(po.Candidate__c);
+                if (lead == null || candidate == null) continue;
+
+                Callout_PurchaseOrderService.Request extReq = new Callout_PurchaseOrderService.Request();
+                extReq.source       = 'sf';
+                extReq.sf_id        = String.valueOf(lead.Id);
+                extReq.sf_lead_id   = String.valueOf(lead.Id);
+                extReq.uuid         = candidate.UUID__c;
+                extReq.down_payment = downPayments.containsKey(po.Id) ? downPayments.get(po.Id) : 0;
+                extReq.created_by   = 'MPE226';
+
+                Callout_PurchaseOrderService.RequestItem item = new Callout_PurchaseOrderService.RequestItem();
+                item.program = lead.Course__c;
+                item.skus = new List<String>();
+                item.enrolment_line_items = new List<Callout_PurchaseOrderService.EnrolmentLineItem>();
+
+                Boolean hasTraining = false;
+                Boolean hasStudyMaterial = false;
+                Decimal total = 0;
+
+                List<Purchase_Order_Line_Item__c> poLines = linesByPo.get(po.Id);
+                if (poLines == null || poLines.isEmpty()) continue;
+
+                for (Purchase_Order_Line_Item__c line : poLines) {
+                    Product2 p = productMap.get(line.Product__c);
+                    if (p != null && p.Type__c == 'Training') hasTraining = true;
+                    if (p != null && p.Type__c == 'Study Material') hasStudyMaterial = true;
+
+                    String skuVal =
+                        (p != null && !String.isBlank(p.ProductCode)) ? p.ProductCode :
+                        (p != null ? p.Name : null);
+                    if (!String.isBlank(skuVal)) item.skus.add(skuVal);
+
+                    Decimal lineAmount =
+                        (line.Unit_Price__c != null ? line.Unit_Price__c : 0) *
+                        (line.Quantity__c != null ? line.Quantity__c : 0);
+
+                    Callout_PurchaseOrderService.EnrolmentLineItem eli =
+                        new Callout_PurchaseOrderService.EnrolmentLineItem();
+                    eli.item_name = (p != null ? p.Name : 'Item');
+                    eli.price          = lineAmount;
+                    eli.price_with_gst = lineAmount;
+                    eli.discound       = 0;
+                    eli.final_price    = lineAmount;
+                    item.enrolment_line_items.add(eli);
+
+                    total += lineAmount;
+                }
+
+                item.has_training       = hasTraining;
+                item.has_study_material = hasStudyMaterial;
+                item.actual_price = total;
+                item.agreed_fee   = total;
+                item.discount     = po.Discount_Amount__c;
+                item.loan_id      = null;
+
+                extReq.purchase_items = new List<Callout_PurchaseOrderService.RequestItem>{ item };
+
+                Callout_PurchaseOrderService.CalloutResult result =
+                    Callout_PurchaseOrderService.createPurchase(extReq);
+
+                if (result != null && result.purchaseId != null) {
+                    toUpdate.add(new Purchase_Order__c(
+                        Id = po.Id,
+                        Purchase_Order_Id__c = String.valueOf(result.purchaseId),
+                        Response_Payload__c = result.responseBody
+                    ));
+                }
+            }
+
+            if (!toUpdate.isEmpty()) {
+                update toUpdate;
+            }
+        }
+    }
+
+    private static Decimal calculateSubTotal(List<LineItemRequest> items) {
+        if (items == null) return 0;
+        Decimal total = 0;
+        for (LineItemRequest li : items) {
+            if (li == null) continue;
+            Decimal unit = li.unitPrice == null ? 0 : li.unitPrice;
+            Decimal qty = li.qty == null ? 0 : li.qty;
+            total += unit * qty;
+        }
+        return total;
+    }
+
+    private static Decimal getDiscountThreshold(String course) {
+        if (String.isBlank(course)) return null;
+
+        List<Course_Down_Payment_Detail__mdt> rows = [
+            SELECT Discount__c
+            FROM Course_Down_Payment_Detail__mdt
+            WHERE Course__c = :course
+            LIMIT 1
+        ];
+
+        if (rows.isEmpty() || rows[0].Discount__c == null) return null;
+        return rows[0].Discount__c;
     }
 }

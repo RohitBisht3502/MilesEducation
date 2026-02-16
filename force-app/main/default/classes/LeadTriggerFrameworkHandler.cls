@@ -50,7 +50,7 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         LeadTriggerHandler.createLeadActivityLogs(newLeads, null, true);
         
         // M.Com Bridge Course Tasks
-        LeadTriggerHelperClass.createMComTasks(newLeads, null);
+       // LeadTriggerHelperClass.createMComTasks(newLeads, null);
     }
 
     public override void afterUpdate() {

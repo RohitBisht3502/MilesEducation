@@ -64,6 +64,11 @@
                 <default>false</default>
                 <label>Owner Change</label>
             </value>
+            <value>
+                <fullName>Gmeet</fullName>
+                <default>false</default>
+                <label>Gmeet</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

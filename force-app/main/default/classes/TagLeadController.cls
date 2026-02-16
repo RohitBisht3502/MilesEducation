@@ -1,4 +1,4 @@
-public with sharing class TagLeadController {
+public without sharing class TagLeadController {
 
     @AuraEnabled(cacheable=true)
     public static List<Lead__c> searchLeads(String keyword) {
@@ -91,7 +91,7 @@ public with sharing class TagLeadController {
             }
             
             // Create Phone Number record only if it doesn't exist
-            createPhoneNumberRecordIfNotExists(callLog.Phone_Number__c, customLeadRecord.Id);
+            createPhoneNumberRecordIfNotExists(callLog.Phone_Number__c, customLeadRecord.Candidate__c);
             
         } else {
             // Creating new lead
@@ -135,18 +135,18 @@ public with sharing class TagLeadController {
             }
             
             // Step 4: Create Phone Number record only if it doesn't exist
-            createPhoneNumberRecordIfNotExists(callLog.Phone_Number__c, customLeadRecord.Id);
+            createPhoneNumberRecordIfNotExists(callLog.Phone_Number__c, customLeadRecord.Candidate__c);
         }
     }
     
-    private static void createPhoneNumberRecordIfNotExists(String phoneNumber, Id leadId) {
-        if (String.isNotBlank(phoneNumber)) {
-            // Check if phone number already exists for this lead
+    private static void createPhoneNumberRecordIfNotExists(String phoneNumber, Id standardLeadId) {
+        if (String.isNotBlank(phoneNumber) && standardLeadId != null) {
+            // Check if phone number already exists for this candidate (standard lead)
             List<Phone_Number__c> existingPhones = [
                 SELECT Id 
                 FROM Phone_Number__c 
                 WHERE Name = :phoneNumber 
-                AND Lead__c = :leadId 
+                AND Candidate__c = :standardLeadId 
                 LIMIT 1
             ];
             
@@ -154,7 +154,7 @@ public with sharing class TagLeadController {
             if (existingPhones.isEmpty()) {
                 Phone_Number__c phoneRec = new Phone_Number__c();
                 phoneRec.Name = phoneNumber;
-                phoneRec.Lead__c = leadId;
+                phoneRec.Candidate__c = standardLeadId;
                 insert phoneRec;
             }
         }

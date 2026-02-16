@@ -151,6 +151,79 @@ public without sharing class EligibilityFileService {
         return res;
     }
 
+    public static SimpleResponse handleMainFolderFiles(
+        String salesforceId,
+        String flatFolderKey,
+        List<IncomingFile> incoming
+    ) {
+        SimpleResponse res = new SimpleResponse();
+        res.success = false;
+        res.message = 'Unknown error';
+
+        if (String.isBlank(salesforceId)) {
+            res.message = 'Missing Lead Id (salesforceId).';
+            return res;
+        }
+
+        String key = EligibilityPathParser.normalizeFlatFolderKey(flatFolderKey);
+        if (String.isBlank(key)) {
+            res.message = 'Invalid main folder type.';
+            return res;
+        }
+
+        Id leadId;
+        try {
+            leadId = Id.valueOf(salesforceId);
+        } catch (Exception e) {
+            res.message = 'Invalid Lead Id (salesforceId).';
+            return res;
+        }
+
+        String label = EligibilityPathParser.flatFolderLabel(key);
+        Eligibility_Folder__c mainFolder =
+            EligibilityFolderService.findMainFolderForFlatType(leadId, key, label);
+        if (mainFolder == null) {
+            res.message = 'Main folder not found for ' + (label != null ? label : key) + '.';
+            return res;
+        }
+
+        List<Eligibility_File__c> toUpsert = new List<Eligibility_File__c>();
+        List<Eligibility_File__c> toDelete = new List<Eligibility_File__c>();
+        Set<Id> affectedFolderIds = new Set<Id>();
+
+        String logicalType = String.isNotBlank(label) ? label : key;
+        syncFilesForFolder(
+            leadId,
+            mainFolder.Id,
+            logicalType,
+            incoming,
+            toUpsert,
+            toDelete,
+            affectedFolderIds
+        );
+
+        if (!toUpsert.isEmpty()) {
+            upsert toUpsert;
+        }
+        if (!toDelete.isEmpty()) {
+            delete toDelete;
+        }
+
+        if (!affectedFolderIds.isEmpty()) {
+            EligibilityFolderService.recalcFromFileFolders(affectedFolderIds);
+        }
+
+        NewQualificationRequest req = new NewQualificationRequest();
+        req.qualificationTitle = logicalType;
+        req.qualificationType = logicalType;
+        req.qualificationMonthYear = null;
+        createUploadDocTaskForLead(leadId, req);
+
+        res.success = true;
+        res.message = 'Main folder files synced successfully.';
+        return res;
+    }
+
     // Extracts the file name from a full path (supports "/" and "\" separators).
     private static String extractFileName(String filePath) {
         if (String.isBlank(filePath)) {

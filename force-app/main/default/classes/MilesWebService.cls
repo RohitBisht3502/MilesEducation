@@ -228,7 +228,7 @@ global without sharing class MilesWebService {
                 Lead__c existingLeadC;
                 if (isConvertedStudent && studentAccountId != null) {
                     List<Lead__c> leadCs = [
-                        SELECT Id, Stage__c, Is_ReEnquiry__c, OwnerId
+                        SELECT Id, Stage__c, Is_ReEnquiry__c, OwnerId,Candidate__c
                         FROM Lead__c
                         WHERE Student__c = :studentAccountId AND Course__c = :inputData.course
                         LIMIT 1
@@ -236,7 +236,7 @@ global without sharing class MilesWebService {
                     if (!leadCs.isEmpty()) existingLeadC = leadCs[0];
                 } else if (candidate != null && candidate.Id != null) {
                     List<Lead__c> leadCs = [
-                        SELECT Id, Stage__c, Is_ReEnquiry__c, OwnerId
+                        SELECT Id, Stage__c, Is_ReEnquiry__c, OwnerId,Candidate__c
                         FROM Lead__c
                         WHERE Candidate__c = :candidate.Id AND Course__c = :inputData.course
                         LIMIT 1

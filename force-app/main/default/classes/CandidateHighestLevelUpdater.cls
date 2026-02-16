@@ -13,13 +13,20 @@ public without sharing class CandidateHighestLevelUpdater {
             return;
         }
 
-        List<Lead__c> childs = [SELECT Id, Candidate__c, Stage__c FROM Lead__c WHERE Candidate__c IN :candidateIds];
+        List<Lead__c> childs = [
+            SELECT Id, Candidate__c, Stage__c, Course__c
+            FROM Lead__c
+            WHERE Candidate__c IN :candidateIds
+        ];
 
         System.debug('Child Lead__c fetched => ' + childs.size());
 
         Map<Id, Integer> bestRankByCandidate = new Map<Id, Integer>();
         Map<Id, String> bestStageByCandidate = new Map<Id, String>();
         Map<Id, String> bestBucketByCandidate = new Map<Id, String>();
+
+        Map<String, Integer> bestRankByCandidateCourse = new Map<String, Integer>();
+        Map<String, String> bestStageByCandidateCourse = new Map<String, String>();
 
         for (Lead__c c : childs) {
             if (c.Candidate__c == null || String.isBlank(c.Stage__c)) continue;
@@ -35,9 +42,18 @@ public without sharing class CandidateHighestLevelUpdater {
 
                 System.debug('Best updated => Candidate: ' + c.Candidate__c + ' Stage: ' + normalizedStage + ' Bucket: ' + bucket + ' Rank: ' + r);
             }
+
+            if (!String.isBlank(c.Course__c)) {
+                String courseKey = buildCandidateCourseKey(c.Candidate__c, c.Course__c);
+                if (!bestRankByCandidateCourse.containsKey(courseKey) || r > bestRankByCandidateCourse.get(courseKey)) {
+                    bestRankByCandidateCourse.put(courseKey, r);
+                    bestStageByCandidateCourse.put(courseKey, normalizedStage);
+                }
+            }
         }
 
         List<Lead> toUpdate = new List<Lead>();
+        Map<String, Schema.SObjectField> candFieldMap = Lead.SObjectType.getDescribe().fields.getMap();
 
         for (Id candId : candidateIds) {
             String bestStage = bestStageByCandidate.get(candId);
@@ -50,6 +66,16 @@ public without sharing class CandidateHighestLevelUpdater {
               //  Stage__c = bestStage,
                 Engagement_Bucket__c = bestBucket
             );
+
+            // Overall highest level across all courses
+            setIfPresent(l, candFieldMap, 'Highest_level__c', bestStage);
+
+            // Course-wise highest levels
+            setCourseLevel(l, candFieldMap, candId, 'CAIRA', 'CAIRA_Level__c', bestStageByCandidateCourse);
+            setCourseLevel(l, candFieldMap, candId, 'CPA', 'CPA_Level__c', bestStageByCandidateCourse);
+            setCourseLevel(l, candFieldMap, candId, 'CMA', 'CMA_Level__c', bestStageByCandidateCourse);
+            setCourseLevel(l, candFieldMap, candId, 'US PATHWAY', 'USP_Level__c', bestStageByCandidateCourse);
+
             toUpdate.add(l);
         }
 
@@ -119,5 +145,33 @@ public without sharing class CandidateHighestLevelUpdater {
         }
         if (String.isBlank(digits)) return null;
         try { return Integer.valueOf(digits); } catch (Exception e) { return null; }
+    }
+
+    private static String buildCandidateCourseKey(Id candId, String course) {
+        return String.valueOf(candId) + '||' + normalizeCourse(course);
+    }
+
+    private static String normalizeCourse(String raw) {
+        return String.isBlank(raw) ? null : raw.trim().toUpperCase();
+    }
+
+    private static void setCourseLevel(
+        Lead cand,
+        Map<String, Schema.SObjectField> fieldMap,
+        Id candId,
+        String course,
+        String fieldApiName,
+        Map<String, String> bestStageByCandidateCourse
+    ) {
+        if (cand == null || fieldMap == null || !fieldMap.containsKey(fieldApiName)) return;
+        String key = buildCandidateCourseKey(candId, course);
+        String stage = bestStageByCandidateCourse.get(key);
+        setIfPresent(cand, fieldMap, fieldApiName, stage);
+    }
+
+    private static void setIfPresent(SObject sobj, Map<String, Schema.SObjectField> fieldMap, String fieldApiName, Object value) {
+        if (sobj == null || fieldMap == null || String.isBlank(fieldApiName)) return;
+        if (!fieldMap.containsKey(fieldApiName)) return;
+        sobj.put(fieldApiName, value);
     }
 }

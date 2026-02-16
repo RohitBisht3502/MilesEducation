@@ -10,7 +10,7 @@ global without sharing class EchoApi {
 
         String body = RestContext.request.requestBody == null ? '' : RestContext.request.requestBody.toString();
         Integer statusCode = 200;
-        String resPayload;
+        Object resPayload;
 
         System.debug('EchoApi request body => ' + body);
 
@@ -25,12 +25,14 @@ global without sharing class EchoApi {
 
             if (String.isBlank(uuid) || String.isBlank(level) || String.isBlank(program)) {
                 statusCode = 400;
-                resPayload = 'UUID or Level or Program missing';
+                resPayload = new Map<String, Object>{
+                    'status' => 'failed',
+                    'message' => 'UUID or Level or Program missing'
+                };
                 System.debug('EchoApi validation failed => ' + resPayload);
 
-                IntegrationLogUtil.insertLog('GP Level Update API', body, resPayload, 'Validation Failed', 'Failed', statusCode);
-                RestContext.response.statusCode = statusCode;
-                RestContext.response.responseBody = Blob.valueOf(resPayload);
+                IntegrationLogUtil.insertLog('GP Level Update API', body, JSON.serialize(resPayload), 'Validation Failed', 'Failed', statusCode);
+                sendJsonResponse(statusCode, resPayload);
                 return;
             }
 
@@ -63,28 +65,35 @@ global without sharing class EchoApi {
                 createOrUpdateStudentFiles(payload, program, null, null, a.Id, ce.Id,level);
             }
 
-            resPayload = JSON.serialize(new Map<String, Object>{
+            resPayload = new Map<String, Object>{
                 'uuid' => uuid,
                 'level' => level,
                 'program' => program,
                 'status' => 'success'
-            });
+            };
 
             System.debug('EchoApi response => ' + resPayload);
 
-            IntegrationLogUtil.insertLog('GP Level Update API', body, resPayload, 'Success', 'Success', 200);
-            RestContext.response.statusCode = 200;
-            RestContext.response.responseBody = Blob.valueOf(resPayload);
+            IntegrationLogUtil.insertLog('GP Level Update API', body, JSON.serialize(resPayload), 'Success', 'Success', 200);
+            sendJsonResponse(200, resPayload);
 
         } catch (Exception e) {
             statusCode = 500;
-            resPayload = 'Error: ' + e.getMessage();
+            resPayload = new Map<String, Object>{
+                'status' => 'failed',
+                'message' => 'Error: ' + e.getMessage()
+            };
             System.debug('EchoApi exception => ' + resPayload);
 
-            IntegrationLogUtil.insertLog('GP Level Update API', body, resPayload, 'Unhandled Error', 'Failed', statusCode);
-            RestContext.response.statusCode = statusCode;
-            RestContext.response.responseBody = Blob.valueOf(resPayload);
+            IntegrationLogUtil.insertLog('GP Level Update API', body, JSON.serialize(resPayload), 'Unhandled Error', 'Failed', statusCode);
+            sendJsonResponse(statusCode, resPayload);
         }
+    }
+
+    private static void sendJsonResponse(Integer statusCode, Object payload) {
+        RestContext.response.statusCode = statusCode;
+        RestContext.response.addHeader('Content-Type', 'application/json');
+        RestContext.response.responseBody = Blob.valueOf(JSON.serialize(payload));
     }
 
     private static void createOrUpdateStudentFiles(

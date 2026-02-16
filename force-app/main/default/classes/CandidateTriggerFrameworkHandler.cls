@@ -25,12 +25,12 @@ public without sharing class CandidateTriggerFrameworkHandler extends BaseTrigge
     public override void afterInsert() {
         CandidateTriggerHelperClass.handleAfterInsert(getNewLeads());
         CandidateTriggerHelperClass.handleCandidateIdAfterInsert(getNewLeads());
-        CandidateTriggerHelperClass.createBridgeCourseLeads(getNewLeads(), null);
+        // CandidateTriggerHelperClass.createBridgeCourseLeads(getNewLeads(), null);
     }
 
     public override void afterUpdate() {
         CandidateTriggerHelperClass.transferRecordsOnConversion(getNewLeads(), getOldLeadMap());
-        CandidateTriggerHelperClass.createBridgeCourseLeads(getNewLeads(), getOldLeadMap());
+        // CandidateTriggerHelperClass.createBridgeCourseLeads(getNewLeads(), getOldLeadMap());
     }
 
     public override void beforeDelete() {

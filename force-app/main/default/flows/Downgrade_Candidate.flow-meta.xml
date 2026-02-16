@@ -55,7 +55,7 @@
             <assignToReference>managerId</assignToReference>
             <operator>Add</operator>
             <value>
-                <elementReference>Get_Candidate_Owner_Details.ManagerId</elementReference>
+                <elementReference>Get_Manager_Details.ManagerId</elementReference>
             </value>
         </assignmentItems>
         <assignmentItems>
@@ -69,16 +69,6 @@
             <targetReference>Fetch_Custom_Notification</targetReference>
         </connector>
     </assignments>
-    <customErrors>
-        <name>You_Can_t_Downgrade_Lead</name>
-        <label>You Can&apos;t Downgrade Lead</label>
-        <locationX>0</locationX>
-        <locationY>0</locationY>
-        <customErrorMessages>
-            <errorMessage>You Cannot Downgrade Candidate Because you have at least 2 records of Lead__c object.</errorMessage>
-            <isFieldError>false</isFieldError>
-        </customErrorMessages>
-    </customErrors>
     <decisions>
         <name>Check_if_User_have_Manger</name>
         <label>Check if User have Manger</label>
@@ -89,7 +79,7 @@
             <name>Yes</name>
             <conditionLogic>and</conditionLogic>
             <conditions>
-                <leftValueReference>$Record.Owner:User.ManagerId</leftValueReference>
+                <leftValueReference>Get_Manager_Details.ManagerId</leftValueReference>
                 <operator>IsNull</operator>
                 <rightValue>
                     <booleanValue>false</booleanValue>
@@ -106,9 +96,6 @@
         <label>If Count Lead is greater than Or Equal to 2</label>
         <locationX>0</locationX>
         <locationY>0</locationY>
-        <defaultConnector>
-            <targetReference>You_Can_t_Downgrade_Lead</targetReference>
-        </defaultConnector>
         <defaultConnectorLabel>Default Outcome</defaultConnectorLabel>
         <rules>
             <name>IF_YES</name>
@@ -212,7 +199,7 @@
         <inputAssignments>
             <field>New_Owner__c</field>
             <value>
-                <elementReference>Get_Candidate_Owner_Details.ManagerId</elementReference>
+                <elementReference>Get_Manager_Details.ManagerId</elementReference>
             </value>
         </inputAssignments>
         <inputAssignments>
@@ -252,7 +239,7 @@
         <locationY>0</locationY>
         <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
         <connector>
-            <targetReference>Get_Custom_Lead_Related_to_Candidate</targetReference>
+            <targetReference>Get_Manager_Details</targetReference>
         </connector>
         <filterLogic>and</filterLogic>
         <filters>
@@ -287,6 +274,27 @@
         <outputReference>customLeadRecords</outputReference>
         <queriedFields>Id</queriedFields>
     </recordLookups>
+    <recordLookups>
+        <name>Get_Manager_Details</name>
+        <label>Get Manager Details</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Get_Custom_Lead_Related_to_Candidate</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>Get_Candidate_Owner_Details.ManagerId</elementReference>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>User</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
     <recordUpdates>
         <name>Update_Call_logs_Related_to_Candidate</name>
         <label>Update Call logs Related to Candidate</label>
@@ -298,7 +306,7 @@
         <inputAssignments>
             <field>OwnerId</field>
             <value>
-                <elementReference>Get_Candidate_Owner_Details.ManagerId</elementReference>
+                <elementReference>Get_Manager_Details.ManagerId</elementReference>
             </value>
         </inputAssignments>
         <inputReference>$Record.Call_Logs__r</inputReference>
@@ -320,7 +328,7 @@
         <inputAssignments>
             <field>OwnerId</field>
             <value>
-                <elementReference>Get_Candidate_Owner_Details.ManagerId</elementReference>
+                <elementReference>Get_Manager_Details.ManagerId</elementReference>
             </value>
         </inputAssignments>
         <inputReference>$Record.Leads__r</inputReference>
@@ -336,7 +344,7 @@
         <inputAssignments>
             <field>OwnerId</field>
             <value>
-                <elementReference>Get_Candidate_Owner_Details.ManagerId</elementReference>
+                <elementReference>Get_Manager_Details.ManagerId</elementReference>
             </value>
         </inputAssignments>
         <inputReference>$Record.Emails__r</inputReference>
@@ -352,7 +360,7 @@
         <inputAssignments>
             <field>OwnerId</field>
             <value>
-                <elementReference>Get_Candidate_Owner_Details.ManagerId</elementReference>
+                <elementReference>Get_Manager_Details.ManagerId</elementReference>
             </value>
         </inputAssignments>
         <inputReference>$Record.Enquiries__r</inputReference>
@@ -368,7 +376,7 @@
         <inputAssignments>
             <field>OwnerId</field>
             <value>
-                <elementReference>Get_Candidate_Owner_Details.ManagerId</elementReference>
+                <elementReference>Get_Manager_Details.ManagerId</elementReference>
             </value>
         </inputAssignments>
         <inputAssignments>
@@ -390,7 +398,7 @@
         <inputAssignments>
             <field>OwnerId</field>
             <value>
-                <elementReference>Get_Candidate_Owner_Details.ManagerId</elementReference>
+                <elementReference>Get_Manager_Details.ManagerId</elementReference>
             </value>
         </inputAssignments>
         <inputReference>$Record.Phone_Numbers__r</inputReference>
@@ -414,7 +422,7 @@
         <inputAssignments>
             <field>OwnerId</field>
             <value>
-                <elementReference>Get_Candidate_Owner_Details.ManagerId</elementReference>
+                <elementReference>Get_Manager_Details.ManagerId</elementReference>
             </value>
         </inputAssignments>
         <object>Webinar_Member__c</object>

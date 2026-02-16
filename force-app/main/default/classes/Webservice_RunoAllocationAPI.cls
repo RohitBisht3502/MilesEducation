@@ -686,6 +686,21 @@ public static Call_Log__c findCallLog(Id recordId, String callId) {
         if (!logs.isEmpty()) logRecord = logs[0];
     }
 
+    //  Course Enrolled fallback
+    if (logRecord == null &&
+        recordId != null &&
+        recordId.getSObjectType() == Call_Log__c.SObjectType) {
+
+        List<Call_Log__c> logs = [
+            SELECT Id,Phone_Number__c, Lead__c, Course_Enrolled__c
+            FROM Call_Log__c
+            WHERE Id = :recordId
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+        if (!logs.isEmpty()) logRecord = logs[0];
+    }
+
     //  Lead fallback
     if (logRecord == null &&
         recordId != null &&

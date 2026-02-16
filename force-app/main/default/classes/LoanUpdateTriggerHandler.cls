@@ -73,7 +73,7 @@ public class LoanUpdateTriggerHandler {
             }
 
             if (m7Lead == null) {
-                loan.addError('Not eligible for loan. Stage is not in M7 for this course lead.');
+                //loan.addError('Not eligible for loan. Stage is not in M7 for this course lead.');
                 continue;
             }
 

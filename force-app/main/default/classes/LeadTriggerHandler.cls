@@ -244,7 +244,7 @@ public without sharing class LeadTriggerHandler {
         }
     }
 
-    if (!logsToInsert.isEmpty()) {
+    if (!logsToInsert.isEmpty()) { 
         insert logsToInsert;
     }
 }

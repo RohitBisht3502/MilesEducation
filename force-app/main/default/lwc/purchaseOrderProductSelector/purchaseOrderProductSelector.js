@@ -8,9 +8,10 @@ import savePurchaseOrder from '@salesforce/apex/PurchaseOrderService.save';
 import checkAddressByRecordId from '@salesforce/apex/PurchaseOrderService.checkAddressByRecordId';
 import saveAddress from '@salesforce/apex/PurchaseOrderService.saveAddress';
 import getMinimumDownPayment from '@salesforce/apex/PurchaseOrderService.getMinimumDownPayment';
+import getDiscountThreshold from '@salesforce/apex/PurchaseOrderService.getDiscountThreshold';
 import MINIMUM_DOWNPAYMENT from '@salesforce/label/c.Minimum_Downpayment';
 
-const MAX_DISCOUNT_PERCENT = 5;
+const MAX_DISCOUNT_PERCENT = 100;
 
 export default class PurchaseOrderProductSelector extends LightningElement {
     @track products = [];
@@ -24,6 +25,8 @@ export default class PurchaseOrderProductSelector extends LightningElement {
     recordId;
     @track sameAsBilling = false;
     minimumDownPayment = 0;
+    discountThreshold = 0;
+    approvalComments = '';
     shippingPhone = '';
 
     hasBillingAddress = false;
@@ -46,6 +49,15 @@ export default class PurchaseOrderProductSelector extends LightningElement {
             this.minimumDownPayment = Number(data) || 0;
         } else if (error) {
             this.minimumDownPayment = Number(MINIMUM_DOWNPAYMENT) || 0;
+        }
+    }
+
+    @wire(getDiscountThreshold, { recordId: '$recordId' })
+    wiredDiscountThreshold({ data, error }) {
+        if (data !== undefined && data !== null) {
+            this.discountThreshold = Number(data) || 0;
+        } else if (error) {
+            this.discountThreshold = 0;
         }
     }
 
@@ -136,6 +148,20 @@ handleSameAsBilling(event) {
         if (this.subTotal <= 0) return 0;
         if (this.discountType === 'percentage') return Math.round((this.subTotal * Math.min(this.discountValue, 100)) / 100);
         return Math.min(this.discountValue, this.subTotal);
+    }
+
+    get discountPercent() {
+        if (this.subTotal <= 0) return 0;
+        return Math.round(((this.discountAmount / this.subTotal) * 100) * 100) / 100;
+    }
+
+    get isApprovalRequired() {
+        if (!this.discountThreshold || this.discountThreshold <= 0) return false;
+        return this.discountPercent > this.discountThreshold;
+    }
+
+    get confirmButtonLabel() {
+        return this.isApprovalRequired ? 'Submit for Approval' : 'Confirm Purchase';
     }
 
     get finalPayable() {
@@ -229,6 +255,9 @@ validateAddressFields(address, sectionLabel) {
         this.discountValue = value;
         this.validateDiscount(event.target);
         this.syncDownPayment();
+    }
+    handleApprovalComments(event) {
+        this.approvalComments = event.target.value || '';
     }
     handleDownPaymentChange(event) {
         const value = Number(event.target.value) || 0;
@@ -383,6 +412,11 @@ validateAddressFields(address, sectionLabel) {
             return;
         }
 
+        if (this.isApprovalRequired && !String(this.approvalComments || '').trim()) {
+            this.showToast('Error', 'Comments are required for approval.', 'error');
+            return;
+        }
+
         if (!this.recordId) {
             this.showToast('Error', 'Record Id not found.', 'error');
             return;
@@ -394,6 +428,7 @@ validateAddressFields(address, sectionLabel) {
             downPayment: this.downPayment,
             phoneNumber: this.shippingPhone,
             addressType: this.selectedAddressType,
+            approvalComments: this.approvalComments,
             items: this.selectedProducts.map(p => ({
                 productId: p.id,
                 unitPrice: p.price,
@@ -404,9 +439,13 @@ validateAddressFields(address, sectionLabel) {
 
         const requestJson = JSON.stringify(payload);
 
+        const successMsg = this.isApprovalRequired
+            ? 'Purchase Order submitted for approval.'
+            : 'Purchase Order created successfully';
+
         savePurchaseOrder({ requestJson })
             .then(() => {
-                this.showToast('Success', 'Purchase Order created successfully', 'success');
+                this.showToast('Success', successMsg, 'success');
                 this.dispatchEvent(new CloseActionScreenEvent());
                 this.resetComponent();
             })
@@ -425,6 +464,8 @@ validateAddressFields(address, sectionLabel) {
         this.selectedAddressType = 'billing';
         this.downPayment = 0;
         this.minimumDownPayment = 0;
+        this.discountThreshold = 0;
+        this.approvalComments = '';
         this.shippingPhone = '';
     }
 
@@ -447,11 +488,8 @@ validateAddressFields(address, sectionLabel) {
                 message = `Discount must be between 0% and ${MAX_DISCOUNT_PERCENT}%`;
             }
         } else {
-            const maxFixed = Math.round((this.subTotal * MAX_DISCOUNT_PERCENT) / 100);
-            if (value < 0 || value > maxFixed) {
-                message = `Discount must be between â‚¹0 and â‚¹${maxFixed}`;
-            } else if (value > this.subTotal) {
-                message = 'Discount cannot exceed total amount.';
+            if (value < 0 || value > this.subTotal) {
+                message = `Discount must be between â‚¹0 and â‚¹${this.subTotal}`;
             }
         }
 

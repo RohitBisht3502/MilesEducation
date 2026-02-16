@@ -134,6 +134,66 @@
 
                             <!-- ROOT CONTENT (DEGREES + FILES) -->
                             <template if:true={root.expanded}>
+                                <!-- FILES UNDER ROOT -->
+                                <template if:true={root.files}>
+                                    <template for:each={root.files} for:item="file">
+                                        <div key={file.id} class="row file-row row-hover">
+                                            <div class="row-left level-2-indent">
+                                                <lightning-icon icon-name={file.iconName}
+                                                                size="small"
+                                                                class="file-icon">
+                                                </lightning-icon>
+                                                <div class="title-block">
+                                                    <div class="title file-name">
+                                                        {file.name}
+                                                    </div>
+                                                    <div class="subtitle">
+                                                        {file.fileType} · {file.fileFormat}
+                                                        <template if:true={file.percentage}>
+                                                            · {file.percentage}%
+                                                        </template>
+                                                        <template if:true={file.yearOfGraduation}>
+                                                            · {file.yearOfGraduation}
+                                                        </template>
+                                                    </div>
+
+                                                    <template if:true={file.comment}>
+                                                        <div class="file-comment">Comment: {file.comment}</div>
+                                                    </template>
+                                                </div>
+                                            </div>
+
+                                            <div class="row-right">
+                                                <lightning-button
+                                                    variant="brand-outline"
+                                                    label="View"
+                                                    class="file-link view-button"
+                                                    data-id={file.id}
+                                                    onclick={handleViewFile}
+                                                    disabled={file.isViewing}>
+                                                </lightning-button>
+                                                <template if:true={file.isViewing}>
+                                                    <lightning-spinner alternative-text="Loading" size="small" class="view-spinner"></lightning-spinner>
+                                                </template>
+
+                                                <span class={file.statusClass}>
+                                                    <span class="status-dot"></span>
+                                                    {file.status}
+                                                </span>
+
+                                                <lightning-button-icon
+                                                    icon-name="utility:edit"
+                                                    alternative-text="Edit File"
+                                                    title="Edit File"
+                                                    class="file-edit-btn"
+                                                    data-id={file.id}
+                                                    onclick={handleEditFile}>
+                                                </lightning-button-icon>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </template>
+
                                 <!-- Level 2: Degrees under root -->
                                 <template if:true={root.children}>
                                     <template for:each={root.children} for:item="deg">
@@ -203,6 +263,66 @@
 
                                             <!-- Level 3: Certificates / Marksheets folders under degree -->
                                             <template if:true={deg.expanded}>
+                                                <!-- FILES UNDER DEGREE -->
+                                                <template if:true={deg.files}>
+                                                    <template for:each={deg.files} for:item="file">
+                                                        <div key={file.id} class="row file-row row-hover">
+                                                            <div class="row-left level-3-indent">
+                                                                <lightning-icon icon-name={file.iconName}
+                                                                                size="small"
+                                                                                class="file-icon">
+                                                                </lightning-icon>
+                                                                <div class="title-block">
+                                                                    <div class="title file-name">
+                                                                        {file.name}
+                                                                    </div>
+                                                                    <div class="subtitle">
+                                                                        {file.fileType} · {file.fileFormat}
+                                                                        <template if:true={file.percentage}>
+                                                                            · {file.percentage}%
+                                                                        </template>
+                                                                        <template if:true={file.yearOfGraduation}>
+                                                                            · {file.yearOfGraduation}
+                                                                        </template>
+                                                                    </div>
+
+                                                                    <template if:true={file.comment}>
+                                                                        <div class="file-comment">Comment: {file.comment}</div>
+                                                                    </template>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="row-right">
+                                                                <lightning-button
+                                                                    variant="brand-outline"
+                                                                    label="View"
+                                                                    class="file-link view-button"
+                                                                    data-id={file.id}
+                                                                    onclick={handleViewFile}
+                                                                    disabled={file.isViewing}>
+                                                                </lightning-button>
+                                                                <template if:true={file.isViewing}>
+                                                                    <lightning-spinner alternative-text="Loading" size="small" class="view-spinner"></lightning-spinner>
+                                                                </template>
+
+                                                                <span class={file.statusClass}>
+                                                                    <span class="status-dot"></span>
+                                                                    {file.status}
+                                                                </span>
+
+                                                                <lightning-button-icon
+                                                                    icon-name="utility:edit"
+                                                                    alternative-text="Edit File"
+                                                                    title="Edit File"
+                                                                    class="file-edit-btn"
+                                                                    data-id={file.id}
+                                                                    onclick={handleEditFile}>
+                                                                </lightning-button-icon>
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                </template>
+
                                                 <template if:true={deg.children}>
                                                     <template for:each={deg.children} for:item="cat">
                                                         <div key={cat.id} class="row-wrapper">

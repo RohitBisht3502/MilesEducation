@@ -78,6 +78,75 @@
         </value>
     </customProperties>
     <decisions>
+        <name>Check_Event_Approval_And_Stage</name>
+        <label>Check Event Approval And Stage</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <defaultConnector>
+            <targetReference>Check_if_have_GM</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>Default Outcome</defaultConnectorLabel>
+        <rules>
+            <name>Approval_Already</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Get_Event_Related_to_Lead.Stage__c</leftValueReference>
+                <operator>NotEqualTo</operator>
+                <rightValue>
+                    <stringValue>Completed</stringValue>
+                </rightValue>
+            </conditions>
+            <conditions>
+                <leftValueReference>Get_Event_Related_to_Lead.Approval_Status__c</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <stringValue>Approved</stringValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Already_Approved_or_Pending</targetReference>
+            </connector>
+            <label>Approval Already</label>
+        </rules>
+        <rules>
+            <name>Pending_For_Approval</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Get_Event_Related_to_Lead.Stage__c</leftValueReference>
+                <operator>NotEqualTo</operator>
+                <rightValue>
+                    <stringValue>Completed</stringValue>
+                </rightValue>
+            </conditions>
+            <conditions>
+                <leftValueReference>Get_Event_Related_to_Lead.Approval_Status__c</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <stringValue>Pending For Approval</stringValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Already_Approved_or_Pending</targetReference>
+            </connector>
+            <label>Pending For Approval</label>
+        </rules>
+        <rules>
+            <name>Event_Not_Completed</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Get_Event_Related_to_Lead.Stage__c</leftValueReference>
+                <operator>NotEqualTo</operator>
+                <rightValue>
+                    <stringValue>Completed</stringValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Event_Not_Completed_Yet</targetReference>
+            </connector>
+            <label>Event Not Completed</label>
+        </rules>
+    </decisions>
+    <decisions>
         <name>Check_if_have_GM</name>
         <label>Check if have GM</label>
         <locationX>0</locationX>
@@ -135,7 +204,7 @@
         <locationY>0</locationY>
         <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
         <connector>
-            <targetReference>Check_if_have_GM</targetReference>
+            <targetReference>Check_Event_Approval_And_Stage</targetReference>
         </connector>
         <filterLogic>and</filterLogic>
         <filters>
@@ -143,13 +212,6 @@
             <operator>EqualTo</operator>
             <value>
                 <elementReference>Get_Lead_Record.Id</elementReference>
-            </value>
-        </filters>
-        <filters>
-            <field>Stage__c</field>
-            <operator>EqualTo</operator>
-            <value>
-                <stringValue>Completed</stringValue>
             </value>
         </filters>
         <getFirstRecordOnly>true</getFirstRecordOnly>
@@ -177,6 +239,54 @@
         <object>Lead__c</object>
         <storeOutputAutomatically>true</storeOutputAutomatically>
     </recordLookups>
+    <screens>
+        <name>Already_Approved_or_Pending</name>
+        <label>Already Approved or Pending</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <allowBack>true</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>false</allowPause>
+        <fields>
+            <name>Approval_Already_Text</name>
+            <fieldText>&lt;p&gt;Event is already approved or status is pending for approval.&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+            <styleProperties>
+                <verticalAlignment>
+                    <stringValue>top</stringValue>
+                </verticalAlignment>
+                <width>
+                    <stringValue>12</stringValue>
+                </width>
+            </styleProperties>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>true</showHeader>
+    </screens>
+    <screens>
+        <name>Event_Not_Completed_Yet</name>
+        <label>Event Not Completed</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <allowBack>true</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>false</allowPause>
+        <fields>
+            <name>Event_Not_Completed_Text</name>
+            <fieldText>&lt;p&gt;Event is not completed yet.&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+            <styleProperties>
+                <verticalAlignment>
+                    <stringValue>top</stringValue>
+                </verticalAlignment>
+                <width>
+                    <stringValue>12</stringValue>
+                </width>
+            </styleProperties>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>true</showHeader>
+    </screens>
     <start>
         <locationX>0</locationX>
         <locationY>0</locationY>

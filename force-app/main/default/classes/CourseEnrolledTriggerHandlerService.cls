@@ -1,5 +1,22 @@
 public class CourseEnrolledTriggerHandlerService {
 
+    public static void checkAndCreateNewTaskForInsert(List<Course_Enrolled__c> newList) {
+        if (newList == null || newList.isEmpty()) return;
+
+        List<Course_Enrolled__c> cpaList = new List<Course_Enrolled__c>();
+        List<Course_Enrolled__c> cmaList = new List<Course_Enrolled__c>();
+
+        for (Course_Enrolled__c enrolledObj : newList) {
+            if (enrolledObj == null) continue;
+            if (String.isBlank(enrolledObj.Stages__c)) continue;
+            if (enrolledObj.Course__c == 'CPA') cpaList.add(enrolledObj);
+            if (enrolledObj.Course__c == 'CMA') cmaList.add(enrolledObj);
+        }
+
+        if (!cpaList.isEmpty()) createCPATasks(cpaList, null);
+        if (!cmaList.isEmpty()) createCMATasks(cmaList, null);
+    }
+
     public static void checkAndCreateNewTaskForStatusChange(Map<Id, Course_Enrolled__c> newMap, Map<Id, Course_Enrolled__c> oldMap) {
         List<Course_Enrolled__c> cpaStatusChangedList 	= new List<Course_Enrolled__c>();
         List<Course_Enrolled__c> cmaStatusChangedList 	= new List<Course_Enrolled__c>();

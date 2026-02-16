@@ -8,7 +8,7 @@ export default class EligibilityQuickAction extends LightningElement {
     @track isProcessing = false;
 
     handleCancel() {
-        this.dispatchEvent(new CloseActionScreenEvent());
+        this.closeAndReload();
     }
 
     handleConfirm() {
@@ -23,7 +23,7 @@ export default class EligibilityQuickAction extends LightningElement {
                         variant: 'success'
                     })
                 );
-                this.dispatchEvent(new CloseActionScreenEvent());
+                this.closeAndReload();
             })
             .catch(error => {
                 let message = 'Something went wrong while enabling eligibility.';
@@ -40,5 +40,10 @@ export default class EligibilityQuickAction extends LightningElement {
                 );
                 this.isProcessing = false;
             });
+    }
+
+    closeAndReload() {
+        this.dispatchEvent(new CloseActionScreenEvent());
+        setTimeout(() => window.location.reload(), 800);
     }
 }

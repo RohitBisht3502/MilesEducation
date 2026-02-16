@@ -51,10 +51,20 @@ global without sharing class EligibilityApi {
                 return res;
             }
 
-            RawNewQualificationRequest raw =
-                (RawNewQualificationRequest) JSON.deserialize(body, RawNewQualificationRequest.class);
+            Object rawObj = JSON.deserializeUntyped(body);
+            if (!(rawObj instanceof Map<String, Object>)) {
+                res.success = false;
+                res.message = 'Invalid payload.';
+                logParams.status = 'failed';
+                logParams.errorMessage = res.message;
+                return res;
+            }
 
-            if (raw == null || String.isBlank(raw.sf_id)) {
+            Map<String, Object> raw = (Map<String, Object>) rawObj;
+            String sfId = (String) raw.get('sf_id');
+            String qualificationTitle = (String) raw.get('qualification_title');
+
+            if (String.isBlank(sfId)) {
                 res.success = false;
                 res.message = 'Missing sf_id (Lead Id).';
                 logParams.status = 'failed';
@@ -66,7 +76,7 @@ global without sharing class EligibilityApi {
             Lead targetLead = [
                 SELECT GP_Lead_Status__c
                 FROM Lead
-                WHERE Id = :raw.sf_id
+                WHERE Id = :sfId
                 LIMIT 1
             ];
             if (targetLead != null &&
@@ -81,15 +91,56 @@ global without sharing class EligibilityApi {
 
             // Group incoming files by parsed qualification (type + title) from file_path
             Map<String, EligibilityFileService.NewQualificationRequest> grouped = new Map<String, EligibilityFileService.NewQualificationRequest>();
+            Map<String, List<EligibilityFileService.IncomingFile>> flatGrouped = new Map<String, List<EligibilityFileService.IncomingFile>>();
 
-            if (raw.files != null) {
-                processIncomingFiles(raw.sf_id, raw.files.certificates, 'Certificate', grouped);
-                processIncomingFiles(raw.sf_id, raw.files.mark_sheets, 'Marksheet', grouped);
+            if (raw.containsKey('files')) {
+                Object filesObj = raw.get('files');
+                if (filesObj instanceof Map<String, Object>) {
+                    Map<String, Object> filesMap = (Map<String, Object>) filesObj;
+                    processIncomingFiles(
+                        sfId,
+                        parseFileItems(filesMap.get('certificates')),
+                        'Certificate',
+                        grouped,
+                        flatGrouped,
+                        qualificationTitle
+                    );
+                    processIncomingFiles(
+                        sfId,
+                        parseFileItems(filesMap.get('mark_sheets')),
+                        'Marksheet',
+                        grouped,
+                        flatGrouped,
+                        qualificationTitle
+                    );
+                } else if (filesObj instanceof List<Object>) {
+                    processIncomingFiles(
+                        sfId,
+                        parseFileItems(filesObj),
+                        null,
+                        grouped,
+                        flatGrouped,
+                        qualificationTitle
+                    );
+                }
             }
 
             for (EligibilityFileService.NewQualificationRequest nq : grouped.values()) {
                 EligibilityFileService.SimpleResponse svcRes =
                     EligibilityFileService.handleNewQualification(JSON.serialize(nq));
+
+                if (!svcRes.success) {
+                    res.success = false;
+                    res.message = svcRes.message;
+                    logParams.status = 'failed';
+                    logParams.errorMessage = res.message;
+                    return res;
+                }
+            }
+
+            for (String flatKey : flatGrouped.keySet()) {
+                EligibilityFileService.SimpleResponse svcRes =
+                    EligibilityFileService.handleMainFolderFiles(sfId, flatKey, flatGrouped.get(flatKey));
 
                 if (!svcRes.success) {
                     res.success = false;
@@ -122,7 +173,9 @@ global without sharing class EligibilityApi {
         String salesforceId,
         List<FileItem> items,
         String logicalType,
-        Map<String, EligibilityFileService.NewQualificationRequest> grouped
+        Map<String, EligibilityFileService.NewQualificationRequest> grouped,
+        Map<String, List<EligibilityFileService.IncomingFile>> flatGrouped,
+        String fallbackQualificationTitle
     ) {
         if (items == null || items.isEmpty()) return;
 
@@ -130,6 +183,32 @@ global without sharing class EligibilityApi {
             if (fi == null || String.isBlank(fi.file_path) || String.isBlank(fi.file_UUID)) continue;
 
             EligibilityPathParser.ParsedPath parsed = EligibilityPathParser.parse(fi.file_path);
+            String flatKey = (parsed != null && parsed.isFlat == true)
+                ? parsed.flatFolderKey
+                : null;
+            Boolean hasQualification = parsed != null
+                && String.isNotBlank(parsed.qualificationType)
+                && String.isNotBlank(parsed.qualificationTitle);
+            if (String.isBlank(flatKey) && !hasQualification && !String.isBlank(fallbackQualificationTitle)) {
+                flatKey = EligibilityPathParser.normalizeFlatFolderKey(fallbackQualificationTitle);
+            }
+
+            if (!String.isBlank(flatKey)) {
+                if (!flatGrouped.containsKey(flatKey)) {
+                    flatGrouped.put(flatKey, new List<EligibilityFileService.IncomingFile>());
+                }
+                EligibilityFileService.IncomingFile f = new EligibilityFileService.IncomingFile();
+                f.uuid = fi.file_UUID;
+                f.path = fi.file_path;
+                f.format = fi.file_type;
+                f.fileType = logicalType;
+                f.fileName = !String.isBlank(fi.file_name)
+                    ? fi.file_name
+                    : (parsed != null ? parsed.fileName : null);
+                flatGrouped.get(flatKey).add(f);
+                continue;
+            }
+
             if (parsed == null || String.isBlank(parsed.qualificationType) || String.isBlank(parsed.qualificationTitle)) {
                 continue;
             }
@@ -162,5 +241,23 @@ global without sharing class EligibilityApi {
                 nq.marksheetFiles.add(f);
             }
         }
+    }
+
+    private static List<FileItem> parseFileItems(Object rawItems) {
+        List<FileItem> items = new List<FileItem>();
+        if (rawItems == null) return items;
+        if (!(rawItems instanceof List<Object>)) return items;
+
+        for (Object o : (List<Object>) rawItems) {
+            if (!(o instanceof Map<String, Object>)) continue;
+            Map<String, Object> m = (Map<String, Object>) o;
+            FileItem fi = new FileItem();
+            fi.file_type = (String) m.get('file_type');
+            fi.file_path = (String) m.get('file_path');
+            fi.file_UUID = (String) m.get('file_UUID');
+            fi.file_name = (String) m.get('file_name');
+            items.add(fi);
+        }
+        return items;
     }
 }

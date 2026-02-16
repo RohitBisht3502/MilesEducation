@@ -474,12 +474,18 @@ get formattedCreatedDate() {
             setTimeout(() => (this.showPopup = false), 4200);
 
             this.clearFeedbackTimers();
-            this.noResponseTimer = setTimeout(() => {
-                if (this.isLive && this.callStatus !== 'Ended') {
-                    this.canEndCall = true;
-                    this.callStatus = 'No Response';
-                }
-            }, this.CALL_NO_RESPONSE_MS);
+      
+this.noResponseTimer = setTimeout(() => {
+    if (this.isLive && this.callStatus !== 'Ended') {
+        this.canEndCall = true;
+        this.callStatus = 'No Response';
+
+        
+        this.showFeedbackSection();
+        this.callButtonDisabled = true; 
+    }
+}, this.CALL_NO_RESPONSE_MS);
+
         } catch (e) {
             this.errorText = e?.body?.message || e?.message || 'Failed to dial';
             this.callStatus = 'Failed';
