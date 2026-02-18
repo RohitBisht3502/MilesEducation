@@ -98,6 +98,7 @@ global without sharing class MilesWebService {
                 Country_of_Residence__c  = inputData.country_of_residence,
                 Register_for_Webinar__c  = inputData.register_for_webinar,
                 Interested_Webinar_ID__c = inputData.interested_webinar_id,
+                Campaign_Name__c         = inputData.campaign_tk, 
                 Stage__c                 = 'Untracked' // Default value Untracked.
             );
             insert enquiry;
@@ -464,6 +465,7 @@ global without sharing class MilesWebService {
         public String country_of_residence;
         public Boolean register_for_webinar;
         public String interested_webinar_id;
+        public String campaign_tk;
         public String stage;
     }
 

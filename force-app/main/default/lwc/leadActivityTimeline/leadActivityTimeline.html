@@ -239,6 +239,76 @@
                                 </div>
                             </template>
 
+                            <!-- GMEET ACTIVITY -->
+                            <template if:true={act.isGmeet}>
+                                <div class="merge-card">
+                                    <div class="merge-header">
+                                        <div class="merge-title-section">
+                                            <lightning-icon
+                                                icon-name="utility:video"
+                                                size="small"
+                                                class="merge-icon">
+                                            </lightning-icon>
+                                            <div>
+                                                <div class="merge-title">{act.name}</div>
+                                                <div class="merge-meta">
+                                                    Category â€¢ <span class="value">{act.activityType}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="merge-time">
+                                            {act.formattedChangedDateTime}
+                                        </div>
+                                    </div>
+
+                                    <div class="merge-body">
+                                        <div class="merge-description">
+                                            {act.description}
+                                        </div>
+                                    </div>
+
+                                    <div class="merge-footer">
+                                        <span class="label">Action Performed By:</span>
+                                        <span class="value">{act.actionByName}</span>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- OTHER ACTIVITY -->
+                            <template if:true={act.isOther}>
+                                <div class="merge-card">
+                                    <div class="merge-header">
+                                        <div class="merge-title-section">
+                                            <lightning-icon
+                                                icon-name="utility:info"
+                                                size="small"
+                                                class="merge-icon">
+                                            </lightning-icon>
+                                            <div>
+                                                <div class="merge-title">{act.name}</div>
+                                                <div class="merge-meta">
+                                                    Category â€¢ <span class="value">{act.activityType}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="merge-time">
+                                            {act.formattedChangedDateTime}
+                                        </div>
+                                    </div>
+
+                                    <div class="merge-body">
+                                        <div class="merge-description">
+                                            {act.description}
+                                        </div>
+                                    </div>
+
+                                    <div class="merge-footer">
+                                        <span class="label">Action Performed By:</span>
+                                        <span class="value">{act.actionByName}</span>
+                                    </div>
+                                </div>
+                            </template>
+
                         </div>
                     </div>
                 </template>

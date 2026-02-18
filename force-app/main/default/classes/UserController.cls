@@ -14,18 +14,11 @@
 public class UserController {
 	 @AuraEnabled(cacheable=true)
     public static User getCurrentUserInfo() {
-        return [SELECT Id, Name, Email, Title, SmallPhotoUrl 
-                FROM User 
-                WHERE Id = :UserInfo.getUserId()];
+        return [SELECT Id, Name, Email, Title, SmallPhotoUrl FROM User WHERE Id = :UserInfo.getUserId()];
     }
     
     @AuraEnabled(cacheable=true)
     public static List<User> getAvailableUsers() {
-        return [SELECT Id, Name, Email, Title, SmallPhotoUrl 
-                FROM User 
-                WHERE IsActive = true 
-                AND Email != null 
-                ORDER BY Name 
-                LIMIT 20];
+        return [SELECT Id, Name, Email, Title, SmallPhotoUrl FROM User WHERE IsActive = true  AND Email != null  ORDER BY Name LIMIT 200];
     }
 }

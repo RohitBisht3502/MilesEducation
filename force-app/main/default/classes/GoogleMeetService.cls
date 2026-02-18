@@ -57,6 +57,7 @@ public without sharing class GoogleMeetService {
         ev.StartDateTime = startUtc;
         ev.EndDateTime   = endUtc;
         ev.OwnerId       = UserInfo.getUserId();
+        ev.Stage__c      = 'Scheduled';
         if (!String.isBlank(result.meetUrl)) {
             ev.Location = result.meetUrl;
         }

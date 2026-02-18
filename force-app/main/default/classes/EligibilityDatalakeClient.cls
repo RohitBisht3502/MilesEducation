@@ -2,7 +2,7 @@
 public without sharing class EligibilityDatalakeClient {
 
     // TODO: move API key to a protected custom setting/Named Credential.
-    private static final String BASE_URL = 'https://1c8fjh4ddg.execute-api.ap-south-1.amazonaws.com/Miles360';
+    private static final String BASE_URL = 'https://hn19ywvvng.execute-api.ap-south-1.amazonaws.com/Miles360';
     private static final String API_KEY  = 'n7yno1N32NaXgZJFLbzf137wCHFf2UsM40j7gSgW';
 
     public class DownloadResponse {
@@ -100,6 +100,11 @@ public without sharing class EligibilityDatalakeClient {
         } finally {
             IntegrationLogService.log(logParams);
         }
+    }
+
+    @AuraEnabled(cacheable=false)
+    public static String getDownloadUrlForLwc(String filePath) {
+        return getDownloadUrl(filePath);
     }
 
     public static CalloutResult postEligibilityResponse(EligibilityResponsePayload payload) {

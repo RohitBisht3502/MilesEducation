@@ -69,6 +69,66 @@ public without sharing class LeadTriggerHelperClass {
             System.enqueueJob(new LeadZoomRegistrationJob(leadsForZoom));
         }
     }
+public static void validateCallLogBeforeStageChange(
+    List<Lead__c> newLeads,
+    Map<Id, Lead__c> oldMapLead
+) {
+
+    Set<Id> leadIdsToCheck = new Set<Id>();
+
+    // Detect stage change
+    for (Lead__c newLead : newLeads) {
+        Lead__c oldLead = oldMapLead.get(newLead.Id);
+
+        if (oldLead != null && newLead.Stage__c != oldLead.Stage__c) {
+            leadIdsToCheck.add(newLead.Id);
+        }
+    }
+
+    if (leadIdsToCheck.isEmpty()) return;
+
+    //  CHECK CUSTOM CALL LOG OBJECT
+    Map<Id, Integer> callCountMap = new Map<Id, Integer>();
+
+    for (AggregateResult ar : [
+        SELECT Lead__c leadId, COUNT(Id) total
+        FROM Call_Log__c
+        WHERE Lead__c IN :leadIdsToCheck
+        GROUP BY Lead__c
+    ]) {
+        callCountMap.put(
+            (Id) ar.get('leadId'),
+            (Integer) ar.get('total')
+        );
+    }
+
+    // BLOCK STAGE CHANGE IF NO CALL LOG EXISTS
+    for (Lead__c newLead : newLeads) {
+        if (!leadIdsToCheck.contains(newLead.Id)) continue;
+
+        Integer callCount = callCountMap.get(newLead.Id);
+
+        if (callCount == null || callCount == 0) {
+            newLead.addError(
+                'You must log at least one Call before changing the Lead Stage.'
+            );
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     public static void afterInsertAutoRegisterWebinar(List<Lead__c> newList) {
         if (newList == null || newList.isEmpty()) return;

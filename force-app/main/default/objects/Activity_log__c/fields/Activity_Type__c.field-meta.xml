@@ -69,6 +69,11 @@
                 <default>false</default>
                 <label>Gmeet</label>
             </value>
+            <value>
+                <fullName>Webinar</fullName>
+                <default>false</default>
+                <label>Webinar</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

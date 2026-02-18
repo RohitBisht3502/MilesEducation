@@ -2,14 +2,11 @@
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
     <actionCalls>
         <name>Send_Email_To_GM</name>
-        <label>Send Email To GM</label>
+        <label>Send Email + Notification to Manager</label>
         <locationX>0</locationX>
         <locationY>0</locationY>
         <actionName>EventApprovalEmailInvocable</actionName>
         <actionType>apex</actionType>
-        <connector>
-            <targetReference>Send_Notification_to_GM</targetReference>
-        </connector>
         <flowTransactionModel>Automatic</flowTransactionModel>
         <inputParameters>
             <name>eventId</name>
@@ -23,82 +20,12 @@
                 <elementReference>Get_Lead_Related_to_Event_Record.Id</elementReference>
             </value>
         </inputParameters>
-        <inputParameters>
-            <name>recipientId</name>
-            <value>
-                <stringValue>005C1000005HJMjIAO</stringValue>
-            </value>
-        </inputParameters>
         <nameSegment>EventApprovalEmailInvocable</nameSegment>
         <offset>0</offset>
         <storeOutputAutomatically>true</storeOutputAutomatically>
     </actionCalls>
-    <actionCalls>
-        <name>Send_Notification_to_GM</name>
-        <label>Send Notification to GM</label>
-        <locationX>0</locationX>
-        <locationY>0</locationY>
-        <actionName>customNotificationAction</actionName>
-        <actionType>customNotificationAction</actionType>
-        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
-        <inputParameters>
-            <name>customNotifTypeId</name>
-            <value>
-                <elementReference>Fetch_Custom_Notification.Id</elementReference>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>recipientIds</name>
-            <value>
-                <elementReference>managerId</elementReference>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>title</name>
-            <value>
-                <elementReference>Title_Used_In_Notification</elementReference>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>body</name>
-            <value>
-                <elementReference>Template_Used_In_Notification</elementReference>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>targetId</name>
-            <value>
-                <elementReference>Get_Event.Id</elementReference>
-            </value>
-        </inputParameters>
-        <nameSegment>customNotificationAction</nameSegment>
-        <offset>0</offset>
-    </actionCalls>
     <apiVersion>65.0</apiVersion>
     <areMetricsLoggedToDataCloud>false</areMetricsLoggedToDataCloud>
-    <assignments>
-        <name>Assignment_GM</name>
-        <label>Assignment GM</label>
-        <locationX>0</locationX>
-        <locationY>0</locationY>
-        <assignmentItems>
-            <assignToReference>managerId</assignToReference>
-            <operator>Add</operator>
-            <value>
-                <stringValue>005C1000005HJMjIAO</stringValue>
-            </value>
-        </assignmentItems>
-        <assignmentItems>
-            <assignToReference>recipentIdForEmail</assignToReference>
-            <operator>Add</operator>
-            <value>
-                <elementReference>Get_Lead_Related_to_Event_Record.Owner:User.Manager.Manager.Id</elementReference>
-            </value>
-        </assignmentItems>
-        <connector>
-            <targetReference>Send_Email_To_GM</targetReference>
-        </connector>
-    </assignments>
     <customProperties>
         <name>ScreenProgressIndicator</name>
         <value>
@@ -190,13 +117,6 @@
                     <stringValue></stringValue>
                 </rightValue>
             </conditions>
-            <conditions>
-                <leftValueReference>Get_Lead_Related_to_Event_Record.Owner:User.Manager.ManagerId</leftValueReference>
-                <operator>NotEqualTo</operator>
-                <rightValue>
-                    <stringValue></stringValue>
-                </rightValue>
-            </conditions>
             <connector>
                 <targetReference>Update_Comment_on_Event</targetReference>
             </connector>
@@ -249,27 +169,6 @@
     </processMetadataValues>
     <processType>Flow</processType>
     <recordLookups>
-        <name>Fetch_Custom_Notification</name>
-        <label>Fetch Custom Notification</label>
-        <locationX>0</locationX>
-        <locationY>0</locationY>
-        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
-        <connector>
-            <targetReference>Check_Having_Manager_Or_Not</targetReference>
-        </connector>
-        <filterLogic>and</filterLogic>
-        <filters>
-            <field>MasterLabel</field>
-            <operator>EqualTo</operator>
-            <value>
-                <stringValue>Custom Notification</stringValue>
-            </value>
-        </filters>
-        <getFirstRecordOnly>true</getFirstRecordOnly>
-        <object>CustomNotificationType</object>
-        <storeOutputAutomatically>true</storeOutputAutomatically>
-    </recordLookups>
-    <recordLookups>
         <name>Get_Event</name>
         <label>Get Event</label>
         <locationX>0</locationX>
@@ -297,7 +196,7 @@
         <locationY>0</locationY>
         <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
         <connector>
-            <targetReference>Fetch_Custom_Notification</targetReference>
+            <targetReference>Check_Having_Manager_Or_Not</targetReference>
         </connector>
         <filterLogic>and</filterLogic>
         <filters>
@@ -317,7 +216,7 @@
         <locationX>0</locationX>
         <locationY>0</locationY>
         <connector>
-            <targetReference>Assignment_GM</targetReference>
+            <targetReference>Send_Email_To_GM</targetReference>
         </connector>
         <filterLogic>and</filterLogic>
         <filters>
@@ -436,20 +335,6 @@
         <isViewedAsPlainText>true</isViewedAsPlainText>
         <text>Gmeet Approval Request</text>
     </textTemplates>
-    <variables>
-        <name>managerId</name>
-        <dataType>String</dataType>
-        <isCollection>true</isCollection>
-        <isInput>true</isInput>
-        <isOutput>false</isOutput>
-    </variables>
-    <variables>
-        <name>recipentIdForEmail</name>
-        <dataType>String</dataType>
-        <isCollection>false</isCollection>
-        <isInput>true</isInput>
-        <isOutput>false</isOutput>
-    </variables>
     <variables>
         <name>recordId</name>
         <dataType>String</dataType>

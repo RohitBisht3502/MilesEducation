@@ -1,11 +1,8 @@
-public with sharing class EventApprovalEmailInvocable {
+public without sharing class EventApprovalEmailInvocable {
 
     public class Request {
         @InvocableVariable(required=true)
         public Id eventId;
-
-        @InvocableVariable(required=true)
-        public Id recipientId;
 
         @InvocableVariable
         public Id leadId;
@@ -17,8 +14,8 @@ public with sharing class EventApprovalEmailInvocable {
     }
 
     @InvocableMethod(
-        label='Send Event Approval Email (Template + RecipientId)'
-        description='Loads template by DeveloperName, replaces Event tokens, sends email to recipientId user. ReviewUrl auto-built from Event Id.'
+        label='Send Event Approval Email + Notification (Manager)'
+        description='Loads template by DeveloperName, replaces tokens, and sends email + custom notification to the lead owner manager. ReviewUrl auto-built from Event Id.'
     )
     public static List<Result> send(List<Request> requests) {
 
@@ -33,13 +30,11 @@ public with sharing class EventApprovalEmailInvocable {
         ];
 
         Set<Id> eventIds = new Set<Id>();
-        Set<Id> recipientIds = new Set<Id>();
         Set<Id> leadIds = new Set<Id>();
 
         for (Request r : requests) {
             if (r != null) {
                 if (r.eventId != null) eventIds.add(r.eventId);
-                if (r.recipientId != null) recipientIds.add(r.recipientId);
                 if (r.leadId != null) leadIds.add(r.leadId);
             }
         }
@@ -50,33 +45,69 @@ public with sharing class EventApprovalEmailInvocable {
             WHERE Id IN :eventIds
         ]);
 
-        Map<Id, User> userMap = new Map<Id, User>([
-            SELECT Id, Email, Name
-            FROM User
-            WHERE Id IN :recipientIds
-        ]);
+        for (Event ev : evMap.values()) {
+            if (ev.WhatId != null) {
+                leadIds.add(ev.WhatId);
+            }
+        }
 
         Map<Id, Lead__c> leadMap = leadIds.isEmpty()
             ? new Map<Id, Lead__c>()
             : new Map<Id, Lead__c>([
-                SELECT Id, Name
+                SELECT Id, Name, OwnerId
                 FROM Lead__c
                 WHERE Id IN :leadIds
+            ]);
+
+        Set<Id> ownerIds = new Set<Id>();
+        for (Lead__c l : leadMap.values()) {
+            if (l.OwnerId != null) ownerIds.add(l.OwnerId);
+        }
+
+        Map<Id, User> ownerUserMap = ownerIds.isEmpty()
+            ? new Map<Id, User>()
+            : new Map<Id, User>([
+                SELECT Id, ManagerId
+                FROM User
+                WHERE Id IN :ownerIds
+            ]);
+
+        Set<Id> managerIds = new Set<Id>();
+        for (User u : ownerUserMap.values()) {
+            if (u.ManagerId != null) managerIds.add(u.ManagerId);
+        }
+
+        Map<Id, User> managerMap = managerIds.isEmpty()
+            ? new Map<Id, User>()
+            : new Map<Id, User>([
+                SELECT Id, Email, Name, ManagerId
+                FROM User
+                WHERE Id IN :managerIds
+            ]);
+
+        Set<Id> managerManagerIds = new Set<Id>();
+        for (User mgr : managerMap.values()) {
+            if (mgr.ManagerId != null) managerManagerIds.add(mgr.ManagerId);
+        }
+
+        Map<Id, User> managerManagerMap = managerManagerIds.isEmpty()
+            ? new Map<Id, User>()
+            : new Map<Id, User>([
+                SELECT Id, Email, Name
+                FROM User
+                WHERE Id IN :managerManagerIds
             ]);
 
         String currentUserName = UserInfo.getName();
 
         List<Messaging.SingleEmailMessage> mails = new List<Messaging.SingleEmailMessage>();
+        List<PendingNotification> pendingNotifs = new List<PendingNotification>();
 
         for (Request r : requests) {
             Result out = new Result();
             try {
                 if (r == null || r.eventId == null) {
                     out.success = false; out.message = 'eventId is required';
-                    results.add(out); continue;
-                }
-                if (r.recipientId == null) {
-                    out.success = false; out.message = 'recipientId is required';
                     results.add(out); continue;
                 }
 
@@ -86,15 +117,38 @@ public with sharing class EventApprovalEmailInvocable {
                     results.add(out); continue;
                 }
 
-                User u = userMap.get(r.recipientId);
-                if (u == null || String.isBlank(u.Email)) {
-                    out.success = false; out.message = 'Recipient user not found or email blank: ' + r.recipientId;
+                Lead__c leadRec = (r.leadId != null) ? leadMap.get(r.leadId) : null;
+                if (leadRec == null && ev.WhatId != null) {
+                    leadRec = leadMap.get(ev.WhatId);
+                }
+                if (leadRec == null || leadRec.OwnerId == null) {
+                    Id leadRefId = (r.leadId != null) ? r.leadId : ev.WhatId;
+                    out.success = false; out.message = 'Lead owner manager not found for lead: ' + leadRefId;
+                    results.add(out); continue;
+                }
+
+                User ownerUser = ownerUserMap.get(leadRec.OwnerId);
+                if (ownerUser == null || ownerUser.ManagerId == null) {
+                    out.success = false; out.message = 'Lead owner manager not found for lead: ' + leadRec.Id;
+                    results.add(out); continue;
+                }
+
+                User manager = managerMap.get(ownerUser.ManagerId);
+                if (manager == null || manager.ManagerId == null) {
+                    out.success = false; out.message = 'Manager\'s manager not found for lead: ' + leadRec.Id;
+                    results.add(out); continue;
+                }
+
+                Id managerManagerId = manager.ManagerId;
+                User managerManager = managerManagerMap.get(managerManagerId);
+                if (managerManager == null || String.isBlank(managerManager.Email)) {
+                    out.success = false; out.message = 'Manager\'s manager user not found or email blank: ' + managerManagerId;
                     results.add(out); continue;
                 }
 
                 String leadName = '';
-                if (r.leadId != null && leadMap.containsKey(r.leadId)) {
-                    leadName = leadMap.get(r.leadId).Name;
+                if (leadRec != null) {
+                    leadName = leadRec.Name;
                 }
 
                 String reviewUrl = URL.getOrgDomainUrl().toExternalForm()
@@ -114,7 +168,7 @@ public with sharing class EventApprovalEmailInvocable {
                 }
 
                 Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
-                mail.setToAddresses(new List<String>{ u.Email });
+                mail.setToAddresses(new List<String>{ managerManager.Email });
                 mail.setSubject(subject);
 
                 if (!String.isBlank(htmlBody)) {
@@ -125,6 +179,11 @@ public with sharing class EventApprovalEmailInvocable {
 
                 mail.setSaveAsActivity(false);
                 mails.add(mail);
+
+                String notifTitle = 'Gmeet Approval Request';
+                String notifBody = 'Gmeet ' + (ev.Subject == null ? '' : ev.Subject)
+                    + ' for Lead ' + leadName + '  requires approval.';
+                pendingNotifs.add(new PendingNotification(managerManagerId, ev.Id, notifTitle, notifBody));
 
                 out.success = true;
                 out.message = 'Prepared';
@@ -139,7 +198,50 @@ public with sharing class EventApprovalEmailInvocable {
             Messaging.sendEmail(mails, false);
         }
 
+        sendCustomNotifications(pendingNotifs);
+
         return results;
+    }
+
+    private class PendingNotification {
+        public Id recipientId;
+        public Id targetId;
+        public String title;
+        public String body;
+
+        public PendingNotification(Id recipientId, Id targetId, String title, String body) {
+            this.recipientId = recipientId;
+            this.targetId = targetId;
+            this.title = title;
+            this.body = body;
+        }
+    }
+
+    private static void sendCustomNotifications(List<PendingNotification> pendingNotifs) {
+        if (pendingNotifs == null || pendingNotifs.isEmpty()) return;
+
+        Id notifTypeId;
+        try {
+            notifTypeId = [
+                SELECT Id
+                FROM CustomNotificationType
+                WHERE DeveloperName = 'Custom_Notification' OR MasterLabel = 'Custom Notification'
+                LIMIT 1
+            ].Id;
+        } catch (Exception e) {
+            return;
+        }
+
+        for (PendingNotification pn : pendingNotifs) {
+            if (pn == null || pn.recipientId == null || pn.targetId == null) continue;
+            Messaging.CustomNotification cn = new Messaging.CustomNotification();
+            cn.setNotificationTypeId(notifTypeId);
+            cn.setTitle(pn.title);
+            cn.setBody(pn.body);
+            cn.setSenderId(UserInfo.getUserId());
+            cn.setTargetId(pn.targetId);
+            cn.send(new Set<String>{ String.valueOf(pn.recipientId) });
+        }
     }
 
     private static String replaceTokens(String input, Event ev, String reviewUrl, String leadName, String currentUserName) {

@@ -60,7 +60,7 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
         List<Lead__c> leads = leadOnlyIds.isEmpty()
             ? new List<Lead__c>()
             : [
-                SELECT Id, Name, Email__c, Phone__c, City__c, Stage__c, OwnerId, Interested_Webinar_Id__c FROM Lead__c WHERE Id IN :leadOnlyIds ];
+                SELECT Id, Name, Email__c, Phone__c, City__c, Stage__c, OwnerId, Interested_Webinar_Id__c, Candidate__c FROM Lead__c WHERE Id IN :leadOnlyIds ];
 
         List<Enquiry__c> enquiries = enquiryOnlyIds.isEmpty()
             ? new List<Enquiry__c>()
@@ -248,7 +248,7 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
 
         Map<Id, Lead__c> leadMap = leadOnlyIds.isEmpty()
             ? new Map<Id, Lead__c>()
-            : new Map<Id, Lead__c>([SELECT Id, Stage__c, OwnerId FROM Lead__c WHERE Id IN :leadOnlyIds ]);
+            : new Map<Id, Lead__c>([SELECT Id, Stage__c, OwnerId, Candidate__c FROM Lead__c WHERE Id IN :leadOnlyIds ]);
 
         Map<Id, Enquiry__c> enquiryMap = enquiryOnlyIds.isEmpty()
             ? new Map<Id, Enquiry__c>()
@@ -270,10 +270,11 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
             Boolean isLead = (rid.getSObjectType() == Lead__c.SObjectType);
             Id ownerId;
             String stageVal;
+            Id candidateId;
 
             if (isLead) {
                 Lead__c ld = leadMap.get(rid);
-                if (ld != null) { ownerId = ld.OwnerId; stageVal = ld.Stage__c; }
+                if (ld != null) { ownerId = ld.OwnerId; stageVal = ld.Stage__c; candidateId = ld.Candidate__c; }
             } else {
                 Enquiry__c eq = enquiryMap.get(rid);
                 if (eq != null) { ownerId = eq.OwnerId; stageVal = eq.Stage__c; }
@@ -289,6 +290,7 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
 
                 if (isLead) wm.Lead__c = rid;
                 else wm.Enquiry__c = rid;
+                if (candidateId != null) wm.Candidate__c = candidateId;
 
                 wm.Lead_Owner_at_Registration__c = UserInfo.getUserId();
                 wm.Lead_Stage_at_Registration__c = stageVal;
@@ -300,6 +302,7 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
 
                 if (isLead) { existing.Lead__c = rid; existing.Enquiry__c = null; }
                 else { existing.Enquiry__c = rid; existing.Lead__c = null; }
+                existing.Candidate__c = candidateId;
 
                 existing.Lead_Owner_at_Registration__c = UserInfo.getUserId();
                 existing.Lead_Stage_at_Registration__c = stageVal;

@@ -28,16 +28,16 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         // LeadTriggerHelperClass.assignOwnerForM1(getNewLeads(), null, true);
     }
 
-    public override void beforeUpdate() {
-        List<Lead__c> newLeads = getNewLeads();
-        Map<Id, Lead__c> oldMapLead = getOldLeadMap();
+   public override void beforeUpdate() {
+    List<Lead__c> newLeads = getNewLeads();
+    Map<Id, Lead__c> oldMapLead = getOldLeadMap();
 
-      //  EnquiryStageService.validateStageTransitions(newLeads, oldMapLead);// COMMENTED FOR DEMO ONLY
-        LeadTriggerHelperClass.updateLevelSequence(newLeads, oldMapLead);
-        LeadTriggerHelperClass.handleBeforeUpdate(newLeads, oldMapLead);
-        // If you want M1 owner logic on update:
-        // LeadTriggerHelperClass.assignOwnerForM1(newLeads, oldMapLead, false);
-    }
+    LeadTriggerHelperClass.validateCallLogBeforeStageChange(newLeads, oldMapLead);
+
+    LeadTriggerHelperClass.updateLevelSequence(newLeads, oldMapLead);
+    LeadTriggerHelperClass.handleBeforeUpdate(newLeads, oldMapLead);
+}
+
 
     public override void afterInsert() {
         List<Lead__c> newLeads = getNewLeads();

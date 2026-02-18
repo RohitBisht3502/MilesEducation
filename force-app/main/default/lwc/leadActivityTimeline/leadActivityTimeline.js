@@ -41,8 +41,10 @@ export default class LeadActivityTimeline extends LightningElement {
                 const isLevelChange = log.activityType === 'Level Change';
                 const isMergeLead = log.activityType === 'Lead Merge';
                 const isViewedPhoneNumber = log.activityType === 'View Phone Number';
+                const isGmeet = (log.activityType || '').toLowerCase() === 'gmeet';
                 const isCreated = log.name?.includes('Created') || false;
                 const isUpdated = log.name?.includes('Updated') || false;
+                const isOther = !isCall && !isLevelChange && !isMergeLead && !isViewedPhoneNumber && !isGmeet;
 
                 const formattedChangedDateTime = log.changedDateTime
                     ? new Date(log.changedDateTime).toLocaleString()
@@ -72,8 +74,10 @@ export default class LeadActivityTimeline extends LightningElement {
                     isLevelChange,
                     isMergeLead,
                     isViewedPhoneNumber,
+                    isGmeet,
                     isCreated,
                     isUpdated,
+                    isOther,
                     formattedChangedDateTime,
                     formattedDuration,
                     callTypeLabel,

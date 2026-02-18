@@ -13,6 +13,7 @@ public without sharing class WebinarLiveAttendanceSyncService {
         public String participant_email;
         public String registrant_id;
         public String participant_name;
+        public Decimal duration;
     }
 
     public static void enqueueSync(Set<Id> webinarRecordIds) {
@@ -75,6 +76,7 @@ public without sharing class WebinarLiveAttendanceSyncService {
                 Set<String> emailSet = new Set<String>();
                 Map<String, String> emailToRegistrantId = new Map<String, String>();
                 Map<String, String> emailToRegistrantName = new Map<String, String>();
+                Map<String, Decimal> emailToDuration = new Map<String, Decimal>();
 
                 for (RegistrantDTO r : input.registrants) {
                     if (r == null || String.isBlank(r.participant_email)) continue;
@@ -83,6 +85,9 @@ public without sharing class WebinarLiveAttendanceSyncService {
                     emailSet.add(email);
                     emailToRegistrantId.put(email, r.registrant_id);
                     emailToRegistrantName.put(email, r.participant_name);
+                    if (r.duration != null) {
+                        emailToDuration.put(email, r.duration);
+                    }
                 }
 
                 System.debug(LoggingLevel.INFO, 'Emails collected | distinctEmails=' + emailSet.size());
@@ -123,6 +128,9 @@ public without sharing class WebinarLiveAttendanceSyncService {
                     if (wm != null) {
                         wm.Attendance_Status__c = 'Present';
                         wm.Registrant_Id__c = emailToRegistrantId.get(email);
+                        if (emailToDuration.containsKey(email)) {
+                            wm.Duration__c = emailToDuration.get(email);
+                        }
                         membersToUpdate.add(wm);
                         memberIdsPresent.add(wm.Id);
                         presentCount++;
@@ -183,6 +191,9 @@ public without sharing class WebinarLiveAttendanceSyncService {
                         newWm.Webinar__c = wbRec.Id;
                         newWm.Attendance_Status__c = 'Present';
                         newWm.Registrant_Id__c = emailToRegistrantId.get(email);
+                        if (emailToDuration.containsKey(email)) {
+                            newWm.Duration__c = emailToDuration.get(email);
+                        }
 
                         // Tag Webinar Member to Enquiry (update field API name if needed)
                         newWm.Enquiry__c = enqInserted.Id;
@@ -235,6 +246,10 @@ public without sharing class WebinarLiveAttendanceSyncService {
                         r.participant_email = (String) rmap.get('participant_email');
                         r.registrant_id = (String) rmap.get('registrant_id');
                         r.participant_name = (String) rmap.get('participant_name');
+                        r.duration = parseDecimal(rmap.get('duration'));
+                        if (r.duration == null) {
+                            r.duration = parseDecimal(rmap.get('participant_duration'));
+                        }
                         dto.registrants.add(r);
                     }
                 }
@@ -243,6 +258,19 @@ public without sharing class WebinarLiveAttendanceSyncService {
                 System.debug(LoggingLevel.ERROR, 'parseResponse untyped failed | ' + ex2.getMessage());
                 return null;
             }
+        }
+    }
+
+    private static Decimal parseDecimal(Object value) {
+        if (value == null) return null;
+        try {
+            if (value instanceof Decimal) return (Decimal) value;
+            if (value instanceof Integer) return Decimal.valueOf(String.valueOf(value));
+            if (value instanceof Long) return Decimal.valueOf(String.valueOf(value));
+            if (value instanceof Double) return Decimal.valueOf(String.valueOf(value));
+            return Decimal.valueOf(String.valueOf(value));
+        } catch (Exception ex) {
+            return null;
         }
     }
 }

@@ -75,9 +75,6 @@ public without sharing class EventTriggerHandler {
             Id leadId = getLeadIdFromEvent(ev);
             if (leadId == null) continue;
 
-            String meetingType = getStringField(ev, 'Meeting_type__c');
-            if (!isGmeet(meetingType)) continue;
-
             String approvalStatus = getStringField(ev, 'Approval_Status__c');
 
             Boolean approvalChanged = false;
@@ -86,14 +83,8 @@ public without sharing class EventTriggerHandler {
                 approvalChanged = (oldApproval != approvalStatus);
             }
 
-            Boolean becameGmeet = false;
-            if (!isInsert && oldMap != null && oldMap.containsKey(ev.Id)) {
-                String oldMeetingType = getStringField(oldMap.get(ev.Id), 'Meeting_type__c');
-                becameGmeet = !isGmeet(oldMeetingType) && isGmeet(meetingType);
-            }
-
-            Boolean shouldCreate = isInsert || becameGmeet;
-            Boolean shouldLogApproval = approvalChanged && isTrackedApprovalStatus(approvalStatus);
+            Boolean shouldCreate = isInsert;
+            Boolean shouldLogApproval = !isInsert && approvalChanged;
 
             if (!shouldCreate && !shouldLogApproval) continue;
 
@@ -129,16 +120,6 @@ public without sharing class EventTriggerHandler {
     private static Id getLeadIdFromEvent(Event ev) {
         if (ev == null || ev.WhatId == null) return null;
         return (ev.WhatId.getSObjectType() == Lead__c.SObjectType) ? ev.WhatId : null;
-    }
-
-    private static Boolean isGmeet(String meetingType) {
-        return !String.isBlank(meetingType) && meetingType.trim().equalsIgnoreCase('Gmeet');
-    }
-
-    private static Boolean isTrackedApprovalStatus(String status) {
-        if (String.isBlank(status)) return false;
-        String s = status.trim().toLowerCase();
-        return s == 'pending for approval' || s == 'approved' || s == 'rejected';
     }
 
     private static String getStringField(SObject sobj, String fieldApiName) {

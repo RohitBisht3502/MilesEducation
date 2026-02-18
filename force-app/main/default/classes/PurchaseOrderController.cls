@@ -86,14 +86,15 @@ public with sharing class PurchaseOrderController {
             throw new AuraHandledException('No products selected.');
         }
 
-        Purchase_Order__c po = new Purchase_Order__c(
-            Purchase_Order_Date__c = Date.today(),
-            Status__c = 'Confirmed',
-            Discount_Amount__c = req.discountAmount,
-            Student__c = req.studentId,
-            Candidate__c = req.candidateId,
-            Lead__c = req.leadId
-        );
+       Purchase_Order__c po = new Purchase_Order__c(
+    Purchase_Order_Date__c = Date.today(),
+    Enrollment_Status__c = 'Confirmed', 
+    Discount_Amount__c = req.discountAmount,
+    Student__c = req.studentId,
+    Candidate__c = req.candidateId,
+    Lead__c = req.leadId
+);
+
         insert po;
 
         Set<Id> productIds = new Set<Id>();
@@ -128,12 +129,12 @@ public with sharing class PurchaseOrderController {
                 Purchase_Order__c = po.Id,
                 Product__c = item.productId,
                 Quantity__c = item.quantity,
-                Unit_Price__c = priceMap.get(item.productId), // ✅ OBJECT FIELD
-                Name = 'PO Item'
+                Unit_Price__c = priceMap.get(item.productId) // ✅ OBJECT FIELD
+                // Name = 'PO Item'
             ));
         }
 
         insert lines;
         return po.Id;
     }
-}
+ }

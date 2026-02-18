@@ -137,6 +137,25 @@ public static List<EventDTO> getLeadEvents(Id recordId) {
 }
 
 
+@AuraEnabled(cacheable=true)
+public static Id getLatestUntrackedCallLog(Id leadId) {
+
+    List<Call_Log__c> logs = [
+        SELECT Id, Untracked__c
+        FROM Call_Log__c
+        WHERE Lead__c = :leadId
+        ORDER BY CreatedDate DESC
+        LIMIT 1
+    ];
+
+    if (!logs.isEmpty() && logs[0].Untracked__c == true) {
+        return logs[0].Id;
+    }
+
+    return null;
+}
+
+
 
 
 
@@ -236,9 +255,14 @@ public static List<WebinarMemberDTO> getWebinarMembers(Id recordId) {
             throw new AuraHandledException('Unsupported object for Runo allocation.');
         }
 
-        if (String.isBlank(customerName) || String.isBlank(customerPhone)) {
-            throw new AuraHandledException('Record must have Name and Phone.');
-        }
+       if (String.isBlank(customerPhone)) {
+    throw new AuraHandledException('Phone number is required for call allocation.');
+}
+
+if (String.isBlank(customerName)) {
+    customerName = 'Unknown Caller';
+}
+
 
         cfg = getRunoConfig();
         payload = buildAllocationPayload(customerName, customerPhone, customerEmail);
@@ -336,23 +360,7 @@ public static List<WebinarMemberDTO> getWebinarMembers(Id recordId) {
         return req;
     }
 
-    // public static void createCallLog(Id recordId, String userPhone, String phone) {
-    //     Call_Log__c callLog = new Call_Log__c(
-    //         User_Phone__c = userPhone,
-    //         Phone_Number__c = phone,
-    //         Status__c = 'In Progress'
-    //     );
 
-    //     if (recordId != null && recordId.getSObjectType() == Lead__c.SObjectType) {
-    //         callLog.Lead__c = recordId;
-    //         Id candidateId = Utility.candidateByPhone(phone);
-    //         if (candidateId != null) {
-    //             callLog.Candidate__c = candidateId;
-    //         }
-    //     }
-
-    //     insert callLog;
-    // }
     public static void createCallLog(
     Id recordId,
     String userPhone,
@@ -534,127 +542,6 @@ public static List<WebinarMemberDTO> getWebinarMembers(Id recordId) {
         }
     }
 
-    // public static Call_Log__c findCallLog(Id recordId, String callId) {
-    //     Call_Log__c logRecord = null;
-    //     SObjectType sType = (recordId != null) ? recordId.getSObjectType() : null;
-    //     Boolean isLead    = (sType == Lead__c.SObjectType);
-    //     Boolean isCallLog = (sType == Call_Log__c.SObjectType);
-
-    //     if (isCallLog && String.isBlank(callId)) {
-    //         Call_Log__c recordCallLog = [SELECT Id, Lead__c, Phone_Number__c FROM Call_Log__c WHERE Id = :recordId AND Untracked__c = true ORDER BY CreatedDate DESC LIMIT 1 ];
-
-    //         recordCallLog.Untracked__c = false;
-    //         update recordCallLog;
-
-    //         List<Call_Log__c> logsById = [SELECT Id, Lead__c, Phone_Number__c FROM Call_Log__c WHERE Phone_Number__c = :recordCallLog.Phone_Number__c AND Status__c = 'In Progress' ORDER BY CreatedDate DESC LIMIT 1];
-
-    //         if (!logsById.isEmpty()) {
-    //             logRecord = logsById[0];
-    //         }
-    //         return logRecord;
-    //     }
-
-    //     if (!String.isBlank(callId)) {
-    //         List<Call_Log__c> logsByCall = [SELECT Id, Lead__c FROM Call_Log__c WHERE Call_Id__c = :callId ORDER BY CreatedDate DESC LIMIT 1 ];
-    //         if (!logsByCall.isEmpty()) {
-    //             logRecord = logsByCall[0];
-    //         }
-    //     }
-
-    //     if (logRecord == null && isLead && recordId != null) {
-    //         List<Call_Log__c> logsByLead = [SELECT Id, Lead__c FROM Call_Log__c WHERE Lead__c = :recordId ORDER BY CreatedDate DESC LIMIT 1];
-    //         if (!logsByLead.isEmpty()) {
-    //             logRecord = logsByLead[0];
-    //         }
-    //     }
-
-    //     return logRecord;
-    // }
-
-    // modified on 25 dec
-    // public static Call_Log__c findCallLog(Id recordId, String callId) {
-    //     System.debug('Line 389::: ');
-    //     Call_Log__c logRecord = null;
-    //     SObjectType sType = (recordId != null) ? recordId.getSObjectType() : null;
-    //     Boolean isLead    = (sType == Lead__c.SObjectType);
-    //     Boolean isCallLog = (sType == Call_Log__c.SObjectType);
-
-    //     if (isCallLog && String.isNotBlank(callId)) {
-    //         System.debug('callId::: '+callId);
-    //         Call_Log__c recordCallLog = [SELECT Id, Lead__c, Phone_Number__c, Untracked__c FROM Call_Log__c WHERE Id = :recordId ORDER BY CreatedDate DESC LIMIT 1];
-	// 		System.debug('recordCallLog::: '+recordCallLog);
-    //         // One query: fetch all logs for same phone (DESC)
-    //         List<Call_Log__c> phoneLogs = new List<Call_Log__c>();
-    //         if (!String.isBlank(recordCallLog.Phone_Number__c)) {
-    //             phoneLogs = [SELECT Id, Lead__c, Phone_Number__c, Call_Id__c, Status__c, Untracked__c FROM Call_Log__c WHERE Phone_Number__c = :recordCallLog.Phone_Number__c ORDER BY CreatedDate DESC];
-    //         }
-
-    //         List<Call_Log__c> toUpdate = new List<Call_Log__c>();
-    //         for (Call_Log__c cl : phoneLogs) {
-    //             if (cl.Untracked__c == true) {
-    //                 cl.Untracked__c = false;
-    //                 toUpdate.add(cl);
-    //             }
-
-    //             if (logRecord == null && cl.Call_Id__c == callId) {
-    //                 logRecord = cl;
-    //             }
-    //         }
-
-    //         // In case phoneLogs empty, still mark recordCallLog itself
-    //         if (phoneLogs.isEmpty() && recordCallLog.Untracked__c == true) {
-    //             recordCallLog.Untracked__c = false;
-    //             toUpdate.add(recordCallLog);
-    //         }
-
-    //         if (!toUpdate.isEmpty()) {
-    //             update toUpdate;
-    //         }
-	// 		System.debug('logRecord::: '+logRecord);
-    //         return logRecord;
-    //     }
-
-    //     if (!String.isBlank(callId)) {
-    //         List<Call_Log__c> logsByCall = [
-    //             SELECT Id, Lead__c
-    //             FROM Call_Log__c
-    //             WHERE Call_Id__c = :callId
-    //             ORDER BY CreatedDate DESC
-    //             LIMIT 1
-    //         ];
-    //         if (!logsByCall.isEmpty()) {
-    //             logRecord = logsByCall[0];
-    //         }
-    //     }
-
-    //     if (logRecord == null && isLead && recordId != null) {
-    //         List<Call_Log__c> logsByLead = [
-    //             SELECT Id, Lead__c
-    //             FROM Call_Log__c
-    //             WHERE Lead__c = :recordId
-    //             ORDER BY CreatedDate DESC
-    //             LIMIT 1
-    //         ];
-    //         if (!logsByLead.isEmpty()) {
-    //             logRecord = logsByLead[0];
-    //         }
-    //     }
-
-    //     if(logRecord == null && isCallLog){
-    //         List<Call_Log__c> logsByLead = [
-    //             SELECT Id, Lead__c
-    //             FROM Call_Log__c
-    //             WHERE Id = :recordId
-    //             ORDER BY CreatedDate DESC
-    //             LIMIT 1
-    //         ];
-    //         if (!logsByLead.isEmpty()) {
-    //             logRecord = logsByLead[0];
-    //         }
-    //     }
-
-    //     return logRecord;
-    // }
 public static Call_Log__c findCallLog(Id recordId, String callId) {
 
     Call_Log__c logRecord;
@@ -735,33 +622,54 @@ public static Call_Log__c findCallLog(Id recordId, String callId) {
 
 
 
-    @AuraEnabled(cacheable=true)
-    public static Map<String, List<String>> getStageLevelValues(Id recordId) {
-        Map<String, List<String>> result = new Map<String, List<String>>();
-        List<String> stageValues = new List<String>();
-        List<String> levelValues = new List<String>();
-        Schema.DescribeFieldResult stageField;
-        Schema.DescribeFieldResult levelField;
+@AuraEnabled(cacheable=true)
+public static Map<String, List<String>> getStageLevelValues(Id recordId) {
 
-        stageField = Lead__c.Stage__c.getDescribe();
-        for (Schema.PicklistEntry pe : stageField.getPicklistValues()) {
-            if (pe.isActive()) {
-                stageValues.add(pe.getLabel());
-            }
+    Map<String, List<String>> result = new Map<String, List<String>>();
+
+    result.put(
+        'stage',
+        getPicklistValues(Lead__c.Stage__c)
+    );
+
+    result.put(
+        'level',
+        getPicklistValues(Lead__c.Course__c)
+    );
+
+    return result;
+}
+
+private static List<String> getPicklistValues(Schema.SObjectField fieldRef) {
+
+    List<String> values = new List<String>();
+
+    Schema.DescribeFieldResult field = fieldRef.getDescribe();
+
+    for (Schema.PicklistEntry pe : field.getPicklistValues()) {
+        if (pe.isActive()) {
+            values.add(pe.getLabel());
         }
-
-        levelField = Lead__c.Course__c.getDescribe();
-        for (Schema.PicklistEntry pe : levelField.getPicklistValues()) {
-            if (pe.isActive()) {
-                levelValues.add(pe.getLabel());
-            }
-        }
-
-        result.put('stage', stageValues);
-        result.put('level', levelValues);
-
-        return result;
     }
+
+    return values;
+}
+
+
+// private static List<String> getPicklistValues(Schema.SObjectField fieldRef) {
+
+//     List<String> values = new List<String>();
+
+//     Schema.DescribeFieldResult field = fieldRef.getDescribe();
+
+//     for (Schema.PicklistEntry pe : field.getPicklistValues()) {
+//         if (pe.isActive()) {
+//             values.add(pe.getLabel());   // or pe.getValue() if you prefer API value
+//         }
+//     }
+
+//     return values;
+// }
 
  @AuraEnabled
 public static String allocateCourseNow(Id recordId) {

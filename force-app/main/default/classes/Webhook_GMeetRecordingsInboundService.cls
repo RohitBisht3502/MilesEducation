@@ -58,7 +58,7 @@ global without sharing class Webhook_GMeetRecordingsInboundService {
                     out.message = 'Missing event_id';
                     IntegrationLogUtil.insertLog('GMeet Recordings Inbound', reqBody, null, out.message, 'Failed', statusCode);
                 } else {
-                    List<Event> evts = [SELECT Id, Event_Id__c ,EndDateTime , StartDateTime, Mutual_Meeting_Seconds__c ,Recording_File_Path__c,Notes_File_Path__c FROM Event WHERE Event_Id__c = :p.event_id LIMIT 1];
+                    List<Event> evts = [SELECT Id, Event_Id__c ,EndDateTime , StartDateTime, Mutual_Meeting_Seconds__c ,Recording_File_Path__c,Notes_File_Path__c,Stage__c FROM Event WHERE Event_Id__c = :p.event_id LIMIT 1];
 
                     if (evts.isEmpty()) {
                         statusCode = 404;
@@ -76,6 +76,10 @@ global without sharing class Webhook_GMeetRecordingsInboundService {
                         ev.put(
                             'Candidate_Attendance__c',
                             (p.mutual_meeting_seconds != null && p.mutual_meeting_seconds > 0) ? 'Present' : 'Absent'
+                        );
+                        ev.put(
+                            'Stage__c',
+                            (p.mutual_meeting_seconds != null && p.mutual_meeting_seconds > 0) ? 'Completed' : 'No Show'
                         );
 
                         String videoPath;

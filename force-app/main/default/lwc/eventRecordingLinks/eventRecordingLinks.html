@@ -1,0 +1,25 @@
+<template>
+    <lightning-card title="EVENT FILES">
+        <div class="slds-p-horizontal_medium slds-p-vertical_small">
+            <template if:true={isLoading}>
+                <lightning-spinner size="small" alternative-text="Loading"></lightning-spinner>
+            </template>
+
+            <div class="button-row">
+                <lightning-button
+                    class="button-gap"
+                    label="Open Recording"
+                    variant="brand"
+                    onclick={handleOpenRecording}
+                    disabled={disableRecording}>
+                </lightning-button>
+                <lightning-button
+                    label="Open Notes"
+                    variant="neutral"
+                    onclick={handleOpenNotes}
+                    disabled={disableNotes}>
+                </lightning-button>
+            </div>
+        </div>
+    </lightning-card>
+</template>
