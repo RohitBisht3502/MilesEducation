@@ -1,5 +1,6 @@
+// @Depricated:
 public class CourseEnrolledTriggerHandlerService {
-
+/*
     public static void checkAndCreateNewTaskForInsert(List<Course_Enrolled__c> newList) {
         if (newList == null || newList.isEmpty()) return;
 
@@ -147,4 +148,5 @@ public class CourseEnrolledTriggerHandlerService {
         newTask.OwnerId = ownerId;
         return newTask;
     }
+        */
 }

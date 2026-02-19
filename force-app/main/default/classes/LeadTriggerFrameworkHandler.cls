@@ -36,6 +36,8 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
 
     LeadTriggerHelperClass.updateLevelSequence(newLeads, oldMapLead);
     LeadTriggerHelperClass.handleBeforeUpdate(newLeads, oldMapLead);
+
+    LeadPostEnrollmentRoundRobinHandler.handleBeforeUpdate(newLeads, oldMapLead);
 }
 
 
@@ -48,6 +50,9 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         // LeadTriggerHelperClass.registerLeadForUpcomingWebinars(getNewLeads());
         LeadTriggerHelperClass.afterInsertAutoRegisterWebinar(newLeads);
         LeadTriggerHandler.createLeadActivityLogs(newLeads, null, true);
+
+        // Gp tool tasks updates
+        LeadStageTaskHandlerService.checkAndCreateNewTaskForInsert(newLeads);
         
         // M.Com Bridge Course Tasks
        // LeadTriggerHelperClass.createMComTasks(newLeads, null);
@@ -56,6 +61,8 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
     public override void afterUpdate() {
         List<Lead__c> newLeads = getNewLeads();
         Map<Id, Lead__c> oldMapLead = getOldLeadMap();
+
+        LeadStageService.validateStageTransitions(newLeads, oldMapLead);
 
         LeadTriggerHandler.createLeadActivityLogs(newLeads, oldMapLead, false);
 
@@ -91,6 +98,8 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         // Validate mandatory comments for rejection
         LeadTriggerHelperClass.validateApprovalComments(newLeads, oldMapLead);
 
+        // Gp tool tasks updates
+        LeadStageTaskHandlerService.checkAndCreateNewTaskForStatusChange((Map<Id, Lead__c>)newMap, oldMapLead);
 
        // conversion
         LeadTriggerConversionClass.convertCandidateOnFullPayment(newLeads, oldMapLead);

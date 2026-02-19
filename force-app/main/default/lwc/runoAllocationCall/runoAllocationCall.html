@@ -159,7 +159,7 @@
                                 </div>
 
 
-                                
+
 
 
                                 <template if:true={showPopup}>
@@ -196,6 +196,10 @@
                                         Stage not applicable for Not-Connected calls
                                     </div>
                                 </template>
+                                <lightning-combobox label="Course" value={courseValue} options={courseOptions}
+                                    onchange={handleCourseChange}>
+                                </lightning-combobox>
+
 
                                 <lightning-input type="datetime-local" label="Next Follow Up" value={nextFollowUpDate}
                                     onchange={handleNextFollowUpDateChange} disabled={autoSetFollowUp}>
@@ -205,8 +209,8 @@
                                     checked={autoSetFollowUp} onchange={handleAutoSetChange}>
                                 </lightning-input>
 
-                                <lightning-textarea class="full-row" label="Comments" value={feedback}    required={isCommentMandatory}
-                                    onchange={handleFeedbackChange}>
+                                <lightning-textarea class="full-row" label="Comments" value={feedback}
+                                    required={isCommentMandatory} onchange={handleFeedbackChange}>
                                 </lightning-textarea>
                             </div>
                         </div>

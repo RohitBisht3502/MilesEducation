@@ -1,0 +1,43 @@
+<template>
+    <template if:true={leadRecord}>
+        <lightning-card title="Approval Details">
+            <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+                <lightning-record-view-form record-id={leadId} object-api-name="Lead__c">
+                    <div class="slds-grid slds-wrap">
+                        <div class="slds-col slds-size_1-of-2 slds-p-right_small">
+                            <lightning-output-field field-name="Name"></lightning-output-field>
+                            <lightning-output-field field-name="Stage__c"></lightning-output-field>
+                            <lightning-output-field field-name="CAN_ID__c"></lightning-output-field>
+                            <lightning-output-field field-name="City__c"></lightning-output-field>
+                            <lightning-output-field field-name="Course__c"></lightning-output-field>
+                            <lightning-output-field field-name="Course_Bucket__c"></lightning-output-field>
+                            <lightning-output-field field-name="Source__c"></lightning-output-field>
+                            <lightning-output-field field-name="Source_Bucket__c"></lightning-output-field>
+                            <lightning-output-field field-name="Candidate__c"></lightning-output-field>
+                            <lightning-output-field field-name="Is_ReEnquiry__c"></lightning-output-field>
+                            <lightning-output-field field-name="Expected_payment_date__c"></lightning-output-field>
+                            <lightning-output-field field-name="Status__c"></lightning-output-field>
+                            <lightning-output-field field-name="CC_Spoc__c"></lightning-output-field>
+                        </div>
+                        <div class="slds-col slds-size_1-of-2 slds-p-left_small">
+                            <lightning-output-field field-name="OwnerId"></lightning-output-field>
+                            <lightning-output-field field-name="Student__c"></lightning-output-field>
+                            <lightning-output-field field-name="Is_Merged__c"></lightning-output-field>
+                            <lightning-output-field field-name="Payment_Received__c"></lightning-output-field>
+                            <lightning-output-field field-name="GP_SPOC__c"></lightning-output-field>
+                            <lightning-output-field field-name="Not_Commited__c"></lightning-output-field>
+                        </div>
+                    </div>
+                </lightning-record-view-form>
+            </div>
+        </lightning-card>
+    </template>
+
+    <template if:false={leadRecord}>
+        <lightning-card title="Approval Details">
+            <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+                No related Lead__c found.
+            </div>
+        </lightning-card>
+    </template>
+</template>

@@ -10,10 +10,15 @@ import getCallHistory from '@salesforce/apex/Webservice_RunoAllocationAPI.getCal
 import getWebinarMembers from '@salesforce/apex/Webservice_RunoAllocationAPI.getWebinarMembers';
 import getLeadEvents from '@salesforce/apex/Webservice_RunoAllocationAPI.getLeadEvents';
 import { NavigationMixin } from 'lightning/navigation';
+import getLatestUntrackedCallLog 
+from '@salesforce/apex/Webservice_RunoAllocationAPI.getLatestUntrackedCallLog';
+
 
 
 import { CloseActionScreenEvent } from 'lightning/actions';
 import { subscribe, unsubscribe, onError } from 'lightning/empApi';
+
+
 
 export default class RunoAllocationCalls extends NavigationMixin(LightningElement) {
 
@@ -37,6 +42,10 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
 
     // Call popup overlay (Calling Runo...)
     showCallPopup = false;
+
+    callLogId = null;
+showTagLead = false;
+
 
 
     userChangedStage = false;
@@ -92,6 +101,13 @@ eventLoaded = false;
     elapsedMs = 0;
     elapsedLabel = '00:00';
     timerId = null;
+    showTagLeadUI = false;
+
+
+openTagLeadUI() {
+    this.showTagLeadUI = true;
+}
+
   
 
 
@@ -157,12 +173,24 @@ eventLoaded = false;
         }
     }
 
+
+    openTagLeadUI() {
+    this[NavigationMixin.Navigate]({
+        type: 'standard__recordAction',
+        attributes: {
+            recordId: this.recordId,
+            actionName: 'Tag_Lead' 
+        }
+    });
+}
+
     // --------------- LIFECYCLE -------------
     connectedCallback() {
         this.loadPicklists();
         this.loadStageLevel();
         this.loadCallHistory();
         this.subscribeToEvents();
+         this.loadUntrackedStatus();
         onError(err => console.warn('EMP API Error:', JSON.stringify(err)));
     }
 
@@ -195,6 +223,7 @@ get hasEvents() {
 
 
 
+
     handleViewMoreLead() {
         if (!this.recordId) return;
 
@@ -211,7 +240,8 @@ get hasEvents() {
     }
 
     handleTabClick(event) {
-    this.activeTab = event.target.dataset.tab;
+    const selectedTab = event.currentTarget.dataset.tab;
+    this.activeTab = selectedTab;
 
 
 
@@ -222,6 +252,25 @@ get hasEvents() {
         this.loadEventHistory();
     }
 }
+
+async loadUntrackedStatus() {
+    if (!this.recordId) return;
+
+    try {
+        const id = await getLatestUntrackedCallLog({ leadId: this.recordId });
+
+        this.callLogId = id;
+        this.showTagLead = id !== null;
+
+    } catch (e) {
+        console.error('Failed loading untracked status', e);
+        this.showTagLead = false;
+    }
+}
+
+
+
+
 
 
 
@@ -323,21 +372,15 @@ get hasEvents() {
         return (this.callHistory || []).length > 0;
     }
 
-//     get leadTabClass() {
-//     return `tab-item ${this.activeTab === 'lead' ? 'active' : ''}`;
-// }
 
-// get historyTabClass() {
-//     return `tab-item ${this.activeTab === 'history' ? 'active' : ''}`;
-// }
 
-  get leadTabClass() {
-        return this.isHistoryTab ? 'tab-item' : 'tab-item active';
-    }
+ get leadTabClass() {
+    return `tab-item ${this.activeTab === 'lead' ? 'active' : ''}`;
+}
 
-    get historyTabClass() {
-        return this.isHistoryTab ? 'tab-item active' : 'tab-item';
-    }
+get historyTabClass() {
+    return `tab-item ${this.activeTab === 'history' ? 'active' : ''}`;
+}
 
 get webinarTabClass() {
     return `tab-item ${this.activeTab === 'webinar' ? 'active' : ''}`;
@@ -346,6 +389,7 @@ get webinarTabClass() {
 get eventTabClass() {
     return `tab-item ${this.activeTab === 'event' ? 'active' : ''}`;
 }
+
 
 get formattedCreatedDate() {
     if (!this.identity.createdDate) return '';
@@ -425,9 +469,6 @@ get formattedCreatedDate() {
         }
     }
 
-    // ----------------------------
-    // API call from PARENT
-    // ----------------------------
     @api
     startCall() {
         if (!this.recordId) {
@@ -437,7 +478,7 @@ get formattedCreatedDate() {
         this.callApi();
     }
 
-    // -------------- CALL API ---------------
+   
     async callApi() {
         this.callButtonDisabled = true;
         this.loading = true;
@@ -664,6 +705,8 @@ this.noResponseTimer = setTimeout(() => {
             this.toast('Saved', 'Feedback saved successfully.', 'success');
 
             await this.loadCallHistory();
+            await this.loadUntrackedStatus();
+
 
 
 

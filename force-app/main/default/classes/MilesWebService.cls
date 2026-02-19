@@ -111,7 +111,7 @@ global without sharing class MilesWebService {
             // checking all scnerios number staring from +91,0 etc
             Set<String> phoneVariants = Utility.buildPhoneVariants(inputData.phone);
             
-            List<Phone_Number__c> phoneExistingList = [SELECT Id, Phone__c, Candidate__c, Student__c, Lead__c FROM Phone_Number__c WHERE Phone__c IN :phoneVariants LIMIT 1];
+            List<Phone_Number__c> phoneExistingList = [SELECT Id, Phone__c, Candidate__c, Student__c FROM Phone_Number__c WHERE Phone__c IN :phoneVariants LIMIT 1];
             if (!phoneExistingList.isEmpty()) {
                 phoneExisting       = phoneExistingList[0];
                 studentAccountId    = phoneExisting.Student__c;
@@ -179,10 +179,9 @@ global without sharing class MilesWebService {
 
                 // Create Phone_Number__c (tag phone)
                 Phone_Number__c phoneRec = new Phone_Number__c(
-                    Name        = inputData.phone,
-                    Phone__c    = inputData.phone,
-                    Candidate__c= candidate.Id,
-                    Lead__c     = newLead.Id,
+                    Name         = inputData.phone,
+                    Phone__c     = inputData.phone,
+                    Candidate__c = candidate.Id,
                     Is_Primary__c = true
                 );
                 insert phoneRec;
@@ -192,7 +191,7 @@ global without sharing class MilesWebService {
                 leadToReturn       = newLead;
 
                 // Email Associations
-                EmailDecision ed = handleEmailAssociation(inputData.email, leadToReturn.Id, candidate.Id, enquiry.Id,studentAccountId);
+                EmailDecision ed = handleEmailAssociation(inputData.email, candidate.Id, enquiry.Id, studentAccountId);
 
             } else {
 
@@ -256,7 +255,7 @@ global without sharing class MilesWebService {
                     }
 
                     // Email Associations
-                    EmailDecision ed = handleEmailAssociation(inputData.email, existingLeadC.Id, enquiryCandidateId, enquiry.Id,studentAccountId);
+                    EmailDecision ed = handleEmailAssociation(inputData.email, enquiryCandidateId, enquiry.Id, studentAccountId);
 
                     // If Email is same/unlinked/created -> mark re-enquiry (as in your current logic)
                     if (ed == EmailDecision.SAME_LEAD ||
@@ -295,10 +294,6 @@ global without sharing class MilesWebService {
                             phoneExisting.Candidate__c = enquiryCandidateId;
                             phoneChanged = true;
                         }
-                        if (phoneExisting.Lead__c == null) {
-                            phoneExisting.Lead__c = newLead2.Id;
-                            phoneChanged = true;
-                        }
                         if (phoneChanged) update phoneExisting;
                     }
 
@@ -306,7 +301,7 @@ global without sharing class MilesWebService {
                     leadToReturn  = newLead2;
 
                     // Email Associations
-                    EmailDecision ed = handleEmailAssociation(inputData.email, newLead2.Id, enquiryCandidateId, enquiry.Id,studentAccountId);
+                    EmailDecision ed = handleEmailAssociation(inputData.email, enquiryCandidateId, enquiry.Id, studentAccountId);
 
                     if (ed == EmailDecision.DIFFERENT_LEAD) {
                         System.debug('Email exists with different Lead. Not associating.');
@@ -338,45 +333,31 @@ global without sharing class MilesWebService {
         }
     }
 
-    private static EmailDecision handleEmailAssociation(String email, Id leadId, Id candidateId, Id enquiryId,Id studentAccountId) {
+    private static EmailDecision handleEmailAssociation(String email, Id candidateId, Id enquiryId, Id studentAccountId) {
 
-        if (String.isBlank(email) || leadId == null) {
-            System.debug('Email association skipped: blank email or leadId is null');
+        if (String.isBlank(email)) {
+            System.debug('Email association skipped: blank email');
             return null;
         }
 
-        List<Email__c> emailList = [SELECT Id, Lead__c, Candidate__c FROM Email__c WHERE Email__c = :email LIMIT 1 ];
+        List<Email__c> emailList = [SELECT Id, Candidate__c FROM Email__c WHERE Email__c = :email LIMIT 1 ];
 
         // Email exists
         if (!emailList.isEmpty()) {
             Email__c existingEmail = emailList[0];
 
-            // With Different Lead -> Don't associate
-            if (existingEmail.Lead__c != null && existingEmail.Lead__c != leadId) {
-                System.debug('Email__c found linked to DIFFERENT Lead. Not associating.');
-                return EmailDecision.DIFFERENT_LEAD;
-            }
-
-            // With Same Lead
-            if (existingEmail.Lead__c == leadId) {
-                System.debug('Email__c found linked to SAME Lead.');
-                return EmailDecision.SAME_LEAD;
-            }
-
-            // Email exists but Lead__c is null -> safe to associate
-            existingEmail.Lead__c      = leadId;
+            // Email exists -> only associate to candidate (do not touch Lead__c)
             if (existingEmail.Candidate__c == null) existingEmail.Candidate__c = candidateId;
             // if (existingEmail.Enquiry__c == null)   existingEmail.Enquiry__c   = enquiryId;
             update existingEmail;
 
-            System.debug('Email__c existed but was unlinked. Now associated.');
+            System.debug('Email__c existed. Candidate associated if missing.');
             return EmailDecision.ASSOCIATED_TO_LEAD;
         }
 
         // Email Not Exist in SF -> Create email and associate
         Email__c newEmail = new Email__c(
             Email__c         = email,
-            Lead__c          = leadId,
             Candidate__c     = candidateId,
             Student__c       = (studentAccountId != null ? studentAccountId : null),
             Is_Primary__c    = true

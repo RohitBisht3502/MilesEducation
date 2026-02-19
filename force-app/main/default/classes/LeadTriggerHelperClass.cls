@@ -502,6 +502,7 @@ public static void validateCallLogBeforeStageChange(
         }
 
         Set<Id> candidateIds = new Set<Id>();
+        Set<Id> studentIds = new Set<Id>();
 
         for (Lead__c n : newLeads) {
             Lead__c o = oldMapLead.get(n.Id);
@@ -514,15 +515,31 @@ public static void validateCallLogBeforeStageChange(
             if (o.Candidate__c != null && n.Candidate__c != o.Candidate__c) {
                 candidateIds.add(o.Candidate__c);
             }
+
+            if (n.Student__c != null && n.Stage__c != o.Stage__c) {
+                studentIds.add(n.Student__c);
+            }
+
+            if (o.Student__c != null && n.Student__c != o.Student__c) {
+                studentIds.add(o.Student__c);
+            }
         }
 
         System.debug('updateHighestLevelOnCandidateWhenStageChanges => candidateIds size: ' + candidateIds.size() + ' ids: ' + candidateIds);
+        System.debug('updateHighestLevelOnCandidateWhenStageChanges => studentIds size: ' + studentIds.size() + ' ids: ' + studentIds);
 
         if (!candidateIds.isEmpty()) {
             System.debug('updateHighestLevelOnCandidateWhenStageChanges => calling CandidateHighestLevelUpdater');
             CandidateHighestLevelUpdater.updationOfHighestLevelOnCandidate(candidateIds);
         } else {
             System.debug('updateHighestLevelOnCandidateWhenStageChanges => no candidateIds to process');
+        }
+
+        if (!studentIds.isEmpty()) {
+            System.debug('updateHighestLevelOnCandidateWhenStageChanges => calling AccountHighestLevelUpdater');
+            AccountHighestLevelUpdater.updationOfHighestLevelOnAccount(studentIds);
+        } else {
+            System.debug('updateHighestLevelOnCandidateWhenStageChanges => no studentIds to process');
         }
 
         System.debug('updateHighestLevelOnCandidateWhenStageChanges => end');

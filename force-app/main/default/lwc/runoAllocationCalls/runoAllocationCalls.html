@@ -33,10 +33,33 @@
     <div class={eventTabClass} data-tab="event" onclick={handleTabClick}>
         Event History
     </div>
+    
+    <template if:true={showTagLead}>
+    <lightning-button 
+        label="Tag Lead"
+        variant="brand"
+        onclick={openTagLeadUI}>
+    </lightning-button>
+</template>
+
+
+
+
+
+
 
     <div class="view-more-wrap">
         <a onclick={handleViewMoreLead} class="view-more-link">View More</a>
     </div>
+
+  <template if:true={showTagLeadUI}>
+    <c-tag-lead-for-call-log
+        lead-id={recordId}
+        phone-number={identity.phone}>
+    </c-tag-lead-for-call-log>
+</template>
+
+
 
 </div>
 

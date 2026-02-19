@@ -249,6 +249,40 @@ public without sharing class CandidateTriggerHelperClass {
         }
     }
 
+    // Sync GP User from Candidate (Lead) to related Lead__c records
+    public static void syncGpUserToRelatedLeads(List<Lead> newLeads, Map<Id, Lead> oldLeadsMap) {
+        if (newLeads == null || newLeads.isEmpty() || oldLeadsMap == null) return;
+
+        Map<Id, Id> candidateToGp = new Map<Id, Id>();
+        for (Lead n : newLeads) {
+            Lead o = oldLeadsMap.get(n.Id);
+            if (o == null) continue;
+
+            if (n.GP_User__c != o.GP_User__c && n.GP_User__c != null) {
+                candidateToGp.put(n.Id, n.GP_User__c);
+            }
+        }
+
+        if (candidateToGp.isEmpty()) return;
+
+        List<Lead__c> leadsToUpdate = new List<Lead__c>();
+        for (Lead__c l : [
+            SELECT Id, Candidate__c, GP_SPOC__c
+            FROM Lead__c
+            WHERE Candidate__c IN :candidateToGp.keySet()
+        ]) {
+            Id gpId = candidateToGp.get(l.Candidate__c);
+            if (gpId != null && l.GP_SPOC__c != gpId) {
+                l.GP_SPOC__c = gpId;
+                leadsToUpdate.add(l);
+            }
+        }
+
+        if (!leadsToUpdate.isEmpty()) {
+            update leadsToUpdate;
+        }
+    }
+
     // Author: Dheeraj Kumar
     // Description: Create Bridge Course Leads  
     // Date: 2026-01-13 

@@ -1,0 +1,88 @@
+<template>
+    <lightning-quick-action-panel header={panelHeader} class="loan-panel">
+        <div class="panel-body">
+            <template if:true={isLoading}>
+                <div class="loading-row">
+                    <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+                    <span class="loading-text">Loading...</span>
+                </div>
+            </template>
+
+            <template if:true={errorMessage}>
+                <div class="slds-notify slds-notify_alert slds-theme_error slds-m-bottom_small" role="alert">
+                    <span class="slds-assistive-text">Error</span>
+                    <h2>{errorMessage}</h2>
+                </div>
+            </template>
+
+            <template if:true={isRecordTypeStep}>
+                <div class="record-type-card">
+                    <p class="record-type-title">Which loan do you want to apply?</p>
+                    <lightning-radio-group
+                        name="loanRecordType"
+                        label="Loan Type"
+                        options={recordTypeOptions}
+                        value={selectedRecordTypeId}
+                        type="radio"
+                        onchange={handleRecordTypeChange}>
+                    </lightning-radio-group>
+                </div>
+            </template>
+
+            <template if:true={isFormStep}>
+                <div class="required-note">* = Required Information</div>
+                <template if:true={noVisibleFields}>
+                    <div class="slds-notify slds-notify_alert slds-theme_warning slds-m-bottom_small" role="alert">
+                        <span class="slds-assistive-text">Warning</span>
+                        <h2>No visible fields. Check Field Set fields and FLS permissions.</h2>
+                    </div>
+                </template>
+
+                <lightning-record-edit-form
+                    object-api-name={loanObjectApiName}
+                    record-type-id={selectedRecordTypeId}
+                    onsubmit={handleSubmit}
+                    onsuccess={handleSuccess}
+                    onerror={handleError}>
+
+                    <template if:true={layoutSections}>
+                        <template for:each={layoutSections} for:item="section">
+                            <div key={section.key} class="section-block">
+                                <div class="section-title">{section.heading}</div>
+                                <div class="section-body">
+                                    <template for:each={section.rows} for:item="row">
+                                        <div key={row.key} class="slds-grid slds-wrap row-grid">
+                                            <template for:each={row.cols} for:item="col">
+                                                <div key={col.key} class="slds-col slds-size_1-of-2 slds-p-around_x-small">
+                                                    <template if:true={col.fieldApiName}>
+                                                        <lightning-input-field
+                                                            field-name={col.fieldApiName}
+                                                            value={col.prefillValue}
+                                                            disabled={col.disabled}>
+                                                        </lightning-input-field>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </template>
+                </lightning-record-edit-form>
+            </template>
+        </div>
+
+        <div slot="footer" class="footer-actions">
+            <template if:true={isRecordTypeStep}>
+                <lightning-button variant="neutral" label="Cancel" onclick={handleCancel}></lightning-button>
+                <lightning-button class="slds-m-left_small" variant="brand" label="Next" onclick={handleNext} disabled={disableNext}></lightning-button>
+            </template>
+
+            <template if:true={isFormStep}>
+                <lightning-button variant="neutral" label="Back" onclick={handleBack}></lightning-button>
+                <lightning-button class="slds-m-left_small" variant="brand" label="Save" onclick={handleSave} disabled={isSaving}></lightning-button>
+            </template>
+        </div>
+    </lightning-quick-action-panel>
+</template>

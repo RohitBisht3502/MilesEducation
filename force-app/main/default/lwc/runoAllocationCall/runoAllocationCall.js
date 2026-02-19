@@ -85,6 +85,9 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
 
     eventHistory = [];
 eventLoaded = false;
+courseValue = '';
+courseOptions = [];
+
 
 
     // call state
@@ -149,7 +152,10 @@ webinarLoaded = false;
         if (data) {
             this.identity = data;
             if (data.stage) this.stageValue = data.stage;
-            if (data.level) this.levelValue = data.level;
+            if (data.level) {
+    this.courseValue = data.level; 
+}
+
         } else if (error) {
             this.errorText = error?.body?.message || 'Failed to load identity';
         }
@@ -169,20 +175,34 @@ webinarLoaded = false;
         }
     }
 
-    @wire(getPicklistValuesByRecordType, {
-        objectApiName: LEAD_OBJECT,
-        recordTypeId: '$recordTypeId'
-    })
-    wiredStagePicklists({ data, error }) {
-        if (data && data.picklistFieldValues && data.picklistFieldValues.Stage__c) {
-            this.stageOptions = data.picklistFieldValues.Stage__c.values.map(v => ({
-                label: v.label,
-                value: v.value
-            }));
-        } else if (error) {
-            console.error('Stage picklist load failed:', error);
-        }
-    }
+//   @wire(getPicklistValuesByRecordType, {
+//     objectApiName: LEAD_OBJECT,
+//     recordTypeId: '$recordTypeId'
+// })
+// wiredPicklists({ data, error }) {
+//     if (data && data.picklistFieldValues) {
+
+//         // Stage
+//         if (data.picklistFieldValues.Stage__c) {
+//             this.stageOptions = data.picklistFieldValues.Stage__c.values.map(v => ({
+//                 label: v.label,
+//                 value: v.value
+//             }));
+//         }
+
+//         // Course (GLOBAL PICKLIST)
+//         if (data.picklistFieldValues.Course__c) {
+//             this.courseOptions = data.picklistFieldValues.Course__c.values.map(v => ({
+//                 label: v.label,
+//                 value: v.value
+//             }));
+//         }
+//     } 
+//     else if (error) {
+//         console.error('Picklist load failed:', error);
+//     }
+// }
+
     // -------------- PAGE REFERENCE (URL SAFE) --------------
 
     @wire(CurrentPageReference)
@@ -313,10 +333,30 @@ get formattedCreatedDate() {
         if (recId && (recId.length === 15 || recId.length === 18)) {
             this.recordId = recId;
             console.log('RecordId resolved from pageRef:', this.recordId);
-            this.loadStageLevel();
+          
             this.loadCallHistory();
         }
     }
+
+// async loadCourses() {
+//     try {
+//         const rows = await getCourses({ recordId: this.recordId });
+
+//         this.courseOptions = (rows || []).map(c => ({
+//             label: c.Name,
+//             value: c.Id   
+//         }));
+
+//     } catch (e) {
+//         console.error('Course load failed', e);
+//     }
+// }
+
+
+
+
+
+
 
 
     // --------------- LIFECYCLE -------------
@@ -326,7 +366,9 @@ get formattedCreatedDate() {
 
         this.resolveRecordIdFromPageRef();
         this.loadPicklists();
-        this.loadStageLevel();
+       
+           this.loadStageAndCourse(); 
+
         this.loadCallHistory();
         this.subscribeToEvents();
         onError(err => console.warn('EMP API Error:', JSON.stringify(err)));
@@ -339,6 +381,37 @@ get formattedCreatedDate() {
         }, 500);
     }
 
+
+
+    async loadStageAndCourse() {
+    try {
+        const data = await getStageLevelValues({ recordId: this.recordId });
+
+        if (data.stage) {
+            this.stageOptions = data.stage.map(v => ({
+                label: v,
+                value: v
+            }));
+        }
+
+        if (data.level) {
+            this.courseOptions = data.level.map(v => ({
+                label: v,
+                value: v
+            }));
+        }
+
+    } catch (e) {
+        console.error('Stage/Course load failed:', e);
+    }
+}
+
+
+
+
+handleCourseChange(e) {
+    this.courseValue = e.target.value;
+}
 
     disconnectedCallback() {
         this.stopTimer();
@@ -363,17 +436,17 @@ get formattedCreatedDate() {
         }
     }
 
-    async loadStageLevel() {
-        try {
-            const mapData = await getStageLevelValues({ recordId: this.recordId });
-            this.levelOptions = (mapData.level || []).map(v => ({
-                label: v,
-                value: v
-            }));
-        } catch (e) {
-            console.error('Stage/Level load failed:', e);
-        }
-    }
+    // async loadStageLevel() {
+    //     try {
+    //         const mapData = await getStageLevelValues({ recordId: this.recordId });
+    //         this.levelOptions = (mapData.level || []).map(v => ({
+    //             label: v,
+    //             value: v
+    //         }));
+    //     } catch (e) {
+    //         console.error('Stage/Level load failed:', e);
+    //     }
+    // }
 
 async loadEventHistory() {
     if (!this.recordId) return;
@@ -777,7 +850,8 @@ this.noResponseTimer = setTimeout(() => {
                 nextFollowUpDate: this.nextFollowUpDate,
                 l1: this.l1Value,
                 l2: this.l2Value,
-                level: this.levelValue,
+               level: this.courseValue,
+
                 notifyMe: false
             };
             if (this.stageValue && String(this.stageValue).trim()) {
@@ -797,6 +871,8 @@ this.noResponseTimer = setTimeout(() => {
             );
 
             this.clearFeedbackTimers();
+            payload.courseId = this.courseValue;
+
 
             this.showFeedback = false;
             this.disableCancel = true;
@@ -813,7 +889,8 @@ this.noResponseTimer = setTimeout(() => {
             this.nextFollowUpDate = null;
             sessionStorage.setItem('RUNO_REFRESH_ON_BACK', 'true');
 
-           this.dispatchEvent(new CloseActionScreenEvent());
+          this.navigateAfterSave();
+
                 // this.navigateAfterSave();
 
         } catch (e) {
@@ -853,41 +930,40 @@ this.noResponseTimer = setTimeout(() => {
         }
     }
 
-    navigateAfterSave() {
-        const state = this.pageRef?.state || {};
-        const recordIdFromUrl =
+navigateAfterSave() {
+    const state = this.pageRef?.state || {};
+
+    const recordIdFromUrl =
         state.c__recordId ||
         state.recordId ||
         state.id ||
         state.c__id;
 
-        // CASE 1: Opened from URL / Utility / Nav item
-        if (recordIdFromUrl) {
-            this[NavigationMixin.Navigate]({
-                type: 'standard__objectPage',
-                attributes: {
-                    objectApiName: 'Lead__c',
-                    actionName: 'list'
-                },
-                state: {
-                    filterName: 'All'
-                }
-            });
+    // CASE 1: Opened from URL / Nav / Utility
+    if (recordIdFromUrl) {
 
-            // 🔥 FORCE HARD RELOAD AFTER NAVIGATION
-            setTimeout(() => {
-                window.location.href = window.location.href;
-            }, 600);
-        }
-        // CASE 2: Opened as Quick Action
-        else {
-            this.dispatchEvent(new CloseActionScreenEvent());
+        this[NavigationMixin.Navigate]({
+            type: 'standard__objectPage',
+            attributes: {
+                objectApiName: 'Lead__c',
+                actionName: 'list'
+            },
+            state: {
+                filterName: 'Recent'
+            }
+        });
 
-            setTimeout(() => {
-                window.location.reload();
-            }, 300);
-        }
+        // force refresh
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
     }
+
+    // CASE 2: Opened as Quick Action
+    else {
+        this.dispatchEvent(new CloseActionScreenEvent());
+    }
+}
 
 
 

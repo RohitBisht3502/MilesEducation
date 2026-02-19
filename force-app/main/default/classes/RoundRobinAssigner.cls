@@ -45,7 +45,6 @@ public without sharing class RoundRobinAssigner {
 
         Map<String, Id> phoneSourceToUser = new Map<String, Id>();
         Map<String, Id> phoneToLeadOwner = new Map<String, Id>();
-        Map<String, Id> phoneToCourseEnrolledOwner = new Map<String, Id>();
         Datetime cutoff = System.now().addSeconds(-30);
 
         if (cfg.enableSticky && objectApiName != 'Lead__c' && !phones.isEmpty() && (cfg.ignoreSource || !sources.isEmpty())) {
@@ -81,19 +80,6 @@ public without sharing class RoundRobinAssigner {
                 if (rid != null) currentLeadIds.add(rid);
             }
 
-            List<Course_Enrolled__c> ceList = [
-                SELECT Phone__c, OwnerId
-                FROM Course_Enrolled__c
-                WHERE Phone__c IN :phones
-            ];
-            for (Course_Enrolled__c ce : ceList) {
-                if (String.isBlank(ce.Phone__c) || ce.OwnerId == null) continue;
-                String key = ce.Phone__c.trim();
-                if (!phoneToCourseEnrolledOwner.containsKey(key)) {
-                    phoneToCourseEnrolledOwner.put(key, ce.OwnerId);
-                }
-            }
-
             String leadSoql = 'SELECT Phone__c, OwnerId FROM Lead__c WHERE Phone__c IN :phones';
             if (!currentLeadIds.isEmpty()) {
                 leadSoql += ' AND Id NOT IN :currentLeadIds';
@@ -118,16 +104,10 @@ public without sharing class RoundRobinAssigner {
                 String phone = (phoneField != null) ? String.valueOf(s.get(phoneField)) : null;
                 if (!String.isBlank(phone)) {
                     String key = phone.trim();
-                    Id ceOwner = phoneToCourseEnrolledOwner.get(key);
-                    if (ceOwner != null) {
-                        setAssignee(s, cfg.assignToField, ceOwner);
+                    Id leadOwner = phoneToLeadOwner.get(key);
+                    if (leadOwner != null) {
+                        setAssignee(s, cfg.assignToField, leadOwner);
                         assigned = true;
-                    } else {
-                        Id leadOwner = phoneToLeadOwner.get(key);
-                        if (leadOwner != null) {
-                            setAssignee(s, cfg.assignToField, leadOwner);
-                            assigned = true;
-                        }
                     }
                 }
             }

@@ -8,7 +8,7 @@ public class LeadTriggerConversionClass {
         
         Set<Id> leadCIdsToProcess = new Set<Id>();
         Set<Id> candidateLeadIds = new Set<Id>();
-        Set<String> allowedRecordTypes = new Set<String>{ 'CPA', 'CMA', 'USP Pathway' };
+        Set<String> allowedRecordTypes = new Set<String>{ 'CPA', 'CMA', 'US Pathway' };
         
         for (Lead__c n : newLeads) {
             Lead__c o = oldMap != null ? oldMap.get(n.Id) : null;
@@ -53,7 +53,8 @@ public class LeadTriggerConversionClass {
         }
         
         Map<Id, Lead> candMap = new Map<Id, Lead>([
-            SELECT Id, Name, IsConverted, ConvertedAccountId, GP_User__c, OwnerId
+            SELECT Id, Name, IsConverted, ConvertedAccountId, GP_User__c, OwnerId,
+                   CPA_Level__c, CMA_Level__c, USP_Level__c, CAIRA_Level__c, Highest_Level__c
             FROM Lead
             WHERE Id IN :candidateLeadIds
         ]);
@@ -78,7 +79,14 @@ public class LeadTriggerConversionClass {
             lc.setConvertedStatus(convertedStatus);
             lc.setDoNotCreateOpportunity(true);
             
-            Account acc = new Account(Name = cand.Name);
+            Account acc = new Account(
+                Name = cand.Name,
+                CPA_Level__c = cand.CPA_Level__c,
+                CMA_Level__c = cand.CMA_Level__c,
+                USP_Level__c = cand.USP_Level__c,
+                CAIRA_Level__c = cand.CAIRA_Level__c,
+                Highest_Level__c = cand.Highest_Level__c
+            );
             insert acc;
             lc.setAccountId(acc.Id);
             
@@ -129,34 +137,27 @@ public class LeadTriggerConversionClass {
             System.debug('EXIT: candidateToAccount empty after conversion.');
             return;
         }
-        
-        Set<Id> studentAccountIds = new Set<Id>(candidateToAccount.values());
-        Set<String> studentCourseKeysHavingCourseEnrolled = new Set<String>();
 
-        Map<Id, Account> accMap = new Map<Id, Account>([
-            SELECT Id, OwnerId
-            FROM Account
-            WHERE Id IN :studentAccountIds
-        ]);
-        
-        List<Course_Enrolled__c> existingCE = [
-            SELECT Id, Student__c, Course__c
-            FROM Course_Enrolled__c
-            WHERE Student__c IN :studentAccountIds
-        ];
-        
-        for (Course_Enrolled__c ce : existingCE) {
-            if (ce.Student__c != null) {
-                studentCourseKeysHavingCourseEnrolled.add(
-                    buildStudentCourseKey(ce.Student__c, ce.Course__c)
-                );
-            }
+        List<Account> accLevelUpdates = new List<Account>();
+        for (Id candId : candidateToAccount.keySet()) {
+            Lead cand = candMap.get(candId);
+            Id accId = candidateToAccount.get(candId);
+            if (cand == null || accId == null) continue;
+            accLevelUpdates.add(new Account(
+                Id = accId,
+                CPA_Level__c = cand.CPA_Level__c,
+                CMA_Level__c = cand.CMA_Level__c,
+                USP_Level__c = cand.USP_Level__c,
+                CAIRA_Level__c = cand.CAIRA_Level__c,
+                Highest_Level__c = cand.Highest_Level__c
+            ));
+        }
+        if (!accLevelUpdates.isEmpty()) {
+            update accLevelUpdates;
         }
         
         List<Lead__c> leadCToUpdate = new List<Lead__c>();
-        List<Course_Enrolled__c> ceToInsert = new List<Course_Enrolled__c>();
         Map<Id, Id> leadToAccount = new Map<Id, Id>();
-        Map<String, Id> ceRecordTypeByName = getCourseRecordTypeIdsByName();
         
         for (Lead__c n : newLeads) {
             if (!leadCIdsToProcess.contains(n.Id)) {
@@ -167,50 +168,23 @@ public class LeadTriggerConversionClass {
             if (accId == null) {
                 continue;
             }
-            Account studentAcc = accMap.get(accId);
 
             String rtName = getLeadRecordTypeName(n.RecordTypeId);
             if (String.isBlank(rtName) || !allowedRecordTypes.contains(rtName)) {
                 continue;
             }
 
-            String courseValue = resolveCourseForLead(n, rtName);
-            
-            if (n.Student__c != accId) {
-                leadCToUpdate.add(new Lead__c(Id = n.Id, Student__c = accId));
+            String stageToSet = (rtName == 'US Pathway') ? 'U7+' : 'M7+';
+            Boolean needsStudentUpdate = (n.Student__c != accId);
+            Boolean needsStageUpdate = (n.Stage__c != stageToSet);
+
+            if (needsStudentUpdate || needsStageUpdate) {
+                Lead__c upd = new Lead__c(Id = n.Id);
+                if (needsStudentUpdate) upd.Student__c = accId;
+                if (needsStageUpdate) upd.Stage__c = stageToSet;
+                leadCToUpdate.add(upd);
             }
             leadToAccount.put(n.Id, accId);
-            
-            String studentCourseKey = buildStudentCourseKey(accId, courseValue);
-            if (!studentCourseKeysHavingCourseEnrolled.contains(studentCourseKey)) {
-                Course_Enrolled__c ce = new Course_Enrolled__c();
-                ce.Student__c = accId;
-                if (studentAcc != null && studentAcc.OwnerId != null) {
-                    ce.OwnerId = studentAcc.OwnerId;
-                }
-                ce.CC_Spoc__c = n.OwnerId;
-                ce.Source__c = n.Source__c;
-                ce.Phone__c = n.Phone__c;
-                ce.Course__c = courseValue;
-                ce.City__c = n.City__c;
-                ce.Course_Bucket__c = n.Course_Bucket__c;
-                Id ceRtId = ceRecordTypeByName.get(rtName);
-                if (ceRtId != null) {
-                    ce.RecordTypeId = ceRtId;
-                }
-                Lead candidateLead = candMap.get(n.Candidate__c);
-                if (candidateLead != null) {
-                    ce.GP_SPOC__c = candidateLead.GP_User__c != null
-                        ? candidateLead.GP_User__c
-                        : candidateLead.OwnerId;
-                }
-                ceToInsert.add(ce);
-                studentCourseKeysHavingCourseEnrolled.add(studentCourseKey);
-            }
-        }
-        
-        if (!ceToInsert.isEmpty()) {
-            insert ceToInsert;
         }
         
         if (!leadCToUpdate.isEmpty()) {
@@ -318,32 +292,9 @@ public class LeadTriggerConversionClass {
         return ls.MasterLabel;
     }
 
-    private static String buildStudentCourseKey(Id studentId, String course) {
-        return String.valueOf(studentId) + '|' + String.valueOf(course);
-    }
-
     private static String getLeadRecordTypeName(Id recordTypeId) {
         if (recordTypeId == null) return null;
         Schema.RecordTypeInfo rti = Schema.SObjectType.Lead__c.getRecordTypeInfosById().get(recordTypeId);
         return rti != null ? rti.getName() : null;
-    }
-
-    private static Map<String, Id> getCourseRecordTypeIdsByName() {
-        Map<String, Id> mapRt = new Map<String, Id>();
-        Map<String, Schema.RecordTypeInfo> byName = Schema.SObjectType.Course_Enrolled__c.getRecordTypeInfosByName();
-        for (String key : byName.keySet()) {
-            Schema.RecordTypeInfo rti = byName.get(key);
-            if (rti != null && rti.isAvailable()) {
-                mapRt.put(key, rti.getRecordTypeId());
-            }
-        }
-        return mapRt;
-    }
-
-    private static String resolveCourseForLead(Lead__c leadRec, String recordTypeName) {
-        if (leadRec != null && !String.isBlank(leadRec.Course__c)) {
-            return leadRec.Course__c;
-        }
-        return recordTypeName;
     }
 }

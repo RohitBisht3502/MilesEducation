@@ -9,9 +9,9 @@ public class WebinarController {
             SELECT Id, Name, Webinar_Id__c, Topic__c, Agenda__c, Start_Date_Time__c, End_Date_Time__c, Status__c
             FROM Webinar__c
             WHERE IsActive__c = TRUE
-                AND Status__c = 'Created'
+                AND Status__c IN ('Created', 'Started')
                 AND Start_Date_Time__c != null
-                AND Start_Date_Time__c >= :nowDt
+                // AND Start_Date_Time__c >= :nowDt
             ORDER BY Start_Date_Time__c DESC, Name ASC
             LIMIT 200
         ]) {
@@ -32,9 +32,9 @@ public class WebinarController {
                 SELECT Id, Name, Webinar_Id__c, Topic__c, Agenda__c, Start_Date_Time__c, End_Date_Time__c, Status__c
                 FROM Webinar__c
                 WHERE IsActive__c = TRUE
-                    AND Status__c = 'Created'
+                    AND Status__c IN ('Created', 'Started')
                     AND Start_Date_Time__c != null
-                    AND Start_Date_Time__c >= :nowDt
+                    // AND Start_Date_Time__c >= :nowDts
                 ORDER BY Start_Date_Time__c DESC, Name ASC
                 LIMIT 200
             ];
@@ -43,7 +43,7 @@ public class WebinarController {
                 SELECT Id, Name, Webinar_Id__c, Topic__c, Agenda__c, Start_Date_Time__c, End_Date_Time__c, Status__c
                 FROM Webinar__c
                 WHERE IsActive__c = TRUE
-                    AND Status__c = 'Created'
+                    AND Status__c IN ('Created', 'Started')
                     AND Start_Date_Time__c != null
                     AND Start_Date_Time__c >= :nowDt
                     AND (Name LIKE :key OR Webinar_Id__c LIKE :key)

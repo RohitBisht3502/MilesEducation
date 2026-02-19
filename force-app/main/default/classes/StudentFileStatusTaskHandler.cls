@@ -67,16 +67,16 @@ public class StudentFileStatusTaskHandler {
     }
 
     private static void createTasks(List<Student_File_Status__c> newList,Boolean isInsert, Map<Id, Student_File_Status__c> oldMap) {
-        Set<Id> courseIds = new Set<Id>();
+        Set<Id> leadIds = new Set<Id>();
         List<Student_File_Status__c> toProcess = new List<Student_File_Status__c>();
 
         for (Student_File_Status__c sfs : newList) {
-            if (sfs.Course_Enrolled__c == null) continue;
+            if (sfs.Lead__c == null) continue;
             if (String.isBlank(sfs.Status__c)) continue;
 
             if (isInsert) {
                 toProcess.add(sfs);
-                courseIds.add(sfs.Course_Enrolled__c);
+                leadIds.add(sfs.Lead__c);
                 continue;
             }
 
@@ -85,46 +85,46 @@ public class StudentFileStatusTaskHandler {
             if (sfs.Status__c == oldRec.Status__c) continue;
 
             toProcess.add(sfs);
-            courseIds.add(sfs.Course_Enrolled__c);
+            leadIds.add(sfs.Lead__c);
         }
 
         if (toProcess.isEmpty()) return;
 
-        completePreviousTasks(courseIds);
+        completePreviousTasks(leadIds);
 
-        Map<Id, Course_Enrolled__c> courseMap = new Map<Id, Course_Enrolled__c>([
-            SELECT Id, OwnerId, GP_Spoc__c, CC_Spoc__c FROM Course_Enrolled__c WHERE Id IN :courseIds
+        Map<Id, Lead__c> leadMap = new Map<Id, Lead__c>([
+            SELECT Id, OwnerId, GP_User__c FROM Lead__c WHERE Id IN :leadIds
         ]);
 
-        Map<String, Task> existingOpenByCourseAndSubject = new Map<String, Task>();
-        for (Task t : [SELECT Id, WhatId, Subject, Status FROM Task WHERE WhatId IN :courseIds AND Status != 'Completed']) {
-            existingOpenByCourseAndSubject.put(String.valueOf(t.WhatId) + '||' + norm(t.Subject), t);
+        Map<String, Task> existingOpenByLeadAndSubject = new Map<String, Task>();
+        for (Task t : [SELECT Id, WhatId, Subject, Status FROM Task WHERE WhatId IN :leadIds AND Status != 'Completed']) {
+            existingOpenByLeadAndSubject.put(String.valueOf(t.WhatId) + '||' + norm(t.Subject), t);
         }
 
         List<Task> toInsert = new List<Task>();
 
         for (Student_File_Status__c sfs : toProcess) {
-            Course_Enrolled__c ce = courseMap.get(sfs.Course_Enrolled__c);
-            if (ce == null) continue;
+            Lead__c ld = leadMap.get(sfs.Lead__c);
+            if (ld == null) continue;
 
             Rule r = RULES.get(keyOf(sfs.Level__c, sfs.File_Type__c, sfs.Status__c));
             if (r == null) continue;
 
             Id ownerId;
-            if (r.assigneeType == AssigneeType.SR_SPOC) ownerId = ce.OwnerId;
-            else if (r.assigneeType == AssigneeType.GP_SPOC) ownerId = ce.GP_Spoc__c;
-            else ownerId = ce.CC_Spoc__c;
+            if (r.assigneeType == AssigneeType.SR_SPOC) ownerId = ld.OwnerId;
+            else if (r.assigneeType == AssigneeType.GP_SPOC) ownerId = ld.GP_User__c;
+            else ownerId = ld.OwnerId;
 
             if (ownerId == null) continue;
 
-            String dupKey = String.valueOf(ce.Id) + '||' + norm(r.taskSubject);
-            if (existingOpenByCourseAndSubject.containsKey(dupKey)) continue;
+            String dupKey = String.valueOf(ld.Id) + '||' + norm(r.taskSubject);
+            if (existingOpenByLeadAndSubject.containsKey(dupKey)) continue;
 
             String source = isInsert ? 'insert' : 'update';
             Task t = new Task(
                 Subject      = r.taskSubject,
                 OwnerId      = ownerId,
-                WhatId       = ce.Id,
+                WhatId       = ld.Id,
                 ActivityDate = Date.today(),
                 Status       = 'Not Started',
                 Priority     = 'High',
@@ -134,20 +134,20 @@ public class StudentFileStatusTaskHandler {
             );
 
             toInsert.add(t);
-            existingOpenByCourseAndSubject.put(dupKey, t);
+            existingOpenByLeadAndSubject.put(dupKey, t);
         }
 
         if (!toInsert.isEmpty()) insert toInsert;
     }
 
-    private static void completePreviousTasks(Set<Id> courseIds) {
-        if (courseIds == null || courseIds.isEmpty()) return;
+    private static void completePreviousTasks(Set<Id> leadIds) {
+        if (leadIds == null || leadIds.isEmpty()) return;
 
         List<Task> taskToUpdate = new List<Task>();
         Set<Id> processedWhatIds = new Set<Id>();
 
         for (Task taskObj : [
-            SELECT Id, WhatId, Status FROM Task WHERE WhatId IN :courseIds AND Status != 'Completed' ORDER BY WhatId, CreatedDate DESC]) {
+            SELECT Id, WhatId, Status FROM Task WHERE WhatId IN :leadIds AND Status != 'Completed' ORDER BY WhatId, CreatedDate DESC]) {
             if (!processedWhatIds.contains(taskObj.WhatId)) {
                 taskObj.Status = 'Completed';
                 taskToUpdate.add(taskObj);

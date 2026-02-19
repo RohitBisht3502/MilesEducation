@@ -1,10 +1,6 @@
 @RestResource(urlMapping='/echo/*')
 global without sharing class EchoApi {
 
-    private static Boolean isLeadStage(String level) {
-        return new Set<String>{'M1','M2','M3','M3+','M3++','M4-','M4','M5','M6','M7'}.contains(level);
-    }
-
     @HttpPost
     global static void doPost() {
 
@@ -36,34 +32,17 @@ global without sharing class EchoApi {
                 return;
             }
 
-            if (isLeadStage(level)) {
+            Lead candidate = [SELECT Id FROM Lead WHERE UUID__c = :uuid LIMIT 1];
+            Lead__c lead = [SELECT Id, Stage__c FROM Lead__c WHERE Candidate__c = :candidate.Id AND Course__c = :program LIMIT 1];
 
-                Lead candidate = [SELECT Id FROM Lead WHERE UUID__c = :uuid LIMIT 1];
-                Lead__c lead = [SELECT Id, Stage__c FROM Lead__c WHERE Candidate__c = :candidate.Id AND Course__c = :program LIMIT 1];
+            System.debug('EchoApi leadStage => LeadId=' + candidate.Id + ', CandidateId=' + lead.Id + ', OldStage=' + lead.Stage__c);
 
-                System.debug('EchoApi leadStage => LeadId=' + candidate.Id + ', CandidateId=' + lead.Id + ', OldStage=' + lead.Stage__c);
+            lead.Stage__c = level;
+            update lead;
 
-                lead.Stage__c = level;
-                update lead;
+            System.debug('EchoApi leadStage => Updated Candidate Stage=' + level);
 
-                System.debug('EchoApi leadStage => Updated Candidate Stage=' + level);
-
-                createOrUpdateStudentFiles(payload, program, candidate.Id, lead.Id, null, null,level);
-
-            } else {
-
-                Account a = [SELECT Id FROM Account WHERE UUID__c = :uuid LIMIT 1];
-                Course_Enrolled__c ce = [SELECT Id, Stages__c FROM Course_Enrolled__c WHERE Student__c = :a.Id AND Course__c = :program LIMIT 1];
-
-                System.debug('EchoApi studentStage => AccountId=' + a.Id + ', CourseEnrolledId=' + ce.Id + ', OldStage=' + ce.Stages__c);
-
-                ce.Stages__c = level;
-                update ce;
-
-                System.debug('EchoApi studentStage => Updated CourseEnrolled Stage=' + level);
-
-                createOrUpdateStudentFiles(payload, program, null, null, a.Id, ce.Id,level);
-            }
+            createOrUpdateStudentFiles(payload, program, candidate.Id, lead.Id, level);
 
             resPayload = new Map<String, Object>{
                 'uuid' => uuid,
@@ -101,8 +80,6 @@ global without sharing class EchoApi {
         String program,
         Id candidateId,
         Id leadId,
-        Id accountId,
-        Id courseEnrolledId,
         String level
     ) {
         if (payload == null || !payload.containsKey('files_status') || payload.get('files_status') == null) {
@@ -134,23 +111,13 @@ global without sharing class EchoApi {
 
         List<Student_File_Status__c> existing;
 
-        if (leadId != null || candidateId != null) {
-            existing = [
-                SELECT Id, File_Type__c
-                FROM Student_File_Status__c
-                WHERE Course__c = :program
-                AND File_Type__c IN :fileTypes
-                AND (Lead__c = :leadId OR Candidate__c = :candidateId)
-            ];
-        } else {
-            existing = [
-                SELECT Id, File_Type__c
-                FROM Student_File_Status__c
-                WHERE Course__c = :program
-                AND File_Type__c IN :fileTypes
-                AND (Student__c = :accountId OR Course_Enrolled__c = :courseEnrolledId)
-            ];
-        }
+        existing = [
+            SELECT Id, File_Type__c
+            FROM Student_File_Status__c
+            WHERE Course__c = :program
+            AND File_Type__c IN :fileTypes
+            AND (Lead__c = :leadId OR Candidate__c = :candidateId)
+        ];
 
         System.debug('StudentFiles => existing found=' + existing.size());
 
@@ -176,8 +143,7 @@ global without sharing class EchoApi {
             rec.Level__c = level;
             rec.Lead__c = leadId;
             rec.Candidate__c = candidateId;
-            rec.Student__c = accountId;
-            rec.Course_Enrolled__c = courseEnrolledId;
+            // no-op: course enrolled removed
 
             if (fileTypeToId.containsKey(fileType)) {
                 rec.Id = fileTypeToId.get(fileType);

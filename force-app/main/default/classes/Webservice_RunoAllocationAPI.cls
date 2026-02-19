@@ -395,152 +395,213 @@ if (String.isBlank(customerName)) {
     insert callLog;
 }
 
+@AuraEnabled
+public static void updateCallFeedback1(
+    Id recordId,
+    String callId,
+    String feedback,
+    Datetime nextFollowUpDate,
+    String l1,
+    String l2,
+    String stage,
+    String level,
+    Boolean notifyMe
+) {
 
-    @AuraEnabled
-    public static void updateCallFeedback1(Id recordId, String callId, String feedback, Datetime nextFollowUpDate, String l1, String l2, String stage, String level ,   Boolean notifyMe  ) {
-        SObjectType sType;
-        Boolean isLead;
-        Boolean isCallLogRec;
-        Call_Log__c logRecord;
-        Id leadIdToUpdate;
+    if (String.isBlank(feedback)) {
+        return;
+    }
 
-        System.debug('UPDATE FB => RecordId:' + recordId + ' Call:' + callId);
+    SObjectType sType = recordId != null ? recordId.getSObjectType() : null;
+    Boolean isLead = (sType == Lead__c.SObjectType);
+    Boolean isCallLogRec = (sType == Call_Log__c.SObjectType);
 
-        if (String.isBlank(feedback)) {
-            return;
+    // 🔹 Find Call Log
+    Call_Log__c logRecord = findCallLog(recordId, callId);
+
+    if (logRecord == null) {
+        throw new AuraHandledException('No Call Log found for this record.');
+    }
+
+    if (l1 == 'Connected' && String.isBlank(stage)) {
+        throw new AuraHandledException('Stage is required when L1 is Connected.');
+    }
+
+    // =============================
+    // 🔹 Update Call Log
+    // =============================
+
+    logRecord.Feedback__c            = feedback;
+    logRecord.Next_Follow_Up_Date__c = nextFollowUpDate;
+    logRecord.L1__c                  = l1;
+    logRecord.L2__c                  = l2;
+    logRecord.Notify_Me__c           = notifyMe;
+    logRecord.Untracked__c           = false;
+
+    if (!String.isBlank(stage)) {
+        logRecord.Stage__c = stage;
+    }
+
+    // 🔹 Store Course in Call Log
+    if (!String.isBlank(level)) {
+        logRecord.Course__c = level;
+    }
+
+    update logRecord;
+
+    // =============================
+    // 🔹 Identify Related Lead
+    // =============================
+
+    Id leadIdToUpdate;
+
+    if (logRecord.Lead__c != null) {
+        leadIdToUpdate = logRecord.Lead__c;
+    } else if (isLead && recordId != null) {
+        leadIdToUpdate = recordId;
+    }
+
+    // =============================
+    // 🔹 Update Lead
+    // =============================
+
+    if (leadIdToUpdate != null) {
+
+        Lead__c leadUpdate = new Lead__c(
+            Id = leadIdToUpdate,
+            Next_Follow_Up_Date__c = nextFollowUpDate,
+            Notify_Me__c = notifyMe
+        );
+
+        // Update Stage
+        if (!String.isBlank(stage)) {
+            leadUpdate.Stage__c = stage;
         }
 
+        // Update Course + Record Type
+        if (!String.isBlank(level)) {
 
-        sType = recordId != null ? recordId.getSObjectType() : null;
-        isLead = (sType == Lead__c.SObjectType);
-        isCallLogRec = (sType == Call_Log__c.SObjectType);
-        leadIdToUpdate = null;
+            leadUpdate.Course__c = level;
 
-        logRecord = findCallLog(recordId, callId);
+            // Fetch matching Record Type
+            List<RecordType> rts = [
+                SELECT Id
+                FROM RecordType
+                WHERE SObjectType = 'Lead__c'
+                AND Name = :level
+                AND IsActive = true
+                LIMIT 1
+            ];
 
-        if (logRecord == null) {
-            throw new AuraHandledException('No Call Log found for this record.');
+            if (!rts.isEmpty()) {
+                leadUpdate.RecordTypeId = rts[0].Id;
+            }
         }
-        if (l1 == 'Connected' && String.isBlank(stage)) {
-    throw new AuraHandledException('Stage is required when L1 is Connected.');
+
+        update leadUpdate;
+    }
 }
 
 
-        logRecord.Feedback__c            = feedback;
-        logRecord.Next_Follow_Up_Date__c = nextFollowUpDate;
-        logRecord.L1__c                  = l1;
-        logRecord.L2__c                  = l2;
-        if (!String.isBlank(stage)) {
-            logRecord.Stage__c = stage;
-        }
-        logRecord.Notify_Me__c           = notifyMe;
-        logRecord.Untracked__c           = FALSE;
+    
+  @AuraEnabled
+public static void updateCallFeedback(String jsonBody) {
 
-        if (isCallLogRec) {
-            logRecord.Course__c = level;
-        }
+    CallFeedbackRequest request;
+    try {
+        request = (CallFeedbackRequest) JSON.deserialize(jsonBody, CallFeedbackRequest.class);
+    } catch (Exception e) {
+        throw new AuraHandledException('Invalid JSON format: ' + e.getMessage());
+    }
 
-        update logRecord;
+    if (request == null || String.isBlank(request.feedback)) {
+        return;
+    }
 
-        if (logRecord.Lead__c != null) {
-            leadIdToUpdate = logRecord.Lead__c;
-        } else if (isLead && recordId != null) {
-            leadIdToUpdate = recordId;
-        }
+    Id recordId = !String.isBlank(request.recordId) ? (Id)request.recordId : null;
+    String callId = request.callId;
 
-        if (leadIdToUpdate != null) {
-            Lead__c leadUpdate = new Lead__c(
-                Id = leadIdToUpdate,
-                Next_Follow_Up_Date__c = nextFollowUpDate,
-                Notify_Me__c = notifyMe
-            );
-            if (!String.isBlank(stage)) {
-                leadUpdate.Stage__c = stage;
-            }
-            update leadUpdate;
+    //  Find Call Log
+    Call_Log__c logRecord = findCallLog(recordId, callId);
+
+    if (logRecord == null) {
+        throw new AuraHandledException('No Call Log found for this record.');
+    }
+
+    //  Validation
+    if (request.l1 == 'Connected' && String.isBlank(request.stage)) {
+        throw new AuraHandledException('Stage is required when L1 is Connected.');
+    }
+
+    
+
+    logRecord.Feedback__c            = request.feedback;
+    logRecord.Next_Follow_Up_Date__c = request.nextFollowUpDate;
+    logRecord.L1__c                  = request.l1;
+    logRecord.L2__c                  = request.l2;
+    logRecord.Notify_Me__c           = request.notifyMe;
+    logRecord.Untracked__c           = false;
+
+    if (!String.isBlank(request.stage)) {
+        logRecord.Stage__c = request.stage;
+    }
+
+    if (!String.isBlank(request.level)) {
+        logRecord.Course__c = request.level;
+    }
+
+    update logRecord;
+
+    // =============================
+    // 🔹 Identify related Lead
+    // =============================
+
+    Id leadIdToUpdate;
+
+    if (logRecord.Lead__c != null) {
+        leadIdToUpdate = logRecord.Lead__c;
+    } else if (recordId != null && recordId.getSObjectType() == Lead__c.SObjectType) {
+        leadIdToUpdate = recordId;
+    }
+
+    if (leadIdToUpdate == null) return;
+
+    // =============================
+    // 🔹 Update Lead (ONCE)
+    // =============================
+
+    Lead__c leadUpdate = new Lead__c(
+        Id = leadIdToUpdate,
+        Next_Follow_Up_Date__c = request.nextFollowUpDate,
+        Notify_Me__c = request.notifyMe
+    );
+
+    if (!String.isBlank(request.stage)) {
+        leadUpdate.Stage__c = request.stage;
+    }
+
+    if (!String.isBlank(request.level)) {
+
+        leadUpdate.Course__c = request.level;
+
+        List<RecordType> rts = [
+            SELECT Id
+            FROM RecordType
+            WHERE SObjectType = 'Lead__c'
+            AND Name = :request.level
+            AND IsActive = true
+            LIMIT 1
+        ];
+
+        if (!rts.isEmpty()) {
+            leadUpdate.RecordTypeId = rts[0].Id;
         }
     }
 
-    @AuraEnabled
-    public static void updateCallFeedback(String jsonBody) {
-        CallFeedbackRequest request;
-        try {
-            request = (CallFeedbackRequest) JSON.deserialize(jsonBody, CallFeedbackRequest.class);
-            System.debug('request  >>> '+request);
-        } catch (Exception e) {
-            throw new AuraHandledException('Invalid JSON format: ' + e.getMessage());
-        }
+    update leadUpdate;
+}
 
-        Id recordId               = (request != null && !String.isBlank(request.recordId)) ? (Id)request.recordId : null;
-        String callId             = (request != null && !String.isBlank(request.callId)) ? request.callId : null;
-        String feedback           = (request != null && !String.isBlank(request.feedback)) ? request.feedback : null;
-        Datetime nextFollowUpDate = (request != null) ? request.nextFollowUpDate : null;
-        String l1                 = (request != null && !String.isBlank(request.l1)) ? request.l1 : null;
-        String l2                 = (request != null && !String.isBlank(request.l2)) ? request.l2 : null;
-       String stage = (request != null && !String.isBlank(request.stage))
-    ? request.stage
-    : null;
 
-        String level              = (request != null && !String.isBlank(request.level)) ? request.level : null;
-        Boolean notifyMe          = (request != null && request.notifyMe != null) ? request.notifyMe : false;
-
-        // Existing logic continues below...
-        SObjectType sType;
-        Boolean isLead;
-        Boolean isCallLogRec;
-        Call_Log__c logRecord;
-        Id leadIdToUpdate;
-
-        System.debug('UPDATE FB => RecordId:' + recordId + ' Call:' + callId);
-
-        if (String.isBlank(feedback)) {
-            return;
-        }
-
-        sType = recordId != null ? recordId.getSObjectType() : null;
-        isLead = (sType == Lead__c.SObjectType);
-        isCallLogRec = (sType == Call_Log__c.SObjectType);
-        leadIdToUpdate = null;
-
-        logRecord = findCallLog(recordId, callId);
-
-        if (logRecord == null) {
-            throw new AuraHandledException('No Call Log found for this record.');
-        }
-
-        logRecord.Feedback__c            = feedback;
-        logRecord.Next_Follow_Up_Date__c = nextFollowUpDate;
-        logRecord.L1__c                  = l1;
-        logRecord.L2__c                  = l2;
-        if (!String.isBlank(stage)) {
-            logRecord.Stage__c = stage;
-        }
-        logRecord.Notify_Me__c           = notifyMe;
-        logRecord.Untracked__c           = FALSE;
-        if (isCallLogRec) {
-            logRecord.Course__c = level;
-        }
-
-        update logRecord;
-
-        if (logRecord.Lead__c != null) {
-            leadIdToUpdate = logRecord.Lead__c;
-        } else if (isLead && recordId != null) {
-            leadIdToUpdate = recordId;
-        }
-
-        if (leadIdToUpdate != null) {
-            Lead__c leadUpdate = new Lead__c(
-                Id = leadIdToUpdate,
-                Next_Follow_Up_Date__c = nextFollowUpDate,
-                Notify_Me__c = notifyMe
-            );
-            if (!String.isBlank(stage)) {
-                leadUpdate.Stage__c = stage;
-            }
-            update leadUpdate;
-        }
-    }
 
 public static Call_Log__c findCallLog(Id recordId, String callId) {
 
@@ -640,10 +701,10 @@ public static Map<String, List<String>> getStageLevelValues(Id recordId) {
     return result;
 }
 
+
 private static List<String> getPicklistValues(Schema.SObjectField fieldRef) {
 
     List<String> values = new List<String>();
-
     Schema.DescribeFieldResult field = fieldRef.getDescribe();
 
     for (Schema.PicklistEntry pe : field.getPicklistValues()) {
@@ -651,9 +712,9 @@ private static List<String> getPicklistValues(Schema.SObjectField fieldRef) {
             values.add(pe.getLabel());
         }
     }
-
     return values;
 }
+
 
 
 // private static List<String> getPicklistValues(Schema.SObjectField fieldRef) {
