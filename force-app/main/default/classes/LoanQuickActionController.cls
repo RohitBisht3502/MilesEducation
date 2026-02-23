@@ -180,7 +180,7 @@ public with sharing class LoanQuickActionController {
                 ? loanLowerMap.get(key.toLowerCase())
                 : key;
             if (!loanFieldMap.containsKey(api)) continue;
-            loan.put(api, fields.get(key));
+            loan.put(api, coerceFieldValue(fields.get(key), loanFieldMap.get(api)));
         }
 
         if (leadId != null) {
@@ -253,6 +253,9 @@ public with sharing class LoanQuickActionController {
                 throw new AuraHandledException(vr.message);
             }
         }
+
+        // Call vendor API before insert. Throw if it fails.
+        Callout_CreationApiService.callAndPopulate(loan);
 
         insert loan;
         return loan.Id;
@@ -498,6 +501,41 @@ public with sharing class LoanQuickActionController {
         if (loanFieldMap.containsKey(loanFieldApi)) {
             prefill.put(loanFieldApi, value);
         }
+    }
+
+    private static Object coerceFieldValue(Object rawValue, Schema.SObjectField fieldRef) {
+        if (rawValue == null || fieldRef == null) return rawValue;
+        Schema.DescribeFieldResult d = fieldRef.getDescribe();
+        Schema.DisplayType t = d.getType();
+
+        if (rawValue instanceof String) {
+            String s = (String) rawValue;
+            if (String.isBlank(s)) return null;
+
+            try {
+                if (t == Schema.DisplayType.Currency
+                    || t == Schema.DisplayType.Double
+                    || t == Schema.DisplayType.Percent) {
+                    return Decimal.valueOf(s);
+                }
+                if (t == Schema.DisplayType.Integer) {
+                    return Integer.valueOf(s);
+                }
+                if (t == Schema.DisplayType.Boolean) {
+                    return s.equalsIgnoreCase('true');
+                }
+                if (t == Schema.DisplayType.Date) {
+                    return Date.valueOf(s);
+                }
+                if (t == Schema.DisplayType.DateTime) {
+                    return DateTime.valueOf(s);
+                }
+            } catch (Exception e) {
+                // Keep raw value if parsing fails to avoid hard error here.
+                return rawValue;
+            }
+        }
+        return rawValue;
     }
 
 }

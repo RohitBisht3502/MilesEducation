@@ -8,13 +8,6 @@
                 </div>
             </template>
 
-            <template if:true={errorMessage}>
-                <div class="slds-notify slds-notify_alert slds-theme_error slds-m-bottom_small" role="alert">
-                    <span class="slds-assistive-text">Error</span>
-                    <h2>{errorMessage}</h2>
-                </div>
-            </template>
-
             <template if:true={isRecordTypeStep}>
                 <div class="record-type-card">
                     <p class="record-type-title">Which loan do you want to apply?</p>
@@ -58,7 +51,9 @@
                                                         <lightning-input-field
                                                             field-name={col.fieldApiName}
                                                             value={col.prefillValue}
-                                                            disabled={col.disabled}>
+                                                            disabled={col.disabled}
+                                                            required={col.required}
+                                                            onchange={handleFieldChange}>
                                                         </lightning-input-field>
                                                     </template>
                                                 </div>

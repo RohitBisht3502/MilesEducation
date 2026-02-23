@@ -10,7 +10,7 @@ public without sharing class Callout_PurchaseOrderService {
     public class Request{
         public String source;
         public String sf_id;
-        public String sf_lead_id;
+        // public String sf_lead_id;
         public String uuid;
         public List<RequestItem> purchase_items;
         public Decimal down_payment;

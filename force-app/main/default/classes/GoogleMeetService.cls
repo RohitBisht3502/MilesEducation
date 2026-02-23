@@ -49,11 +49,24 @@ public without sharing class GoogleMeetService {
             attendeeEmails.add(ORG_MEETING_EMAIL);
         }
 
-        CreateResult result = createMeetEventInternal(ORG_MEETING_EMAIL, subject, description, startUtc, endUtc, timeZoneId, attendeeEmails );
+        String subjectFinal = subject;
+        if (String.isBlank(subjectFinal) && !String.isBlank(typeOfMeeting)) {
+            subjectFinal = typeOfMeeting;
+        }
+
+        String descriptionFinal = description;
+        if (String.isBlank(descriptionFinal)) {
+            List<String> parts = new List<String>();
+            if (!String.isBlank(meetingType)) parts.add(meetingType);
+            if (!String.isBlank(typeOfMeeting)) parts.add(typeOfMeeting);
+            if (!parts.isEmpty()) descriptionFinal = String.join(parts, ' - ');
+        }
+
+        CreateResult result = createMeetEventInternal(ORG_MEETING_EMAIL, subjectFinal, descriptionFinal, startUtc, endUtc, timeZoneId, attendeeEmails );
 
         Event ev = new Event();
-        ev.Subject       = subject;
-        ev.Description   = description;
+        ev.Subject       = subjectFinal;
+        ev.Description   = descriptionFinal;
         ev.StartDateTime = startUtc;
         ev.EndDateTime   = endUtc;
         ev.OwnerId       = UserInfo.getUserId();

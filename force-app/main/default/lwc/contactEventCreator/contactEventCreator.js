@@ -283,6 +283,7 @@ export default class ContactEventCreator extends LightningElement {
     handleMeetingTypeChange(event) {
         this.meetingType = event.detail.value;
         this.clearError();
+        this.updateSubjectAndDescription();
 
         if (!this.durationOptions.find(o => o.value === this.duration)) {
             this.duration = '45';
@@ -296,6 +297,21 @@ export default class ContactEventCreator extends LightningElement {
         this.updateEndDateTimeFromDuration();
     }
 
+    updateSubjectAndDescription() {
+        const mt = (this.meetingType || '').trim();
+        const tom = (this.typeOfMeeting || '').trim();
+
+        if (tom) {
+            this.subject = tom;
+        }
+
+        if (mt || tom) {
+            const parts = [];
+            if (mt) parts.push(mt);
+            if (tom) parts.push(tom);
+            this.description = parts.join(' - ');
+        }
+    }
     handleUserSelection(event) {
         this.selectedUser = event.detail.value;
         this.clearError();
@@ -416,6 +432,7 @@ export default class ContactEventCreator extends LightningElement {
     // ===== main save =====
     // ===== main save =====
     async createMeeting() {
+        this.updateSubjectAndDescription();
         if (!this.validateForm()) {
             return;
         }
@@ -626,6 +643,7 @@ export default class ContactEventCreator extends LightningElement {
         if (!this.showOtherTypeOfMeeting) {
             this.otherTypeOfMeeting = '';
         }
+        this.updateSubjectAndDescription();
         this.clearError();
     }
 

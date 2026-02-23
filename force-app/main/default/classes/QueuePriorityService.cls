@@ -9,8 +9,23 @@ public with sharing class QueuePriorityService {
                 return (pa < pb) ? -1 : 1;
             }
 
-            Datetime da = a.createdDate;
-            Datetime db = b.createdDate;
+            Integer tagRankA = primaryTagRank(a.primaryTag);
+            Integer tagRankB = primaryTagRank(b.primaryTag);
+            if (tagRankA != tagRankB) {
+                return (tagRankA < tagRankB) ? -1 : 1;
+            }
+
+            String seqA = String.isBlank(a.sequenceTag) ? null : a.sequenceTag.trim().toUpperCase();
+            String seqB = String.isBlank(b.sequenceTag) ? null : b.sequenceTag.trim().toUpperCase();
+
+            Boolean aTopNoFollowup = isTopNoFollowup(a);
+            Boolean bTopNoFollowup = isTopNoFollowup(b);
+            if (aTopNoFollowup != bTopNoFollowup) {
+                return aTopNoFollowup ? -1 : 1;
+            }
+
+            Datetime da = a.nextFollowUpDate;
+            Datetime db = b.nextFollowUpDate;
 
             if (da == null && db == null) return 0;
             if (da == null) return 1;
@@ -20,6 +35,16 @@ public with sharing class QueuePriorityService {
             Long tb = db.getTime();
 
             if (ta == tb) return 0;
+
+            if (seqA != null && seqA == seqB) {
+                if (seqA == 'ASCENDING') {
+                    return (ta < tb) ? -1 : 1;
+                }
+                if (seqA == 'DESCENDING') {
+                    return (ta > tb) ? -1 : 1;
+                }
+            }
+
             return (ta > tb) ? -1 : 1;
         }
     }
@@ -54,7 +79,8 @@ public with sharing class QueuePriorityService {
                    Course_Tag__c,
                    Primary_tag__c,
                    Role_tag__c,
-                   Source_Tag__c
+                   Source_Tag__c,
+                   Sequence_Tag__c
             FROM Queue_Priority_Matrix__c
             WHERE Levels__c != null
               AND Queue_Priority__c != null
@@ -82,6 +108,7 @@ public with sharing class QueuePriorityService {
             Integer bestPriority;
             Integer bestScore = -1;
             Id bestRowId;
+            String bestSequenceTag;
 
             if (dtoRole == null || (!matrixRoles.isEmpty() && !matrixRoles.contains(dtoRole))) {
                 System.debug(
@@ -161,10 +188,12 @@ public with sharing class QueuePriorityService {
                     bestPriority = q;
                     bestScore = score;
                     bestRowId = row.Id;
+                    bestSequenceTag = row.Sequence_Tag__c;
                 }
             }
 
             dto.priority = bestPriority;
+            dto.sequenceTag = bestSequenceTag;
             System.debug(
                 'QueuePriorityService.assignPriorities: dtoId=' + dto.id +
                 ', primary=' + dtoPrimary +
@@ -206,5 +235,19 @@ public with sharing class QueuePriorityService {
         }
         System.debug('QueuePriorityService.parseMultiPicklistWithAll: value=' + value + ', parsedWithAll=' + base);
         return base;
+    }
+
+    private static Integer primaryTagRank(String primaryTag) {
+        if (String.isBlank(primaryTag)) return 99;
+        String t = primaryTag.trim().toUpperCase();
+        if (t == 'MISSED CALLS') return 0;
+        if (t == 'UNTRACKED CALLS') return 1;
+        return 50;
+    }
+
+    private static Boolean isTopNoFollowup(LeadQueueItemDTO dto) {
+        if (dto == null || dto.nextFollowUpDate != null) return false;
+        String t = String.isBlank(dto.primaryTag) ? null : dto.primaryTag.trim().toUpperCase();
+        return t == 'MISSED CALLS' || t == 'UNTRACKED CALLS';
     }
 }

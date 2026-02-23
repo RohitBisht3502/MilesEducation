@@ -15,7 +15,7 @@ public without sharing class EventApprovalEmailInvocable {
 
     @InvocableMethod(
         label='Send Event Approval Email + Notification (Manager)'
-        description='Loads template by DeveloperName, replaces tokens, and sends email + custom notification to the lead owner manager. ReviewUrl auto-built from Event Id.'
+        description='Loads template by DeveloperName, replaces tokens, and sends email +  notification.'
     )
     public static List<Result> send(List<Request> requests) {
 
@@ -40,10 +40,28 @@ public without sharing class EventApprovalEmailInvocable {
         }
 
         Map<Id, Event> evMap = new Map<Id, Event>([
-            SELECT Id, Subject, StartDateTime, EndDateTime, Location, Description, WhoId, WhatId
+            SELECT Id, Subject, StartDateTime, EndDateTime, Location, Description, WhoId, WhatId, OwnerId, Approval_Status__c
             FROM Event
             WHERE Id IN :eventIds
         ]);
+        
+        // Collect Event Owner Ids
+        Set<Id> eventOwnerIds = new Set<Id>();
+        for (Event e : evMap.values()) {
+            if (e.OwnerId != null) {
+                eventOwnerIds.add(e.OwnerId);
+            }
+        }
+        
+        // Query Event Owners
+        Map<Id, User> eventOwnerMap = eventOwnerIds.isEmpty()
+            ? new Map<Id, User>()
+            : new Map<Id, User>([
+                SELECT Id, Name, Email
+                FROM User
+                WHERE Id IN :eventOwnerIds
+            ]);
+
 
         for (Event ev : evMap.values()) {
             if (ev.WhatId != null) {
@@ -116,6 +134,81 @@ public without sharing class EventApprovalEmailInvocable {
                     out.success = false; out.message = 'Event not found: ' + r.eventId;
                     results.add(out); continue;
                 }
+                
+                User eventOwner = eventOwnerMap.get(ev.OwnerId);
+                String eventOwnerName = eventOwner != null ? eventOwner.Name : '';
+
+                String reviewUrl = URL.getOrgDomainUrl().toExternalForm()
+                        + '/lightning/r/Event/' + ev.Id + '/view';
+                
+                // ======================================================
+                // SEND EMAIL + NOTIFICATION TO EVENT OWNER (APPROVED / REJECTED)
+                // ======================================================
+                
+                if (ev.OwnerId != null && (ev.Approval_Status__c == 'Approved' || ev.Approval_Status__c == 'Rejected') &&
+                    eventOwner != null &&
+                    !String.isBlank(eventOwner.Email)) {
+                
+                    EmailTemplate statusTemplate = [
+                        SELECT Id, Subject, HtmlValue, Body
+                        FROM EmailTemplate
+                        WHERE DeveloperName = :(
+                            ev.Approval_Status__c == 'Approved'
+                            ? 'Event_Approval_Email_Template'
+                            : 'Event_Rejection_Email_Template'
+                        )
+                        LIMIT 1
+                    ];
+                
+                    //User eventOwner = eventOwnerMap.get(ev.OwnerId);
+
+                
+                    if (!String.isBlank(eventOwner.Email)) {
+                
+                        String reviewUrlOwner = URL.getOrgDomainUrl().toExternalForm()
+                            + '/lightning/r/Event/' + ev.Id + '/view';
+                
+                        String subjectOwner = statusTemplate.Subject;
+                        String htmlBodyOwner = statusTemplate.HtmlValue;
+                        String textBodyOwner = statusTemplate.Body;
+                        
+                        //String eventOwnerName = eventOwner != null ? eventOwner.Name : '';
+                
+                        //subjectOwner = replaceTokens(subjectOwner, ev, reviewUrlOwner, '', currentUserName);
+                        subjectOwner = replaceTokens(subjectOwner, ev, reviewUrlOwner, '', currentUserName, eventOwnerName);
+                
+                        if (!String.isBlank(htmlBodyOwner)) {
+                            htmlBodyOwner = replaceTokens(htmlBodyOwner, ev, reviewUrlOwner, '', currentUserName, eventOwnerName);
+                        }
+                
+                        if (!String.isBlank(textBodyOwner)) {
+                            textBodyOwner = replaceTokens(textBodyOwner, ev, reviewUrlOwner, '', currentUserName, eventOwnerName);
+                        }
+                
+                        Messaging.SingleEmailMessage ownerMail = new Messaging.SingleEmailMessage();
+                        ownerMail.setToAddresses(new List<String>{ eventOwner.Email });
+                        ownerMail.setSubject(subjectOwner);
+                
+                        if (!String.isBlank(htmlBodyOwner)) {
+                            ownerMail.setHtmlBody(htmlBodyOwner);
+                        } else {
+                            ownerMail.setPlainTextBody(textBodyOwner);
+                        }
+                
+                        ownerMail.setSaveAsActivity(false);
+                        mails.add(ownerMail);
+                
+                        // Custom Notification for Event Owner
+                        String ownerNotifTitle = 'Event ' + ev.Approval_Status__c;
+                        String ownerNotifBody = 'Your event "' + ev.Subject +
+                            '" has been ' + ev.Approval_Status__c + '. Click to review details.';
+                
+                        pendingNotifs.add(
+                            new PendingNotification(ev.OwnerId, ev.Id, ownerNotifTitle, ownerNotifBody)
+                        );
+                    }
+                }
+
 
                 Lead__c leadRec = (r.leadId != null) ? leadMap.get(r.leadId) : null;
                 if (leadRec == null && ev.WhatId != null) {
@@ -151,20 +244,20 @@ public without sharing class EventApprovalEmailInvocable {
                     leadName = leadRec.Name;
                 }
 
-                String reviewUrl = URL.getOrgDomainUrl().toExternalForm()
-                    + '/lightning/r/Event/' + ev.Id + '/view';
+                //String reviewUrl = URL.getOrgDomainUrl().toExternalForm()
+                  //  + '/lightning/r/Event/' + ev.Id + '/view';
 
                 String subject = tmpl.Subject;
                 String htmlBody = tmpl.HtmlValue;
                 String textBody = tmpl.Body;
 
-                subject = replaceTokens(subject, ev, reviewUrl, leadName, currentUserName);
+                subject = replaceTokens(subject, ev, reviewUrl, leadName, currentUserName, eventOwnerName);
 
                 if (!String.isBlank(htmlBody)) {
-                    htmlBody = replaceTokens(htmlBody, ev, reviewUrl, leadName, currentUserName);
+                    htmlBody = replaceTokens(htmlBody, ev, reviewUrl, leadName, currentUserName, eventOwnerName);
                 }
                 if (!String.isBlank(textBody)) {
-                    textBody = replaceTokens(textBody, ev, reviewUrl, leadName, currentUserName);
+                    textBody = replaceTokens(textBody, ev, reviewUrl, leadName, currentUserName, eventOwnerName);
                 }
 
                 Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
@@ -244,7 +337,7 @@ public without sharing class EventApprovalEmailInvocable {
         }
     }
 
-    private static String replaceTokens(String input, Event ev, String reviewUrl, String leadName, String currentUserName) {
+    private static String replaceTokens(String input, Event ev, String reviewUrl, String leadName, String currentUserName, String eventOwnerName) {
         if (String.isBlank(input)) return input;
 
         String startStr = (ev.StartDateTime != null) ? String.valueOf(ev.StartDateTime) : '';
@@ -263,6 +356,8 @@ public without sharing class EventApprovalEmailInvocable {
         input = input.replace('{!CurrentUserName}', String.isBlank(currentUserName) ? '' : currentUserName);
 
         input = input.replace('{ReviewUrl}', reviewUrl);
+        input = input.replace('{!Event.OwnerName}', String.isBlank(eventOwnerName) ? '' : eventOwnerName);
+
 
         return input;
     }

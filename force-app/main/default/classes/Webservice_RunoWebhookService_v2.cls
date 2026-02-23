@@ -45,12 +45,19 @@ global without sharing class Webservice_RunoWebhookService_v2 {
             wrapperObj.userPhone = formatPhoneNo(wrapperObj.userPhone);
             wrapperObj.phoneNumber = formatPhoneNo(wrapperObj.phoneNumber);
 
+            Phone_Number__c phoneMatch;
+            List<Phone_Number__c> phoneMatches = [
+                SELECT Id, Candidate__c, Student__c FROM Phone_Number__c WHERE Phone__c LIKE :('%' + wrapperObj.phoneNumber) ORDER BY CreatedDate DESC LIMIT 1];
+            if (!phoneMatches.isEmpty()) {
+                phoneMatch = phoneMatches[0];
+            }
+
             if (wrapperObj.type == 'outgoing') {
 
                 Call_Log__c baseLog;
 
                 List<Call_Log__c> inProgress = [
-                    SELECT Id, Lead__c, Untracked__c  FROM Call_Log__c WHERE User_Phone__c LIKE :('%' + wrapperObj.userPhone) 
+                    SELECT Id, Candidate__c, Student__c, Untracked__c  FROM Call_Log__c WHERE User_Phone__c LIKE :('%' + wrapperObj.userPhone) 
                     AND Phone_Number__c LIKE :('%' + wrapperObj.phoneNumber) 
                     AND Status__c = 'In Progress' 
                     ORDER BY CreatedDate DESC LIMIT 1];
@@ -59,7 +66,7 @@ global without sharing class Webservice_RunoWebhookService_v2 {
                     baseLog = inProgress[0];
                 } else {
                     List<Call_Log__c> untracked = [
-                        SELECT Id, Lead__c, Untracked__c  FROM Call_Log__c WHERE User_Phone__c LIKE :('%' + wrapperObj.userPhone)
+                        SELECT Id, Candidate__c, Student__c, Untracked__c  FROM Call_Log__c WHERE User_Phone__c LIKE :('%' + wrapperObj.userPhone)
                         AND Phone_Number__c LIKE :('%' + wrapperObj.phoneNumber)
                         AND Untracked__c = TRUE
                         ORDER BY CreatedDate DESC
@@ -72,19 +79,23 @@ global without sharing class Webservice_RunoWebhookService_v2 {
 
                 if (baseLog != null) {
                     callLogObj.Id = baseLog.Id;
-                    callLogObj.Lead__c = baseLog.Lead__c;
+                    callLogObj.Candidate__c = baseLog.Candidate__c;
+                    callLogObj.Student__c = baseLog.Student__c;
                     if (baseLog.Untracked__c) callLogObj.Untracked__c = true;
+                }
+
+                if (phoneMatch != null) {
+                    if (callLogObj.Candidate__c == null) callLogObj.Candidate__c = phoneMatch.Candidate__c;
+                    if (callLogObj.Student__c == null) callLogObj.Student__c = phoneMatch.Student__c;
                 }
 
                 callLogObj = populateCallLogRecord(callLogObj, wrapperObj);
 
             } else {
 
-                List<Lead__c> existingLeads = [
-                    SELECT Id  FROM Lead__c  WHERE Phone__c LIKE :('%' + wrapperObj.phoneNumber) ORDER BY CreatedDate DESC LIMIT 1];
-
-                if (!existingLeads.isEmpty()) {
-                    callLogObj.Lead__c = existingLeads[0].Id;
+                if (phoneMatch != null) {
+                    callLogObj.Candidate__c = phoneMatch.Candidate__c;
+                    callLogObj.Student__c = phoneMatch.Student__c;
                 } else {
                     callLogObj.Untracked__c = true;
                 }

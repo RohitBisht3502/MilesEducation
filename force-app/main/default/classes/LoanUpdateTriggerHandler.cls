@@ -312,7 +312,7 @@ public class LoanUpdateTriggerHandler {
                             if (ok instanceof Boolean && (Boolean) ok && data != null) {
                                 loan.miles_loan_code__c = (String) data.get('miles_loan_code');
                                 loan.application_id__c = (String) data.get('application_id');
-                                loan.loan_status__c = (String) data.get('loan_status');
+                                // loan.loan_status__c = (String) data.get('loan_status');
                                 loan.redirection_url__c = (String) data.get('redirection_url');
                                 loansToUpdate.add(loan);
                             }

@@ -22,12 +22,6 @@ public without sharing class LoanTriggerFrameworkHandler extends BaseTriggerHand
     }
 
     public override void afterInsert() {
-        List<Id> loanIds = new List<Id>();
-        for (Loan__c l : getNewLoans()) {
-            loanIds.add(l.Id);
-        }
-        if (!loanIds.isEmpty()) {
-            LoanUpdateTriggerHandler.loanUpdate(loanIds);
-        }
+        // Loan vendor API is now called before insert from Quick Action.
     }
 }

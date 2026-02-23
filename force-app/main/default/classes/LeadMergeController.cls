@@ -366,6 +366,6 @@ public without sharing class LeadMergeController {
             return new List<Id>(managerIds)[0];
         }
 
-        return '005C1000005OqaTIAS';
+        return '005C1000005Qn8fIAC';
     }
 }

@@ -17,7 +17,20 @@ const EXCLUDED_FIELDS = new Set([
 ]);
 
 export default class LoanCreateFromLead extends LightningElement {
-    @api recordId;
+    _recordId;
+    _initLoaded = false;
+
+    @api
+    get recordId() {
+        return this._recordId;
+    }
+    set recordId(value) {
+        this._recordId = value;
+        if (this._recordId && !this._initLoaded) {
+            this._initLoaded = true;
+            this.loadInitData();
+        }
+    }
 
     @track recordTypeOptions = [];
     @track layoutSections = [];
@@ -36,6 +49,7 @@ export default class LoanCreateFromLead extends LightningElement {
     prefillValues = {};
     prefillValuesLower = {};
     prefillApplied = false;
+    formValues = {};
 
     candidateFieldApi;
     courseFieldApi;
@@ -66,9 +80,7 @@ export default class LoanCreateFromLead extends LightningElement {
         return !this.selectedRecordTypeId;
     }
 
-    connectedCallback() {
-        this.loadInitData();
-    }
+    connectedCallback() {}
 
     renderedCallback() {
         if (!this.isFormStep || this.prefillApplied) return;
@@ -87,12 +99,14 @@ export default class LoanCreateFromLead extends LightningElement {
             if (value === undefined || value === null) return;
             if (input.value === undefined || input.value === null || input.value === '') {
                 input.value = value;
+                this.formValues[apiName.toLowerCase()] = value;
             }
         });
 
         this.prefillApplied = true;
         const visibleFields = Array.from(inputs).filter((i) => i.fieldName);
         this.noVisibleFields = visibleFields.length === 0;
+        this.updateRequiredFlags();
     }
 
     loadInitData() {
@@ -125,6 +139,7 @@ export default class LoanCreateFromLead extends LightningElement {
         const match = this.recordTypeOptions.find((opt) => opt.value === this.selectedRecordTypeId);
         this.selectedRecordTypeLabel = match ? match.label : 'New Loan';
         this.selectedRecordTypeDevName = match ? match.developerName : null;
+        this.updateRequiredFlags();
     }
 
     handleNext() {
@@ -133,6 +148,7 @@ export default class LoanCreateFromLead extends LightningElement {
         this.noVisibleFields = false;
         this.prefillApplied = false;
         this.step = 'form';
+        this.updateRequiredFlags();
     }
 
     handleBack() {
@@ -141,6 +157,7 @@ export default class LoanCreateFromLead extends LightningElement {
         this.noVisibleFields = false;
         this.layoutSections = [];
         this.prefillApplied = false;
+        this.formValues = {};
     }
 
     handleSave() {
@@ -171,6 +188,13 @@ export default class LoanCreateFromLead extends LightningElement {
     handleError(event) {
         this.isSaving = false;
         this.errorMessage = this.reduceErrors(event.detail);
+        this.dispatchEvent(
+            new ShowToastEvent({
+                title: 'Error',
+                message: this.errorMessage,
+                variant: 'error'
+            })
+        );
     }
 
     handleCancel() {
@@ -325,11 +349,12 @@ export default class LoanCreateFromLead extends LightningElement {
             const rows = (section.rows || []).map((row) => {
                 const cols = (row.cols || []).map((col) => {
                     if (!col || !col.fieldApiName) {
-                        return { ...col, prefillValue: undefined };
+                        return { ...col, prefillValue: undefined, required: false };
                     }
                     return {
                         ...col,
-                        prefillValue: this.resolvePrefillValue(col.fieldApiName)
+                        prefillValue: this.resolvePrefillValue(col.fieldApiName),
+                        required: this.isFieldRequired(col.fieldApiName)
                     };
                 });
                 return { ...row, cols };
@@ -355,7 +380,103 @@ export default class LoanCreateFromLead extends LightningElement {
 
     isFieldDisabled(apiName) {
         if (!apiName) return false;
+        if (apiName === 'Loan_Provider__c') return true;
         return this.candidateFieldApi && apiName === this.candidateFieldApi;
+    }
+
+    handleFieldChange(event) {
+        const apiName = event.target.fieldName;
+        if (!apiName) return;
+        const key = apiName.toLowerCase();
+        this.formValues[key] = event.target.value;
+        this.updateRequiredFlags();
+    }
+
+    updateRequiredFlags() {
+        if (!this.layoutSections || this.layoutSections.length === 0) return;
+        this.layoutSections = this.layoutSections.map((section) => {
+            const rows = (section.rows || []).map((row) => {
+                const cols = (row.cols || []).map((col) => {
+                    if (!col || !col.fieldApiName) return { ...col, required: false };
+                    return { ...col, required: this.isFieldRequired(col.fieldApiName) };
+                });
+                return { ...row, cols };
+            });
+            return { ...section, rows };
+        });
+    }
+
+    isFieldRequired(apiName) {
+        if (!apiName) return false;
+        const key = apiName.toLowerCase();
+        const provider = (this.selectedRecordTypeDevName || '').toUpperCase();
+        const v = this.formValues || {};
+
+        const commonRequired = new Set([
+            'program_name__c',
+            'first_name__c',
+            'email__c',
+            'mobile__c',
+            'amount_requested__c',
+            'tenure__c'
+        ]);
+        if (commonRequired.has(key)) return true;
+
+        if (provider === 'PROPELLD') {
+            return false;
+        }
+
+        if (provider === 'AVANSE') {
+            const permanentRequired = new Set([
+                'permanent_flat_no__c',
+                'permanent_street__c',
+                'permanent_land_mark__c',
+                'permanent_pincode__c'
+            ]);
+            if (permanentRequired.has(key)) return true;
+
+            const sameAsPermanent = v['current_address_same_as_permanent__c'] === true
+                || v['current_address_same_as_permanent__c'] === 'true'
+                || v['current_address_same_as_permanent__c'] === 'True';
+            if (!sameAsPermanent) {
+                const currentRequired = new Set([
+                    'flat_no__c',
+                    'street__c',
+                    'land_mark__c',
+                    'pincode__c'
+                ]);
+                if (currentRequired.has(key)) return true;
+            }
+
+            if (key === 'applying_loan_for__c') return true;
+            if (key === 'relationship_with_applicant__c') {
+                return v['applying_loan_for__c'] === 'OTHER';
+            }
+
+            if (key === 'earning_status__c') return true;
+            const earning = v['earning_status__c'] === 'Earning' || v['earning_status__c'] === '1';
+            if (earning && (key === 'occupation_type__c' || key === 'monthly_income__c')) {
+                return true;
+            }
+
+            if (key === 'marital_status__c' || key === 'gender__c') return true;
+            return false;
+        }
+
+        if (provider === 'AKSHAR') {
+            const aksharRequired = new Set([
+                'pan_number__c',
+                'date_of_birth__c',
+                'flat_no__c',
+                'street__c',
+                'city__c',
+                'state__c',
+                'pincode__c'
+            ]);
+            return aksharRequired.has(key);
+        }
+
+        return false;
     }
 
     saveViaApex(inputs) {
@@ -388,6 +509,13 @@ export default class LoanCreateFromLead extends LightningElement {
             .catch((error) => {
                 this.isSaving = false;
                 this.errorMessage = this.reduceErrors(error);
+                this.dispatchEvent(
+                    new ShowToastEvent({
+                        title: 'Error',
+                        message: this.errorMessage,
+                        variant: 'error'
+                    })
+                );
             });
     }
 }

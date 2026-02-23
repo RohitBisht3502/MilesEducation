@@ -2,19 +2,18 @@ public without sharing class TagLeadController {
 
     @AuraEnabled(cacheable=true)
     public static List<Lead__c> searchLeads(String keyword) {
-        // Search by Name, Phone, or Candidate ID from standard Lead
         List<Lead__c> results = new List<Lead__c>();
         
-        // First, search custom leads directly by Name or Phone
         results = [
-            SELECT Id, Name, Email__c, Phone__c, Owner.Name
+            SELECT Id, Name, Email__c, Phone__c, Owner.Name, Course__c, Candidate__c, Candidate__r.Name, Candidate__r.Candidate_ID__c
             FROM Lead__c
             WHERE (Name LIKE :('%' + keyword + '%')
-                OR Phone__c LIKE :('%' + keyword + '%'))
+                OR Phone__c LIKE :('%' + keyword + '%')
+                OR Candidate__r.Name LIKE :('%' + keyword + '%')
+                OR Candidate__r.Candidate_ID__c LIKE :('%' + keyword + '%'))
             LIMIT 10
         ];
         
-        // If no results, search by Candidate ID in standard Lead
         if (results.isEmpty()) {
             List<Lead> standardLeads = [
                 SELECT Id, Candidate_ID__c
@@ -29,9 +28,8 @@ public without sharing class TagLeadController {
                     standardLeadIds.add(stdLead.Id);
                 }
                 
-                // Find custom leads linked to these standard leads
                 results = [
-                    SELECT Id, Name, Email__c, Phone__c, Owner.Name
+                    SELECT Id, Name, Email__c, Phone__c, Owner.Name, Course__c, Candidate__c, Candidate__r.Name, Candidate__r.Candidate_ID__c
                     FROM Lead__c
                     WHERE Candidate__c IN :standardLeadIds
                     LIMIT 10
@@ -58,7 +56,6 @@ public without sharing class TagLeadController {
     ) {
         Lead__c customLeadRecord;
         
-        // Get Call Log phone number
         Call_Log__c callLog = [
             SELECT Id, Phone_Number__c
             FROM Call_Log__c
@@ -67,10 +64,8 @@ public without sharing class TagLeadController {
         ];
 
         if (leadId != null) {
-            // Tagging existing lead
             customLeadRecord = [SELECT Id, Candidate__c FROM Lead__c WHERE Id = :leadId LIMIT 1];
             
-            // Update Call Log with Lead, L1, L2, and Feedback values
             callLog.Lead__c = customLeadRecord.Id;
             callLog.Candidate__c = customLeadRecord.Candidate__c;
             callLog.L1__c = l1;
@@ -84,27 +79,21 @@ public without sharing class TagLeadController {
                 update callLog;
             }
             
-            // Update Lead's Next Follow Up Date if provided
             if (String.isNotBlank(nextFollowUpDate)) {
                 customLeadRecord.Next_Follow_Up_Date__c = parseUiDateTime(nextFollowUpDate);
                 update customLeadRecord;
             }
             
-            // Create Phone Number record only if it doesn't exist
             createPhoneNumberRecordIfNotExists(callLog.Phone_Number__c, customLeadRecord.Candidate__c);
             
         } else {
-            // Creating new lead
-            
-            // Step 1: Create Standard Lead (Candidate)
             Lead standardLead = new Lead();
             standardLead.LastName = name;
             standardLead.Email = email;
             standardLead.Phone = phone;
-            standardLead.Company = 'N/A'; // Required field
+            standardLead.Company = 'N/A';
             insert standardLead;
             
-            // Step 2: Create Custom Lead
             customLeadRecord = new Lead__c();
             customLeadRecord.Name = name;
             customLeadRecord.Course__c = course;
@@ -114,14 +103,12 @@ public without sharing class TagLeadController {
             customLeadRecord.Candidate__c = standardLead.Id;
             customLeadRecord.Disable_Round_Robin__c = disableRR;
             
-            // Set Next Follow Up Date if provided
             if (String.isNotBlank(nextFollowUpDate)) {
                 customLeadRecord.Next_Follow_Up_Date__c = parseUiDateTime(nextFollowUpDate);
             }
             
             insert customLeadRecord;
             
-            // Step 3: Update Call Log with Lead, L1, L2, and Feedback
             callLog.Lead__c = customLeadRecord.Id;
             callLog.L1__c = l1;
             callLog.L2__c = l2;
@@ -134,14 +121,12 @@ public without sharing class TagLeadController {
                 update callLog;
             }
             
-            // Step 4: Create Phone Number record only if it doesn't exist
             createPhoneNumberRecordIfNotExists(callLog.Phone_Number__c, customLeadRecord.Candidate__c);
         }
     }
     
     private static void createPhoneNumberRecordIfNotExists(String phoneNumber, Id standardLeadId) {
         if (String.isNotBlank(phoneNumber) && standardLeadId != null) {
-            // Check if phone number already exists for this candidate (standard lead)
             List<Phone_Number__c> existingPhones = [
                 SELECT Id 
                 FROM Phone_Number__c 
@@ -150,7 +135,6 @@ public without sharing class TagLeadController {
                 LIMIT 1
             ];
             
-            // Only create if it doesn't exist
             if (existingPhones.isEmpty()) {
                 Phone_Number__c phoneRec = new Phone_Number__c();
                 phoneRec.Name = phoneNumber;
@@ -165,7 +149,6 @@ public without sharing class TagLeadController {
 
         String dt = inputDt.replace('T', ' ');
 
-        // If seconds missing, append :00
         if (dt.length() == 16) {
             dt += ':00';
         }

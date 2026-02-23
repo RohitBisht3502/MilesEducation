@@ -7,6 +7,7 @@ import getActiveProducts from '@salesforce/apex/PurchaseOrderService.getActivePr
 import savePurchaseOrder from '@salesforce/apex/PurchaseOrderService.save';
 import checkAddressByRecordId from '@salesforce/apex/PurchaseOrderService.checkAddressByRecordId';
 import saveAddress from '@salesforce/apex/PurchaseOrderService.saveAddress';
+import getAddressByRecordId from '@salesforce/apex/PurchaseOrderService.getAddressByRecordId';
 import getMinimumDownPayment from '@salesforce/apex/PurchaseOrderService.getMinimumDownPayment';
 import getDiscountThreshold from '@salesforce/apex/PurchaseOrderService.getDiscountThreshold';
 import MINIMUM_DOWNPAYMENT from '@salesforce/label/c.Minimum_Downpayment';
@@ -28,6 +29,7 @@ export default class PurchaseOrderProductSelector extends LightningElement {
     discountThreshold = 0;
     approvalComments = '';
     shippingPhone = '';
+    @track addressData = { billing: {}, shipping: {} };
 
     hasBillingAddress = false;
     hasShippingAddress = false;
@@ -82,16 +84,13 @@ export default class PurchaseOrderProductSelector extends LightningElement {
     return this.missingAddressType === 'billing';
 }
 
-handleSameAsBilling(event) {
-    this.sameAsBilling = event.target.checked;
-}
+    handleSameAsBilling(event) {
+        this.sameAsBilling = event.target.checked;
+    }
 
 
-    get addressOptions() {
-        const options = [];
-        if (this.hasBillingAddress) options.push({ label: 'Billing Address', value: 'billing' });
-        if (this.hasShippingAddress) options.push({ label: 'Shipping Address', value: 'shipping' });
-        return options;
+    get currentAddressLabel() {
+        return this.selectedAddressType === 'shipping' ? 'Shipping Address' : 'Billing Address';
     }
 
     get hasSelectedProducts() {
@@ -130,6 +129,10 @@ handleSameAsBilling(event) {
         return this.products
             .filter(p => p.selected)
             .map(p => ({ ...p, total: p.price }));
+    }
+
+    get hasStudyMaterial() {
+        return this.selectedProducts.some(p => p.type === 'Study Material');
     }
 
     get cartCount() {
@@ -282,7 +285,9 @@ validateAddressFields(address, sectionLabel) {
             this.hasBillingAddress = addressStatus.hasBilling;
             this.hasShippingAddress = addressStatus.hasShipping;
 
-            const hasStudyMaterial = this.selectedProducts.some(p => p.type === 'Study Material');
+            const hasStudyMaterial = this.hasStudyMaterial;
+            this.selectedAddressType = 'shipping';
+            await this.loadAddresses();
 
             // Billing missing
             if (!this.hasBillingAddress) {
@@ -296,11 +301,11 @@ validateAddressFields(address, sectionLabel) {
             // Shipping missing (only for study material)
             if (hasStudyMaterial && !this.hasShippingAddress) {
                 this.missingAddressType = 'shipping';
+                this.showAddressModal = true;
                
                 return;
             }
 
-            this.selectedAddressType = 'billing';
             this.showCheckout = true;
             this.sameAsBilling = false;
 
@@ -361,8 +366,12 @@ validateAddressFields(address, sectionLabel) {
             shipping.country= billing.country;
         }
 
+        const shouldSaveShipping = this.missingAddressType === 'shipping'
+            || this.missingAddressType === 'edit'
+            || this.sameAsBilling;
+
         // save shipping only if needed
-        if (this.missingAddressType === 'shipping') {
+        if (shouldSaveShipping) {
             await saveAddress({
                 recordId: this.recordId,
                 addressType: 'shipping',
@@ -372,6 +381,7 @@ validateAddressFields(address, sectionLabel) {
 
         this.showAddressModal = false;
         this.sameAsBilling = false;
+        await this.loadAddresses();
 
         this.proceedToCheckout();
 
@@ -427,7 +437,7 @@ validateAddressFields(address, sectionLabel) {
             discount: this.discountAmount,
             downPayment: this.downPayment,
             phoneNumber: this.shippingPhone,
-            addressType: this.selectedAddressType,
+            addressType: 'shipping',
             approvalComments: this.approvalComments,
             items: this.selectedProducts.map(p => ({
                 productId: p.id,
@@ -475,6 +485,40 @@ validateAddressFields(address, sectionLabel) {
 
     closeAddressModal() {
         this.showAddressModal = false;
+    }
+
+    openEditAddressModal() {
+        this.missingAddressType = 'edit';
+        this.sameAsBilling = false;
+        this.showAddressModal = true;
+        this.loadAddresses();
+    }
+
+    async loadAddresses() {
+        if (!this.recordId) return;
+        try {
+            const res = await getAddressByRecordId({ recordId: this.recordId });
+            const billing = res?.billing || {};
+            const shipping = res?.shipping || {};
+            this.addressData = {
+                billing: {
+                    street: billing.street || '',
+                    city: billing.city || '',
+                    state: billing.state || '',
+                    postal: billing.postal || '',
+                    country: billing.country || ''
+                },
+                shipping: {
+                    street: shipping.street || '',
+                    city: shipping.city || '',
+                    state: shipping.state || '',
+                    postal: shipping.postal || '',
+                    country: shipping.country || ''
+                }
+            };
+        } catch (error) {
+            this.showToast('Error', error.body?.message || error.message, 'error');
+        }
     }
     validateDiscount(inputEl) {
         const input = inputEl || this.template.querySelector('lightning-input[data-id="discount"]');

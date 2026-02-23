@@ -31,28 +31,16 @@ export default class TagLeadForCallLog extends LightningElement {
         l2: '',
         feedback: ''
     };
-    
-    @track tagData = {
-        l1: '',
-        l2: '',
-        nextFollowUpDate: '',
-        feedback: ''
-    };
-    
     @track searchKeyword = '';
     selectedLeadId = null;
     isLoading = false;
-    viewState = 'search'; // 'search', 'notFound', 'create'
+    viewState = 'search';
     hasAutoSearched = false;
     courseOptions = [];
     l1Options = [];
     l2Options = [];
 
     fullL1L2Map = {};
-    dependentL2Options = [];
-    isL2Disabled = true;
-    
-    // For create form L2 dependency
     createDependentL2Options = [];
     isCreateL2Disabled = true;
 
@@ -73,7 +61,6 @@ export default class TagLeadForCallLog extends LightningElement {
     const defaultDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
 
     this.formData.nextFollowUpDate = defaultDate;
-    this.tagData.nextFollowUpDate = defaultDate;
 }
 
 
@@ -82,7 +69,6 @@ export default class TagLeadForCallLog extends LightningElement {
             const mapData = await getL1L2Values();
             this.fullL1L2Map = mapData;
 
-            // Build L1 options from map keys
             this.l1Options = Object.keys(mapData).map(key => ({
                 label: key,
                 value: key
@@ -92,7 +78,6 @@ export default class TagLeadForCallLog extends LightningElement {
         }
     }
 
-    // Wire Call Log Record
     @wire(getRecord, { recordId: '$recordId', fields: CALL_LOG_FIELDS })
     wiredCallLogHandler(result) {
         this.wiredCallLog = result;
@@ -100,13 +85,11 @@ export default class TagLeadForCallLog extends LightningElement {
         if (data) {
             const phoneNumber = getFieldValue(data, PHONE_NUMBER_FIELD);
             
-            // Auto-populate phone number in search box and trigger search
             if (phoneNumber && !this.hasAutoSearched) {
                 this.searchKeyword = phoneNumber;
                 this.formData.phone = phoneNumber;
                 this.hasAutoSearched = true;
                 
-                // Trigger search automatically
                 this.runSearch(phoneNumber);
             }
         } else if (error) {
@@ -119,17 +102,14 @@ export default class TagLeadForCallLog extends LightningElement {
         }
     }
 
-    // Get Lead Object Info (required for picklist)
     @wire(getObjectInfo, { objectApiName: LEAD_OBJECT })
     leadObjectInfo;
 
-    // Get Call Log Object Info (required for L1 and L2 picklists)
     @wire(getObjectInfo, { objectApiName: CALL_LOG_OBJECT })
     callLogObjectInfo;
 
-    // Get Course Picklist Values
     @wire(getPicklistValues, {
-        recordTypeId: '$leadObjectInfo.data.defaultRecordTypeId',
+        recordTypeId: '$courseRecordTypeId',
         fieldApiName: COURSE_FIELD
     })
     wiredCoursePicklist({ data, error }) {
@@ -143,10 +123,20 @@ export default class TagLeadForCallLog extends LightningElement {
         }
     }
 
-    // Store wire result for accessing in getters
     wiredCallLog;
 
-    // Getters for Call Log Details
+    get courseRecordTypeId() {
+        const info = this.leadObjectInfo?.data;
+        if (!info) return null;
+
+        const rtis = info.recordTypeInfos || {};
+        const master = Object.keys(rtis)
+            .map(id => rtis[id])
+            .find(rti => rti?.master);
+
+        return master?.recordTypeId || info.defaultRecordTypeId;
+    }
+
     get customerName() {
         return getFieldValue(this.wiredCallLog?.data, CUSTOMER_NAME_FIELD) || 'N/A';
     }
@@ -159,7 +149,6 @@ export default class TagLeadForCallLog extends LightningElement {
         return new Date().toISOString().slice(0, 16);
     }
 
-    // Reusable search logic
     runSearch(keyword) {
         if (!keyword || keyword.trim().length < 2) {
             this.leads = [];
@@ -176,7 +165,9 @@ export default class TagLeadForCallLog extends LightningElement {
                     this.leads = result.map(lead => ({
                         ...lead,
                         selectedClass: '',
-                        OwnerName: lead.Owner ? lead.Owner.Name : 'N/A'
+                        OwnerName: lead.Owner ? lead.Owner.Name : 'N/A',
+                        candidateName: lead.Candidate__r ? lead.Candidate__r.Name : lead.Name,
+                        courseDisplay: lead.Course__c || 'NA'
                     }));
                     this.selectedLeadId = null;
                     this.viewState = 'search';
@@ -194,72 +185,26 @@ export default class TagLeadForCallLog extends LightningElement {
             });
     }
 
-    // Handle search input change
     handleSearchInput(event) {
         this.searchKeyword = event.target.value;
     }
 
-    // Handle search button click
     handleSearchClick() {
         this.runSearch(this.searchKeyword);
     }
 
-    // Handle Enter key in search input
     handleSearchKeyPress(event) {
         if (event.key === 'Enter') {
             this.runSearch(this.searchKeyword);
         }
     }
 
-    // Select Lead
     selectLead(event) {
         this.selectedLeadId = event.currentTarget.dataset.id;
 
-        this.leads = this.leads.map(lead => ({
-            ...lead,
-            selectedClass: lead.Id === this.selectedLeadId ? 'selected' : ''
-        }));
-
-        // Reset tag data when selecting a new lead
         this.setDefaultFollowUpDate();
-        this.tagData = {
-            l1: '',
-            l2: '',
-            nextFollowUpDate: this.tagData.nextFollowUpDate,
-            feedback: ''
-        };
-        this.dependentL2Options = [];
-        this.isL2Disabled = true;
     }
 
-    // Handle tag data input changes
-    handleL1Change(event) {
-        this.tagData.l1 = event.target.value;
-
-        const l2List = this.fullL1L2Map[this.tagData.l1] || [];
-
-        this.dependentL2Options = l2List.map(value => ({
-            label: value,
-            value: value
-        }));
-
-        this.isL2Disabled = this.dependentL2Options.length === 0;
-        this.tagData.l2 = ''; // reset L2
-    }
-
-    handleL2Change(event) {
-        this.tagData.l2 = event.target.value;
-    }
-
-    handleTagFollowUpDateChange(event) {
-        this.tagData.nextFollowUpDate = event.target.value;
-    }
-
-    handleTagFeedbackChange(event) {
-        this.tagData.feedback = event.target.value;
-    }
-
-    // Handle form input changes for create
     handleNameChange(event) {
         this.formData.name = event.target.value;
     }
@@ -287,7 +232,7 @@ export default class TagLeadForCallLog extends LightningElement {
         }));
 
         this.isCreateL2Disabled = this.createDependentL2Options.length === 0;
-        this.formData.l2 = ''; // reset L2
+        this.formData.l2 = '';
     }
 
     handleCreateL2Change(event) {
@@ -298,13 +243,11 @@ export default class TagLeadForCallLog extends LightningElement {
         this.formData.feedback = event.target.value;
     }
 
-    // Show create form
     handleCreateNew() {
         this.viewState = 'create';
         this.setDefaultFollowUpDate();
     }
 
-    // Cancel create form
     handleCancel() {
         this.viewState = 'search';
         this.searchKeyword = '';
@@ -321,25 +264,14 @@ export default class TagLeadForCallLog extends LightningElement {
             l2: '',
             feedback: ''
         };
-        this.tagData = {
-            l1: '',
-            l2: '',
-            nextFollowUpDate: this.tagData.nextFollowUpDate,
-            feedback: ''
-        };
         this.createDependentL2Options = [];
         this.isCreateL2Disabled = true;
-        this.dependentL2Options = [];
-        this.isL2Disabled = true;
     }
 
-    // Close modal
     closeModal() {
         this.dispatchEvent(new CloseActionScreenEvent());
-        setTimeout(() => window.location.reload(), 800);
     }
 
-    // Getters for UI
     get hasLeads() {
         return this.leads.length > 0;
     }
@@ -367,10 +299,6 @@ export default class TagLeadForCallLog extends LightningElement {
                this.formData.l2.trim();
     }
 
-    get isTagFormValid() {
-        return this.tagData.l1.trim() && this.tagData.l2.trim();
-    }
-
     get submitButtonLabel() {
         return this.isLoading ? 'Creating...' : 'Create New Lead';
     }
@@ -379,39 +307,33 @@ export default class TagLeadForCallLog extends LightningElement {
         return this.isLoading ? 'Tagging...' : 'Tag Lead';
     }
 
-    get leadItems() {
-        return this.leads.map(lead => ({
-            ...lead,
-            cssClass: lead.selectedClass ? 'lead-card selected' : 'lead-card',
-            showTagForm: lead.Id === this.selectedLeadId
-        }));
+    get groupedLeadItems() {
+        const map = new Map();
+        for (const lead of this.leads) {
+            const candidateId = lead.Candidate__c || lead.Id;
+            const candidateName = lead.Candidate__r ? lead.Candidate__r.Name : lead.Name;
+            const group = map.get(candidateId) || {
+                candidateId,
+                candidateName,
+                courses: []
+            };
+            group.courses.push({
+                id: lead.Id,
+                course: lead.Course__c || 'NA',
+                ownerName: lead.Owner ? lead.Owner.Name : 'N/A',
+                cssClass: lead.Id === this.selectedLeadId ? 'lead-card selected' : 'lead-card',
+                showTagForm: lead.Id === this.selectedLeadId
+            });
+            map.set(candidateId, group);
+        }
+        return Array.from(map.values());
     }
 
-    // Tag existing lead to call log
     handleTagLead() {
         if (!this.selectedLeadId) {
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Error',
                 message: 'Please select a lead to tag',
-                variant: 'error'
-            }));
-            return;
-        }
-
-        if (!this.isTagFormValid) {
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Error',
-                message: 'Please fill in L1 and L2 fields',
-                variant: 'error'
-            }));
-            return;
-        }
-
-        // Validate date is not in past
-        if (this.tagData.nextFollowUpDate && new Date(this.tagData.nextFollowUpDate) < new Date()) {
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Error',
-                message: 'Follow up date cannot be in the past',
                 variant: 'error'
             }));
             return;
@@ -427,10 +349,10 @@ export default class TagLeadForCallLog extends LightningElement {
             email: null,
             phone: null,
             disableRR: true,
-            l1: this.tagData.l1,
-            l2: this.tagData.l2,
-            feedback: this.tagData.feedback || null,
-            nextFollowUpDate: this.tagData.nextFollowUpDate || null
+            l1: null,
+            l2: null,
+            feedback: null,
+            nextFollowUpDate: null
         })
             .then(() => {
                 this.dispatchEvent(new ShowToastEvent({
@@ -453,7 +375,6 @@ export default class TagLeadForCallLog extends LightningElement {
             });
     }
 
-    // Submit - Create new lead and tag to call log
     handleSubmit() {
         if (!this.isFormValid) {
             this.dispatchEvent(new ShowToastEvent({
@@ -464,7 +385,6 @@ export default class TagLeadForCallLog extends LightningElement {
             return;
         }
 
-        // Validate date is not in past
         if (this.formData.nextFollowUpDate && new Date(this.formData.nextFollowUpDate) < new Date()) {
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Error',

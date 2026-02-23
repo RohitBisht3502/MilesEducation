@@ -19,7 +19,7 @@ public class PurchaseOrderApprovalHandler {
         }
 
         if (!toProcess.isEmpty()) {
-            PurchaseOrderService.enqueuePurchaseOrderCallout(toProcess);
+            PurchasrOrderApprovalService.enqueuePurchaseOrderCallout(toProcess);
         }
     }
 }
