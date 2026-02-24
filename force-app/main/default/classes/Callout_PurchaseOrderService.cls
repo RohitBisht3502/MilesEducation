@@ -10,7 +10,7 @@ public without sharing class Callout_PurchaseOrderService {
     public class Request{
         public String source;
         public String sf_id;
-        // public String sf_lead_id;
+        public String sf_lead_id;
         public String uuid;
         public List<RequestItem> purchase_items;
         public Decimal down_payment;
@@ -27,7 +27,7 @@ public without sharing class Callout_PurchaseOrderService {
         public Decimal agreed_fee;
         public Decimal discount;
 
-        public Integer loan_id;
+        public String loan_id;
 
         public Boolean has_training;
         public Boolean has_study_material;

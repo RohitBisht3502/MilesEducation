@@ -136,76 +136,98 @@ public without sharing class RunoCallIdentityService {
         }
     }
 
-    @AuraEnabled
-    public static Id createRelatedLead(Id candidateId, String course, Id sourceRecordId) {
-        if (candidateId == null) {
-            throw new AuraHandledException('Candidate Id is required.');
-        }
-        if (String.isBlank(course)) {
-            throw new AuraHandledException('Course is required.');
-        }
 
-        List<Lead__c> existing = [
-            SELECT Id
-            FROM Lead__c
-            WHERE Candidate__c = :candidateId
-            AND Course__c = :course
-            LIMIT 1
-        ];
-        if (!existing.isEmpty()) {
-            throw new AuraHandledException('Lead already exists for this course.');
-        }
+    
 
-        Lead__c sourceLead;
+ @AuraEnabled
+public static Id createRelatedLead(Id candidateId, String course, Id sourceRecordId) {
 
-        if (sourceRecordId != null && sourceRecordId.getSObjectType() == Lead__c.SObjectType) {
-            sourceLead = [
-                SELECT Id, Name, Phone__c, Email__c
-                FROM Lead__c
-                WHERE Id = :sourceRecordId
-                LIMIT 1
-            ];
-        } else {
-            List<Lead__c> leads = [
-                SELECT Id, Name, Phone__c, Email__c
-                FROM Lead__c
-                WHERE Candidate__c = :candidateId
-                ORDER BY CreatedDate DESC
-                LIMIT 1
-            ];
-            if (!leads.isEmpty()) {
-                sourceLead = leads[0];
-            }
-        }
-
-        Lead__c newLead = new Lead__c();
-        newLead.Candidate__c = candidateId;
-        newLead.Course__c = course;
-
-        if (sourceLead != null) {
-            newLead.Name = sourceLead.Name;
-            newLead.Phone__c = sourceLead.Phone__c;
-            newLead.Email__c = sourceLead.Email__c;
-        } else {
-            newLead.Name = 'New Lead';
-        }
-
-        List<RecordType> rts = [
-            SELECT Id
-            FROM RecordType
-            WHERE SObjectType = 'Lead__c'
-            AND Name = :course
-            AND IsActive = true
-            LIMIT 1
-        ];
-        if (!rts.isEmpty()) {
-            newLead.RecordTypeId = rts[0].Id;
-        }
-
-        insert newLead;
-        return newLead.Id;
+    if (candidateId == null) {
+        throw new AuraHandledException('Candidate Id is required.');
+    }
+    if (String.isBlank(course)) {
+        throw new AuraHandledException('Course is required.');
     }
 
+    // Prevent duplicate course lead
+    List<Lead__c> existing = [
+        SELECT Id
+        FROM Lead__c
+        WHERE Candidate__c = :candidateId
+        AND Course__c = :course
+        LIMIT 1
+    ];
+    if (!existing.isEmpty()) {
+        throw new AuraHandledException('Lead already exists for this course.');
+    }
+
+    // ✅ Candidate = Standard Lead
+    Lead candidate = [
+        SELECT Id, Email
+        FROM Lead
+        WHERE Id = :candidateId
+        LIMIT 1
+    ];
+
+    Lead__c sourceLead;
+
+    if (sourceRecordId != null && sourceRecordId.getSObjectType() == Lead__c.SObjectType) {
+        sourceLead = [
+            SELECT Id, Name, Phone__c, Email__c
+            FROM Lead__c
+            WHERE Id = :sourceRecordId
+            LIMIT 1
+        ];
+    } else {
+        List<Lead__c> leads = [
+            SELECT Id, Name, Phone__c, Email__c
+            FROM Lead__c
+            WHERE Candidate__c = :candidateId
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+        if (!leads.isEmpty()) {
+            sourceLead = leads[0];
+        }
+    }
+
+    Lead__c newLead = new Lead__c();
+    newLead.Candidate__c = candidateId;
+    newLead.Course__c = course;
+
+    // ✅ Email from Standard Lead
+    if (!String.isBlank(candidate.Email)) {
+        newLead.Email__c = candidate.Email;
+    }
+    else if (sourceLead != null && !String.isBlank(sourceLead.Email__c)) {
+        newLead.Email__c = sourceLead.Email__c;
+    }
+    else {
+        throw new AuraHandledException('Candidate does not have an email.');
+    }
+
+    if (sourceLead != null) {
+        newLead.Name = sourceLead.Name;
+        newLead.Phone__c = sourceLead.Phone__c;
+    } else {
+        newLead.Name = 'New Lead';
+    }
+
+    List<RecordType> rts = [
+        SELECT Id
+        FROM RecordType
+        WHERE SObjectType = 'Lead__c'
+        AND Name = :course
+        AND IsActive = true
+        LIMIT 1
+    ];
+    if (!rts.isEmpty()) {
+        newLead.RecordTypeId = rts[0].Id;
+    }
+
+    insert newLead;
+    return newLead.Id;
+}
     /* Optional wrapper for LWC clarity */
     @AuraEnabled(cacheable=true)
     public static IdentityDTO getCourseIdentity(Id recordId) {

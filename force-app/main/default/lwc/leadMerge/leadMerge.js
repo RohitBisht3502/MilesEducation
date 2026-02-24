@@ -96,7 +96,13 @@ export default class LeadMerge extends LightningElement {
     handleRemoveLead(event) {
         event.stopPropagation();
         const leadId = event.currentTarget.dataset.id;
+        const removedLead = this.selectedLeads.find(lead => lead.Id === leadId);
+
         this.selectedLeads = this.selectedLeads.filter(lead => lead.Id !== leadId);
+
+        if (removedLead) {
+            this.leads = [removedLead, ...this.leads];
+        }
     }
 
     mergeComments = '';
@@ -171,6 +177,10 @@ export default class LeadMerge extends LightningElement {
 
     get hasAnyContent() {
         return this.hasSelectedLeads || this.leads.length > 0;
+    }
+
+    get showSearchResults() {
+        return this.leads.length > 0 && !this.hasSelectedLeads;
     }
 
     get showComments() {

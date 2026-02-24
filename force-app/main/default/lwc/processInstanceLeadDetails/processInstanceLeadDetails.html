@@ -1,42 +1,54 @@
 <template>
-    <template if:true={leadRecord}>
-        <lightning-card title="Approval Details">
+    <template if:true={mainLead}>
+        <lightning-card title="Lead Merge Approval Details">
             <div class="slds-p-horizontal_medium slds-p-bottom_medium">
-                <lightning-record-view-form record-id={leadId} object-api-name="Lead__c">
-                    <div class="slds-grid slds-wrap">
-                        <div class="slds-col slds-size_1-of-2 slds-p-right_small">
+                <div class="slds-grid slds-wrap slds-gutters">
+
+                    <!-- Main Lead Column -->
+                    <div class="slds-col slds-size_1-of-2 border-right">
+                        <div class="slds-text-heading_small slds-m-bottom_small slds-text-color_weak">Main Lead
+                            (Destination)</div>
+                        <lightning-record-view-form record-id={mainLead.Id} object-api-name="Lead__c">
                             <lightning-output-field field-name="Name"></lightning-output-field>
-                            <lightning-output-field field-name="Stage__c"></lightning-output-field>
                             <lightning-output-field field-name="CAN_ID__c"></lightning-output-field>
-                            <lightning-output-field field-name="City__c"></lightning-output-field>
                             <lightning-output-field field-name="Course__c"></lightning-output-field>
-                            <lightning-output-field field-name="Course_Bucket__c"></lightning-output-field>
-                            <lightning-output-field field-name="Source__c"></lightning-output-field>
-                            <lightning-output-field field-name="Source_Bucket__c"></lightning-output-field>
-                            <lightning-output-field field-name="Candidate__c"></lightning-output-field>
-                            <lightning-output-field field-name="Is_ReEnquiry__c"></lightning-output-field>
-                            <lightning-output-field field-name="Expected_payment_date__c"></lightning-output-field>
+                            <lightning-output-field field-name="Stage__c"></lightning-output-field>
                             <lightning-output-field field-name="Status__c"></lightning-output-field>
-                            <lightning-output-field field-name="CC_Spoc__c"></lightning-output-field>
-                        </div>
-                        <div class="slds-col slds-size_1-of-2 slds-p-left_small">
                             <lightning-output-field field-name="OwnerId"></lightning-output-field>
-                            <lightning-output-field field-name="Student__c"></lightning-output-field>
-                            <lightning-output-field field-name="Is_Merged__c"></lightning-output-field>
-                            <lightning-output-field field-name="Payment_Received__c"></lightning-output-field>
-                            <lightning-output-field field-name="GP_SPOC__c"></lightning-output-field>
-                            <lightning-output-field field-name="Not_Commited__c"></lightning-output-field>
-                        </div>
+                            <lightning-output-field field-name="Lead_Merge_Comments__c"></lightning-output-field>
+                        </lightning-record-view-form>
                     </div>
-                </lightning-record-view-form>
+
+                    <!-- Merged Lead Column -->
+                    <div class="slds-col slds-size_1-of-2">
+                        <template if:true={mergedLead}>
+                            <div class="slds-text-heading_small slds-m-bottom_small slds-text-color_error">Merging Lead
+                                (Source)</div>
+                            <lightning-record-view-form record-id={mergedLead.Id} object-api-name="Lead__c">
+                                <lightning-output-field field-name="Name"></lightning-output-field>
+                                <lightning-output-field field-name="CAN_ID__c"></lightning-output-field>
+                                <lightning-output-field field-name="Course__c"></lightning-output-field>
+                                <lightning-output-field field-name="Stage__c"></lightning-output-field>
+                                <lightning-output-field field-name="Status__c"></lightning-output-field>
+                                <lightning-output-field field-name="OwnerId"></lightning-output-field>
+                            </lightning-record-view-form>
+                        </template>
+                        <template if:false={mergedLead}>
+                            <div class="slds-align_absolute-center slds-m-top_large">
+                                <p class="slds-text-color_weak">No merging lead detail found.</p>
+                            </div>
+                        </template>
+                    </div>
+
+                </div>
             </div>
         </lightning-card>
     </template>
 
-    <template if:false={leadRecord}>
+    <template if:false={mainLead}>
         <lightning-card title="Approval Details">
             <div class="slds-p-horizontal_medium slds-p-bottom_medium">
-                No related Lead__c found.
+                No related Lead__c found or this record is not part of a merge process.
             </div>
         </lightning-card>
     </template>

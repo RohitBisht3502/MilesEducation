@@ -399,6 +399,11 @@ wiredCityStatuses(result) {
     this._matrixWire = result;
     const { data, error } = result || {};
 
+    if (!this.selectedCity) {
+      this.resetMatrixView();
+      return;
+    }
+
     if (data) {
       this.columns = data.columnsLeadSources || [];
       this.rows = data.rows || [];

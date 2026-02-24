@@ -1,5 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <actionCalls>
+        <name>Send_Email_and_Notification_to_Owner</name>
+        <label>Send Email and Notification to Owner</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <actionName>EventApprovalEmailInvocable</actionName>
+        <actionType>apex</actionType>
+        <flowTransactionModel>Automatic</flowTransactionModel>
+        <inputParameters>
+            <name>eventId</name>
+            <value>
+                <elementReference>recordId</elementReference>
+            </value>
+        </inputParameters>
+        <nameSegment>EventApprovalEmailInvocable</nameSegment>
+        <offset>0</offset>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </actionCalls>
     <apiVersion>65.0</apiVersion>
     <areMetricsLoggedToDataCloud>false</areMetricsLoggedToDataCloud>
     <customProperties>
@@ -10,6 +28,7 @@
     </customProperties>
     <environments>Default</environments>
     <interviewLabel>Event Approval {!$Flow.CurrentDateTime}</interviewLabel>
+    <isAdditionalPermissionRequiredToRun>true</isAdditionalPermissionRequiredToRun>
     <label>Event Approval</label>
     <processMetadataValues>
         <name>BuilderType</name>
@@ -35,6 +54,9 @@
         <label>Update Event Approved</label>
         <locationX>0</locationX>
         <locationY>0</locationY>
+        <connector>
+            <targetReference>Send_Email_and_Notification_to_Owner</targetReference>
+        </connector>
         <filterLogic>and</filterLogic>
         <filters>
             <field>Id</field>
@@ -44,15 +66,15 @@
             </value>
         </filters>
         <inputAssignments>
-            <field>Approval_Status__c</field>
-            <value>
-                <stringValue>Approved</stringValue>
-            </value>
-        </inputAssignments>
-        <inputAssignments>
             <field>Approval_Comments__c</field>
             <value>
                 <elementReference>Approval_Comments</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Approval_Status__c</field>
+            <value>
+                <stringValue>Approved</stringValue>
             </value>
         </inputAssignments>
         <object>Event</object>

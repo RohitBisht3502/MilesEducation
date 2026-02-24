@@ -4,7 +4,7 @@
         <!-- Header -->
         <div class="header">
             <h2 class="title">Lead Merge</h2>
-            <p class="subtitle">Search and select leads to merge with current record</p>
+            <p class="subtitle">Search and select a lead to merge with current record</p>
         </div>
 
         <!-- Search Bar -->
@@ -28,7 +28,7 @@
                 <div class="section">
                     <div class="section-header">
                         <div class="section-header-left">
-                            <h3 class="section-title">Selected Leads</h3>
+                            <h3 class="section-title">Selected Lead</h3>
                             <span class="count-badge">{selectedLeadsCount}</span>
                         </div>
                     </div>
@@ -113,7 +113,7 @@
             </template>
 
             <!-- Search Results -->
-            <template if:true={leads.length}>
+            <template if:true={showSearchResults}>
                 <div class="section">
                     <div class="section-header">
                         <div class="section-header-left">

@@ -10,12 +10,15 @@ import saveAddress from '@salesforce/apex/PurchaseOrderService.saveAddress';
 import getAddressByRecordId from '@salesforce/apex/PurchaseOrderService.getAddressByRecordId';
 import getMinimumDownPayment from '@salesforce/apex/PurchaseOrderService.getMinimumDownPayment';
 import getDiscountThreshold from '@salesforce/apex/PurchaseOrderService.getDiscountThreshold';
+import getLoansForLead from '@salesforce/apex/PurchaseOrderService.getLoansForLead';
 import MINIMUM_DOWNPAYMENT from '@salesforce/label/c.Minimum_Downpayment';
 
 const MAX_DISCOUNT_PERCENT = 100;
 
 export default class PurchaseOrderProductSelector extends LightningElement {
     @track products = [];
+    @track loans = [];
+    selectedLoanId = null;
     searchKey = '';
     showCheckout = false;
     discountType = 'fixed';
@@ -36,7 +39,7 @@ export default class PurchaseOrderProductSelector extends LightningElement {
 
     // Modal variables
     @track showAddressModal = false;
-    @track missingAddressType = ''; 
+    @track missingAddressType = '';
 
     @wire(CurrentPageReference)
     getStateParameters(currentPageReference) {
@@ -72,7 +75,7 @@ export default class PurchaseOrderProductSelector extends LightningElement {
                 sku: p.productCode || '',
                 category: p.family || '',
                 price: Number(p.unitPrice) || 0,
-                type: p.type || '', 
+                type: p.type || '',
                 quantity: 1,
                 selected: false
             }));
@@ -81,8 +84,8 @@ export default class PurchaseOrderProductSelector extends LightningElement {
         }
     }
     get isBillingModal() {
-    return this.missingAddressType === 'billing';
-}
+        return this.missingAddressType === 'billing';
+    }
 
     handleSameAsBilling(event) {
         this.sameAsBilling = event.target.checked;
@@ -139,6 +142,18 @@ export default class PurchaseOrderProductSelector extends LightningElement {
         return this.selectedProducts.length;
     }
 
+    get hasLoans() {
+        return this.loans && this.loans.length > 0;
+    }
+
+    get formattedLoans() {
+        return this.loans.map(l => ({
+            ...l,
+            className: `loan-card${this.selectedLoanId === l.id ? ' selected' : ''}`,
+            isSelected: this.selectedLoanId === l.id
+        }));
+    }
+
     get subTotal() {
         return this.selectedProducts.reduce((sum, p) => sum + p.total, 0);
     }
@@ -171,39 +186,39 @@ export default class PurchaseOrderProductSelector extends LightningElement {
         return Math.max(0, this.subTotal - this.discountAmount);
     }
 
-get showShippingSection() {
-    return !this.sameAsBilling;
-}
-
-get sameBillingBoxClass() {
-    return `same-checkbox-card${this.sameAsBilling ? ' is-selected' : ''}`;
-}
-
-get shouldShowShippingFields() {
-    return !this.isBillingModal || !this.sameAsBilling;
-}
-
-get downPaymentMinMessage() {
-    if (this.minimumDownPayment > 0) {
-        return `Minimum down payment should be ₹${this.minimumDownPayment}`;
+    get showShippingSection() {
+        return !this.sameAsBilling;
     }
-    return 'Down payment cannot be negative.';
-}
 
-validateAddressFields(address, sectionLabel) {
-    const required = ['street', 'city', 'state', 'postal', 'country'];
-    for (const key of required) {
-        const value = address[key];
-        if (!value || !String(value).trim()) {
-            const fieldLabel = key === 'postal'
-                ? 'ZIP Code'
-                : `${key.charAt(0).toUpperCase()}${key.slice(1)}`;
-            this.showToast('Error', `${sectionLabel} ${fieldLabel} is mandatory.`, 'error');
-            return false;
+    get sameBillingBoxClass() {
+        return `same-checkbox-card${this.sameAsBilling ? ' is-selected' : ''}`;
+    }
+
+    get shouldShowShippingFields() {
+        return !this.isBillingModal || !this.sameAsBilling;
+    }
+
+    get downPaymentMinMessage() {
+        if (this.minimumDownPayment > 0) {
+            return `Minimum down payment should be ₹${this.minimumDownPayment}`;
         }
+        return 'Down payment cannot be negative.';
     }
-    return true;
-}
+
+    validateAddressFields(address, sectionLabel) {
+        const required = ['street', 'city', 'state', 'postal', 'country'];
+        for (const key of required) {
+            const value = address[key];
+            if (!value || !String(value).trim()) {
+                const fieldLabel = key === 'postal'
+                    ? 'ZIP Code'
+                    : `${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+                this.showToast('Error', `${sectionLabel} ${fieldLabel} is mandatory.`, 'error');
+                return false;
+            }
+        }
+        return true;
+    }
 
 
 
@@ -213,6 +228,10 @@ validateAddressFields(address, sectionLabel) {
 
     handleAddressChange(event) {
         this.selectedAddressType = event.detail.value;
+    }
+
+    handleLoanSelect(event) {
+        this.selectedLoanId = event.target.value;
     }
 
     addToCart(event) {
@@ -280,6 +299,15 @@ validateAddressFields(address, sectionLabel) {
         }
 
         try {
+            const loans = await getLoansForLead({ recordId: this.recordId });
+            this.loans = loans.map(l => ({
+                id: l.Id,
+                name: l.Name,
+                provider: l.Loan_Provider__c,
+                status: l.loan_status__c,
+                appId: l.application_id__c
+            }));
+
             const addressStatus = await checkAddressByRecordId({ recordId: this.recordId });
 
             this.hasBillingAddress = addressStatus.hasBilling;
@@ -302,7 +330,7 @@ validateAddressFields(address, sectionLabel) {
             if (hasStudyMaterial && !this.hasShippingAddress) {
                 this.missingAddressType = 'shipping';
                 this.showAddressModal = true;
-               
+
                 return;
             }
 
@@ -316,80 +344,80 @@ validateAddressFields(address, sectionLabel) {
     }
 
     // ===== SAVE ADDRESS =====
- saveAddress() {
+    saveAddress() {
 
-    const inputs = this.template.querySelectorAll('lightning-input[data-field]');
-    const billing = {};
-    const shipping = {};
+        const inputs = this.template.querySelectorAll('lightning-input[data-field]');
+        const billing = {};
+        const shipping = {};
 
-    inputs.forEach(i => {
-        const key = i.dataset.field;
+        inputs.forEach(i => {
+            const key = i.dataset.field;
 
-        if (key.startsWith('billing_')) {
-            billing[key.replace('billing_', '')] = i.value;
+            if (key.startsWith('billing_')) {
+                billing[key.replace('billing_', '')] = i.value;
+            }
+
+            if (key.startsWith('shipping_')) {
+                shipping[key.replace('shipping_', '')] = i.value;
+            }
+        });
+
+        if (!this.validateAddressFields(billing, 'Billing')) {
+            return;
         }
 
-        if (key.startsWith('shipping_')) {
-            shipping[key.replace('shipping_', '')] = i.value;
-        }
-    });
-
-    if (!this.validateAddressFields(billing, 'Billing')) {
-        return;
-    }
-
-    if (!shipping.phone || !String(shipping.phone).trim()) {
-        this.showToast('Error', 'Shipping Phone Number is mandatory.', 'error');
-        return;
-    }
-
-    if (this.shouldShowShippingFields && !this.validateAddressFields(shipping, 'Shipping')) {
-        return;
-    }
-
-    this.shippingPhone = shipping.phone;
-
-    // save billing first
-    saveAddress({
-        recordId: this.recordId,
-        addressType: 'billing',
-        address: billing
-    })
-    .then(async () => {
-
-        // auto copy if same as billing
-        if (this.sameAsBilling) {
-            shipping.street  = billing.street;
-            shipping.city    = billing.city;
-            shipping.state   = billing.state;
-            shipping.postal = billing.postal;
-            shipping.country= billing.country;
+        if (!shipping.phone || !String(shipping.phone).trim()) {
+            this.showToast('Error', 'Shipping Phone Number is mandatory.', 'error');
+            return;
         }
 
-        const shouldSaveShipping = this.missingAddressType === 'shipping'
-            || this.missingAddressType === 'edit'
-            || this.sameAsBilling;
+        if (this.shouldShowShippingFields && !this.validateAddressFields(shipping, 'Shipping')) {
+            return;
+        }
 
-        // save shipping only if needed
-        if (shouldSaveShipping) {
-            await saveAddress({
-                recordId: this.recordId,
-                addressType: 'shipping',
-                address: shipping
+        this.shippingPhone = shipping.phone;
+
+        // save billing first
+        saveAddress({
+            recordId: this.recordId,
+            addressType: 'billing',
+            address: billing
+        })
+            .then(async () => {
+
+                // auto copy if same as billing
+                if (this.sameAsBilling) {
+                    shipping.street = billing.street;
+                    shipping.city = billing.city;
+                    shipping.state = billing.state;
+                    shipping.postal = billing.postal;
+                    shipping.country = billing.country;
+                }
+
+                const shouldSaveShipping = this.missingAddressType === 'shipping'
+                    || this.missingAddressType === 'edit'
+                    || this.sameAsBilling;
+
+                // save shipping only if needed
+                if (shouldSaveShipping) {
+                    await saveAddress({
+                        recordId: this.recordId,
+                        addressType: 'shipping',
+                        address: shipping
+                    });
+                }
+
+                this.showAddressModal = false;
+                this.sameAsBilling = false;
+                await this.loadAddresses();
+
+                this.proceedToCheckout();
+
+            })
+            .catch(err => {
+                this.showToast('Error', err.body?.message || err.message, 'error');
             });
-        }
-
-        this.showAddressModal = false;
-        this.sameAsBilling = false;
-        await this.loadAddresses();
-
-        this.proceedToCheckout();
-
-    })
-    .catch(err => {
-        this.showToast('Error', err.body?.message || err.message, 'error');
-    });
-}
+    }
 
 
     confirmPurchase() {
@@ -439,6 +467,7 @@ validateAddressFields(address, sectionLabel) {
             phoneNumber: this.shippingPhone,
             addressType: 'shipping',
             approvalComments: this.approvalComments,
+            loanId: this.selectedLoanId,
             items: this.selectedProducts.map(p => ({
                 productId: p.id,
                 unitPrice: p.price,
@@ -477,6 +506,8 @@ validateAddressFields(address, sectionLabel) {
         this.discountThreshold = 0;
         this.approvalComments = '';
         this.shippingPhone = '';
+        this.loans = [];
+        this.selectedLoanId = null;
     }
 
     showToast(title, message, variant) {

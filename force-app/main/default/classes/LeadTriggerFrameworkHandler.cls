@@ -32,7 +32,7 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
     List<Lead__c> newLeads = getNewLeads();
     Map<Id, Lead__c> oldMapLead = getOldLeadMap();
 
-    LeadTriggerHelperClass.validateCallLogBeforeStageChange(newLeads, oldMapLead);
+   // LeadTriggerHelperClass.validateCallLogBeforeStageChange(newLeads, oldMapLead);
 
     LeadTriggerHelperClass.updateLevelSequence(newLeads, oldMapLead);
     LeadTriggerHelperClass.handleBeforeUpdate(newLeads, oldMapLead);
@@ -49,7 +49,7 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
 
         // LeadTriggerHelperClass.registerLeadForUpcomingWebinars(getNewLeads());
         LeadTriggerHelperClass.afterInsertAutoRegisterWebinar(newLeads);
-        LeadTriggerHandler.createLeadActivityLogs(newLeads, null, true);
+       // LeadTriggerHandler.createLeadActivityLogs(newLeads, null, true);
 
         // Gp tool tasks updates
         LeadStageTaskHandlerService.checkAndCreateNewTaskForInsert(newLeads);
@@ -64,7 +64,7 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
 
         LeadStageService.validateStageTransitions(newLeads, oldMapLead);
 
-        LeadTriggerHandler.createLeadActivityLogs(newLeads, oldMapLead, false);
+       // LeadTriggerHandler.createLeadActivityLogs(newLeads, oldMapLead, false);
 
         LeadTriggerHelperClass.afterUpdateMergeLead((List<Lead__c>)newList, (Map<Id, Lead__c>)oldMap);  
 
@@ -90,7 +90,7 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         LeadRelatedSyncService.syncOnOwnerChange(oldMapLead, (Map<Id, Lead__c>)newMap); 
 
         // log owner change activity
-        LeadTriggerHandler.createOwnerChangeActivityLogs(newLeads, oldMapLead);
+       // LeadTriggerHandler.createOwnerChangeActivityLogs(newLeads, oldMapLead);
 
         // M.Com Bridge Course Tasks (Status changes)
         LeadTriggerHelperClass.createMComTasks(newLeads, oldMapLead);

@@ -8,6 +8,7 @@ public without sharing class PurchaseOrderService {
         @AuraEnabled public String addressType;
         @AuraEnabled public String approvalComments;
         @AuraEnabled public List<LineItemRequest> items;
+        @AuraEnabled public String loanId;
     }
 
     public class LineItemRequest {
@@ -576,6 +577,12 @@ public without sharing class PurchaseOrderService {
         );
     }
 
+    @AuraEnabled(cacheable=true)
+    public static List<Loan__c> getLoansForLead(Id recordId) {
+        if (recordId == null) return new List<Loan__c>();
+        return [SELECT Id, Name, Loan_Provider__c, loan_status__c, application_id__c, Loan_Id__c FROM Loan__c WHERE Lead__c = :recordId];
+    }
+
     @AuraEnabled
     public static AddressStatusDTO checkAddressByRecordId(Id recordId) {
         AddressStatusDTO res = new AddressStatusDTO();
@@ -642,8 +649,8 @@ public without sharing class PurchaseOrderService {
 
         Callout_PurchaseOrderService.Request extReq = new Callout_PurchaseOrderService.Request();
         extReq.source       = 'sf';
-        extReq.sf_id        = String.valueOf(lead.Id);
-        // extReq.sf_lead_id   = String.valueOf(req.leadId);
+        extReq.sf_id        = String.valueOf(candidate.Id);
+        extReq.sf_lead_id   = String.valueOf(req.leadId);
         extReq.uuid         = candidate.UUID__c;
         extReq.down_payment = req.downPayment;
         //extReq.created_by   = UserInfo.getName();
@@ -701,7 +708,23 @@ public without sharing class PurchaseOrderService {
         item.actual_price = total;
         item.agreed_fee   = total;
         item.discount     = req.discount;
-        item.loan_id      = null;
+        
+        if (!String.isBlank(req.loanId)) {
+            try {
+                // req.loanId is the Salesforce Id of the Loan record from LWC
+                List<Loan__c> loans = [SELECT Loan_Id__c FROM Loan__c WHERE Id = :req.loanId LIMIT 1];
+                if (!loans.isEmpty() && !String.isBlank(loans[0].Loan_Id__c)) {
+                    item.loan_id = loans[0].Loan_Id__c;
+                } else {
+                    item.loan_id = null;
+                }
+            } catch (Exception e) {
+                System.debug('Failed to fetch loan info: ' + e.getMessage());
+                item.loan_id = null;
+            }
+        } else {
+            item.loan_id = null;
+        }
 
         extReq.purchase_items =
             new List<Callout_PurchaseOrderService.RequestItem>{ item };

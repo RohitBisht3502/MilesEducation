@@ -195,10 +195,10 @@
                                     <div class="slds-text-color_weak slds-m-top_x-small stage-section">
                                         Stage not applicable for Not-Connected calls
                                     </div>
-                                </template>
-                                <lightning-combobox label="Course" value={courseValue} options={courseOptions}
-                                    onchange={handleCourseChange}>
-                                </lightning-combobox>
+                                 </template>
+                               <lightning-input type="checkbox" label="Notify Me" checked={notifyMe} onchange={handleNotifyChange}>
+                  </lightning-input>
+                               
 
 
                                 <lightning-input type="datetime-local" label="Next Follow Up" value={nextFollowUpDate}
@@ -207,6 +207,16 @@
 
                                 <lightning-input type="checkbox" label="Auto set next follow up (+24 hrs)"
                                     checked={autoSetFollowUp} onchange={handleAutoSetChange}>
+                                </lightning-input>
+
+                                <lightning-input class="full-row" type="date" label="Expected Date"
+                                    value={expectedPaymentDate} onchange={handleExpectedDateChange}>
+                                </lightning-input>
+                                 <lightning-input type="checkbox" label="DND" checked={isDnd} onchange={handleDndChange}>
+                                </lightning-input>
+
+                                <lightning-input type="checkbox" label="Is Spam" checked={isSpam}
+                                    onchange={handleSpamChange}>
                                 </lightning-input>
 
                                 <lightning-textarea class="full-row" label="Comments" value={feedback}

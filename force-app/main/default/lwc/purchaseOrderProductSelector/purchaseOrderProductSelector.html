@@ -9,10 +9,7 @@
                 <h2 class="section-title">Product Catalog</h2>
             </div>
 
-            <lightning-input
-                class="search-box"
-                type="search"
-                placeholder="Search products by name…"
+            <lightning-input class="search-box" type="search" placeholder="Search products by name…"
                 onchange={handleSearch}>
             </lightning-input>
 
@@ -27,36 +24,33 @@
                             <th class="text-center">Action</th>
                         </tr>
                     </thead>
-                  <tbody>
-    <template if:true={showProducts}>
-        <template for:each={filteredProducts} for:item="prod">
-            <tr key={prod.id}>
-                <td>
-                    <strong>{prod.name}</strong>
-                </td>
-                <td class="muted">{prod.sku}</td>
-                <td class="muted">{prod.category}</td>
-                <td class="text-right">₹{prod.price}</td>
-                <td class="text-center">
-                    <button
-                        class="btn-icon primary"
-                        data-id={prod.id}
-                        onclick={addToCart}>
-                        +
-                    </button>
-                </td>
-            </tr>
-        </template>
-    </template>
+                    <tbody>
+                        <template if:true={showProducts}>
+                            <template for:each={filteredProducts} for:item="prod">
+                                <tr key={prod.id}>
+                                    <td>
+                                        <strong>{prod.name}</strong>
+                                    </td>
+                                    <td class="muted">{prod.sku}</td>
+                                    <td class="muted">{prod.category}</td>
+                                    <td class="text-right">₹{prod.price}</td>
+                                    <td class="text-center">
+                                        <button class="btn-icon primary" data-id={prod.id} onclick={addToCart}>
+                                            +
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </template>
 
-    <template if:false={showProducts}>
-        <tr>
-            <td colspan="5" class="empty">
-                No products found
-            </td>
-        </tr>
-    </template>
-</tbody>
+                        <template if:false={showProducts}>
+                            <tr>
+                                <td colspan="5" class="empty">
+                                    No products found
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
 
                 </table>
             </div>
@@ -110,96 +104,95 @@
             </div>
 
             <div class="action-bar">
-                <lightning-button
-                    variant="brand"
-                    label="Proceed to Checkout"
-                    onclick={proceedToCheckout}
+                <lightning-button variant="brand" label="Proceed to Checkout" onclick={proceedToCheckout}
                     disabled={disableCreatePurchase}>
                 </lightning-button>
             </div>
         </section>
 
     </template>
-    
-<!-- ================= ADDRESS MODAL ================= -->
-<template if:true={showAddressModal}>
-    <div class="modal-backdrop"></div>
 
-    <section class="custom-modal">
-        <header class="modal-header">
-            <h2>Add Addresses</h2>
-            <button class="close-btn" onclick={closeAddressModal}>×</button>
-        </header>
+    <!-- ================= ADDRESS MODAL ================= -->
+    <template if:true={showAddressModal}>
+        <div class="modal-backdrop"></div>
 
-        <div class="modal-body">
-            <div class="address-columns">
-                <div class="address-panel">
-                    <h3 class="address-heading">Billing Address</h3>
-                    <div class="address-grid">
-                        <lightning-input label="Street Address" data-field="billing_street" value={addressData.billing.street}></lightning-input>
-                        <lightning-input label="City" data-field="billing_city" value={addressData.billing.city}></lightning-input>
-                        <lightning-input label="State" data-field="billing_state" value={addressData.billing.state}></lightning-input>
-                        <lightning-input label="ZIP Code" data-field="billing_postal" value={addressData.billing.postal}></lightning-input>
-                        <lightning-input label="Country" data-field="billing_country" value={addressData.billing.country}></lightning-input>
-                    </div>
-                </div>
+        <section class="custom-modal">
+            <header class="modal-header">
+                <h2>Add Addresses</h2>
+                <button class="close-btn" onclick={closeAddressModal}>×</button>
+            </header>
 
-                <div class="address-panel">
-                    <h3 class="address-heading">Shipping Address</h3>
-
-                    <template if:true={isBillingModal}>
-                        <div class={sameBillingBoxClass}>
-                            <lightning-input
-                                type="checkbox"
-                                label="Same as billing address"
-                                checked={sameAsBilling}
-                                onchange={handleSameAsBilling}>
-                            </lightning-input>
+            <div class="modal-body">
+                <div class="address-columns">
+                    <div class="address-panel">
+                        <h3 class="address-heading">Billing Address</h3>
+                        <div class="address-grid">
+                            <lightning-input label="Street Address" data-field="billing_street"
+                                value={addressData.billing.street}></lightning-input>
+                            <lightning-input label="City" data-field="billing_city"
+                                value={addressData.billing.city}></lightning-input>
+                            <lightning-input label="State" data-field="billing_state"
+                                value={addressData.billing.state}></lightning-input>
+                            <lightning-input label="ZIP Code" data-field="billing_postal"
+                                value={addressData.billing.postal}></lightning-input>
+                            <lightning-input label="Country" data-field="billing_country"
+                                value={addressData.billing.country}></lightning-input>
                         </div>
+                    </div>
 
-                        <template if:true={sameAsBilling}>
-                            <div class="same-billing-info">
-                                <div class="same-billing-check">✓</div>
-                                <div>Shipping address will be the same as billing address</div>
+                    <div class="address-panel">
+                        <h3 class="address-heading">Shipping Address</h3>
+
+                        <template if:true={isBillingModal}>
+                            <div class={sameBillingBoxClass}>
+                                <lightning-input type="checkbox" label="Same as billing address" checked={sameAsBilling}
+                                    onchange={handleSameAsBilling}>
+                                </lightning-input>
+                            </div>
+
+                            <template if:true={sameAsBilling}>
+                                <div class="same-billing-info">
+                                    <div class="same-billing-check">✓</div>
+                                    <div>Shipping address will be the same as billing address</div>
+                                </div>
+                            </template>
+                        </template>
+
+                        <lightning-input label="Phone Number" data-field="shipping_phone"
+                            value={shippingPhone}></lightning-input>
+
+                        <template if:true={shouldShowShippingFields}>
+                            <div class="address-grid slide-in">
+                                <lightning-input label="Street Address" data-field="shipping_street"
+                                    value={addressData.shipping.street}></lightning-input>
+                                <lightning-input label="City" data-field="shipping_city"
+                                    value={addressData.shipping.city}></lightning-input>
+                                <lightning-input label="State" data-field="shipping_state"
+                                    value={addressData.shipping.state}></lightning-input>
+                                <lightning-input label="ZIP Code" data-field="shipping_postal"
+                                    value={addressData.shipping.postal}></lightning-input>
+                                <lightning-input label="Country" data-field="shipping_country"
+                                    value={addressData.shipping.country}></lightning-input>
                             </div>
                         </template>
-                    </template>
-
-                    <lightning-input label="Phone Number" data-field="shipping_phone" value={shippingPhone}></lightning-input>
-
-                    <template if:true={shouldShowShippingFields}>
-                        <div class="address-grid slide-in">
-                            <lightning-input label="Street Address" data-field="shipping_street" value={addressData.shipping.street}></lightning-input>
-                            <lightning-input label="City" data-field="shipping_city" value={addressData.shipping.city}></lightning-input>
-                            <lightning-input label="State" data-field="shipping_state" value={addressData.shipping.state}></lightning-input>
-                            <lightning-input label="ZIP Code" data-field="shipping_postal" value={addressData.shipping.postal}></lightning-input>
-                            <lightning-input label="Country" data-field="shipping_country" value={addressData.shipping.country}></lightning-input>
-                        </div>
-                    </template>
+                    </div>
                 </div>
             </div>
-        </div>
 
 
-        <footer class="modal-footer">
-            <lightning-button
-                label="Cancel"
-                variant="neutral"
-                onclick={closeAddressModal}>
-            </lightning-button>
+            <footer class="modal-footer">
+                <lightning-button label="Cancel" variant="neutral" onclick={closeAddressModal}>
+                </lightning-button>
 
-            <lightning-button
-                label="Save Address"
-                variant="brand"
-                onclick={saveAddress}>
-            </lightning-button>
-        </footer>
-    </section>
+                <lightning-button label="Save Address" variant="brand" onclick={saveAddress}>
+                </lightning-button>
+            </footer>
+        </section>
 
 
- 
 
-</template>
+
+    </template>
 
 
 
@@ -225,19 +218,39 @@
                         </div>
                     </template>
                 </div>
+
+                <!-- LOAN SECTION -->
+                <template if:true={hasLoans}>
+                    <div class="summary-card">
+                        <h2 class="section-title">Select Loan</h2>
+                        <div class="muted">Choose a loan to associate with this purchase</div>
+                        <div class="loan-section">
+                            <template for:each={formattedLoans} for:item="loan">
+                                <label key={loan.id} class={loan.className}>
+                                    <input type="radio" name="loanSelection" value={loan.id} onchange={handleLoanSelect}
+                                        class="loan-radio" checked={loan.isSelected} />
+                                    <div class="loan-info">
+                                        <div class="loan-name">{loan.name} - {loan.provider}</div>
+                                        <div class="loan-meta">
+                                            <span>App ID: {loan.appId}</span>
+                                            <span class="status-badge">{loan.status}</span>
+                                        </div>
+                                    </div>
+                                </label>
+                            </template>
+                        </div>
+                    </div>
+                </template>
             </div>
 
             <!-- RIGHT COLUMN: ADDRESS + DISCOUNT -->
             <div class="checkout-right">
-                
+
                 <!-- ADDRESS -->
                 <div class="summary-card">
                     <h2 class="section-title">Address</h2>
                     <div class="muted">Delivery Address (Shipping)</div>
-                    <lightning-button
-                        class="confirm-btn"
-                        variant="neutral"
-                        label="Edit Address"
+                    <lightning-button class="confirm-btn" variant="neutral" label="Edit Address"
                         onclick={openEditAddressModal}>
                     </lightning-button>
                 </div>
@@ -247,46 +260,34 @@
                     <h2 class="section-title">Pricing & Discount</h2>
 
                     <div class="radio-group">
-                       
+
 
                         <label>
-                            <input type="radio" name="discountType" value="fixed"
-                                   checked={isFixed} onchange={handleDiscountType}/>
+                            <input type="radio" name="discountType" value="fixed" checked={isFixed}
+                                onchange={handleDiscountType} />
                             Fixed Amount
                         </label>
-                         <label>
-                            <input type="radio" name="discountType" value="percentage"
-                                   checked={isPercentage} onchange={handleDiscountType}/>
+                        <label>
+                            <input type="radio" name="discountType" value="percentage" checked={isPercentage}
+                                onchange={handleDiscountType} />
                             Percentage
                         </label>
                     </div>
 
-                    <lightning-input
-                        data-id="discount"
-                        type="number"
-                        label={discountLabel}
-                        value={discountValue}
+                    <lightning-input data-id="discount" type="number" label={discountLabel} value={discountValue}
                         onchange={handleDiscountValue}>
                     </lightning-input>
-                    <lightning-input
-                        data-id="downPayment"
-                        type="number"
-                        label="Down Payment (₹)"
-                        value={downPayment}
-                        min={minimumDownPayment}
-                        max={finalPayable}
+                    <lightning-input data-id="downPayment" type="number" label="Down Payment (₹)" value={downPayment}
+                        min={minimumDownPayment} max={finalPayable}
                         message-when-range-overflow="Down payment cannot exceed total payable."
-                        message-when-range-underflow={downPaymentMinMessage}
-                        onchange={handleDownPaymentChange}>
+                        message-when-range-underflow={downPaymentMinMessage} onchange={handleDownPaymentChange}>
                     </lightning-input>
 
                     <template if:true={isApprovalRequired}>
                         <div class="approval-note">
                             Discount exceeds allowed {discountThreshold}% for this course. Approval required.
                         </div>
-                        <lightning-textarea
-                            label="Approval Comments"
-                            value={approvalComments}
+                        <lightning-textarea label="Approval Comments" value={approvalComments}
                             onchange={handleApprovalComments}>
                         </lightning-textarea>
                     </template>
@@ -306,12 +307,8 @@
                         <span>₹{finalPayable}</span>
                     </div>
 
-                    <lightning-button
-                        class="confirm-btn"
-                        variant="brand"
-                        label={confirmButtonLabel}
-                        onclick={confirmPurchase}
-                        disabled={disableConfirmPurchase}>
+                    <lightning-button class="confirm-btn" variant="brand" label={confirmButtonLabel}
+                        onclick={confirmPurchase} disabled={disableConfirmPurchase}>
                     </lightning-button>
                 </div>
 

@@ -1,11 +1,21 @@
-import { LightningElement, api, track } from 'lwc';
+import { LightningElement, api, wire } from 'lwc';
 import initializeEligibility from '@salesforce/apex/EligibilityQuickActionController.initializeEligibility';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { CloseActionScreenEvent } from 'lightning/actions';
+import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
+import GP_LEAD_STATUS_FIELD from '@salesforce/schema/Lead.GP_Lead_Status__c';
 
 export default class EligibilityQuickAction extends LightningElement {
     @api recordId;
-    @track isProcessing = false;
+    isProcessing = false;
+
+    @wire(getRecord, { recordId: '$recordId', fields: [GP_LEAD_STATUS_FIELD] })
+    lead;
+
+    get isConfirmDisabled() {
+        const status = getFieldValue(this.lead.data, GP_LEAD_STATUS_FIELD);
+        return this.isProcessing || (status && status !== 'Yet to Initiate');
+    }
 
     handleCancel() {
         this.closeAndReload();

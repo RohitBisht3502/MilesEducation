@@ -86,6 +86,7 @@ relatedLeads = [];
 relatedLeadsLoaded = false;
 relatedLeadEdits = {};
 newLeadCourse = '';
+newLeadEmail = '';
 isCreatingRelatedLead = false;
 
     stageValue = '';
@@ -110,6 +111,9 @@ isCreatingRelatedLead = false;
     mhpTag: '',
     leadOwner: ''
     };
+
+     isDnd = false;
+    isSpam = false;
 
     // call state
     isLive = false;
@@ -149,6 +153,16 @@ openTagLeadUI() {
     CALL_NO_RESPONSE_MS = 30000;
     noResponseTimer = null;
 
+
+
+     handleDndChange(e) {
+        this.isDnd = e.target.checked;
+    }
+
+    handleSpamChange(e) {
+        this.isSpam = e.target.checked;
+    }
+
     // mandatory comment logic
     showCommentBox = true;
     isCommentMandatory = false;
@@ -187,7 +201,12 @@ openTagLeadUI() {
             if (data.level) this.levelValue = data.level;
             if (!this.candidateId && data.candidateId) {
                 this.candidateId = data.candidateId;
+                console.log('Candidate Id:', this.candidateId);
             }
+
+             if (this.candidateId) {
+            this.loadCallHistory();
+        }
         } else if (error) {
             this.errorText = error?.body?.message || 'Failed to load identity';
             console.error('wiredIdentity error', error);
@@ -263,13 +282,16 @@ get disableCreateLead() {
     return (
         !this.candidateId ||
         !this.newLeadCourse ||
+        !this.newLeadEmail ||
         this.availableCourseOptions.length === 0 ||
         this.isCreatingRelatedLead
     );
 }
 
 
-
+handleNewLeadEmailChange(event) {
+    this.newLeadEmail = event.target.value;
+}
 
     handleViewMoreLead() {
         if (!this.recordId) return;
@@ -348,20 +370,30 @@ handleNewLeadCourseChange(event) {
 }
 
 async handleCreateRelatedLead() {
-    if (!this.candidateId || !this.newLeadCourse || this.isCreatingRelatedLead) return;
+    if (!this.candidateId || !this.newLeadCourse || !this.newLeadEmail || this.isCreatingRelatedLead) return;
 
     try {
         this.isCreatingRelatedLead = true;
+
         await createRelatedLead({
             candidateId: this.candidateId,
             course: this.newLeadCourse,
+            email: this.newLeadEmail,
             sourceRecordId: this.recordId
         });
+
         this.newLeadCourse = '';
+        this.newLeadEmail = '';
+
         await this.loadRelatedLeads();
+
     } catch (e) {
         console.error('Create related lead failed:', e);
-        this.toast('Create Failed', e?.body?.message || e?.message || 'Failed to create lead', 'error');
+        this.toast(
+            'Create Failed',
+            e?.body?.message || e?.message || 'Failed to create lead',
+            'error'
+        );
     } finally {
         this.isCreatingRelatedLead = false;
     }
@@ -460,26 +492,35 @@ async loadUntrackedStatus() {
     }
 
 
+async loadWebinarHistory() {
+    if (!this.candidateId) return;
 
-    async loadWebinarHistory() {
-        if (!this.recordId) return;
-
-        const rows = await getWebinarMembers({ recordId: this.recordId });
+    try {
+        const rows = await getWebinarMembers({
+            candidateId: this.candidateId
+        });
 
         const dateFmt = new Intl.DateTimeFormat('en-IN', {
-            day: '2-digit', month: 'short', year: 'numeric'
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
         });
 
         this.webinarHistory = (rows || []).map(r => ({
             id: r.id,
-           
             webinar: r.webinarName,
             status: r.attendanceStatus || 'NA',
-            createdDate: r.createdDate ? dateFmt.format(new Date(r.createdDate)) : 'NA'
+            createdDate: r.createdDate
+                ? dateFmt.format(new Date(r.createdDate))
+                : 'NA'
         }));
 
         this.webinarLoaded = true;
+
+    } catch (e) {
+        console.error('Webinar history load failed:', e);
     }
+}
 
 
     get hasCallHistory() {
@@ -511,23 +552,36 @@ get relatedTabClass() {
 get showRelatedTab() {
     return this.isMissedCall || this.isUntrackedCall;
 }
+get normalizedPrimaryTag() {
+    const raw = (this.primaryTag || '').trim().toLowerCase();
+    return raw.replace(/[^a-z]/g, '');
+}
 
 get isUntrackedCall() {
-    const raw = (this.primaryTag || '').trim().toLowerCase();
-    const tag = raw.replace(/[^a-z]/g, '');
+    const tag = this.normalizedPrimaryTag;
+
     if (tag.includes('untracked')) return true;
+
+    
+    if (tag.includes('ne') || tag.includes('noteligible')) return false;
+
     if (tag.includes('missed')) return false;
+
     return this.isCallLog === true && !this.candidateId;
 }
 
 get isMissedCall() {
-    const raw = (this.primaryTag || '').trim().toLowerCase();
-    const tag = raw.replace(/[^a-z]/g, '');
+    const tag = this.normalizedPrimaryTag;
+
     if (tag.includes('missed')) return true;
+
+
+    if (tag.includes('ne') || tag.includes('noteligible')) return true;
+
     if (tag.includes('untracked')) return false;
+
     return this.isCallLog === true && !!this.candidateId;
 }
-
 
 
 get formattedCreatedDate() {
@@ -554,7 +608,7 @@ get formattedCreatedDate() {
 
     handleL1Change(e) {
         this.l1Value = e.target.value;
-        this.userChangedStage = false; // 👈 reset
+        this.userChangedStage = false; 
 
         this.l2Options = (this.fullMap[this.l1Value] || []).map(v => ({
             label: v,
@@ -597,8 +651,6 @@ get formattedCreatedDate() {
             this.nextFollowUpDate = e.target.value;
         }
     }
-
-
 
     close() {
         try {
@@ -832,7 +884,9 @@ this.noResponseTimer = setTimeout(() => {
                 l1: this.l1Value,
                 l2: this.l2Value,
                 level: this.levelValue,
-                notifyMe: this.notifyMe
+                notifyMe: this.notifyMe,
+                 isDnd: this.isDnd,
+                isSpam: this.isSpam
             };
             if (this.stageValue && String(this.stageValue).trim()) {
                 payload.stage = this.stageValue;
@@ -943,48 +997,56 @@ this.noResponseTimer = setTimeout(() => {
     }
 
 
-    async loadCallHistory() {
-        if (!this.recordId) return;
+async loadCallHistory() {
+    if (!this.recordId) return;
 
-        try {
-            const rows = await getCallHistory({ recordId: this.recordId });
+    try {
+       const rows = await getCallHistory({
+            candidateId: this.candidateId
+        });
 
-            const dateFmt = new Intl.DateTimeFormat('en-IN', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-            });
+        const dateFmt = new Intl.DateTimeFormat('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+        });
 
-            const timeFmt = new Intl.DateTimeFormat('en-IN', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+        const timeFmt = new Intl.DateTimeFormat('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
 
-            this.callHistory = (rows || []).map(r => {
-                const dt = r.startTime || r.createdDate;
-                const d = dt ? new Date(dt) : null;
+        this.callHistory = (rows || []).map(r => {
+            const dt = r.startTime || r.createdDate;
+            const d = dt ? new Date(dt) : null;
 
-                const totalSec = Number(r.durationSeconds || 0);
-                const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
-                const ss = String(totalSec % 60).padStart(2, '0');
+            const totalSec = Number(r.durationSeconds || 0);
+            const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+            const ss = String(totalSec % 60).padStart(2, '0');
 
-                return {
-                    id: r.id,
-                    dateLabel: d ? dateFmt.format(d) : 'NA',
-                    timeLabel: d ? timeFmt.format(d) : '',
-                    durationLabel: `${mm}:${ss}`,
-                    status: r.status || 'NA',
-                    l1: r.l1 || '',
-                    l2: r.l2 || '',
-                    stage: r.stage || ''
-                };
-            });
+            return {
+                id: r.id,
+                dateLabel: d ? dateFmt.format(d) : 'NA',
+                timeLabel: d ? timeFmt.format(d) : '',
+                durationLabel: `${mm}:${ss}`,
+                status: r.status || 'NA',
+                l1: r.l1 || '',
+                l2: r.l2 || '',
+                stage: r.stage || ''
+            };
+        });
 
-        } catch (e) {
-            console.error('Call history load failed:', e);
-        }
+    } catch (e) {
+        console.error('Call history load failed:', e);
     }
+}
 
+get disablePauseBtnFinal() {
+    return (
+        this.isQueuePaused ||    
+        !this.showFeedback        
+    );
+}
     async handlePauseQueue() {
         const saved = await this.saveFeedback({ stopQueue: true });
         if (!saved) {

@@ -207,6 +207,22 @@ public class LeadTriggerConversionClass {
             if (!poToUpdate.isEmpty()) {
                 update poToUpdate;
             }
+
+            List<Eligibility_Folder__c> foldersToUpdate = new List<Eligibility_Folder__c>();
+            for (Eligibility_Folder__c folder : [
+                SELECT Id, Candidate__c, Student__c
+                FROM Eligibility_Folder__c
+                WHERE Candidate__c IN :candidateToAccount.keySet()
+            ]) {
+                Id accId = candidateToAccount.get(folder.Candidate__c);
+                if (accId != null && folder.Student__c != accId) {
+                    folder.Student__c = accId;
+                    foldersToUpdate.add(folder);
+                }
+            }
+            if (!foldersToUpdate.isEmpty()) {
+                update foldersToUpdate;
+            }
         }
         
         syncAccountAddressesFromCandidate(candidateToAccount);

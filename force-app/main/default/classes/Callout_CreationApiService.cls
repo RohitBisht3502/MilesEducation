@@ -84,6 +84,8 @@ public with sharing class Callout_CreationApiService {
             req.setBody(requestPayload);
         }
 
+        System.debug(LoggingLevel.INFO, 'Callout request body: ' + requestPayload);
+
         Http http = new Http();
         HttpResponse res;
         try {
@@ -93,6 +95,11 @@ public with sharing class Callout_CreationApiService {
         }
 
         String responsePayload = res != null ? res.getBody() : null;
+        System.debug(
+            LoggingLevel.INFO,
+            'Callout response status: ' + (res != null ? res.getStatusCode() : null) +
+            ', body: ' + responsePayload
+        );
         if (res == null || res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
             throw new AuraHandledException(buildFriendlyErrorFromPayload(responsePayload));
         }

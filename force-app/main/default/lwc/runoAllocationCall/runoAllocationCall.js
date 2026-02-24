@@ -37,6 +37,8 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     isStageDisabled = false;
 
     activeTab = 'lead';
+    expectedPaymentDate;
+    notifyMe = false;
 
     // L1/L2
     l1Value = '';
@@ -77,16 +79,18 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         level: '',
         canId: '',
         createdDate: '',
-    mhpTag: '',
-    leadOwner: ''
+        mhpTag: '',
+        leadOwner: ''
     };
 
     callHistory = [];
 
     eventHistory = [];
-eventLoaded = false;
-courseValue = '';
-courseOptions = [];
+    eventLoaded = false;
+    // courseValue = '';
+    // courseOptions = [];
+    isDnd = false;
+    isSpam = false;
 
 
 
@@ -99,7 +103,7 @@ courseOptions = [];
     elapsedLabel = '00:00';
     timerId = null;
     webinarHistory = [];
-webinarLoaded = false;
+    webinarLoaded = false;
 
 
     // feedback
@@ -115,7 +119,12 @@ webinarLoaded = false;
     CALL_NO_RESPONSE_MS = 30000;
     noResponseTimer = null;
 
-    // mandatory comment logic
+
+    handleNotifyChange(event) {
+        this.notifyMe = event.target.checked;
+    }
+
+
     // comment box always visible; mandatory controlled by isCommentMandatory
     showCommentBox = true;
     isCommentMandatory = false;
@@ -153,8 +162,8 @@ webinarLoaded = false;
             this.identity = data;
             if (data.stage) this.stageValue = data.stage;
             if (data.level) {
-    this.courseValue = data.level; 
-}
+                this.courseValue = data.level;
+            }
 
         } else if (error) {
             this.errorText = error?.body?.message || 'Failed to load identity';
@@ -175,33 +184,33 @@ webinarLoaded = false;
         }
     }
 
-//   @wire(getPicklistValuesByRecordType, {
-//     objectApiName: LEAD_OBJECT,
-//     recordTypeId: '$recordTypeId'
-// })
-// wiredPicklists({ data, error }) {
-//     if (data && data.picklistFieldValues) {
+    //   @wire(getPicklistValuesByRecordType, {
+    //     objectApiName: LEAD_OBJECT,
+    //     recordTypeId: '$recordTypeId'
+    // })
+    // wiredPicklists({ data, error }) {
+    //     if (data && data.picklistFieldValues) {
 
-//         // Stage
-//         if (data.picklistFieldValues.Stage__c) {
-//             this.stageOptions = data.picklistFieldValues.Stage__c.values.map(v => ({
-//                 label: v.label,
-//                 value: v.value
-//             }));
-//         }
+    //         // Stage
+    //         if (data.picklistFieldValues.Stage__c) {
+    //             this.stageOptions = data.picklistFieldValues.Stage__c.values.map(v => ({
+    //                 label: v.label,
+    //                 value: v.value
+    //             }));
+    //         }
 
-//         // Course (GLOBAL PICKLIST)
-//         if (data.picklistFieldValues.Course__c) {
-//             this.courseOptions = data.picklistFieldValues.Course__c.values.map(v => ({
-//                 label: v.label,
-//                 value: v.value
-//             }));
-//         }
-//     } 
-//     else if (error) {
-//         console.error('Picklist load failed:', error);
-//     }
-// }
+    //         // Course (GLOBAL PICKLIST)
+    //         if (data.picklistFieldValues.Course__c) {
+    //             this.courseOptions = data.picklistFieldValues.Course__c.values.map(v => ({
+    //                 label: v.label,
+    //                 value: v.value
+    //             }));
+    //         }
+    //     } 
+    //     else if (error) {
+    //         console.error('Picklist load failed:', error);
+    //     }
+    // }
 
     // -------------- PAGE REFERENCE (URL SAFE) --------------
 
@@ -222,96 +231,105 @@ webinarLoaded = false;
     }
 
 
-get showFeedbackInLeadTab() {
-    return this.isLeadTab && this.showFeedback;
-}
-
-
-
-get isLeadTab() {
-    return this.activeTab === 'lead';
-}
-
-get isHistoryTab() {
-    return this.activeTab === 'history';
-}
-
-handleTabClick(event) {
-    this.activeTab = event.target.dataset.tab;
-      if (this.activeTab === 'webinar' && !this.webinarLoaded) {
-        this.loadWebinarHistory();
+    get showFeedbackInLeadTab() {
+        return this.isLeadTab && this.showFeedback;
     }
-    if (this.activeTab === 'event' && !this.eventLoaded) {
-    this.loadEventHistory();
-}
-
-}
 
 
-get leadTabClass() {
-    return `tab-item ${this.activeTab === 'lead' ? 'active' : ''}`;
-}
 
-get historyTabClass() {
-    return `tab-item ${this.activeTab === 'history' ? 'active' : ''}`;
-}
+    get isLeadTab() {
+        return this.activeTab === 'lead';
+    }
 
+    get isHistoryTab() {
+        return this.activeTab === 'history';
+    }
 
-get isWebinarTab() {
-    return this.activeTab === 'webinar';
-}
-
-get hasWebinarHistory() {
-    return (this.webinarHistory || []).length > 0;
-}
-get webinarTabClass() {
-    return `tab-item ${this.activeTab === 'webinar' ? 'active' : ''}`;
-}
-
-get eventTabClass() {
-    return `tab-item ${this.activeTab === 'event' ? 'active' : ''}`;
-}
-
-get isEventTab() {
-    return this.activeTab === 'event';
-}
-
-get hasEvents() {
-    return (this.eventHistory || []).length > 0;
-}
-
-
-handleViewMoreLead() {
-    if (!this.recordId) return;
-
-    this[NavigationMixin.GenerateUrl]({
-        type: 'standard__recordPage',
-        attributes: {
-            recordId: this.recordId,
-            objectApiName: 'Lead',
-            actionName: 'view'
+    handleTabClick(event) {
+        this.activeTab = event.target.dataset.tab;
+        if (this.activeTab === 'webinar' && !this.webinarLoaded) {
+            this.loadWebinarHistory();
         }
-    }).then(url => {
-        window.open(url, '_blank'); 
-    });
-}
+        if (this.activeTab === 'event' && !this.eventLoaded) {
+            this.loadEventHistory();
+        }
+
+    }
+
+
+    get leadTabClass() {
+        return `tab-item ${this.activeTab === 'lead' ? 'active' : ''}`;
+    }
+
+    get historyTabClass() {
+        return `tab-item ${this.activeTab === 'history' ? 'active' : ''}`;
+    }
+
+
+    get isWebinarTab() {
+        return this.activeTab === 'webinar';
+    }
+
+    get hasWebinarHistory() {
+        return (this.webinarHistory || []).length > 0;
+    }
+    get webinarTabClass() {
+        return `tab-item ${this.activeTab === 'webinar' ? 'active' : ''}`;
+    }
+
+    get eventTabClass() {
+        return `tab-item ${this.activeTab === 'event' ? 'active' : ''}`;
+    }
+
+    get isEventTab() {
+        return this.activeTab === 'event';
+    }
+
+    get hasEvents() {
+        return (this.eventHistory || []).length > 0;
+    }
+
+
+    handleViewMoreLead() {
+        if (!this.recordId) return;
+
+        this[NavigationMixin.GenerateUrl]({
+            type: 'standard__recordPage',
+            attributes: {
+                recordId: this.recordId,
+                objectApiName: 'Lead',
+                actionName: 'view'
+            }
+        }).then(url => {
+            window.open(url, '_blank');
+        });
+    }
+    handleDndChange(e) {
+        this.isDnd = e.target.checked;
+    }
+
+    handleSpamChange(e) {
+        this.isSpam = e.target.checked;
+    }
+    handleExpectedDateChange(event) {
+        this.expectedPaymentDate = event.target.value;
+    }
 
 
 
+    get formattedCreatedDate() {
+        if (!this.identity.createdDate) return '';
 
-get formattedCreatedDate() {
-    if (!this.identity.createdDate) return '';
+        const date = new Date(this.identity.createdDate);
 
-    const date = new Date(this.identity.createdDate);
-
-    return new Intl.DateTimeFormat('en-IN', {
-        year: 'numeric',
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-    }).format(date);
-}
+        return new Intl.DateTimeFormat('en-IN', {
+            year: 'numeric',
+            month: 'short',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        }).format(date);
+    }
 
 
 
@@ -325,32 +343,32 @@ get formattedCreatedDate() {
         if (!state) return;
 
         const recId =
-        state.recordId ||
-        state.c__recordId ||
-        state.id ||
-        state.c__id;
+            state.recordId ||
+            state.c__recordId ||
+            state.id ||
+            state.c__id;
 
         if (recId && (recId.length === 15 || recId.length === 18)) {
             this.recordId = recId;
             console.log('RecordId resolved from pageRef:', this.recordId);
-          
+
             this.loadCallHistory();
         }
     }
 
-// async loadCourses() {
-//     try {
-//         const rows = await getCourses({ recordId: this.recordId });
+    // async loadCourses() {
+    //     try {
+    //         const rows = await getCourses({ recordId: this.recordId });
 
-//         this.courseOptions = (rows || []).map(c => ({
-//             label: c.Name,
-//             value: c.Id   
-//         }));
+    //         this.courseOptions = (rows || []).map(c => ({
+    //             label: c.Name,
+    //             value: c.Id   
+    //         }));
 
-//     } catch (e) {
-//         console.error('Course load failed', e);
-//     }
-// }
+    //     } catch (e) {
+    //         console.error('Course load failed', e);
+    //     }
+    // }
 
 
 
@@ -366,8 +384,8 @@ get formattedCreatedDate() {
 
         this.resolveRecordIdFromPageRef();
         this.loadPicklists();
-       
-           this.loadStageAndCourse(); 
+
+        this.loadStageAndCourse();
 
         this.loadCallHistory();
         this.subscribeToEvents();
@@ -384,40 +402,40 @@ get formattedCreatedDate() {
 
 
     async loadStageAndCourse() {
-    try {
-        const data = await getStageLevelValues({ recordId: this.recordId });
+        try {
+            const data = await getStageLevelValues({ recordId: this.recordId });
 
-        if (data.stage) {
-            this.stageOptions = data.stage.map(v => ({
-                label: v,
-                value: v
-            }));
+            if (data.stage) {
+                this.stageOptions = data.stage.map(v => ({
+                    label: v,
+                    value: v
+                }));
+            }
+
+            if (data.level) {
+                this.courseOptions = data.level.map(v => ({
+                    label: v,
+                    value: v
+                }));
+            }
+
+        } catch (e) {
+            console.error('Stage/Course load failed:', e);
         }
-
-        if (data.level) {
-            this.courseOptions = data.level.map(v => ({
-                label: v,
-                value: v
-            }));
-        }
-
-    } catch (e) {
-        console.error('Stage/Course load failed:', e);
     }
-}
 
 
 
 
-handleCourseChange(e) {
-    this.courseValue = e.target.value;
-}
+    handleCourseChange(e) {
+        this.courseValue = e.target.value;
+    }
 
     disconnectedCallback() {
         this.stopTimer();
         this.clearFeedbackTimers();
         if (this.subscription) {
-            unsubscribe(this.subscription, () => {});
+            unsubscribe(this.subscription, () => { });
             this.subscription = null;
         }
     }
@@ -448,26 +466,26 @@ handleCourseChange(e) {
     //     }
     // }
 
-async loadEventHistory() {
-    if (!this.recordId) return;
+    async loadEventHistory() {
+        if (!this.recordId) return;
 
-    try {
-        const rows = await getLeadEvents({ recordId: this.recordId });
+        try {
+            const rows = await getLeadEvents({ recordId: this.recordId });
 
-        console.log('Event rows => ', rows);
+            console.log('Event rows => ', rows);
 
-        this.eventHistory = (rows || []).map(r => ({
-            id: r.id,
-            subject: r.subject,
-            attendance: r.attendance || 'NA'
-        }));
+            this.eventHistory = (rows || []).map(r => ({
+                id: r.id,
+                subject: r.subject,
+                attendance: r.attendance || 'NA'
+            }));
 
-        this.eventLoaded = true;
+            this.eventLoaded = true;
 
-    } catch (e) {
-        console.error('Event load failed:', e);
+        } catch (e) {
+            console.error('Event load failed:', e);
+        }
     }
-}
 
 
 
@@ -506,38 +524,35 @@ async loadEventHistory() {
     }
 
 
-async loadWebinarHistory() {
-    if (!this.recordId) return;
+    async loadWebinarHistory() {
+        if (!this.candidateId) return;
 
-    try {
-        const rows = await getWebinarMembers({ recordId: this.recordId });
+        try {
+            const rows = await getWebinarMembers({
+                candidateId: this.candidateId
+            });
 
-        const dateFmt = new Intl.DateTimeFormat('en-US', {
-            month: 'short',
-            day: '2-digit',
-            year: 'numeric'
-        });
+            const dateFmt = new Intl.DateTimeFormat('en-IN', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            });
 
-        this.webinarHistory = (rows || []).map(r => {
-            return {
+            this.webinarHistory = (rows || []).map(r => ({
                 id: r.id,
-                name: r.name,
                 webinar: r.webinarName,
                 status: r.attendanceStatus || 'NA',
                 createdDate: r.createdDate
                     ? dateFmt.format(new Date(r.createdDate))
                     : 'NA'
-            };
-        });
+            }));
 
-        this.webinarLoaded = true;
+            this.webinarLoaded = true;
 
-        console.log('Webinar rows => ', rows);
-
-    } catch (e) {
-        console.error('Webinar load failed:', e);
+        } catch (e) {
+            console.error('Webinar history load failed:', e);
+        }
     }
-}
 
 
 
@@ -545,7 +560,7 @@ async loadWebinarHistory() {
 
 
 
-  
+
 
     updateCommentVisibility() {
         const key = `${this.l1Value}:${this.l2Value}`;
@@ -583,7 +598,7 @@ async loadWebinarHistory() {
 
     handleStageChange(e) {
         this.stageValue = e.target.value;
-          this.userChangedStage = true;
+        this.userChangedStage = true;
     }
 
     handleLevelChange(e) {
@@ -623,46 +638,46 @@ async loadWebinarHistory() {
 
 
     async loadCallHistory() {
-    if (!this.recordId) return;
+        if (!this.recordId) return;
 
-    try {
-        const rows = await getCallHistory({ recordId: this.recordId });
+        try {
+            const rows = await getCallHistory({ recordId: this.recordId });
 
-        const dateFmt = new Intl.DateTimeFormat('en-US', {
-            month: 'short',
-            day: '2-digit',
-            year: 'numeric'
-        });
+            const dateFmt = new Intl.DateTimeFormat('en-US', {
+                month: 'short',
+                day: '2-digit',
+                year: 'numeric'
+            });
 
-        const timeFmt = new Intl.DateTimeFormat('en-US', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+            const timeFmt = new Intl.DateTimeFormat('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
 
-        this.callHistory = (rows || []).map(r => {
-            const dt = r.startTime || r.createdDate;
-            const d = dt ? new Date(dt) : null;
+            this.callHistory = (rows || []).map(r => {
+                const dt = r.startTime || r.createdDate;
+                const d = dt ? new Date(dt) : null;
 
-            const totalSec = Number(r.durationSeconds || 0);
-            const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
-            const ss = String(totalSec % 60).padStart(2, '0');
+                const totalSec = Number(r.durationSeconds || 0);
+                const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+                const ss = String(totalSec % 60).padStart(2, '0');
 
-            return {
-                id: r.id,
-                dateLabel: d ? dateFmt.format(d) : 'NA',
-                timeLabel: d ? timeFmt.format(d) : '',
-                durationLabel: `${mm}:${ss}`,
-                status: r.status || 'NA',
-                l1: r.l1 || '',
-                l2: r.l2 || '',
-                stage: r.stage || ''
-            };
-        });
+                return {
+                    id: r.id,
+                    dateLabel: d ? dateFmt.format(d) : 'NA',
+                    timeLabel: d ? timeFmt.format(d) : '',
+                    durationLabel: `${mm}:${ss}`,
+                    status: r.status || 'NA',
+                    l1: r.l1 || '',
+                    l2: r.l2 || '',
+                    stage: r.stage || ''
+                };
+            });
 
-    } catch (e) {
-        console.error('Call history load failed:', e);
+        } catch (e) {
+            console.error('Call history load failed:', e);
+        }
     }
-}
 
 
     // -------------- CALL API ---------------
@@ -699,17 +714,17 @@ async loadWebinarHistory() {
 
             // 30s no-response timer → show End Call option
             this.clearFeedbackTimers();
-           
-this.noResponseTimer = setTimeout(() => {
-    if (this.isLive && this.callStatus !== 'Ended') {
-        this.canEndCall = true;
-        this.callStatus = 'No Response';
 
-        // ✅ Automatically show feedback after 30s
-        this.showFeedbackSection();
-        this.callButtonDisabled = true; // optional, disable call button
-    }
-}, this.CALL_NO_RESPONSE_MS);
+            this.noResponseTimer = setTimeout(() => {
+                if (this.isLive && this.callStatus !== 'Ended') {
+                    this.canEndCall = true;
+                    this.callStatus = 'No Response';
+
+                    // ✅ Automatically show feedback after 30s
+                    this.showFeedbackSection();
+                    this.callButtonDisabled = true; // optional, disable call button
+                }
+            }, this.CALL_NO_RESPONSE_MS);
 
         } catch (e) {
             this.errorText = e?.body?.message || e?.message || 'Failed to dial';
@@ -850,9 +865,15 @@ this.noResponseTimer = setTimeout(() => {
                 nextFollowUpDate: this.nextFollowUpDate,
                 l1: this.l1Value,
                 l2: this.l2Value,
-               level: this.courseValue,
+                //    level: this.courseValue,
 
-                notifyMe: false
+                notifyMe: this.notifyMe,
+                isDnd: this.isDnd,
+                isSpam: this.isSpam,
+                expectedPaymentDate: this.expectedPaymentDate
+
+
+
             };
             if (this.stageValue && String(this.stageValue).trim()) {
                 payload.stage = this.stageValue;
@@ -871,7 +892,7 @@ this.noResponseTimer = setTimeout(() => {
             );
 
             this.clearFeedbackTimers();
-            payload.courseId = this.courseValue;
+            // payload.courseId = this.courseValue;
 
 
             this.showFeedback = false;
@@ -889,9 +910,9 @@ this.noResponseTimer = setTimeout(() => {
             this.nextFollowUpDate = null;
             sessionStorage.setItem('RUNO_REFRESH_ON_BACK', 'true');
 
-          this.navigateAfterSave();
+            this.navigateAfterSave();
 
-                // this.navigateAfterSave();
+            // this.navigateAfterSave();
 
         } catch (e) {
             let message = 'Failed to save feedback.';
@@ -914,7 +935,7 @@ this.noResponseTimer = setTimeout(() => {
                 }
 
 
-            } catch (err) {}
+            } catch (err) { }
 
             this.dispatchEvent(
                 new ShowToastEvent({
@@ -930,40 +951,40 @@ this.noResponseTimer = setTimeout(() => {
         }
     }
 
-navigateAfterSave() {
-    const state = this.pageRef?.state || {};
+    navigateAfterSave() {
+        const state = this.pageRef?.state || {};
 
-    const recordIdFromUrl =
-        state.c__recordId ||
-        state.recordId ||
-        state.id ||
-        state.c__id;
+        const recordIdFromUrl =
+            state.c__recordId ||
+            state.recordId ||
+            state.id ||
+            state.c__id;
 
-    // CASE 1: Opened from URL / Nav / Utility
-    if (recordIdFromUrl) {
+        // CASE 1: Opened from URL / Nav / Utility
+        if (recordIdFromUrl) {
 
-        this[NavigationMixin.Navigate]({
-            type: 'standard__objectPage',
-            attributes: {
-                objectApiName: 'Lead__c',
-                actionName: 'list'
-            },
-            state: {
-                filterName: 'Recent'
-            }
-        });
+            this[NavigationMixin.Navigate]({
+                type: 'standard__objectPage',
+                attributes: {
+                    objectApiName: 'Lead__c',
+                    actionName: 'list'
+                },
+                state: {
+                    filterName: 'Recent'
+                }
+            });
 
-        // force refresh
-        setTimeout(() => {
-            window.location.reload();
-        }, 500);
+            // force refresh
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
+        }
+
+        // CASE 2: Opened as Quick Action
+        else {
+            this.dispatchEvent(new CloseActionScreenEvent());
+        }
     }
-
-    // CASE 2: Opened as Quick Action
-    else {
-        this.dispatchEvent(new CloseActionScreenEvent());
-    }
-}
 
 
 
@@ -1015,7 +1036,7 @@ navigateAfterSave() {
             .then(resp => {
                 this.subscription = resp;
             })
-            .catch(() => {});
+            .catch(() => { });
     }
 
     onRunoEvent(msg) {

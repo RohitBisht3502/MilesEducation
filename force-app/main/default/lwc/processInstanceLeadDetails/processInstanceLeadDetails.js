@@ -4,20 +4,19 @@ import getLeadForWorkitem from '@salesforce/apex/ProcessInstanceLeadService.getL
 export default class ProcessInstanceLeadDetails extends LightningElement {
     @api recordId;
 
-    leadId;
-    leadRecord;
+    mainLead;
+    mergedLead;
     loadError;
-
 
     @wire(getLeadForWorkitem, { workitemId: '$recordId' })
     wiredLead({ data, error }) {
         if (data) {
-            this.leadRecord = data;
-            this.leadId = data.Id;
+            this.mainLead = data.mainLead;
+            this.mergedLead = data.mergedLead;
             this.loadError = undefined;
         } else if (error) {
-            this.leadRecord = undefined;
-            this.leadId = undefined;
+            this.mainLead = undefined;
+            this.mergedLead = undefined;
             this.loadError = error;
         }
     }
