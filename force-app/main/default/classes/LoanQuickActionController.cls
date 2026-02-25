@@ -238,6 +238,24 @@ public with sharing class LoanQuickActionController {
             if (candId != null) {
                 populateCandidateAddressOnLoan(loan, loanFieldMap, candId);
             }
+
+            if (leadId != null && recordTypeId != null) {
+
+    List<Loan__c> existingLoans = [
+        SELECT Id, Loan_Status__c
+        FROM Loan__c
+        WHERE Lead__c = :leadId
+        AND RecordTypeId = :recordTypeId
+        AND Loan_Status__c IN ('In Progress', 'Approved')
+        LIMIT 1
+    ];
+
+    if (!existingLoans.isEmpty()) {
+        throw new AuraHandledException(
+            'A Loan is already In Progress or Approved for this Lead and Loan Provider.'
+        );
+    }
+        }
         }
 
         applyCurrentAddressFromPermanentSingle(loan);
@@ -246,13 +264,95 @@ public with sharing class LoanQuickActionController {
         String candField = getFirstExistingField(loanFieldMap, new List<String>{ 'Candidate__c', 'Candidate_Id__c' });
         String crsField = getFirstExistingField(loanFieldMap, new List<String>{ 'Program_Name__c', 'Course__c' });
         if (!String.isBlank(candField) && !String.isBlank(crsField)) {
-            Id candId = (Id) loan.get(candField);
+            Id candIdForValidation = (Id) loan.get(candField);
             String course = (String) loan.get(crsField);
-            ValidationResult vr = validateLeadCandidateCourse(candId, course);
+           ValidationResult vr = validateLeadCandidateCourse(candIdForValidation, course);
             if (vr != null && vr.isValid == false) {
                 throw new AuraHandledException(vr.message);
             }
         }
+
+
+
+// ================= PROGRAM AMOUNT VALIDATION =================
+
+String programField = getFirstExistingField(
+    loanFieldMap,
+    new List<String>{ 'Program_Name__c', 'Course__c' }
+);
+
+String amountField = getFirstExistingField(
+    loanFieldMap,
+    new List<String>{ 'Amount_requested__c' }
+);
+
+if (!String.isBlank(programField) && !String.isBlank(amountField)) {
+
+    String program = (String) loan.get(programField);
+    Decimal amount = (Decimal) loan.get(amountField);
+
+    if (!String.isBlank(program) && amount != null) {
+
+        // CPA / CMA → Max 79,000
+        if ((program == 'CPA' || program == 'CMA') && amount > 79000) {
+            throw new AuraHandledException(
+                'Requested amount exceeds the maximum limit for the selected Program.\n' +
+                'CPA/CMA: Max 79,000'
+            );
+        }
+
+        // CAIRA → Max 40,000
+        if (program == 'CAIRA' && amount > 40000) {
+            throw new AuraHandledException(
+                'Requested amount exceeds the maximum limit for the selected Program.\n' +
+                'CAIRA: Max 40,000'
+            );
+        }
+    }
+}
+
+
+        // ================= AKSHAR VALIDATION =================
+if (recordTypeId != null) {
+
+    Schema.RecordTypeInfo rtInfo = Loan__c.SObjectType
+        .getDescribe()
+        .getRecordTypeInfosById()
+        .get(recordTypeId);
+
+    if (rtInfo != null && rtInfo.getDeveloperName() == 'AKSHAR') {
+
+        // PAN Validation
+        String pan = (String) loan.get('PAN_Number__c');
+        if (String.isBlank(pan)) {
+            throw new AuraHandledException('PAN Number is required for AKSHAR.');
+        }
+
+        // PAN Format: 5 letters + 4 digits + 1 letter
+        Pattern panPattern = Pattern.compile('^[A-Z]{5}[0-9]{4}[A-Z]{1}$');
+        if (!panPattern.matcher(pan).matches()) {
+            throw new AuraHandledException('Invalid PAN format. Example: ABCDE1234F');
+        }
+
+       
+       // DOB Validation (Minimum 18 years)
+Date dob = (Date) loan.get('Date_of_Birth__c');
+if (dob == null) {
+    throw new AuraHandledException('Date of Birth is required for AKSHAR.');
+}
+
+Integer age = Date.today().year() - dob.year();
+
+if (Date.today().addYears(-age) < dob) {
+    age--;
+}
+
+if (age < 18) {
+    throw new AuraHandledException('Applicant must be at least 18 years old for AKSHAR.');
+}
+    }
+}
+
 
         // Call vendor API before insert. Throw if it fails.
         Callout_CreationApiService.callAndPopulate(loan);
@@ -260,6 +360,7 @@ public with sharing class LoanQuickActionController {
         insert loan;
         return loan.Id;
     }
+    
 
     @AuraEnabled(cacheable=true)
     public static Map<String, String> getLoanFieldApiCaseMap() {

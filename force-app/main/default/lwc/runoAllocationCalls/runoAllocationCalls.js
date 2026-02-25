@@ -15,6 +15,10 @@ import getLeadEvents from '@salesforce/apex/Webservice_RunoAllocationAPI.getLead
 import { NavigationMixin } from 'lightning/navigation';
 import getLatestUntrackedCallLog 
 from '@salesforce/apex/Webservice_RunoAllocationAPI.getLatestUntrackedCallLog';
+import { getObjectInfo, getPicklistValuesByRecordType } 
+from 'lightning/uiObjectInfoApi';
+import LEAD_OBJECT from '@salesforce/schema/Lead__c';
+import STAGE_FIELD from '@salesforce/schema/Lead__c.Stage__c';
 
 
 
@@ -39,7 +43,7 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
     }
     @api candidateId;
     // isHistoryTab = true;
-
+   objectInfo;
 
     hasRendered = false;
     isStageDisabled = false;
@@ -114,6 +118,7 @@ isCreatingRelatedLead = false;
 
      isDnd = false;
     isSpam = false;
+    recordTypeStageMap = {};
 
     // call state
     isLive = false;
@@ -129,6 +134,7 @@ isCreatingRelatedLead = false;
 openTagLeadUI() {
     this.showTagLeadUI = true;
 }
+dynamicRecordTypeId;
 
   
 
@@ -213,6 +219,32 @@ openTagLeadUI() {
         }
     }
 
+    @wire(getObjectInfo, { objectApiName: LEAD_OBJECT })
+wiredObjectInfo({ data, error }) {
+    if (data) {
+        this.objectInfo = data;
+    } else if (error) {
+        console.error('Object info error', error);
+    }
+}
+
+@wire(getPicklistValuesByRecordType, {
+    objectApiName: LEAD_OBJECT,
+    recordTypeId: '$dynamicRecordTypeId'
+})
+wiredStageValues({ data, error }) {
+    if (data && this.dynamicRecordTypeId) {
+        const stageField = data.picklistFieldValues.Stage__c;
+
+        this.recordTypeStageMap[this.dynamicRecordTypeId] =
+            (stageField?.values || []).map(v => ({
+                label: v.label,
+                value: v.value
+            }));
+    } else if (error) {
+        console.error('Stage picklist load error', error);
+    }
+}
 
     openTagLeadUI() {
     this[NavigationMixin.Navigate]({
@@ -329,17 +361,36 @@ async loadRelatedLeads() {
     if (!this.candidateId) {
         this.relatedLeads = [];
         this.relatedLeadsLoaded = true;
-        this.relatedLeadEdits = {};
         return;
     }
 
     try {
-        const rows = await getRelatedLeads({ candidateId: this.candidateId });
-        this.relatedLeads = (rows || []).map(r => ({
-            id: r.id,
-            course: r.course || 'NA',
-            stage: r.stage || ''
-        }));
+        const rows = await getRelatedLeads({
+            candidateId: this.candidateId
+        });
+
+        const processed = [];
+
+        for (const r of (rows || [])) {
+
+            const recordTypeId = r.recordTypeId;
+
+            // Trigger wire adapter
+            if (recordTypeId && !this.recordTypeStageMap[recordTypeId]) {
+                this.dynamicRecordTypeId = recordTypeId;
+            }
+
+            processed.push({
+                id: r.id,
+                course: r.course || 'NA',
+                stage: r.stage || '',
+                stageOptions:
+                    this.recordTypeStageMap[recordTypeId] || []
+            });
+        }
+
+        this.relatedLeads = processed;
+
     } catch (e) {
         console.error('Related leads load failed:', e);
         this.relatedLeads = [];
@@ -348,6 +399,7 @@ async loadRelatedLeads() {
         this.relatedLeadEdits = {};
     }
 }
+
 
 handleRelatedStageChange(event) {
     const leadId = event.currentTarget.dataset.id;

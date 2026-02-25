@@ -471,6 +471,18 @@ export default class ContactEventCreator extends LightningElement {
             emailsSet.add(ORG_MEETING_EMAIL);
 
             const attendeeEmails = Array.from(emailsSet);
+            const attendeeList = this.participants
+                .filter(p => p && p.email)
+                .map(p => {
+                    const name = (p.name || '').trim();
+                    const email = (p.email || '').trim();
+                    if (name) {
+                        return `${name} - ${email}`;
+                    }
+                    return email;
+                })
+                .join(', ');
+
 
             // 🔹 Convert to proper ISO strings for Apex Datetime params
             const startIso = new Date(this.startDateTime).toISOString();
@@ -484,6 +496,7 @@ export default class ContactEventCreator extends LightningElement {
                 endUtc: endIso,
                 timeZoneId: this.timezone,
                 attendeeEmails: attendeeEmails,
+                attendeeList: attendeeList,
                 meetingType: this.meetingType,
                 typeOfMeeting: this.typeOfMeeting,
                 otherTypeOfMeeting: this.otherTypeOfMeeting,

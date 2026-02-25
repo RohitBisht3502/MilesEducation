@@ -1,35 +1,21 @@
-public without sharing class LeadQ1QueueController {
+public without sharing class LeadQ2QueueController {
 
     @AuraEnabled(cacheable=true)
-    public static List<LeadQueueItemDTO> getQ1Leads() {
+    public static List<LeadQueueItemDTO> getQ2Leads() {
         User currentUser = [SELECT Id, City__c, UserRole.Name FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1];
         String userCity = currentUser.City__c;
 
-        String queueSearchName = userCity + ' High Priorty Queue';
+        // Requirement: Queue name pattern for Q2 is "City Public Queue"
+        String queueSearchName = userCity + ' Public Queue';
         
-        // 1. Verify if the current user is a member of this specific Queue
-        List<GroupMember> membership = [
-            SELECT Id 
-            FROM GroupMember 
-            WHERE Group.Type = 'Queue' 
-            AND Group.Name = :queueSearchName 
-            AND UserOrGroupId = :UserInfo.getUserId()
-            LIMIT 1
-        ];
-
-        // 2. If user is not a member (and not a system admin), return empty list
-        if (membership.isEmpty()) {
-            return new List<LeadQueueItemDTO>();
-        }
-
-        // 3. Fetch leads if membership confirmed
+        // Fetch leads where Owner is a Queue with name matching the user's city public queue, and Queue_Stage__c is Q2
         List<Lead__c> leads = [
             SELECT Id, Name, Phone__c, Email__c, Course__c, City__c, Stage__c, Source_Bucket__c, CreatedDate, 
                    Primary_tag__c, Next_Follow_Up_Date__c, Candidate__c, Is_ReEnquiry__c, Queue_Stage__c
             FROM Lead__c 
             WHERE Owner.Type = 'Queue' 
             AND Owner.Name = :queueSearchName
-            AND Queue_Stage__c = 'Q1'
+            AND Queue_Stage__c = 'Q2'
             AND Is_DND__c = FALSE 
             AND Is_Spam__c = FALSE 
             AND Is_Merged__c = FALSE 
@@ -50,7 +36,6 @@ public without sharing class LeadQ1QueueController {
             dto.createdDate = l.CreatedDate;
             dto.iscallLog   = false;
             
-            // Reusing derivation logic if available or default to something sensible
             dto.primaryTag   = derivePrimaryTag(l.Next_Follow_Up_Date__c, null, l.Candidate__c, l.Is_ReEnquiry__c);
 
             dto.roleTag     = currentUser.UserRole != null ? currentUser.UserRole.Name : null;

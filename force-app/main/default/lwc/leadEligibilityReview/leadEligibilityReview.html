@@ -62,7 +62,7 @@
                 <!-- MESSAGE IF THERE ARE NO FILES ANYWHERE -->
                 <template if:false={hasAnyFile}>
                     <div class="no-files-note">
-                        No eligibility documents have been uploaded yet for this Lead.
+                        No eligibility documents have been uploaded yet for this record.
                     </div>
                 </template>
 
@@ -575,7 +575,7 @@
 
                         <lightning-combobox
                             name="editLeadStatus"
-                            label="Lead Eligibility Status"
+                            label="Record Eligibility Status"
                             value={editLeadStatus}
                             options={leadStatusOptionsForUi}
                             onchange={handleEditFieldChange}>

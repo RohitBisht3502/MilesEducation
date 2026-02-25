@@ -1,0 +1,102 @@
+<template>
+    <div class="container">
+        <!-- Header Section -->
+        <div class="header">
+            <div class="header-left">
+                <lightning-icon icon-name="standard:lead" size="medium"></lightning-icon>
+                <div class="title-group">
+                    <h1>Lead Q2 Queue Management</h1>
+                    <p>Manage leads owned by your city public queue (Stage Q2)</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="btn-refresh" onclick={handleRefresh} disabled={isRefreshing}>
+                    <lightning-icon icon-name="utility:refresh" size="x-small"
+                        class={refreshIconClass}></lightning-icon>
+                    Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- Stats Section -->
+        <div class="stats-bar">
+            <div class="stat-item">
+                <span class="stat-label">Total Leads</span>
+                <span class="stat-value">{totalLeads}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Remaining</span>
+                <span class="stat-value">{remainingLeads}</span>
+            </div>
+        </div>
+
+        <!-- Table Section -->
+        <div class="table-wrapper">
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th class="col-num">#</th>
+                        <th>Name</th>
+                        <th>Course</th>
+                        <th>City</th>
+                        <th>Stage</th>
+                        <th>Bucket</th>
+                        <th>Created</th>
+                        <th>Tag</th>
+                        <th class="col-action">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template for:each={leads} for:item="lead">
+                        <tr key={lead.id}>
+                            <td class="col-num">{lead.rowNumber}</td>
+                            <td class="col-name">
+                                <strong>{lead.name}</strong>
+                                <span class="phone">{lead.phone}</span>
+                            </td>
+                            <td>{lead.courseLabel}</td>
+                            <td>{lead.cityLabel}</td>
+                            <td><span class={lead.levelClass}>{lead.levelLabel}</span></td>
+                            <td><span class={lead.bucketClass}>{lead.bucketLabel}</span></td>
+                            <td>{lead.createdDate}</td>
+                            <td><span class={lead.primaryTagClass}>{lead.primaryTagLabel}</span></td>
+                            <td class="col-action">
+                                <button class="btn-call" data-id={lead.id} onclick={handleCall}>
+                                    <lightning-icon icon-name="utility:call" size="x-small"
+                                        variant="inverse"></lightning-icon>
+                                    Call
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                    <template if:false={hasLeads}>
+                        <tr>
+                            <td colspan="9" class="empty-state">No leads available in Q2 Public Queue.</td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Call Modal -->
+        <template if:true={showModal}>
+            <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open slds-modal_medium">
+                <div class="slds-modal__container">
+                    <header class="slds-modal__header modal-header-custom">
+                        <h2 class="slds-text-heading_medium">Active Call</h2>
+                        <button class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse"
+                            title="Close" onclick={closeModal}>
+                            <lightning-icon icon-name="utility:close" size="small" variant="inverse"></lightning-icon>
+                        </button>
+                    </header>
+
+                    <c-runo-allocation-call-q1 record-id={currentLeadId} auto-call="true"
+                        oncallcomplete={handleCallComplete}>
+                    </c-runo-allocation-call-q1>
+
+                </div>
+            </section>
+            <div class="slds-backdrop slds-backdrop_open"></div>
+        </template>
+    </div>
+</template>

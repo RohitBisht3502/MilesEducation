@@ -15,7 +15,13 @@ public without sharing class USPPathwayLeadService {
             throw new AuraHandledException('US Pathway lead already exists for this student.');
         }
 
-        List<Lead__c> sourceLeads = [SELECT Id, Name, RecordTypeId, Stage__c FROM Lead__c WHERE Student__c = :accountId ORDER BY CreatedDate DESC LIMIT 1];
+        List<Lead__c> sourceLeads = [
+            SELECT Id, Name, RecordTypeId, Stage__c, Email__c, Phone__c, Candidate__c
+            FROM Lead__c
+            WHERE Student__c = :accountId
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
         if (sourceLeads.isEmpty()) {
             throw new AuraHandledException('No Lead found for this student.');
         }
@@ -25,6 +31,9 @@ public without sharing class USPPathwayLeadService {
         newLead.Name = sourceLeads[0].Name;
         newLead.RecordTypeId = uspRecordTypeId;
         newLead.Stage__c = 'U3';
+        newLead.Email__c = sourceLeads[0].Email__c;
+        newLead.Phone__c = sourceLeads[0].Phone__c;
+        newLead.Candidate__c = sourceLeads[0].Candidate__c;
         insert newLead;
 
         return newLead.Id;

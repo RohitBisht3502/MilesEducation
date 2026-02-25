@@ -1,24 +1,14 @@
-import { LightningElement, api, wire } from 'lwc';
+import { LightningElement, api, track } from 'lwc';
 import initializeEligibility from '@salesforce/apex/EligibilityQuickActionController.initializeEligibility';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { CloseActionScreenEvent } from 'lightning/actions';
-import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
-import GP_LEAD_STATUS_FIELD from '@salesforce/schema/Lead.GP_Lead_Status__c';
 
 export default class EligibilityQuickAction extends LightningElement {
     @api recordId;
-    isProcessing = false;
-
-    @wire(getRecord, { recordId: '$recordId', fields: [GP_LEAD_STATUS_FIELD] })
-    lead;
-
-    get isConfirmDisabled() {
-        const status = getFieldValue(this.lead.data, GP_LEAD_STATUS_FIELD);
-        return this.isProcessing || (status && status !== 'Yet to Initiate');
-    }
+    @track isProcessing = false;
 
     handleCancel() {
-        this.closeAndReload();
+        this.dispatchEvent(new CloseActionScreenEvent());
     }
 
     handleConfirm() {
@@ -29,11 +19,11 @@ export default class EligibilityQuickAction extends LightningElement {
                 this.dispatchEvent(
                     new ShowToastEvent({
                         title: 'Eligibility Enabled',
-                        message: 'Eligibility folder structure has been created for this Lead.',
+                        message: 'Eligibility folder structure has been created for this record.',
                         variant: 'success'
                     })
                 );
-                this.closeAndReload();
+                this.dispatchEvent(new CloseActionScreenEvent());
             })
             .catch(error => {
                 let message = 'Something went wrong while enabling eligibility.';
@@ -50,10 +40,5 @@ export default class EligibilityQuickAction extends LightningElement {
                 );
                 this.isProcessing = false;
             });
-    }
-
-    closeAndReload() {
-        this.dispatchEvent(new CloseActionScreenEvent());
-        setTimeout(() => window.location.reload(), 800);
     }
 }

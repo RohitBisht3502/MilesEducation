@@ -10,7 +10,7 @@ public without sharing class EligibilityFileService {
     }
 
     public class NewQualificationRequest {
-        public String salesforceId;           // Lead.Id
+        public String salesforceId;           // UUID__c (Candidate/Student)
         public String qualificationType;      // UG / PG / Certification
         public String qualificationTitle;     // B.Com, CA-Inter
         public String qualificationMonthYear; // e.g. "June 2024"
@@ -43,7 +43,7 @@ public without sharing class EligibilityFileService {
         }
 
         if (input == null || String.isBlank(input.salesforceId)) {
-            res.message = 'Missing Lead Id (salesforceId).';
+            res.message = 'Missing UUID (salesforceId).';
             return res;
         }
 
@@ -70,27 +70,37 @@ public without sharing class EligibilityFileService {
             return res;
         }
 
-        Id leadId = Id.valueOf(input.salesforceId);
+        EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByKey(input.salesforceId);
+        if (ctx == null || (ctx.studentId == null && ctx.candidateId == null)) {
+            res.message = 'No Candidate or Student found for provided UUID.';
+            return res;
+        }
+        Id candidateId = ctx.candidateId;
+        Id studentId = ctx.studentId;
 
         // Find or create the degree folder and its child folders (Certificates/Marksheets)
         Eligibility_Folder__c degreeFolder =
-            EligibilityFolderService.findDegreeFolder(
-                leadId,
+            EligibilityFolderService.findDegreeFolderForContext(
+                candidateId,
+                studentId,
                 input.qualificationType,
                 input.qualificationTitle,
                 input.qualificationMonthYear
             );
         if (degreeFolder == null) {
             degreeFolder = EligibilityFolderService.createDynamicDegreeFolders(
-                leadId,
+                candidateId,
+                studentId,
                 input.qualificationType,
                 input.qualificationTitle
             );
         }
+        EligibilityFolderService.ensureFolderLookups(degreeFolder, candidateId, studentId);
 
         Eligibility_Folder__c certFolder =
             EligibilityFolderService.findCategoryFolderForDoc(
-                leadId,
+                candidateId,
+                studentId,
                 input.qualificationType,
                 input.qualificationTitle,
                 'Certificate'
@@ -98,11 +108,14 @@ public without sharing class EligibilityFileService {
 
         Eligibility_Folder__c markFolder =
             EligibilityFolderService.findCategoryFolderForDoc(
-                leadId,
+                candidateId,
+                studentId,
                 input.qualificationType,
                 input.qualificationTitle,
                 'Marksheet'
             );
+        EligibilityFolderService.ensureFolderLookups(certFolder, candidateId, studentId);
+        EligibilityFolderService.ensureFolderLookups(markFolder, candidateId, studentId);
 
         List<Eligibility_File__c> toUpsert = new List<Eligibility_File__c>();
         List<Eligibility_File__c> toDelete = new List<Eligibility_File__c>();
@@ -110,7 +123,8 @@ public without sharing class EligibilityFileService {
 
         if (certFolder != null) {
             syncFilesForFolder(
-                leadId,
+                candidateId,
+                studentId,
                 certFolder.Id,
                 'Certificate',
                 input.certificateFiles,
@@ -122,7 +136,8 @@ public without sharing class EligibilityFileService {
 
         if (markFolder != null) {
             syncFilesForFolder(
-                leadId,
+                candidateId,
+                studentId,
                 markFolder.Id,
                 'Marksheet',
                 input.marksheetFiles,
@@ -143,8 +158,8 @@ public without sharing class EligibilityFileService {
             EligibilityFolderService.recalcFromFileFolders(affectedFolderIds);
         }
 
-        // Create "Upload document" Task for GP user on Lead
-        createUploadDocTaskForLead(leadId, input);
+        // Create "Upload document" Tasks for Student/GP user or Candidate
+        createUploadDocTasks(candidateId, studentId, input);
 
         res.success = true;
         res.message = 'Qualification files synced successfully.';
@@ -161,7 +176,7 @@ public without sharing class EligibilityFileService {
         res.message = 'Unknown error';
 
         if (String.isBlank(salesforceId)) {
-            res.message = 'Missing Lead Id (salesforceId).';
+            res.message = 'Missing UUID (salesforceId).';
             return res;
         }
 
@@ -171,21 +186,22 @@ public without sharing class EligibilityFileService {
             return res;
         }
 
-        Id leadId;
-        try {
-            leadId = Id.valueOf(salesforceId);
-        } catch (Exception e) {
-            res.message = 'Invalid Lead Id (salesforceId).';
+        EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByKey(salesforceId);
+        if (ctx == null || (ctx.studentId == null && ctx.candidateId == null)) {
+            res.message = 'No Candidate or Student found for provided UUID.';
             return res;
         }
+        Id candidateId = ctx.candidateId;
+        Id studentId = ctx.studentId;
 
         String label = EligibilityPathParser.flatFolderLabel(key);
         Eligibility_Folder__c mainFolder =
-            EligibilityFolderService.findMainFolderForFlatType(leadId, key, label);
+            EligibilityFolderService.findMainFolderForFlatType(candidateId, studentId, key, label);
         if (mainFolder == null) {
             res.message = 'Main folder not found for ' + (label != null ? label : key) + '.';
             return res;
         }
+        EligibilityFolderService.ensureFolderLookups(mainFolder, candidateId, studentId);
 
         List<Eligibility_File__c> toUpsert = new List<Eligibility_File__c>();
         List<Eligibility_File__c> toDelete = new List<Eligibility_File__c>();
@@ -193,7 +209,8 @@ public without sharing class EligibilityFileService {
 
         String logicalType = String.isNotBlank(label) ? label : key;
         syncFilesForFolder(
-            leadId,
+            candidateId,
+            studentId,
             mainFolder.Id,
             logicalType,
             incoming,
@@ -217,7 +234,7 @@ public without sharing class EligibilityFileService {
         req.qualificationTitle = logicalType;
         req.qualificationType = logicalType;
         req.qualificationMonthYear = null;
-        createUploadDocTaskForLead(leadId, req);
+        createUploadDocTasks(candidateId, studentId, req);
 
         res.success = true;
         res.message = 'Main folder files synced successfully.';
@@ -237,7 +254,8 @@ public without sharing class EligibilityFileService {
     }
 
     private static void syncFilesForFolder(
-        Id leadId,
+        Id candidateId,
+        Id studentId,
         Id folderId,
         String logicalFileType, // "Certificate" / "Marksheet"
         List<IncomingFile> incoming,
@@ -247,13 +265,32 @@ public without sharing class EligibilityFileService {
     ) {
         if (incoming == null) incoming = new List<IncomingFile>();
 
-        List<Eligibility_File__c> existing = [
-            SELECT Id, Candidate__c, Folder__c, File_UUID__c, Status__c,
-                   Storage_Key__c, File_Format__c, File_Type__c
-            FROM Eligibility_File__c
-            WHERE Candidate__c = :leadId
-              AND Folder__c = :folderId
-        ];
+        List<Eligibility_File__c> existing;
+        if (studentId != null && candidateId != null) {
+            existing = [
+                SELECT Id, Candidate__c, Student__c, Folder__c, File_UUID__c, Status__c,
+                       Storage_Key__c, File_Format__c, File_Type__c
+                FROM Eligibility_File__c
+                WHERE Folder__c = :folderId
+                  AND (Student__c = :studentId OR Candidate__c = :candidateId)
+            ];
+        } else if (studentId != null) {
+            existing = [
+                SELECT Id, Candidate__c, Student__c, Folder__c, File_UUID__c, Status__c,
+                       Storage_Key__c, File_Format__c, File_Type__c
+                FROM Eligibility_File__c
+                WHERE Folder__c = :folderId
+                  AND Student__c = :studentId
+            ];
+        } else {
+            existing = [
+                SELECT Id, Candidate__c, Student__c, Folder__c, File_UUID__c, Status__c,
+                       Storage_Key__c, File_Format__c, File_Type__c
+                FROM Eligibility_File__c
+                WHERE Folder__c = :folderId
+                  AND Candidate__c = :candidateId
+            ];
+        }
 
         Map<String, Eligibility_File__c> existingByUuid = new Map<String, Eligibility_File__c>();
         Set<String> existingUuids = new Set<String>();
@@ -282,10 +319,21 @@ public without sharing class EligibilityFileService {
                     File_Type__c = logicalFileType,
                     Status__c = 'Submitted'
                 );
+                if (candidateId != null) {
+                    upd.Candidate__c = candidateId;
+                }
+                if (studentId != null) {
+                    upd.Student__c = studentId;
+                }
                 toUpsert.add(upd);
             } else {
                 Eligibility_File__c nf = new Eligibility_File__c();
-                nf.Candidate__c = leadId;
+                if (candidateId != null) {
+                    nf.Candidate__c = candidateId;
+                }
+                if (studentId != null) {
+                    nf.Student__c = studentId;
+                }
                 nf.Folder__c = folderId;
                 nf.Name = fileName;
                 nf.File_UUID__c = inf.uuid;
@@ -308,26 +356,65 @@ public without sharing class EligibilityFileService {
         }
     }
 
-    private static void createUploadDocTaskForLead(Id leadId, NewQualificationRequest req) {
-        if (leadId == null || req == null) {
+    private static void createUploadDocTasks(Id candidateId, Id studentId, NewQualificationRequest req) {
+        if (req == null || (candidateId == null && studentId == null)) {
             return;
         }
 
-        Lead l = [
-            SELECT Id, OwnerId, GP_User__c
-            FROM Lead
-            WHERE Id = :leadId
-            LIMIT 1
-        ];
+        List<Task> tasks = new List<Task>();
 
-        Id ownerForTask = (l.GP_User__c != null) ? l.GP_User__c : l.OwnerId;
-        if (ownerForTask == null) {
-            return;
+        if (studentId != null) {
+            Account a = [
+                SELECT Id, OwnerId, GP_User__c
+                FROM Account
+                WHERE Id = :studentId
+                LIMIT 1
+            ];
+
+            Id gpUserId = a.GP_User__c;
+            if (gpUserId == null && candidateId != null) {
+                Lead l = [
+                    SELECT GP_User__c
+                    FROM Lead
+                    WHERE Id = :candidateId
+                    LIMIT 1
+                ];
+                gpUserId = l.GP_User__c;
+            }
+
+            if (a.OwnerId != null) {
+                tasks.add(buildUploadTask(a.OwnerId, null, a.Id, req));
+            }
+            if (gpUserId != null && gpUserId != a.OwnerId) {
+                tasks.add(buildUploadTask(gpUserId, null, a.Id, req));
+            }
+        } else if (candidateId != null) {
+            Lead l = [
+                SELECT Id, OwnerId, GP_User__c
+                FROM Lead
+                WHERE Id = :candidateId
+                LIMIT 1
+            ];
+            Id ownerForTask = (l.GP_User__c != null) ? l.GP_User__c : l.OwnerId;
+            if (ownerForTask != null) {
+                tasks.add(buildUploadTask(ownerForTask, l.Id, null, req));
+            }
         }
 
+        if (!tasks.isEmpty()) {
+            insert tasks;
+        }
+    }
+
+    private static Task buildUploadTask(Id ownerId, Id whoId, Id whatId, NewQualificationRequest req) {
         Task t = new Task();
-        t.OwnerId  = ownerForTask;
-        t.WhoId    = l.Id;
+        t.OwnerId  = ownerId;
+        if (whoId != null) {
+            t.WhoId = whoId;
+        }
+        if (whatId != null) {
+            t.WhatId = whatId;
+        }
         t.Subject  = 'Upload eligibility documents - ' +
                      (String.isNotBlank(req.qualificationTitle)
                         ? req.qualificationTitle
@@ -351,7 +438,6 @@ public without sharing class EligibilityFileService {
         }
 
         t.Description = bodyText;
-
-        insert t;
+        return t;
     }
 }

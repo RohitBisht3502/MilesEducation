@@ -12,18 +12,44 @@ public without sharing class EligibilityQuickActionController {
         if (recordId == null) {
             throw new AuraHandledException('Record Id is required.');
         }
-        String eligibility = 'GP';
-        List<Lead> leads = [SELECT Id, OwnerId, Phone, City__c, Course__c, Source_Bucket__c, GP_User__c, GP_Lead_Status__c, LeadSource FROM Lead WHERE Id = :recordId LIMIT 1];
+        String eligibility = 'Eligibility Criteria';
 
-        if (leads.isEmpty()) return;
+        Schema.SObjectType sobjectType = recordId.getSObjectType();
+        if (sobjectType == Lead.SObjectType) {
+            List<Lead> leads = [
+                SELECT Id, OwnerId, Phone, City__c, Course__c, Source_Bucket__c, GP_User__c, GP_Lead_Status__c, LeadSource
+                FROM Lead
+                WHERE Id = :recordId
+                LIMIT 1
+            ];
 
-        for (Lead l : leads) {
-            l.GP_Lead_Status__c = 'Initiated';
+            if (leads.isEmpty()) return;
+
+            for (Lead l : leads) {
+                l.GP_Lead_Status__c = 'Initiated';
+            }
+
+            RoundRobinAssigner.assignWithStickyAndRoundRobin((List<SObject>) leads, 'Lead', eligibility);
+            update leads;
+
+            EligibilityFolderService.createFoldersForLead(recordId);
+            return;
         }
 
-        RoundRobinAssigner.assignWithStickyAndRoundRobin((List<SObject>) leads,'Lead', eligibility);
-        update leads;
+        if (sobjectType == Account.SObjectType) {
+            EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByRecordId(recordId);
+            if (ctx.studentId == null) return;
 
-        EligibilityFolderService.createFoldersForLead(recordId);
+            Account a = [
+                SELECT Id, GP_Lead_Status__c
+                FROM Account
+                WHERE Id = :ctx.studentId
+                LIMIT 1
+            ];
+            a.GP_Lead_Status__c = 'Initiated';
+            update a;
+
+            EligibilityFolderService.createFoldersForRecord(ctx.candidateId, ctx.studentId);
+        }
     }
 }

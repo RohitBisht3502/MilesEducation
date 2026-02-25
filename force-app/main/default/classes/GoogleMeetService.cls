@@ -1,8 +1,9 @@
 /*
-    Author       : ROHIT SINGH BISHT
-    Description  : 
-*/
+ * Author: Rohit Singh Bisht
+ * Description: Google Meet + Salesforce Event creation service
+ */
 public without sharing class GoogleMeetService {
+
     private static final String NC = 'GMeet_Scheduler';
     private static final String ORG_MEETING_EMAIL = 'meetings@mileseducation.com';
 
@@ -16,53 +17,62 @@ public without sharing class GoogleMeetService {
     }
 
     @AuraEnabled(cacheable=false)
-    public static CreateResult createMeetEvent(String subject, String description, Datetime startUtc, Datetime endUtc, String timeZoneId, List<String> attendeeEmails) {
+    public static CreateResult createMeetEvent(
+        String subject,
+        String description,
+        Datetime startUtc,
+        Datetime endUtc,
+        String timeZoneId,
+        List<String> attendeeEmails
+    ) {
         return createMeetEventInternal('primary', subject, description, startUtc, endUtc, timeZoneId, attendeeEmails);
     }
 
     @AuraEnabled(cacheable=false)
-  public static CreateResult createMeetingWithEvent(
-    Id recordId,
-    String subject,
-    String description,
-    Datetime startUtc,
-    Datetime endUtc,
-    String timeZoneId,
-    List<String> attendeeEmails,
-    String meetingType,
-    String typeOfMeeting,
-    String otherTypeOfMeeting,
-    Integer durationMinutes
-)
- {
+    public static CreateResult createMeetingWithEvent(
+        Id recordId,
+        String subject,
+        String description,
+        Datetime startUtc,
+        Datetime endUtc,
+        String timeZoneId,
+        List<String> attendeeEmails,
+        String attendeeList,
+        String meetingType,
+        String typeOfMeeting,
+        String otherTypeOfMeeting,
+        Integer durationMinutes
+    ) {
         if (String.isBlank(timeZoneId)) timeZoneId = 'Asia/Kolkata';
         if (attendeeEmails == null) attendeeEmails = new List<String>();
 
-        Boolean hasOrg = false;
-        for (String e : attendeeEmails) {
-            if (!String.isBlank(e) && e.trim().toLowerCase() == ORG_MEETING_EMAIL.toLowerCase()) {
-                hasOrg = true;
-                break;
-            }
-        }
-        if (!hasOrg) {
-            attendeeEmails.add(ORG_MEETING_EMAIL);
-        }
+        ensureOrgMeetingEmail(attendeeEmails);
+        System.debug('AttendeeList: ' + attendeeList);
 
         String subjectFinal = subject;
-        if (String.isBlank(subjectFinal) && !String.isBlank(typeOfMeeting)) {
+        if (String.isBlank(subjectFinal) && String.isNotBlank(typeOfMeeting)) {
             subjectFinal = typeOfMeeting;
         }
 
         String descriptionFinal = description;
         if (String.isBlank(descriptionFinal)) {
             List<String> parts = new List<String>();
-            if (!String.isBlank(meetingType)) parts.add(meetingType);
-            if (!String.isBlank(typeOfMeeting)) parts.add(typeOfMeeting);
+            if (String.isNotBlank(meetingType)) parts.add(meetingType);
+            if (String.isNotBlank(typeOfMeeting)) parts.add(typeOfMeeting);
             if (!parts.isEmpty()) descriptionFinal = String.join(parts, ' - ');
         }
 
-        CreateResult result = createMeetEventInternal(ORG_MEETING_EMAIL, subjectFinal, descriptionFinal, startUtc, endUtc, timeZoneId, attendeeEmails );
+        validateLeadEmailIfApplicable(recordId);
+
+        CreateResult result = createMeetEventInternal(
+            ORG_MEETING_EMAIL,
+            subjectFinal,
+            descriptionFinal,
+            startUtc,
+            endUtc,
+            timeZoneId,
+            attendeeEmails
+        );
 
         Event ev = new Event();
         ev.Subject       = subjectFinal;
@@ -71,59 +81,32 @@ public without sharing class GoogleMeetService {
         ev.EndDateTime   = endUtc;
         ev.OwnerId       = UserInfo.getUserId();
         ev.Stage__c      = 'Scheduled';
-        if (!String.isBlank(result.meetUrl)) {
+
+        if (String.isNotBlank(result.meetUrl)) {
             ev.Location = result.meetUrl;
         }
-
         if (recordId != null) {
             ev.WhatId = recordId;
         }
 
-        Schema.DescribeSObjectResult evDescribe = Event.SObjectType.getDescribe();
-        Map<String, Schema.SObjectField> fMap = evDescribe.fields.getMap();
+        Map<String, Schema.SObjectField> fMap = Event.SObjectType.getDescribe().fields.getMap();
 
-        if (!String.isBlank(meetingType) && fMap.containsKey('Meeting_type__c')) {
-            ev.put('Meeting_type__c', meetingType);
-        }
-        if (!String.isBlank(typeOfMeeting) && fMap.containsKey('Type_of_Meeting__c')) {
-    ev.put('Type_of_Meeting__c', typeOfMeeting);
-}
-
-
-//  Validate Lead email from lookup
-if (recordId != null) {
-
-    Lead__c leadRec = [
-        SELECT Id, Email__c 
-        FROM Lead__c 
-        WHERE Id = :recordId
-        LIMIT 1
-    ];
-
-    if (String.isBlank(leadRec.Email__c)) {
-        throw new AuraHandledException(
-            'Lead email is required before registering meeting.'
-        );
-    }
-}
-
-        if (!String.isBlank(otherTypeOfMeeting) && fMap.containsKey('Others__c')) {
-            ev.put('Others__c', otherTypeOfMeeting);
-        }
+        putIfPresent(ev, fMap, 'Meeting_type__c', meetingType);
+        putIfPresent(ev, fMap, 'Type_of_Meeting__c', typeOfMeeting);
+        putIfPresent(ev, fMap, 'Others__c', otherTypeOfMeeting);
 
         if (durationMinutes != null && fMap.containsKey('Duration__c')) {
             ev.put('Duration__c', durationMinutes);
         }
-
-        if (fMap.containsKey('ConferenceId__c') && !String.isBlank(result.conferenceId)) {
+        if (fMap.containsKey('ConferenceId__c') && String.isNotBlank(result.conferenceId)) {
             ev.put('ConferenceId__c', result.conferenceId);
         }
-
-        if (fMap.containsKey('Event_Id__c') && !String.isBlank(result.eventId)) {
+        if (fMap.containsKey('Event_Id__c') && String.isNotBlank(result.eventId)) {
             ev.put('Event_Id__c', result.eventId);
         }
-
-
+        if (String.isNotBlank(attendeeList) && fMap.containsKey('Attendee_List__c')) {
+            ev.put('Attendee_List__c', attendeeList);
+        }
 
         insert ev;
         result.salesforceEventId = ev.Id;
@@ -131,19 +114,27 @@ if (recordId != null) {
         return result;
     }
 
-    private static CreateResult createMeetEventInternal(String calendarId, String subject, String description, Datetime startUtc, Datetime endUtc, String timeZoneId, List<String> attendeeEmails) {
+    private static CreateResult createMeetEventInternal(
+        String calendarId,
+        String subject,
+        String description,
+        Datetime startUtc,
+        Datetime endUtc,
+        String timeZoneId,
+        List<String> attendeeEmails
+    ) {
         if (String.isBlank(timeZoneId)) timeZoneId = 'Asia/Kolkata';
         if (String.isBlank(calendarId)) calendarId = 'primary';
 
         Map<String, Object> body = new Map<String, Object>();
         body.put('summary', subject);
-        if (!String.isBlank(description)) body.put('description', description);
+        if (String.isNotBlank(description)) body.put('description', description);
 
-        body.put('start', new Map<String,Object>{
+        body.put('start', new Map<String, Object>{
             'dateTime' => startUtc.formatGmt('yyyy-MM-dd\'T\'HH:mm:ss\'Z\''),
             'timeZone' => timeZoneId
         });
-        body.put('end', new Map<String,Object>{
+        body.put('end', new Map<String, Object>{
             'dateTime' => endUtc.formatGmt('yyyy-MM-dd\'T\'HH:mm:ss\'Z\''),
             'timeZone' => timeZoneId
         });
@@ -152,20 +143,21 @@ if (recordId != null) {
             List<Object> attendees = new List<Object>();
             for (String e : attendeeEmails) {
                 if (String.isNotBlank(e)) {
-                    attendees.add(new Map<String,Object>{ 'email' => e.trim() });
+                    attendees.add(new Map<String, Object>{ 'email' => e.trim() });
                 }
             }
             if (!attendees.isEmpty()) body.put('attendees', attendees);
         }
 
-        body.put('conferenceData', new Map<String,Object>{
-            'createRequest' => new Map<String,Object>{
+        body.put('conferenceData', new Map<String, Object>{
+            'createRequest' => new Map<String, Object>{
                 'requestId' => String.valueOf(Crypto.getRandomLong()),
-                'conferenceSolutionKey' => new Map<String,Object>{ 'type' => 'hangoutsMeet' }
+                'conferenceSolutionKey' => new Map<String, Object>{ 'type' => 'hangoutsMeet' }
             }
         });
 
         String encodedCalId = EncodingUtil.urlEncode(calendarId, 'UTF-8');
+
         HttpRequest req = new HttpRequest();
         req.setEndpoint(
             'callout:' + NC +
@@ -180,30 +172,48 @@ if (recordId != null) {
 
         Http http = new Http();
         HttpResponse res;
+
         try {
             res = http.send(req);
         } catch (Exception e) {
-            IntegrationLogUtil.insertLog('GoogleMeetService', requestPayload, null, 'Callout error: ' + e.getMessage(), 'Failed',  null );
+            IntegrationLogUtil.insertLog(
+                'GoogleMeetService',
+                requestPayload,
+                null,
+                'Callout error: ' + e.getMessage(),
+                'Failed',
+                null
+            );
             throw new AuraHandledException('Google Meet callout failed: ' + e.getMessage());
         }
 
         Integer code = res.getStatusCode();
         String responseBody = res.getBody();
-        String truncatedResponse = (responseBody != null && responseBody.length() > 3000)
-            ? responseBody.substring(0, 3000)
-            : responseBody;
+        String truncatedResponse =
+            (responseBody != null && responseBody.length() > 3000)
+                ? responseBody.substring(0, 3000)
+                : responseBody;
 
         if (code < 200 || code >= 300) {
-            IntegrationLogUtil.insertLog( 'GoogleMeetService', requestPayload, truncatedResponse,'Non-2xx response: ' + res.getStatus(),'Failed', code);
+            IntegrationLogUtil.insertLog(
+                'GoogleMeetService',
+                requestPayload,
+                truncatedResponse,
+                'Non-2xx response: ' + res.getStatus(),
+                'Failed',
+                code
+            );
             throw new AuraHandledException('Google error: ' + res.getStatus() + ' — ' + responseBody);
         }
 
         Map<String, Object> m = (Map<String, Object>) JSON.deserializeUntyped(responseBody);
+
         String meetUrl;
         String conferenceId;
-        
+
         if (m.containsKey('conferenceData')) {
-            Map<String,Object> cd = (Map<String,Object>) m.get('conferenceData');
+            Map<String, Object> cd = (Map<String, Object>) m.get('conferenceData');
+
             if (cd != null && cd.containsKey('conferenceId')) {
                 conferenceId = (String) cd.get('conferenceId');
             }
@@ -211,7 +221,7 @@ if (recordId != null) {
             if (cd != null && cd.containsKey('entryPoints')) {
                 List<Object> eps = (List<Object>) cd.get('entryPoints');
                 for (Object o : eps) {
-                    Map<String,Object> ep = (Map<String,Object>) o;
+                    Map<String, Object> ep = (Map<String, Object>) o;
                     if (ep.get('entryPointType') == 'video' && ep.containsKey('uri')) {
                         meetUrl = (String) ep.get('uri');
                         break;
@@ -219,103 +229,162 @@ if (recordId != null) {
                 }
             }
         }
+
         if (String.isBlank(meetUrl) && m.containsKey('hangoutLink')) {
             meetUrl = (String) m.get('hangoutLink');
         }
 
-        IntegrationLogUtil.insertLog('GoogleMeetService', requestPayload, truncatedResponse, 'Success', 'Success', code );
+        IntegrationLogUtil.insertLog(
+            'GoogleMeetService',
+            requestPayload,
+            truncatedResponse,
+            'Success',
+            'Success',
+            code
+        );
 
         CreateResult out = new CreateResult();
-        out.eventId  = (String) m.get('id');
-        out.htmlLink = (String) m.get('htmlLink');
-        out.meetUrl  = meetUrl;
-        out.rawJson  = responseBody;
-        out.conferenceId = conferenceId;
+        out.eventId       = (String) m.get('id');
+        out.htmlLink      = (String) m.get('htmlLink');
+        out.meetUrl       = meetUrl;
+        out.rawJson       = responseBody;
+        out.conferenceId  = conferenceId;
         return out;
     }
 
     @AuraEnabled
-    public static CreateResult createMeetForOpportunity( Id opportunityId, Datetime startUtc, Datetime endUtc, String attendeesCsv ) {
-        Opportunity opp = [SELECT Id, Name FROM Opportunity WHERE Id = :opportunityId LIMIT 1];
+    public static CreateResult createMeetForOpportunity(
+        Id opportunityId,
+        Datetime startUtc,
+        Datetime endUtc,
+        String attendeesCsv
+    ) {
+        Opportunity opp = [
+            SELECT Id, Name
+            FROM Opportunity
+            WHERE Id = :opportunityId
+            LIMIT 1
+        ];
+
         List<String> emails = new List<String>();
-        if (!String.isBlank(attendeesCsv)) {
+        if (String.isNotBlank(attendeesCsv)) {
             for (String s : attendeesCsv.split('[,;\\s]+')) {
                 if (String.isNotBlank(s)) emails.add(s.trim());
             }
         }
-        CreateResult r = createMeetEvent( 'Meeting: ' + opp.Name, 'Auto-created from Salesforce', startUtc, endUtc, 'Asia/Kolkata', emails);
 
-        Schema.DescribeSObjectResult d = Opportunity.SObjectType.getDescribe();
-        if (d.fields.getMap().containsKey('Meeting_Link__c')) {
+        CreateResult r = createMeetEvent(
+            'Meeting: ' + opp.Name,
+            'Auto-created from Salesforce',
+            startUtc,
+            endUtc,
+            'Asia/Kolkata',
+            emails
+        );
+
+        if (Opportunity.SObjectType.getDescribe().fields.getMap().containsKey('Meeting_Link__c')) {
             opp.put('Meeting_Link__c', r.meetUrl);
             update opp;
         }
+
         return r;
     }
 
     @AuraEnabled(cacheable=true)
     public static String getCurrentUserEmail() {
         try {
-            User currentUser = [SELECT Id, Email FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1];
+            User currentUser = [
+                SELECT Id, Email
+                FROM User
+                WHERE Id = :UserInfo.getUserId()
+                LIMIT 1
+            ];
             return currentUser.Email;
         } catch (Exception e) {
             throw new AuraHandledException('Error getting user email: ' + e.getMessage());
         }
     }
 
-   @AuraEnabled(cacheable=true)
-public static List<Map<String, String>> getEventPicklistValues(
-    String fieldApiName
-) {
-    if (String.isBlank(fieldApiName)) {
-        throw new AuraHandledException('Field API name is required');
+    @AuraEnabled(cacheable=true)
+    public static List<Map<String, String>> getEventPicklistValues(String fieldApiName) {
+        if (String.isBlank(fieldApiName)) {
+            throw new AuraHandledException('Field API name is required');
+        }
+
+        Map<String, Schema.SObjectField> fieldMap = Event.SObjectType.getDescribe().fields.getMap();
+        if (!fieldMap.containsKey(fieldApiName)) {
+            throw new AuraHandledException('Field does not exist on Event: ' + fieldApiName);
+        }
+
+        Schema.DescribeFieldResult dfr = fieldMap.get(fieldApiName).getDescribe();
+        List<Map<String, String>> options = new List<Map<String, String>>();
+
+        for (Schema.PicklistEntry pe : dfr.getPicklistValues()) {
+            if (pe.isActive()) {
+                options.add(new Map<String, String>{
+                    'label' => pe.getLabel(),
+                    'value' => pe.getValue()
+                });
+            }
+        }
+
+        return options;
     }
 
-    Map<String, Schema.SObjectField> fieldMap =
-        Event.SObjectType.getDescribe().fields.getMap();
-
-    if (!fieldMap.containsKey(fieldApiName)) {
-        throw new AuraHandledException(
-            'Field does not exist on Event: ' + fieldApiName
-        );
-    }
-
-    Schema.DescribeFieldResult dfr =
-        fieldMap.get(fieldApiName).getDescribe();
-
-    List<Map<String, String>> options = new List<Map<String, String>>();
-
-    for (Schema.PicklistEntry pe : dfr.getPicklistValues()) {
-        if (pe.isActive()) {
-            options.add(new Map<String, String>{
-                'label' => pe.getLabel(),
-                'value' => pe.getValue()
-            });
+    @AuraEnabled
+    public static Boolean checkExistingMeetings(Datetime startUtc, Datetime endUtc) {
+        try {
+            List<Event> existingEvents = [
+                SELECT Id
+                FROM Event
+                WHERE StartDateTime = :startUtc
+                AND EndDateTime = :endUtc
+                LIMIT 1
+            ];
+            return !existingEvents.isEmpty();
+        } catch (Exception e) {
+            System.debug('Error: ' + e.getMessage());
+            return false;
         }
     }
 
-    return options;
-}
+    private static void ensureOrgMeetingEmail(List<String> attendeeEmails) {
+        if (attendeeEmails == null) return;
 
-@AuraEnabled
-public static Boolean checkExistingMeetings(Datetime startUtc, Datetime endUtc) {
-    try {
-        // Query for meetings with EXACT same start and end datetime
-        List<Event> existingEvents = [
-            SELECT Id 
-            FROM Event 
-            WHERE StartDateTime = :startUtc
-            AND EndDateTime = :endUtc
+        for (String e : attendeeEmails) {
+            if (String.isNotBlank(e) && e.trim().toLowerCase() == ORG_MEETING_EMAIL.toLowerCase()) {
+                return;
+            }
+        }
+        attendeeEmails.add(ORG_MEETING_EMAIL);
+    }
+
+    private static void validateLeadEmailIfApplicable(Id recordId) {
+        if (recordId == null) return;
+
+        String prefix = String.valueOf(recordId).left(3);
+        if (prefix != Lead__c.SObjectType.getDescribe().getKeyPrefix()) return;
+
+        Lead__c leadRec = [
+            SELECT Id, Email__c
+            FROM Lead__c
+            WHERE Id = :recordId
             LIMIT 1
         ];
-        
-        // Return true if duplicate found
-        return !existingEvents.isEmpty();
-        
-    } catch(Exception e) {
-        System.debug('Error: ' + e.getMessage());
-        return false;
-    }
-}
 
+        if (String.isBlank(leadRec.Email__c)) {
+            throw new AuraHandledException('Lead email is required before registering meeting.');
+        }
+    }
+
+    private static void putIfPresent(Event ev, Map<String, Schema.SObjectField> fMap, String fieldApi, Object value) {
+        if (ev == null || fMap == null) return;
+        if (value == null) return;
+
+        if (value instanceof String && String.isBlank((String) value)) return;
+
+        if (fMap.containsKey(fieldApi)) {
+            ev.put(fieldApi, value);
+        }
+    }
 }

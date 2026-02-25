@@ -66,27 +66,54 @@ global without sharing class EligibilityApi {
 
             if (String.isBlank(sfId)) {
                 res.success = false;
-                res.message = 'Missing sf_id (Lead Id).';
+                res.message = 'Missing sf_id (UUID).';
                 logParams.status = 'failed';
                 logParams.errorMessage = res.message;
                 return res;
             }
 
-            // Validate Lead status (must not be "Yet to Initiate")
-            Lead targetLead = [
-                SELECT GP_Lead_Status__c
-                FROM Lead
-                WHERE Id = :sfId
-                LIMIT 1
-            ];
-            if (targetLead != null &&
-                targetLead.GP_Lead_Status__c != null &&
-                targetLead.GP_Lead_Status__c.equalsIgnoreCase('Yet to Initiate')) {
+            EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByKey(sfId);
+            if (ctx == null || (ctx.studentId == null && ctx.candidateId == null)) {
                 res.success = false;
-                res.message = 'Candidate eligibility process is yet to be initiated. Please check with the sales SPOC to initiate the document verification process.';
+                res.message = 'No Candidate or Student found for provided UUID.';
                 logParams.status = 'failed';
                 logParams.errorMessage = res.message;
                 return res;
+            }
+
+            // Validate status (must not be "Yet to Initiate")
+            if (ctx.studentId != null) {
+                Account targetStudent = [
+                    SELECT GP_Lead_Status__c
+                    FROM Account
+                    WHERE Id = :ctx.studentId
+                    LIMIT 1
+                ];
+                if (targetStudent != null &&
+                    targetStudent.GP_Lead_Status__c != null &&
+                    targetStudent.GP_Lead_Status__c.equalsIgnoreCase('Yet to Initiate')) {
+                    res.success = false;
+                    res.message = 'Student eligibility process is yet to be initiated. Please check with the sales SPOC to initiate the document verification process.';
+                    logParams.status = 'failed';
+                    logParams.errorMessage = res.message;
+                    return res;
+                }
+            } else if (ctx.candidateId != null) {
+                Lead targetLead = [
+                    SELECT GP_Lead_Status__c
+                    FROM Lead
+                    WHERE Id = :ctx.candidateId
+                    LIMIT 1
+                ];
+                if (targetLead != null &&
+                    targetLead.GP_Lead_Status__c != null &&
+                    targetLead.GP_Lead_Status__c.equalsIgnoreCase('Yet to Initiate')) {
+                    res.success = false;
+                    res.message = 'Candidate eligibility process is yet to be initiated. Please check with the sales SPOC to initiate the document verification process.';
+                    logParams.status = 'failed';
+                    logParams.errorMessage = res.message;
+                    return res;
+                }
             }
 
             // Group incoming files by parsed qualification (type + title) from file_path

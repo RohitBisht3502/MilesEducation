@@ -6,14 +6,21 @@ public without sharing class EligibilityResponseService {
         if (fileId == null) return;
 
         Eligibility_File__c file = [
-            SELECT Id, Candidate__c, Folder__c, File_UUID__c, Storage_Key__c, File_Format__c,
+            SELECT Id, Candidate__c, Student__c, Folder__c, File_UUID__c, Storage_Key__c, File_Format__c,
                    Status__c, Comment__c, Name, File_Type__c
             FROM Eligibility_File__c
             WHERE Id = :fileId
             LIMIT 1
         ];
 
-        if (file.Candidate__c == null || file.Folder__c == null) return;
+        if ((file.Candidate__c == null && file.Student__c == null) || file.Folder__c == null) return;
+
+        Id primaryId = (file.Student__c != null) ? file.Student__c : file.Candidate__c;
+        EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByRecordId(primaryId);
+        String uuid = EligibilityRecordResolver.resolveUuid(ctx);
+        if (String.isBlank(uuid)) {
+            uuid = String.valueOf(primaryId);
+        }
 
         // Get category + degree folders
         Eligibility_Folder__c fileFolder = [
@@ -26,7 +33,7 @@ public without sharing class EligibilityResponseService {
         String flatKey = resolveFlatFolderKey(fileFolder);
         if (String.isNotBlank(flatKey)) {
             EligibilityDatalakeClient.FlatEligibilityResponsePayload payload = new EligibilityDatalakeClient.FlatEligibilityResponsePayload();
-            payload.sf_id = String.valueOf(file.Candidate__c);
+            payload.sf_id = uuid;
             payload.qualification_title = flatKey;
             payload.qualification_comment = fileFolder.Comments__c;
             payload.qualification_status = fileFolder.Status__c;
@@ -67,7 +74,7 @@ public without sharing class EligibilityResponseService {
         if (degreeFolder == null) return;
 
         EligibilityDatalakeClient.EligibilityResponsePayload payload = new EligibilityDatalakeClient.EligibilityResponsePayload();
-        payload.sf_id = String.valueOf(file.Candidate__c);
+        payload.sf_id = uuid;
         payload.qualification_title = String.isNotBlank(degreeFolder.Degree_Title__c) ? degreeFolder.Degree_Title__c : degreeFolder.Name;
         payload.qualification_comment = degreeFolder.Comments__c;
         payload.qualification_status = degreeFolder.Status__c;
@@ -106,12 +113,19 @@ public without sharing class EligibilityResponseService {
         if (folderId == null) return;
 
         Eligibility_Folder__c degreeFolder = [
-            SELECT Id, Candidate__c, Name, Degree_Title__c, Status__c, Comments__c
+            SELECT Id, Candidate__c, Student__c, Name, Degree_Title__c, Status__c, Comments__c
             FROM Eligibility_Folder__c
             WHERE Id = :folderId
             LIMIT 1
         ];
-        if (degreeFolder.Candidate__c == null) return;
+        if (degreeFolder.Candidate__c == null && degreeFolder.Student__c == null) return;
+
+        Id primaryId = (degreeFolder.Student__c != null) ? degreeFolder.Student__c : degreeFolder.Candidate__c;
+        EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByRecordId(primaryId);
+        String uuid = EligibilityRecordResolver.resolveUuid(ctx);
+        if (String.isBlank(uuid)) {
+            uuid = String.valueOf(primaryId);
+        }
 
         // Collect category folders and their files
         Map<String, Id> categoryIds = new Map<String, Id>();
@@ -123,13 +137,32 @@ public without sharing class EligibilityResponseService {
             categoryIds.put(cf.Folder_Type__c, cf.Id);
         }
 
-        List<Eligibility_File__c> files = [
-            SELECT Id, Candidate__c, Folder__c, File_UUID__c, Storage_Key__c, File_Format__c,
-                   Status__c, Comment__c, Name, File_Type__c
-            FROM Eligibility_File__c
-            WHERE Candidate__c = :degreeFolder.Candidate__c
-              AND Folder__c IN :categoryIds.values()
-        ];
+        List<Eligibility_File__c> files;
+        if (degreeFolder.Student__c != null && degreeFolder.Candidate__c != null) {
+            files = [
+                SELECT Id, Candidate__c, Student__c, Folder__c, File_UUID__c, Storage_Key__c, File_Format__c,
+                       Status__c, Comment__c, Name, File_Type__c
+                FROM Eligibility_File__c
+                WHERE (Student__c = :degreeFolder.Student__c OR Candidate__c = :degreeFolder.Candidate__c)
+                  AND Folder__c IN :categoryIds.values()
+            ];
+        } else if (degreeFolder.Student__c != null) {
+            files = [
+                SELECT Id, Candidate__c, Student__c, Folder__c, File_UUID__c, Storage_Key__c, File_Format__c,
+                       Status__c, Comment__c, Name, File_Type__c
+                FROM Eligibility_File__c
+                WHERE Student__c = :degreeFolder.Student__c
+                  AND Folder__c IN :categoryIds.values()
+            ];
+        } else {
+            files = [
+                SELECT Id, Candidate__c, Student__c, Folder__c, File_UUID__c, Storage_Key__c, File_Format__c,
+                       Status__c, Comment__c, Name, File_Type__c
+                FROM Eligibility_File__c
+                WHERE Candidate__c = :degreeFolder.Candidate__c
+                  AND Folder__c IN :categoryIds.values()
+            ];
+        }
 
         List<EligibilityDatalakeClient.FilePayload> certs = new List<EligibilityDatalakeClient.FilePayload>();
         List<EligibilityDatalakeClient.FilePayload> marks = new List<EligibilityDatalakeClient.FilePayload>();
@@ -145,7 +178,7 @@ public without sharing class EligibilityResponseService {
         }
 
         EligibilityDatalakeClient.EligibilityResponsePayload payload = new EligibilityDatalakeClient.EligibilityResponsePayload();
-        payload.sf_id = String.valueOf(degreeFolder.Candidate__c);
+        payload.sf_id = uuid;
         payload.qualification_title = String.isNotBlank(degreeFolder.Degree_Title__c) ? degreeFolder.Degree_Title__c : degreeFolder.Name;
         payload.qualification_comment = degreeFolder.Comments__c;
         payload.qualification_status = degreeFolder.Status__c;

@@ -102,11 +102,6 @@ public without sharing class EligibilityDatalakeClient {
         }
     }
 
-    @AuraEnabled(cacheable=false)
-    public static String getDownloadUrlForLwc(String filePath) {
-        return getDownloadUrl(filePath);
-    }
-
     public static CalloutResult postEligibilityResponse(EligibilityResponsePayload payload) {
         CalloutResult cr = new CalloutResult();
         cr.success = false;

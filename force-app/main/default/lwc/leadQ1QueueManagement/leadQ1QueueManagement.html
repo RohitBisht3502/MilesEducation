@@ -95,9 +95,9 @@
                         </button>
                     </header>
 
-                    <c-runo-allocation-calls record-id={currentLeadId} is-call-log={currentIsCallLog}
-                        is-queue-running={queueRunning} oncallcomplete={handleCallComplete}>
-                    </c-runo-allocation-calls>
+                    <c-runo-allocation-call-q1 record-id={currentLeadId} auto-call="true"
+                        oncallcomplete={handleCallComplete}>
+                    </c-runo-allocation-call-q1>
 
                 </div>
             </section>

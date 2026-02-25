@@ -65,22 +65,67 @@ public without sharing class EligibilityReviewController {
     public static List<FolderNode> getFolderTree(Id leadId) {
         if (leadId == null) return new List<FolderNode>();
 
-        List<Eligibility_Folder__c> folders = [
-            SELECT Id, Name, Status__c, Folder_Type__c, Qualification_Type__c,
-                   Degree_Title__c, Level__c, Month_Year__c, Parent_Folder__c,
-                   Comments__c, CreatedDate
-            FROM Eligibility_Folder__c
-            WHERE Candidate__c = :leadId
-            ORDER BY Level__c, Name
-        ];
+        EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByRecordId(leadId);
+        Id candidateId = ctx.candidateId;
+        Id studentId = ctx.studentId;
+        if (candidateId == null && studentId == null) return new List<FolderNode>();
 
-        List<Eligibility_File__c> files = [
-            SELECT Id, Name, Status__c, File_Type__c, File_Format__c, Storage_Key__c,
-                   Percentage__c, Year_of_Graduation__c, Grade__c, Rank_Division__c,
-                   University__c, Comment__c, Folder__c, CreatedDate
-            FROM Eligibility_File__c
-            WHERE Candidate__c = :leadId
-        ];
+        List<Eligibility_Folder__c> folders;
+        if (studentId != null && candidateId != null) {
+            folders = [
+                SELECT Id, Name, Status__c, Folder_Type__c, Qualification_Type__c,
+                       Degree_Title__c, Level__c, Month_Year__c, Parent_Folder__c,
+                       Comments__c, CreatedDate
+                FROM Eligibility_Folder__c
+                WHERE Student__c = :studentId OR Candidate__c = :candidateId
+                ORDER BY Level__c, Name
+            ];
+        } else if (studentId != null) {
+            folders = [
+                SELECT Id, Name, Status__c, Folder_Type__c, Qualification_Type__c,
+                       Degree_Title__c, Level__c, Month_Year__c, Parent_Folder__c,
+                       Comments__c, CreatedDate
+                FROM Eligibility_Folder__c
+                WHERE Student__c = :studentId
+                ORDER BY Level__c, Name
+            ];
+        } else {
+            folders = [
+                SELECT Id, Name, Status__c, Folder_Type__c, Qualification_Type__c,
+                       Degree_Title__c, Level__c, Month_Year__c, Parent_Folder__c,
+                       Comments__c, CreatedDate
+                FROM Eligibility_Folder__c
+                WHERE Candidate__c = :candidateId
+                ORDER BY Level__c, Name
+            ];
+        }
+
+        List<Eligibility_File__c> files;
+        if (studentId != null && candidateId != null) {
+            files = [
+                SELECT Id, Name, Status__c, File_Type__c, File_Format__c, Storage_Key__c,
+                       Percentage__c, Year_of_Graduation__c, Grade__c, Rank_Division__c,
+                       University__c, Comment__c, Folder__c, CreatedDate
+                FROM Eligibility_File__c
+                WHERE Student__c = :studentId OR Candidate__c = :candidateId
+            ];
+        } else if (studentId != null) {
+            files = [
+                SELECT Id, Name, Status__c, File_Type__c, File_Format__c, Storage_Key__c,
+                       Percentage__c, Year_of_Graduation__c, Grade__c, Rank_Division__c,
+                       University__c, Comment__c, Folder__c, CreatedDate
+                FROM Eligibility_File__c
+                WHERE Student__c = :studentId
+            ];
+        } else {
+            files = [
+                SELECT Id, Name, Status__c, File_Type__c, File_Format__c, Storage_Key__c,
+                       Percentage__c, Year_of_Graduation__c, Grade__c, Rank_Division__c,
+                       University__c, Comment__c, Folder__c, CreatedDate
+                FROM Eligibility_File__c
+                WHERE Candidate__c = :candidateId
+            ];
+        }
 
         Map<Id, FolderNode> folderMap = new Map<Id, FolderNode>();
         for (Eligibility_Folder__c f : folders) {
@@ -150,13 +195,27 @@ public without sharing class EligibilityReviewController {
     @AuraEnabled(cacheable=true)
     public static String getLeadEligibilityStatus(Id leadId) {
         if (leadId == null) return null;
-        Lead l = [
-            SELECT Id, GP_Lead_Status__c
-            FROM Lead
-            WHERE Id = :leadId
-            LIMIT 1
-        ];
-        return l.GP_Lead_Status__c;
+
+        EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByRecordId(leadId);
+        if (ctx.studentId != null) {
+            Account a = [
+                SELECT GP_Lead_Status__c
+                FROM Account
+                WHERE Id = :ctx.studentId
+                LIMIT 1
+            ];
+            return a.GP_Lead_Status__c;
+        }
+        if (ctx.candidateId != null) {
+            Lead l = [
+                SELECT GP_Lead_Status__c
+                FROM Lead
+                WHERE Id = :ctx.candidateId
+                LIMIT 1
+            ];
+            return l.GP_Lead_Status__c;
+        }
+        return null;
     }
 
     @AuraEnabled(cacheable=true)
@@ -164,16 +223,31 @@ public without sharing class EligibilityReviewController {
         EligibilitySnapshot snap = new EligibilitySnapshot();
         if (leadId == null) return snap;
 
-        Lead l = [
-            SELECT Id, GP_Lead_Status__c, Credit_score__c, CPA_Eligibility_Status__c
-            FROM Lead
-            WHERE Id = :leadId
-            LIMIT 1
-        ];
+        EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByRecordId(leadId);
+        if (ctx.studentId != null) {
+            Account a = [
+                SELECT GP_Lead_Status__c, Credit_score__c, CPA_Eligibility_Status__c
+                FROM Account
+                WHERE Id = :ctx.studentId
+                LIMIT 1
+            ];
+            snap.leadStatus = a.GP_Lead_Status__c;
+            snap.creditScore = a.Credit_score__c;
+            snap.cpaEligibilityStatus = a.CPA_Eligibility_Status__c;
+            return snap;
+        }
 
-        snap.leadStatus = l.GP_Lead_Status__c;
-        snap.creditScore = l.Credit_score__c;
-        snap.cpaEligibilityStatus = l.CPA_Eligibility_Status__c;
+        if (ctx.candidateId != null) {
+            Lead l = [
+                SELECT GP_Lead_Status__c, Credit_score__c, CPA_Eligibility_Status__c
+                FROM Lead
+                WHERE Id = :ctx.candidateId
+                LIMIT 1
+            ];
+            snap.leadStatus = l.GP_Lead_Status__c;
+            snap.creditScore = l.Credit_score__c;
+            snap.cpaEligibilityStatus = l.CPA_Eligibility_Status__c;
+        }
         return snap;
     }
 
@@ -183,13 +257,29 @@ public without sharing class EligibilityReviewController {
         if (leadId == null) return snap;
 
         try {
-            List<Eligibility_Folder__c> degreeFolders = [
-                SELECT Degree_Title__c, Status__c
-                FROM Eligibility_Folder__c
-                WHERE Candidate__c = :leadId
-                  AND Folder_Type__c = 'Degree'
-                  AND Degree_Title__c != null
-            ];
+            EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByRecordId(leadId);
+            Id candidateId = ctx.candidateId;
+            Id studentId = ctx.studentId;
+            if (candidateId == null && studentId == null) return snap;
+
+            List<Eligibility_Folder__c> degreeFolders;
+            if (studentId != null) {
+                degreeFolders = [
+                    SELECT Degree_Title__c, Status__c
+                    FROM Eligibility_Folder__c
+                    WHERE Student__c = :studentId
+                      AND Folder_Type__c = 'Degree'
+                      AND Degree_Title__c != null
+                ];
+            } else {
+                degreeFolders = [
+                    SELECT Degree_Title__c, Status__c
+                    FROM Eligibility_Folder__c
+                    WHERE Candidate__c = :candidateId
+                      AND Folder_Type__c = 'Degree'
+                      AND Degree_Title__c != null
+                ];
+            }
 
             Set<String> approvedTitles = new Set<String>();
             for (Eligibility_Folder__c f : degreeFolders) {
@@ -225,13 +315,22 @@ public without sharing class EligibilityReviewController {
                 cpaStatus = 'Not Eligible';
             }
 
-            Lead upd = new Lead(
-                Id = leadId,
-                Credit_score__c = total,
-                CPA_Eligibility_Status__c = cpaStatus
-                //GP_Lead_Status__c = 'Eligibility report generated'
-            );
-            update upd;
+            if (studentId != null) {
+                Account upd = new Account(
+                    Id = studentId,
+                    Credit_score__c = total,
+                    CPA_Eligibility_Status__c = cpaStatus
+                );
+                update upd;
+            } else {
+                Lead upd = new Lead(
+                    Id = candidateId,
+                    Credit_score__c = total,
+                    CPA_Eligibility_Status__c = cpaStatus
+                    //GP_Lead_Status__c = 'Eligibility report generated'
+                );
+                update upd;
+            }
 
             snap.creditScore = total;
             snap.cpaEligibilityStatus = cpaStatus;
@@ -250,29 +349,53 @@ public without sharing class EligibilityReviewController {
         EligibilitySnapshot snap = new EligibilitySnapshot();
         if (leadId == null) return snap;
 
-        Lead upd = new Lead(Id = leadId);
-        if (creditScore != null) {
-            upd.Credit_score__c = creditScore;
-        }
-        if (!String.isBlank(cpaEligibilityStatus)) {
-            upd.CPA_Eligibility_Status__c = cpaEligibilityStatus;
-        }
-        if (!String.isBlank(leadStatus)) {
-            upd.GP_Lead_Status__c = leadStatus;
-        }
+        EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByRecordId(leadId);
+        if (ctx.studentId != null) {
+            Account upd = new Account(Id = ctx.studentId);
+            if (creditScore != null) {
+                upd.Credit_score__c = creditScore;
+            }
+            if (!String.isBlank(cpaEligibilityStatus)) {
+                upd.CPA_Eligibility_Status__c = cpaEligibilityStatus;
+            }
+            if (!String.isBlank(leadStatus)) {
+                upd.GP_Lead_Status__c = leadStatus;
+            }
+            update upd;
 
-        update upd;
+            Account a = [
+                SELECT GP_Lead_Status__c, Credit_score__c, CPA_Eligibility_Status__c
+                FROM Account
+                WHERE Id = :ctx.studentId
+                LIMIT 1
+            ];
+            snap.creditScore = a.Credit_score__c;
+            snap.cpaEligibilityStatus = a.CPA_Eligibility_Status__c;
+            snap.leadStatus = a.GP_Lead_Status__c;
+        } else if (ctx.candidateId != null) {
+            Lead upd = new Lead(Id = ctx.candidateId);
+            if (creditScore != null) {
+                upd.Credit_score__c = creditScore;
+            }
+            if (!String.isBlank(cpaEligibilityStatus)) {
+                upd.CPA_Eligibility_Status__c = cpaEligibilityStatus;
+            }
+            if (!String.isBlank(leadStatus)) {
+                upd.GP_Lead_Status__c = leadStatus;
+            }
+            update upd;
 
-        Lead l = [
-            SELECT GP_Lead_Status__c, Credit_score__c, CPA_Eligibility_Status__c
-            FROM Lead
-            WHERE Id = :leadId
-            LIMIT 1
-        ];
+            Lead l = [
+                SELECT GP_Lead_Status__c, Credit_score__c, CPA_Eligibility_Status__c
+                FROM Lead
+                WHERE Id = :ctx.candidateId
+                LIMIT 1
+            ];
 
-        snap.creditScore = l.Credit_score__c;
-        snap.cpaEligibilityStatus = l.CPA_Eligibility_Status__c;
-        snap.leadStatus = l.GP_Lead_Status__c;
+            snap.creditScore = l.Credit_score__c;
+            snap.cpaEligibilityStatus = l.CPA_Eligibility_Status__c;
+            snap.leadStatus = l.GP_Lead_Status__c;
+        }
         return snap;
     }
 
@@ -365,7 +488,7 @@ public without sharing class EligibilityReviewController {
         }
 
         Eligibility_File__c file = [
-            SELECT Id, Folder__c, Candidate__c, Name, Status__c, File_Type__c
+            SELECT Id, Folder__c, Candidate__c, Student__c, Name, Status__c, File_Type__c
             FROM Eligibility_File__c
             WHERE Id = :input.fileId
             LIMIT 1
@@ -386,31 +509,49 @@ public without sharing class EligibilityReviewController {
         EligibilityFolderService.recalcFromFiles(new Set<Id>{ file.Id });
 
         // Task on file status change (every change except Verified)
-        if (file.Candidate__c != null
+        if ((file.Candidate__c != null || file.Student__c != null)
             && oldStatus != newStatus
             && (newStatusLower == null || newStatusLower != 'verified')) {
-            Lead l = [
-                SELECT Id, OwnerId
-                FROM Lead
-                WHERE Id = :file.Candidate__c
-                LIMIT 1
-            ];
-            Id taskOwner = l.OwnerId;
-            if (taskOwner != null) {
-                Task t = new Task();
-                t.OwnerId = taskOwner;
-                t.WhoId = l.Id;
-                t.Subject = 'Eligibility file status updated - ' + (String.isNotBlank(file.Name) ? file.Name : 'Document');
-                t.Status = 'Not Started';
-                t.Priority = 'High';
-                t.ActivityDate = System.today();
-                t.Description =
-                    'File "' + (String.isNotBlank(file.Name) ? file.Name : String.valueOf(file.Id)) +
-                    '" (' + (file.File_Type__c != null ? file.File_Type__c : 'Eligibility Document') + ')' +
-                    ' status changed from "' + (oldStatus != null ? oldStatus : 'None') +
-                    '" to "' + (newStatus != null ? newStatus : 'None') + '".' +
-                    (String.isNotBlank(input.comment) ? '\nReviewer comment: ' + input.comment : '');
-                insert t;
+            List<Task> tasks = new List<Task>();
+
+            if (file.Student__c != null) {
+                Account a = [
+                    SELECT Id, OwnerId, GP_User__c
+                    FROM Account
+                    WHERE Id = :file.Student__c
+                    LIMIT 1
+                ];
+                Id gpUserId = a.GP_User__c;
+                if (gpUserId == null && file.Candidate__c != null) {
+                    Lead l = [
+                        SELECT GP_User__c
+                        FROM Lead
+                        WHERE Id = :file.Candidate__c
+                        LIMIT 1
+                    ];
+                    gpUserId = l.GP_User__c;
+                }
+
+                if (a.OwnerId != null) {
+                    tasks.add(buildFileStatusTask(a.OwnerId, null, a.Id, file, oldStatus, newStatus, input.comment));
+                }
+                if (gpUserId != null && gpUserId != a.OwnerId) {
+                    tasks.add(buildFileStatusTask(gpUserId, null, a.Id, file, oldStatus, newStatus, input.comment));
+                }
+            } else if (file.Candidate__c != null) {
+                Lead l = [
+                    SELECT Id, OwnerId
+                    FROM Lead
+                    WHERE Id = :file.Candidate__c
+                    LIMIT 1
+                ];
+                if (l.OwnerId != null) {
+                    tasks.add(buildFileStatusTask(l.OwnerId, l.Id, null, file, oldStatus, newStatus, input.comment));
+                }
+            }
+
+            if (!tasks.isEmpty()) {
+                insert tasks;
             }
         }
 
@@ -426,6 +567,36 @@ public without sharing class EligibilityReviewController {
         res.success = true;
         res.message = 'File updated successfully.';
         return res;
+    }
+
+    private static Task buildFileStatusTask(
+        Id ownerId,
+        Id whoId,
+        Id whatId,
+        Eligibility_File__c file,
+        String oldStatus,
+        String newStatus,
+        String comment
+    ) {
+        Task t = new Task();
+        t.OwnerId = ownerId;
+        if (whoId != null) {
+            t.WhoId = whoId;
+        }
+        if (whatId != null) {
+            t.WhatId = whatId;
+        }
+        t.Subject = 'Eligibility file status updated - ' + (String.isNotBlank(file.Name) ? file.Name : 'Document');
+        t.Status = 'Not Started';
+        t.Priority = 'High';
+        t.ActivityDate = System.today();
+        t.Description =
+            'File "' + (String.isNotBlank(file.Name) ? file.Name : String.valueOf(file.Id)) +
+            '" (' + (file.File_Type__c != null ? file.File_Type__c : 'Eligibility Document') + ')' +
+            ' status changed from "' + (oldStatus != null ? oldStatus : 'None') +
+            '" to "' + (newStatus != null ? newStatus : 'None') + '".' +
+            (String.isNotBlank(comment) ? '\nReviewer comment: ' + comment : '');
+        return t;
     }
 
     // ----------- FOLDER COMMENT / STATUS APIS -----------
@@ -447,7 +618,7 @@ public without sharing class EligibilityReviewController {
         }
 
         Eligibility_Folder__c oldFolder = [
-            SELECT Id, Candidate__c, Name, Status__c, Comments__c, Folder_Type__c
+            SELECT Id, Candidate__c, Student__c, Name, Status__c, Comments__c, Folder_Type__c
             FROM Eligibility_Folder__c
             WHERE Id = :folderId
             LIMIT 1
@@ -472,6 +643,7 @@ public without sharing class EligibilityReviewController {
         Eligibility_Folder__c newFolder = new Eligibility_Folder__c(
             Id = oldFolder.Id,
             Candidate__c = oldFolder.Candidate__c,
+            Student__c = oldFolder.Student__c,
             Name = oldFolder.Name,
             Status__c = finalStatus,
             Comments__c = finalComment
