@@ -204,7 +204,7 @@
                                                         </div>
                                                     </div>
                                                     <div class="slds-col slds-size_1-of-6 slds-text-align_right">
-                                                        <template if:false={participant.isCurrentUser}>
+                                                        <template if:true={participant.canRemove}>
                                                             <lightning-button-icon
                                                                 icon-name="utility:delete"
                                                                 alternative-text="Remove"

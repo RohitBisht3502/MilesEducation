@@ -66,8 +66,9 @@
                                     </template>
                                 </td>
                                 <td>
-                                    <lightning-button label="Call" variant="brand" icon-name="utility:call"
-                                        data-id={lead.id} onclick={handleCall}>
+                                    <lightning-button label={lead.buttonLabel} variant="brand" icon-name="utility:call"
+                                        data-id={lead.id} onclick={handleCall} disabled={lead.isProcessing}
+                                        class={lead.buttonClass}>
                                     </lightning-button>
                                 </td>
                             </tr>
@@ -96,7 +97,7 @@
                     </header>
 
                     <c-runo-allocation-call-q1 record-id={currentLeadId} auto-call="true"
-                        oncallcomplete={handleCallComplete}>
+                        oncallcomplete={handleCallComplete} dispositions={dispositions.data}>
                     </c-runo-allocation-call-q1>
 
                 </div>

@@ -40,7 +40,17 @@
                 
                 <!-- Phone -->
                 <lightning:layoutItem size="3" smallDeviceSize="6" padding="around-small">
-                    <lightning:input name="phone" type="tel" label="Phone" required="true" value="{!v.phone}" onchange="{!c.handleInputChange}"/>
+                    <lightning:input
+                        name="phone"
+                        type="tel"
+                        label="Phone"
+                        required="true"
+                        value="{!v.phone}"
+                        minlength="10"
+                        maxlength="10"
+                        pattern="^[6-9]\\d{9}$"
+                        message-when-pattern-mismatch="Enter a valid 10-digit phone number starting with 6-9."
+                        onchange="{!c.handleInputChange}"/>
                 </lightning:layoutItem>
                 
                 <!-- Course -->

@@ -1,13 +1,20 @@
 <template>
     <lightning-quick-action-panel header="Enable Eligibility Check">
         <div class="slds-var-p-around_medium">
-            <p>
-                This will create the eligibility folder structure for this record
-                and enable document-based eligibility checks.
-            </p>
-            <p class="slds-m-top_small">
-                Do you want to proceed?
-            </p>
+            <template if:true={isAlreadyInitiated}>
+                <p>
+                    Eligibility process for the candidate is already initiated.
+                </p>
+            </template>
+            <template if:false={isAlreadyInitiated}>
+                <p>
+                    This will create the eligibility folder structure for this record
+                    and enable document-based eligibility checks.
+                </p>
+                <p class="slds-m-top_small">
+                    Do you want to proceed?
+                </p>
+            </template>
         </div>
 
         <div slot="footer">
@@ -22,7 +29,7 @@
                 variant="brand"
                 label="Confirm"
                 onclick={handleConfirm}
-                disabled={isProcessing}>
+                disabled={isConfirmDisabled}>
             </lightning-button>
         </div>
     </lightning-quick-action-panel>

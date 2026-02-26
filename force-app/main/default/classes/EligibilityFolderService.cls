@@ -616,11 +616,15 @@ public without sharing class EligibilityFolderService {
                     ];
                     gpUserId = l.GP_User__c;
                 }
-                if (a.OwnerId != null) {
-                    tasks.add(buildFolderUpdateTask(a.OwnerId, null, a.Id, oldRec, newRec, statusChanged, commentChanged));
-                }
-                if (gpUserId != null && gpUserId != a.OwnerId) {
-                    tasks.add(buildFolderUpdateTask(gpUserId, null, a.Id, oldRec, newRec, statusChanged, commentChanged));
+                Boolean isApproved = (newRec.Status__c != null && newRec.Status__c.equalsIgnoreCase('Approved'));
+                Boolean shouldCreateTask = !isApproved && (statusChanged || commentChanged);
+                if (shouldCreateTask) {
+                    if (a.OwnerId != null) {
+                        tasks.add(buildFolderUpdateTask(a.OwnerId, null, a.Id, oldRec, newRec, statusChanged, commentChanged));
+                    }
+                    if (gpUserId != null && gpUserId != a.OwnerId) {
+                        tasks.add(buildFolderUpdateTask(gpUserId, null, a.Id, oldRec, newRec, statusChanged, commentChanged));
+                    }
                 }
             } else if (candidateId != null) {
                 Lead l = [
@@ -629,7 +633,9 @@ public without sharing class EligibilityFolderService {
                     WHERE Id = :candidateId
                     LIMIT 1
                 ];
-                if (l.OwnerId != null) {
+                Boolean isApproved = (newRec.Status__c != null && newRec.Status__c.equalsIgnoreCase('Approved'));
+                Boolean shouldCreateTask = !isApproved && (statusChanged || commentChanged);
+                if (shouldCreateTask && l.OwnerId != null) {
                     tasks.add(buildFolderUpdateTask(l.OwnerId, l.Id, null, oldRec, newRec, statusChanged, commentChanged));
                 }
             }

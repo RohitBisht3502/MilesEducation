@@ -3,7 +3,7 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 import allocateLeadNow from '@salesforce/apex/Webservice_RunoAllocationAPI.allocateLeadNow';
 import updateCallFeedback from '@salesforce/apex/Webservice_RunoAllocationAPI.updateCallFeedback';
-import getL1L2Values from '@salesforce/apex/Webservice_RunoAllocationAPI.getL1L2Values';
+import getDispositions from '@salesforce/apex/CallDispositionConfigService.getDispositions';
 import getIdentity from '@salesforce/apex/RunoCallIdentityService.getIdentity';
 import getRelatedLeads from '@salesforce/apex/RunoCallIdentityService.getRelatedLeads';
 import updateRelatedLeadStages from '@salesforce/apex/RunoCallIdentityService.updateRelatedLeadStages';
@@ -13,12 +13,14 @@ import getCallHistory from '@salesforce/apex/Webservice_RunoAllocationAPI.getCal
 import getWebinarMembers from '@salesforce/apex/Webservice_RunoAllocationAPI.getWebinarMembers';
 import getLeadEvents from '@salesforce/apex/Webservice_RunoAllocationAPI.getLeadEvents';
 import { NavigationMixin } from 'lightning/navigation';
-import getLatestUntrackedCallLog 
-from '@salesforce/apex/Webservice_RunoAllocationAPI.getLatestUntrackedCallLog';
-import { getObjectInfo, getPicklistValuesByRecordType } 
-from 'lightning/uiObjectInfoApi';
+import getLatestUntrackedCallLog
+    from '@salesforce/apex/Webservice_RunoAllocationAPI.getLatestUntrackedCallLog';
+import { getObjectInfo, getPicklistValues }
+    from 'lightning/uiObjectInfoApi';
 import LEAD_OBJECT from '@salesforce/schema/Lead__c';
 import STAGE_FIELD from '@salesforce/schema/Lead__c.Stage__c';
+import { getRecord } from 'lightning/uiRecordApi';
+import RECORDTYPE_FIELD from '@salesforce/schema/Lead__c.RecordTypeId';
 
 
 
@@ -31,6 +33,7 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
 
     @api recordId;
     @api isCallLog;
+    isApiResponseReceived = false;
     @api isQueuePaused;
     @api isQueueRunning;
     _primaryTag = null;
@@ -43,7 +46,7 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
     }
     @api candidateId;
     // isHistoryTab = true;
-   objectInfo;
+    objectInfo;
 
     hasRendered = false;
     isStageDisabled = false;
@@ -51,7 +54,7 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
     // UI / state
     loading = false;
     disableCancel = false;
-
+    recordTypeId;
     callButtonLabel = 'Call Runo';
     callButtonDisabled = false;
 
@@ -60,18 +63,18 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
     showCallPopup = false;
 
     callLogId = null;
-showTagLead = false;
+    showTagLead = false;
+    allStageValues = [];
 
 
 
     userChangedStage = false;
 
-    // L1/L2
     l1Value = '';
     l2Value = '';
     l1Options = [];
     l2Options = [];
-    fullMap = {};
+
     isL2Disabled = true;
 
     autoSetFollowUp = true;
@@ -80,18 +83,18 @@ showTagLead = false;
 
     activeTab = 'lead';
 
-webinarHistory = [];
-webinarLoaded = false;
+    webinarHistory = [];
+    webinarLoaded = false;
 
-eventHistory = [];
-eventLoaded = false;
+    eventHistory = [];
+    eventLoaded = false;
 
-relatedLeads = [];
-relatedLeadsLoaded = false;
-relatedLeadEdits = {};
-newLeadCourse = '';
-newLeadEmail = '';
-isCreatingRelatedLead = false;
+    relatedLeads = [];
+    relatedLeadsLoaded = false;
+    relatedLeadEdits = {};
+    newLeadCourse = '';
+    newLeadEmail = '';
+    isCreatingRelatedLead = false;
 
     stageValue = '';
     levelValue = '';
@@ -110,13 +113,13 @@ isCreatingRelatedLead = false;
         city: '',
         source: '',
         stage: '',
-       canId: '',
+        canId: '',
         createdDate: '',
-    mhpTag: '',
-    leadOwner: ''
+        mhpTag: '',
+        leadOwner: ''
     };
 
-     isDnd = false;
+    isDnd = false;
     isSpam = false;
     recordTypeStageMap = {};
 
@@ -131,16 +134,11 @@ isCreatingRelatedLead = false;
     showTagLeadUI = false;
 
 
-openTagLeadUI() {
-    this.showTagLeadUI = true;
-}
-dynamicRecordTypeId;
+    openTagLeadUI() {
+        this.showTagLeadUI = true;
+    }
+    dynamicRecordTypeId;
 
-  
-
-
-
-    // feedback
     showFeedback = false;
     savingFeedback = false;
     feedback = '';
@@ -154,14 +152,13 @@ dynamicRecordTypeId;
 
     lastCallId = null;
 
-    // manual end call if no response in 30s
     canEndCall = false;
     CALL_NO_RESPONSE_MS = 30000;
     noResponseTimer = null;
 
 
 
-     handleDndChange(e) {
+    handleDndChange(e) {
         this.isDnd = e.target.checked;
     }
 
@@ -172,31 +169,8 @@ dynamicRecordTypeId;
     // mandatory comment logic
     showCommentBox = true;
     isCommentMandatory = false;
-    mandatoryCommentRules = {
-        'Connected:Discussed': true,
-        'Connected:Request Call Back': true,
-        'Connected:Not Eligible': true,
-        'Connected:Wrong Number': true,
-        'Connected:Language Barrier': true,
-        'Connected:Visit Confirmed': true,
-        'Connected:Visit Completed': true,
-        'Connected:Visit Rescheduled': true,
-        'Connected:Visit Cancelled': true,
-        'Connected:Visit Booked By Mistake': true,
-        'Connected:Google Meet Completed': true,
-        'Connected:Google Meet Rescheduled': true,
-        'Connected:Google Meet Cancelled': true,
-        'Connected:Attended And Disconnected': true,
-        'Connected:Voice Mail': true,
-        'Connected:Not Interested (DND)': true,
-        'Connected:Postponed': true,
-
-        'Not-Connected:Not Lifting': false,
-        'Not-Connected:Switched Off': false,
-        'Not-Connected:Not Reachable': false,
-        'Not-Connected:Busy': false,
-        'Not-Connected:Invalid Number': true
-    };
+    dispositionConfigMap = {};
+    l1L2Map = {};
 
     // ---------------- WIRE ----------------
     @wire(getIdentity, { recordId: '$recordId' })
@@ -205,64 +179,80 @@ dynamicRecordTypeId;
             this.identity = data;
             if (data.stage) this.stageValue = data.stage;
             if (data.level) this.levelValue = data.level;
+            if (!this.stageOptions.length) {
+                this.loadStageLevel();
+            }
             if (!this.candidateId && data.candidateId) {
                 this.candidateId = data.candidateId;
                 console.log('Candidate Id:', this.candidateId);
             }
 
-             if (this.candidateId) {
-            this.loadCallHistory();
-        }
+            if (this.candidateId) {
+                this.loadCallHistory();
+            }
         } else if (error) {
             this.errorText = error?.body?.message || 'Failed to load identity';
             console.error('wiredIdentity error', error);
         }
     }
 
-    @wire(getObjectInfo, { objectApiName: LEAD_OBJECT })
-wiredObjectInfo({ data, error }) {
-    if (data) {
-        this.objectInfo = data;
-    } else if (error) {
-        console.error('Object info error', error);
+    @wire(getRecord, {
+        recordId: '$recordId',
+        fields: [RECORDTYPE_FIELD]
+    })
+    wiredLead({ data, error }) {
+        if (data) {
+            this.recordTypeId = data.fields.RecordTypeId.value;
+        } else if (error) {
+            console.error('Error fetching RecordTypeId', error);
+        }
     }
-}
 
-@wire(getPicklistValuesByRecordType, {
-    objectApiName: LEAD_OBJECT,
-    recordTypeId: '$dynamicRecordTypeId'
-})
-wiredStageValues({ data, error }) {
-    if (data && this.dynamicRecordTypeId) {
-        const stageField = data.picklistFieldValues.Stage__c;
 
-        this.recordTypeStageMap[this.dynamicRecordTypeId] =
-            (stageField?.values || []).map(v => ({
+
+    @wire(getObjectInfo, { objectApiName: LEAD_OBJECT })
+    wiredObjectInfo({ data, error }) {
+        if (data) {
+            this.objectInfo = data;
+        } else if (error) {
+            console.error('Object info error', error);
+        }
+    }
+
+
+
+    openTagLeadUI() {
+        this[NavigationMixin.Navigate]({
+            type: 'standard__recordAction',
+            attributes: {
+                recordId: this.recordId,
+                actionName: 'Tag_Lead'
+            }
+        });
+    }
+
+
+
+    @wire(getPicklistValues, {
+        recordTypeId: '$recordTypeId',
+        fieldApiName: STAGE_FIELD
+    })
+    wiredStageValues({ data, error }) {
+        if (data) {
+            this.stageOptions = data.values.map(v => ({
                 label: v.label,
                 value: v.value
             }));
-    } else if (error) {
-        console.error('Stage picklist load error', error);
-    }
-}
-
-    openTagLeadUI() {
-    this[NavigationMixin.Navigate]({
-        type: 'standard__recordAction',
-        attributes: {
-            recordId: this.recordId,
-            actionName: 'Tag_Lead' 
+        } else if (error) {
+            console.error('Stage load error', error);
         }
-    });
-}
-
-    // --------------- LIFECYCLE -------------
+    }
     connectedCallback() {
-        this.loadPicklists();
-        this.loadStageLevel();
+        this.loadDispositionConfig();
+        // this.loadStageLevel();
         this.loadCallHistory();
         this.subscribeToEvents();
-         this.loadUntrackedStatus();
+        this.loadUntrackedStatus();
         onError(err => console.warn('EMP API Error:', JSON.stringify(err)));
     }
 
@@ -280,50 +270,50 @@ wiredStageValues({ data, error }) {
     }
 
 
-get isLeadTab() { return this.activeTab === 'lead'; }
-get isHistoryTab() { return this.activeTab === 'history'; }
-get isWebinarTab() { return this.activeTab === 'webinar'; }
-get isEventTab() { return this.activeTab === 'event'; }
-get isRelatedTab() { return this.activeTab === 'related'; }
+    get isLeadTab() { return this.activeTab === 'lead'; }
+    get isHistoryTab() { return this.activeTab === 'history'; }
+    get isWebinarTab() { return this.activeTab === 'webinar'; }
+    get isEventTab() { return this.activeTab === 'event'; }
+    get isRelatedTab() { return this.activeTab === 'related'; }
 
-get hasWebinarHistory() {
-    return (this.webinarHistory || []).length > 0;
-}
+    get hasWebinarHistory() {
+        return (this.webinarHistory || []).length > 0;
+    }
 
-get hasEvents() {
-    return (this.eventHistory || []).length > 0;
-}
+    get hasEvents() {
+        return (this.eventHistory || []).length > 0;
+    }
 
-get hasRelatedLeads() {
-    return (this.relatedLeads || []).length > 0;
-}
+    get hasRelatedLeads() {
+        return (this.relatedLeads || []).length > 0;
+    }
 
-get availableCourseOptions() {
-    const existing = new Set(
-        (this.relatedLeads || [])
-            .map(r => (r.course || '').trim().toLowerCase())
-            .filter(v => v.length > 0)
-    );
-    return (this.levelOptions || []).filter(opt => {
-        const val = (opt.value || '').trim().toLowerCase();
-        return val && !existing.has(val);
-    });
-}
+    get availableCourseOptions() {
+        const existing = new Set(
+            (this.relatedLeads || [])
+                .map(r => (r.course || '').trim().toLowerCase())
+                .filter(v => v.length > 0)
+        );
+        return (this.levelOptions || []).filter(opt => {
+            const val = (opt.value || '').trim().toLowerCase();
+            return val && !existing.has(val);
+        });
+    }
 
-get disableCreateLead() {
-    return (
-        !this.candidateId ||
-        !this.newLeadCourse ||
-        !this.newLeadEmail ||
-        this.availableCourseOptions.length === 0 ||
-        this.isCreatingRelatedLead
-    );
-}
+    get disableCreateLead() {
+        return (
+            !this.candidateId ||
+            !this.newLeadCourse ||
+            !this.newLeadEmail ||
+            this.availableCourseOptions.length === 0 ||
+            this.isCreatingRelatedLead
+        );
+    }
 
 
-handleNewLeadEmailChange(event) {
-    this.newLeadEmail = event.target.value;
-}
+    handleNewLeadEmailChange(event) {
+        this.newLeadEmail = event.target.value;
+    }
 
     handleViewMoreLead() {
         if (!this.recordId) return;
@@ -341,132 +331,192 @@ handleNewLeadEmailChange(event) {
     }
 
     handleTabClick(event) {
-    const selectedTab = event.currentTarget.dataset.tab;
-    this.activeTab = selectedTab;
+        const selectedTab = event.currentTarget.dataset.tab;
+        this.activeTab = selectedTab;
 
 
 
-    if (this.activeTab === 'webinar' && !this.webinarLoaded) {
-        this.loadWebinarHistory();
-    }
-    if (this.activeTab === 'event' && !this.eventLoaded) {
-        this.loadEventHistory();
-    }
-    if (this.activeTab === 'related' && !this.relatedLeadsLoaded) {
-        this.loadRelatedLeads();
-    }
-}
-
-async loadRelatedLeads() {
-    if (!this.candidateId) {
-        this.relatedLeads = [];
-        this.relatedLeadsLoaded = true;
-        return;
+        if (this.activeTab === 'webinar' && !this.webinarLoaded) {
+            this.loadWebinarHistory();
+        }
+        if (this.activeTab === 'event' && !this.eventLoaded) {
+            this.loadEventHistory();
+        }
+        if (this.activeTab === 'related' && !this.relatedLeadsLoaded) {
+            this.loadRelatedLeads();
+        }
     }
 
-    try {
-        const rows = await getRelatedLeads({
-            candidateId: this.candidateId
-        });
+    async loadRelatedLeads() {
+        if (!this.candidateId) {
+            this.relatedLeads = [];
+            this.relatedLeadsLoaded = true;
+            return;
+        }
 
-        const processed = [];
+        try {
+            const rows = await getRelatedLeads({
+                candidateId: this.candidateId
+            });
 
-        for (const r of (rows || [])) {
+            // Just reuse already loaded stageOptions
+            const commonStageOptions = this.stageOptions || [];
 
-            const recordTypeId = r.recordTypeId;
-
-            // Trigger wire adapter
-            if (recordTypeId && !this.recordTypeStageMap[recordTypeId]) {
-                this.dynamicRecordTypeId = recordTypeId;
-            }
-
-            processed.push({
+            this.relatedLeads = (rows || []).map(r => ({
                 id: r.id,
                 course: r.course || 'NA',
                 stage: r.stage || '',
-                stageOptions:
-                    this.recordTypeStageMap[recordTypeId] || []
-            });
+                stageOptions: commonStageOptions
+            }));
+
+        } catch (e) {
+            console.error('Related leads load failed:', e);
+            this.relatedLeads = [];
+        } finally {
+            this.relatedLeadsLoaded = true;
+            this.relatedLeadEdits = {};
+        }
+    }
+    async loadStageOptionsForRecordType(recordTypeId) {
+        if (this.recordTypeStageMap[recordTypeId]) {
+            return this.recordTypeStageMap[recordTypeId];
         }
 
-        this.relatedLeads = processed;
-
-    } catch (e) {
-        console.error('Related leads load failed:', e);
-        this.relatedLeads = [];
-    } finally {
-        this.relatedLeadsLoaded = true;
-        this.relatedLeadEdits = {};
-    }
-}
-
-
-handleRelatedStageChange(event) {
-    const leadId = event.currentTarget.dataset.id;
-    const stage = event.detail.value;
-
-    this.relatedLeads = (this.relatedLeads || []).map(r => {
-        if (r.id === leadId) {
-            return { ...r, stage };
-        }
-        return r;
-    });
-
-    if (leadId) {
-        this.relatedLeadEdits = { ...this.relatedLeadEdits, [leadId]: stage };
-    }
-}
-
-handleNewLeadCourseChange(event) {
-    this.newLeadCourse = event.detail.value;
-}
-
-async handleCreateRelatedLead() {
-    if (!this.candidateId || !this.newLeadCourse || !this.newLeadEmail || this.isCreatingRelatedLead) return;
-
-    try {
-        this.isCreatingRelatedLead = true;
-
-        await createRelatedLead({
-            candidateId: this.candidateId,
-            course: this.newLeadCourse,
-            email: this.newLeadEmail,
-            sourceRecordId: this.recordId
+        const result = await getPicklistValuesByRecordType({
+            objectApiName: LEAD_OBJECT,
+            recordTypeId: recordTypeId
         });
 
-        this.newLeadCourse = '';
-        this.newLeadEmail = '';
+        const stageField = result.picklistFieldValues.Stage__c;
 
-        await this.loadRelatedLeads();
+        const options = (stageField?.values || []).map(v => ({
+            label: v.label,
+            value: v.value
+        }));
 
-    } catch (e) {
-        console.error('Create related lead failed:', e);
-        this.toast(
-            'Create Failed',
-            e?.body?.message || e?.message || 'Failed to create lead',
-            'error'
-        );
-    } finally {
-        this.isCreatingRelatedLead = false;
+        this.recordTypeStageMap = {
+            ...this.recordTypeStageMap,
+            [recordTypeId]: options
+        };
+
+        return options;
     }
-}
 
-async loadUntrackedStatus() {
-    if (!this.recordId) return;
 
-    try {
-        const id = await getLatestUntrackedCallLog({ leadId: this.recordId });
+    handleRelatedStageChange(event) {
+        const leadId = event.currentTarget.dataset.id;
+        const stage = event.detail.value;
 
-        this.callLogId = id;
-        this.showTagLead = id !== null;
+        this.relatedLeads = (this.relatedLeads || []).map(r => {
+            if (r.id === leadId) {
+                return { ...r, stage };
+            }
+            return r;
+        });
 
-    } catch (e) {
-        console.error('Failed loading untracked status', e);
-        this.showTagLead = false;
+        if (leadId) {
+            this.relatedLeadEdits = { ...this.relatedLeadEdits, [leadId]: stage };
+        }
     }
-}
 
+    handleNewLeadCourseChange(event) {
+        this.newLeadCourse = event.detail.value;
+    }
 
+    async handleCreateRelatedLead() {
+        if (!this.candidateId || !this.newLeadCourse || !this.newLeadEmail || this.isCreatingRelatedLead) return;
+
+        try {
+            this.isCreatingRelatedLead = true;
+
+            await createRelatedLead({
+                candidateId: this.candidateId,
+                course: this.newLeadCourse,
+                email: this.newLeadEmail,
+                sourceRecordId: this.recordId
+            });
+
+            this.newLeadCourse = '';
+            this.newLeadEmail = '';
+
+            await this.loadRelatedLeads();
+
+        } catch (e) {
+            console.error('Create related lead failed:', e);
+            this.toast(
+                'Create Failed',
+                e?.body?.message || e?.message || 'Failed to create lead',
+                'error'
+            );
+        } finally {
+            this.isCreatingRelatedLead = false;
+        }
+    }
+
+    async loadUntrackedStatus() {
+        if (!this.recordId) return;
+
+        try {
+            const id = await getLatestUntrackedCallLog({ leadId: this.recordId });
+
+            this.callLogId = id;
+            this.showTagLead = id !== null;
+
+        } catch (e) {
+            console.error('Failed loading untracked status', e);
+            this.showTagLead = false;
+        }
+    }
+
+    async loadDispositionConfig() {
+        try {
+            const data = await getDispositions();
+
+            const l1Set = new Set();
+            const tempL1L2Map = {};
+            const tempCommentMap = {};
+
+            (data || []).forEach(row => {
+
+                if (!row.l1) return;
+
+                // Collect L1
+                l1Set.add(row.l1);
+
+                // Build L1 → L2 mapping
+                if (!tempL1L2Map[row.l1]) {
+                    tempL1L2Map[row.l1] = new Set();
+                }
+                if (row.l2) {
+                    tempL1L2Map[row.l1].add(row.l2);
+                }
+
+                // Build Comment Mandatory map
+                const key = `${row.l1}:${row.l2}`;
+                tempCommentMap[key] = row.commentNeeded === true;
+            });
+
+            // Convert L1 to options
+            this.l1Options = [...l1Set].map(v => ({
+                label: v,
+                value: v
+            }));
+
+            // Convert L1L2 map sets to arrays
+            this.l1L2Map = {};
+            Object.keys(tempL1L2Map).forEach(l1 => {
+                this.l1L2Map[l1] = [...tempL1L2Map[l1]];
+            });
+
+            // Save comment rules
+            this.dispositionConfigMap = tempCommentMap;
+
+            console.log('Disposition metadata loaded successfully');
+
+        } catch (e) {
+            console.error('Disposition metadata load failed:', e);
+        }
+    }
 
 
 
@@ -499,30 +549,24 @@ async loadUntrackedStatus() {
     }
 
 
-    async loadPicklists() {
-        try {
-            const map = await getL1L2Values();
-            this.fullMap = map || {};
-            this.l1Options = Object.keys(this.fullMap).map(k => ({
-                label: k,
-                value: k
-            }));
-        } catch (e) {
-            console.error('Picklist load failed:', e);
-        }
-    }
-
     async loadStageLevel() {
+        if (!this.recordId) return;
+
         try {
-            const mapData = await getStageLevelValues();
+            const mapData = await getStageLevelValues({
+                recordId: this.recordId
+            });
+
             this.stageOptions = (mapData.stage || []).map(v => ({
                 label: v,
                 value: v
             }));
+
             this.levelOptions = (mapData.level || []).map(v => ({
                 label: v,
                 value: v
             }));
+
         } catch (e) {
             console.error('Stage/Level load failed:', e);
         }
@@ -544,35 +588,35 @@ async loadUntrackedStatus() {
     }
 
 
-async loadWebinarHistory() {
-    if (!this.candidateId) return;
+    async loadWebinarHistory() {
+        if (!this.candidateId) return;
 
-    try {
-        const rows = await getWebinarMembers({
-            candidateId: this.candidateId
-        });
+        try {
+            const rows = await getWebinarMembers({
+                candidateId: this.candidateId
+            });
 
-        const dateFmt = new Intl.DateTimeFormat('en-IN', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
-        });
+            const dateFmt = new Intl.DateTimeFormat('en-IN', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            });
 
-        this.webinarHistory = (rows || []).map(r => ({
-            id: r.id,
-            webinar: r.webinarName,
-            status: r.attendanceStatus || 'NA',
-            createdDate: r.createdDate
-                ? dateFmt.format(new Date(r.createdDate))
-                : 'NA'
-        }));
+            this.webinarHistory = (rows || []).map(r => ({
+                id: r.id,
+                webinar: r.webinarName,
+                status: r.attendanceStatus || 'NA',
+                createdDate: r.createdDate
+                    ? dateFmt.format(new Date(r.createdDate))
+                    : 'NA'
+            }));
 
-        this.webinarLoaded = true;
+            this.webinarLoaded = true;
 
-    } catch (e) {
-        console.error('Webinar history load failed:', e);
+        } catch (e) {
+            console.error('Webinar history load failed:', e);
+        }
     }
-}
 
 
     get hasCallHistory() {
@@ -581,88 +625,90 @@ async loadWebinarHistory() {
 
 
 
- get leadTabClass() {
-    return `tab-item ${this.activeTab === 'lead' ? 'active' : ''}`;
-}
+    get leadTabClass() {
+        return `tab-item ${this.activeTab === 'lead' ? 'active' : ''}`;
+    }
 
-get historyTabClass() {
-    return `tab-item ${this.activeTab === 'history' ? 'active' : ''}`;
-}
+    get historyTabClass() {
+        return `tab-item ${this.activeTab === 'history' ? 'active' : ''}`;
+    }
 
-get webinarTabClass() {
-    return `tab-item ${this.activeTab === 'webinar' ? 'active' : ''}`;
-}
+    get webinarTabClass() {
+        return `tab-item ${this.activeTab === 'webinar' ? 'active' : ''}`;
+    }
 
-get eventTabClass() {
-    return `tab-item ${this.activeTab === 'event' ? 'active' : ''}`;
-}
+    get eventTabClass() {
+        return `tab-item ${this.activeTab === 'event' ? 'active' : ''}`;
+    }
 
-get relatedTabClass() {
-    return `tab-item ${this.activeTab === 'related' ? 'active' : ''}`;
-}
+    get relatedTabClass() {
+        return `tab-item ${this.activeTab === 'related' ? 'active' : ''}`;
+    }
 
-get showRelatedTab() {
-    return this.isMissedCall || this.isUntrackedCall;
-}
-get normalizedPrimaryTag() {
-    const raw = (this.primaryTag || '').trim().toLowerCase();
-    return raw.replace(/[^a-z]/g, '');
-}
+    get showRelatedTab() {
+        return !!this.candidateId;
+    }
+    get normalizedPrimaryTag() {
+        const raw = (this.primaryTag || '').trim().toLowerCase();
+        return raw.replace(/[^a-z]/g, '');
+    }
 
-get isUntrackedCall() {
-    const tag = this.normalizedPrimaryTag;
+    get isUntrackedCall() {
+        const tag = this.normalizedPrimaryTag;
 
-    if (tag.includes('untracked')) return true;
-
-    
-    if (tag.includes('ne') || tag.includes('noteligible')) return false;
-
-    if (tag.includes('missed')) return false;
-
-    return this.isCallLog === true && !this.candidateId;
-}
-
-get isMissedCall() {
-    const tag = this.normalizedPrimaryTag;
-
-    if (tag.includes('missed')) return true;
+        if (tag.includes('untracked')) return true;
 
 
-    if (tag.includes('ne') || tag.includes('noteligible')) return true;
+        if (tag.includes('ne') || tag.includes('noteligible')) return false;
 
-    if (tag.includes('untracked')) return false;
+        if (tag.includes('missed')) return false;
 
-    return this.isCallLog === true && !!this.candidateId;
-}
+        return this.isCallLog === true && !this.candidateId;
+    }
+
+    get isMissedCall() {
+        const tag = this.normalizedPrimaryTag;
+
+        if (tag.includes('missed')) return true;
 
 
-get formattedCreatedDate() {
-    if (!this.identity.createdDate) return '';
+        if (tag.includes('ne') || tag.includes('noteligible')) return true;
 
-    const date = new Date(this.identity.createdDate);
+        if (tag.includes('untracked')) return false;
 
-    return new Intl.DateTimeFormat('en-IN', {
-        year: 'numeric',
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-    }).format(date);
-}
+        return this.isCallLog === true && !!this.candidateId;
+    }
+
+
+    get formattedCreatedDate() {
+        if (!this.identity.createdDate) return '';
+
+        const date = new Date(this.identity.createdDate);
+
+        return new Intl.DateTimeFormat('en-IN', {
+            year: 'numeric',
+            month: 'short',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        }).format(date);
+    }
 
 
 
 
     updateCommentVisibility() {
         const key = `${this.l1Value}:${this.l2Value}`;
-        this.isCommentMandatory = this.mandatoryCommentRules[key] === true;
+        this.isCommentMandatory = this.dispositionConfigMap[key] === true;
     }
 
     handleL1Change(e) {
         this.l1Value = e.target.value;
-        this.userChangedStage = false; 
+        this.userChangedStage = false;
 
-        this.l2Options = (this.fullMap[this.l1Value] || []).map(v => ({
+        const l2List = this.l1L2Map[this.l1Value] || [];
+
+        this.l2Options = l2List.map(v => ({
             label: v,
             value: v
         }));
@@ -721,12 +767,14 @@ get formattedCreatedDate() {
         this.callApi();
     }
 
-   
+
     async callApi() {
         this.callButtonDisabled = true;
         this.loading = true;
         this.errorText = null;
-
+    this.isApiResponseReceived = false;  
+    this.l1Value = 'Not-Connected';   
+     this.handleL1Change({ target: { value: this.l1Value } });
         this.callStatus = 'Dialing…';
         this.isLive = false;
         this.showFeedback = false;
@@ -758,17 +806,18 @@ get formattedCreatedDate() {
             setTimeout(() => (this.showPopup = false), 4200);
 
             this.clearFeedbackTimers();
-      
-this.noResponseTimer = setTimeout(() => {
-    if (this.isLive && this.callStatus !== 'Ended') {
-        this.canEndCall = true;
-        this.callStatus = 'No Response';
 
-        
-        this.showFeedbackSection();
-        this.callButtonDisabled = true; 
-    }
-}, this.CALL_NO_RESPONSE_MS);
+            this.noResponseTimer = setTimeout(() => {
+                if (this.isLive && this.callStatus !== 'Ended') {
+                    this.canEndCall = true;
+                    this.callStatus = 'No Response';
+                    this.l1Value = 'Not-Connected';
+                    this.handleL1Change({ target: { value: this.l1Value } });
+
+                    this.showFeedbackSection();
+                    this.callButtonDisabled = true;
+                }
+            }, this.CALL_NO_RESPONSE_MS);
 
         } catch (e) {
             this.errorText = e?.body?.message || e?.message || 'Failed to dial';
@@ -845,7 +894,7 @@ this.noResponseTimer = setTimeout(() => {
     }
 
 
-  
+
 
 
 
@@ -937,7 +986,7 @@ this.noResponseTimer = setTimeout(() => {
                 l2: this.l2Value,
                 level: this.levelValue,
                 notifyMe: this.notifyMe,
-                 isDnd: this.isDnd,
+                isDnd: this.isDnd,
                 isSpam: this.isSpam
             };
             if (this.stageValue && String(this.stageValue).trim()) {
@@ -1049,56 +1098,56 @@ this.noResponseTimer = setTimeout(() => {
     }
 
 
-async loadCallHistory() {
-    if (!this.recordId) return;
+    async loadCallHistory() {
+        if (!this.recordId) return;
 
-    try {
-       const rows = await getCallHistory({
-            candidateId: this.candidateId
-        });
+        try {
+            const rows = await getCallHistory({
+                candidateId: this.candidateId
+            });
 
-        const dateFmt = new Intl.DateTimeFormat('en-IN', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
-        });
+            const dateFmt = new Intl.DateTimeFormat('en-IN', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            });
 
-        const timeFmt = new Intl.DateTimeFormat('en-IN', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+            const timeFmt = new Intl.DateTimeFormat('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
 
-        this.callHistory = (rows || []).map(r => {
-            const dt = r.startTime || r.createdDate;
-            const d = dt ? new Date(dt) : null;
+            this.callHistory = (rows || []).map(r => {
+                const dt = r.startTime || r.createdDate;
+                const d = dt ? new Date(dt) : null;
 
-            const totalSec = Number(r.durationSeconds || 0);
-            const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
-            const ss = String(totalSec % 60).padStart(2, '0');
+                const totalSec = Number(r.durationSeconds || 0);
+                const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+                const ss = String(totalSec % 60).padStart(2, '0');
 
-            return {
-                id: r.id,
-                dateLabel: d ? dateFmt.format(d) : 'NA',
-                timeLabel: d ? timeFmt.format(d) : '',
-                durationLabel: `${mm}:${ss}`,
-                status: r.status || 'NA',
-                l1: r.l1 || '',
-                l2: r.l2 || '',
-                stage: r.stage || ''
-            };
-        });
+                return {
+                    id: r.id,
+                    dateLabel: d ? dateFmt.format(d) : 'NA',
+                    timeLabel: d ? timeFmt.format(d) : '',
+                    durationLabel: `${mm}:${ss}`,
+                    status: r.status || 'NA',
+                    l1: r.l1 || '',
+                    l2: r.l2 || '',
+                    stage: r.stage || ''
+                };
+            });
 
-    } catch (e) {
-        console.error('Call history load failed:', e);
+        } catch (e) {
+            console.error('Call history load failed:', e);
+        }
     }
-}
 
-get disablePauseBtnFinal() {
-    return (
-        this.isQueuePaused ||    
-        !this.showFeedback        
-    );
-}
+    get disablePauseBtnFinal() {
+        return (
+            this.isQueuePaused ||
+            !this.showFeedback
+        );
+    }
     async handlePauseQueue() {
         const saved = await this.saveFeedback({ stopQueue: true });
         if (!saved) {
@@ -1153,6 +1202,7 @@ get disablePauseBtnFinal() {
     onRunoEvent(msg) {
         debugger;
         const p = (msg && msg.data && msg.data.payload) || {};
+          this.isApiResponseReceived = true;
 
         const evtLeadId = p.Lead_Id__c || p.LeadId__c || p.leadId || null;
         const evtCallId = p.Call_Id__c || p.CallId__c || p.callId || null;
@@ -1174,6 +1224,24 @@ get disablePauseBtnFinal() {
             p.Duration__c ||
             p.durationSeconds
         );
+
+        if (!Number.isNaN(s) && s > 0) {
+
+            //  CONNECTED CASE
+            this.l1Value = 'Connected';
+            this.handleL1Change({ target: { value: this.l1Value } });
+
+        } else {
+
+            //  NOT CONNECTED CASE
+            this.l1Value = 'Not-Connected';
+            this.handleL1Change({ target: { value: this.l1Value } });
+
+            // AUTO SELECT L2 WHEN DURATION = 0
+            if (this.l2Options.length > 0) {
+                this.l2Value = this.l2Options[0].value;
+            }
+        }
 
         if (!Number.isNaN(s) && s > 0) {
             const totalSec = Math.floor(s);
@@ -1232,6 +1300,23 @@ get disablePauseBtnFinal() {
         return `Calling via Runo | ${this.callStatus} | ${this.elapsedLabel}`;
     }
 
+
+
+get disableUntilApi() {
+    return !this.isApiResponseReceived;
+}
+
+get disableFollowUpDateTime() {
+    return this.disableUntilApi || this.autoSetFollowUp;
+}
+
+get disableL1() {
+    return !this.isApiResponseReceived;
+}
+
+get disableL2Final() {
+    return !this.isApiResponseReceived || this.isL2Disabled;
+}
     get statusPillClass() {
         const status = (this.callStatus || '').toLowerCase();
         if (status.includes('in call') || status.includes('dialing')) return 'status-pill live';

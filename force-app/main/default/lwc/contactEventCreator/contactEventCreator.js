@@ -191,7 +191,7 @@ export default class ContactEventCreator extends LightningElement {
             this.contactEmail = email;
 
             if (this.contactEmail && this.contactEmail !== this.currentUserEmail) {
-                this.addParticipantWithData(this.contactEmail, name || 'Lead', false);
+                this.addParticipantWithData(this.contactEmail, name || 'Lead', false, true);
             }
         } else if (error) {
             this.showToast('Error', 'Error loading lead information', 'error');
@@ -230,6 +230,17 @@ export default class ContactEventCreator extends LightningElement {
             this.currentUserName = userInfo.Name;
 
             this.addParticipantWithData(this.currentUserEmail, this.currentUserName, true);
+
+            const skipEmail = new Set([
+                this.currentUserEmail,
+                this.contactEmail
+            ]);
+
+            const managerManagerEmail = userInfo?.Manager?.Manager?.Email;
+            const managerManagerName = userInfo?.Manager?.Manager?.Name || 'Manager';
+            if (managerManagerEmail && !skipEmail.has(managerManagerEmail)) {
+                this.addParticipantWithData(managerManagerEmail, managerManagerName, false, false);
+            }
         } catch (error) {
             console.error('Error loading user info:', error);
         }
@@ -323,7 +334,7 @@ export default class ContactEventCreator extends LightningElement {
     }
 
     // ===== participants =====
-    addParticipantWithData(email, name = '', isCurrentUser = false) {
+    addParticipantWithData(email, name = '', isCurrentUser = false, isLead = false) {
         if (!email) return;
 
         if (this.participants.some(p => p.email === email)) {
@@ -337,7 +348,9 @@ export default class ContactEventCreator extends LightningElement {
                 id: Date.now() + Math.random(),
                 email: email,
                 name: name,
-                isCurrentUser: isCurrentUser
+                isCurrentUser: isCurrentUser,
+                isLead: isLead,
+                canRemove: !(isCurrentUser || isLead)
             }
         ];
 
@@ -392,8 +405,8 @@ export default class ContactEventCreator extends LightningElement {
         const index = event.target.dataset.index;
         const participant = this.participants[index];
 
-        if (participant.isCurrentUser) {
-            this.showToast('Info', 'You cannot remove yourself as the organizer', 'info');
+        if (participant.isCurrentUser || participant.isLead) {
+            this.showToast('Info', 'You cannot remove this participant', 'info');
             return;
         }
 

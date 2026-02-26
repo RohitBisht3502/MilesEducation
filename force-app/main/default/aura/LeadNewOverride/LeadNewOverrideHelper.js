@@ -26,13 +26,20 @@
             return;
         }
 
+        var phoneValue = String(phone || "").trim();
+        var phoneRegex = /^[6-9]\d{9}$/;
+        if (!phoneRegex.test(phoneValue)) {
+            component.set("v.errorMessage", "Phone must be a valid 10-digit number starting with 6-9.");
+            return;
+        }
+
         component.set("v.isLoading", true);
         var action = component.get("c.createLeadByCourse");
         action.setParams({
             course: course,
             firstName: component.get("v.firstName"),
             lastName: lastName,
-            phone: phone,
+            phone: phoneValue,
             email: email
         });
         action.setCallback(this, function(resp) {

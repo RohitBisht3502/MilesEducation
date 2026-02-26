@@ -179,48 +179,77 @@
                                 <span>Call Feedback</span>
                             </div>
 
-                            <div class="feedback-grid two-column">
-                                <lightning-combobox label="Call Status (L1)" value={l1Value} options={l1Options}
-                                    onchange={handleL1Change}>
-                                </lightning-combobox>
+                            <div class="feedback-grid">
+                                <!-- Row 1 -->
+                                <div class="row-2">
+                                    <lightning-combobox label="Call Status (L1)" value={l1Value} options={l1Options}
+                                        onchange={handleL1Change}>
+                                    </lightning-combobox>
 
-                                <lightning-combobox label="Sub Status (L2)" value={l2Value} options={l2Options}
-                                    onchange={handleL2Change} disabled={isL2Disabled}>
-                                </lightning-combobox>
+                                    <lightning-combobox label="Sub Status (L2)" value={l2Value} options={l2Options}
+                                        onchange={handleL2Change} disabled={isL2Disabled}>
+                                    </lightning-combobox>
+                                </div>
 
-                                <lightning-combobox label="Stage" value={stageValue} options={stageOptions}
-                                    onchange={handleStageChange} disabled={isStageDisabled}>
-                                </lightning-combobox>
-                                <template if:true={isStageDisabled}>
-                                    <div class="slds-text-color_weak slds-m-top_x-small stage-section">
-                                        Stage not applicable for Not-Connected calls
+                                <!-- Row 2 -->
+                                <div class="row-2">
+                                    <div>
+                                        <lightning-combobox label="Stage" value={stageValue} options={stageOptions}
+                                            onchange={handleStageChange} disabled={isStageDisabled}>
+                                        </lightning-combobox>
+
+                                        <template if:true={isStageDisabled}>
+                                            <div class="helper-text">
+                                                Stage not applicable for Not-Connected calls
+                                            </div>
+                                        </template>
                                     </div>
-                                 </template>
-                               <lightning-input type="checkbox" label="Notify Me" checked={notifyMe} onchange={handleNotifyChange}>
-                  </lightning-input>
-                               
 
+                                    <lightning-input type="date" label="Expected Date" value={expectedPaymentDate}
+                                        onchange={handleExpectedDateChange}>
+                                    </lightning-input>
+                                </div>
 
-                                <lightning-input type="datetime-local" label="Next Follow Up" value={nextFollowUpDate}
-                                    onchange={handleNextFollowUpDateChange} disabled={autoSetFollowUp}>
-                                </lightning-input>
+                                <!-- Row 3 -->
+                                <div class="row-3-followup">
+                                    <div class="follow-date">
+                                        <lightning-input type="date" label="Next Follow Up - Date"
+                                            value={nextFollowUpDate} onchange={handleNextFollowUpDateChange}
+                                            disabled={autoSetFollowUp}>
+                                        </lightning-input>
+                                    </div>
 
-                                <lightning-input type="checkbox" label="Auto set next follow up (+24 hrs)"
-                                    checked={autoSetFollowUp} onchange={handleAutoSetChange}>
-                                </lightning-input>
+                                    <div class="follow-time">
+                                        <lightning-input type="time" label="Time" value={nextFollowUpDate}
+                                            onchange={handleNextFollowUpDateChange} disabled={autoSetFollowUp}>
+                                        </lightning-input>
+                                    </div>
 
-                                <lightning-input class="full-row" type="date" label="Expected Date"
-                                    value={expectedPaymentDate} onchange={handleExpectedDateChange}>
-                                </lightning-input>
-                                 <lightning-input type="checkbox" label="DND" checked={isDnd} onchange={handleDndChange}>
-                                </lightning-input>
+                                    <div class="follow-auto">
+                                        <lightning-input type="checkbox" label="Auto set (+24 hrs)"
+                                            checked={autoSetFollowUp} onchange={handleAutoSetChange}>
+                                        </lightning-input>
+                                    </div>
+                                </div>
 
-                                <lightning-input type="checkbox" label="Is Spam" checked={isSpam}
-                                    onchange={handleSpamChange}>
-                                </lightning-input>
+                                <!-- Row 4 -->
+                                <div class="checkbox-row">
+                                    <lightning-input type="checkbox" label="Notify Me" checked={notifyMe}
+                                        onchange={handleNotifyChange}>
+                                    </lightning-input>
 
-                                <lightning-textarea class="full-row" label="Comments" value={feedback}
-                                    required={isCommentMandatory} onchange={handleFeedbackChange}>
+                                    <lightning-input type="checkbox" label="DND" checked={isDnd}
+                                        onchange={handleDndChange}>
+                                    </lightning-input>
+
+                                    <lightning-input type="checkbox" label="Is Spam" checked={isSpam}
+                                        onchange={handleSpamChange}>
+                                    </lightning-input>
+                                </div>
+
+                                <!-- Row 5 -->
+                                <lightning-textarea label="Comments" value={feedback} required={isCommentMandatory}
+                                    onchange={handleFeedbackChange}>
                                 </lightning-textarea>
                             </div>
                         </div>

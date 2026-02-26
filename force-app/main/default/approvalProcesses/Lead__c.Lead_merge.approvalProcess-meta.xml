@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ApprovalProcess xmlns="http://soap.sforce.com/2006/04/metadata">
+    <active>true</active>
+    <allowRecall>false</allowRecall>
+    <allowedSubmitters>
+        <type>owner</type>
+    </allowedSubmitters>
+    <approvalPageFields>
+        <field>Name</field>
+        <field>Owner</field>
+        <field>Stage__c</field>
+        <field>Candidate__c</field>
+        <field>CAN_ID__c</field>
+        <field>Course__c</field>
+    </approvalPageFields>
+    <approvalStep>
+        <allowDelegate>false</allowDelegate>
+        <assignedApprover>
+            <approver>
+                <type>adhoc</type>
+            </approver>
+        </assignedApprover>
+        <label>Lead Merge Approval</label>
+        <name>Step_1</name>
+    </approvalStep>
+    <emailTemplate>Lead_Merge_Templates/Lead_Merge_Approval_Request</emailTemplate>
+    <enableMobileDeviceAccess>false</enableMobileDeviceAccess>
+    <finalApprovalActions>
+        <action>
+            <name>Update_Status_To_Approved</name>
+            <type>FieldUpdate</type>
+        </action>
+    </finalApprovalActions>
+    <finalApprovalRecordLock>false</finalApprovalRecordLock>
+    <finalRejectionActions>
+        <action>
+            <name>Update_Status_To_Rejected</name>
+            <type>FieldUpdate</type>
+        </action>
+    </finalRejectionActions>
+    <finalRejectionRecordLock>false</finalRejectionRecordLock>
+    <initialSubmissionActions>
+        <action>
+            <name>Update_Status_To_Pending</name>
+            <type>FieldUpdate</type>
+        </action>
+    </initialSubmissionActions>
+    <label>Lead merge</label>
+    <processOrder>1</processOrder>
+    <recordEditability>AdminOnly</recordEditability>
+    <showApprovalHistory>false</showApprovalHistory>
+</ApprovalProcess>

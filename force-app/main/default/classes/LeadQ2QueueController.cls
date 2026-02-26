@@ -49,6 +49,15 @@ public without sharing class LeadQ2QueueController {
     }
 
     @AuraEnabled
+    public static void startProcessingLead(Id leadId, String status) {
+        if (leadId == null) return;
+        Queue_Lead_Status__e evt = new Queue_Lead_Status__e();
+        evt.Lead_Id__c = leadId;
+        evt.Status__c = String.isBlank(status) ? 'Processing' : status;
+        EventBus.publish(evt);
+    }
+
+    @AuraEnabled
     public static void updateLeadOwner(Id leadId) {
         if (leadId == null) return;
         Lead__c l = [SELECT Id, OwnerId FROM Lead__c WHERE Id = :leadId LIMIT 1];

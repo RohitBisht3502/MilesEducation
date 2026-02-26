@@ -7,6 +7,34 @@
 
 public without sharing class EligibilityQuickActionController {
 
+    @AuraEnabled(cacheable=true)
+    public static String getEligibilityStatus(Id recordId) {
+        if (recordId == null) {
+            return null;
+        }
+
+        EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByRecordId(recordId);
+        if (ctx.studentId != null) {
+            Account a = [
+                SELECT GP_Lead_Status__c
+                FROM Account
+                WHERE Id = :ctx.studentId
+                LIMIT 1
+            ];
+            return a.GP_Lead_Status__c;
+        }
+        if (ctx.candidateId != null) {
+            Lead l = [
+                SELECT GP_Lead_Status__c
+                FROM Lead
+                WHERE Id = :ctx.candidateId
+                LIMIT 1
+            ];
+            return l.GP_Lead_Status__c;
+        }
+        return null;
+    }
+
     @AuraEnabled
     public static void initializeEligibility(Id recordId) {
         if (recordId == null) {

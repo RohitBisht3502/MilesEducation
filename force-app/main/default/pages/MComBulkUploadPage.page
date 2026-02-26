@@ -1,0 +1,17 @@
+<apex:page standardController="Lead__c" recordSetVar="leads">
+    <apex:includeLightning />
+    
+    <div id="lwcContainer"></div>
+
+    <script>
+        $Lightning.use("c:MComBulkUploadApp", function() {
+            $Lightning.createComponent("c:mComBulkUpload",
+                {},
+                "lwcContainer",
+                function(cmp) {
+                    console.log("LWC Component created");
+                }
+            );
+        });
+    </script>
+</apex:page>

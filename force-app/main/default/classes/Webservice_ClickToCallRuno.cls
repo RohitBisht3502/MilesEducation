@@ -1,12 +1,14 @@
+/**
+     * Author: Rohit singh bisht
+     * Purpose: Accept click-to-call payload from webhook clients and log it.
+     */
 @RestResource(urlMapping='/runo/call-log/intiated/*')
 global without sharing class Webservice_ClickToCallRuno {
-
     @HttpPost
-    global static void initiateClickToCall() {
+    global static ApiResponse initiateClickToCall() {
         RestRequest req = RestContext.request;
         RestResponse res = RestContext.response;
 
-        // Initialize log variables
         String requestBody = '';
         String responseBody = '';
         String status = 'Failed';
@@ -14,88 +16,60 @@ global without sharing class Webservice_ClickToCallRuno {
         String errorMessage = '';
 
         try {
-            // Capture incoming request body
             requestBody = req.requestBody.toString();
             if (String.isBlank(requestBody)) {
                 statusCode = 400;
                 responseBody = '{"error":"Missing request body"}';
                 res.statusCode = statusCode;
                 res.responseBody = Blob.valueOf(responseBody);
-
-                IntegrationLogUtil.insertLog(
-                    'Miles Force → Runo (Click-to-Call)',
-                    requestBody,
-                    responseBody,
-                    'Empty request body received',
-                    'Failed',
-                    statusCode
-                );
-                return;
+                IntegrationLogUtil.insertLog('Runo call log initiated', requestBody, responseBody, 'Empty request body received', 'Failed', statusCode);
+                return new ApiResponse(false, 'Missing request body', null);
             }
 
-            // Deserialize incoming data
-            Map<String, Object> data = (Map<String, Object>) JSON.deserializeUntyped(requestBody);
-
-            // Prepare Runo body
-            Map<String, Object> runoBody = new Map<String, Object>{
-                'customer'   => data.get('customer'),
-                'processName'=> data.get('processName'),
-                'assignedTo' => data.get('assignedTo'),
-                'priority'   => data.get('priority'),
-                'notes'      => data.get('notes'),
-                'userFields' => data.get('userFields')
-            };
-
-            String jsonBody = JSON.serialize(runoBody);
-
-            // Perform HTTP Callout to Runo
-            Http http = new Http();
-            HttpRequest httpReq = new HttpRequest();
-            httpReq.setEndpoint('https://api.runo.in/v1/crm/allocation?isAutoDialLead=true');
-            httpReq.setMethod('POST');
-            httpReq.setHeader('Auth-Key', 'MTl5ZG5tcHhqOTE3MjE2NTQ=');
-            httpReq.setHeader('Content-Type', 'application/json');
-            httpReq.setBody(jsonBody);
-
-            HttpResponse httpRes = http.send(httpReq);
-            responseBody = httpRes.getBody();
-            statusCode = httpRes.getStatusCode();
-
-            if (statusCode == 200 || statusCode == 201) {
-                status = 'Success';
-                res.statusCode = 200;
-                res.responseBody = Blob.valueOf('{"status":"success","message":"Call initiated successfully."}');
-            } else {
-                status = 'Failed';
+            ClickToCallPayload payload = (ClickToCallPayload) JSON.deserialize(requestBody, ClickToCallPayload.class);
+            if (payload == null || String.isBlank(payload.callerId) || String.isBlank(payload.contactPhone)) {
+                statusCode = 400;
+                responseBody = '{"error":"callerId and contactPhone are required"}';
                 res.statusCode = statusCode;
-                res.responseBody = Blob.valueOf('{"status":"error","message":"Runo API Error"}');
+                res.responseBody = Blob.valueOf(responseBody);
+                IntegrationLogUtil.insertLog('Runo call log initiated', requestBody, responseBody, 'Missing required fields', 'Failed', statusCode);
+                return new ApiResponse(false, 'callerId and contactPhone are required', null);
             }
 
-            // Log Integration
-            IntegrationLogUtil.insertLog(
-                'Miles Force → Runo (Click-to-Call)',
-                requestBody,
-                responseBody,
-                'Runo click-to-call API executed',
-                status,
-                statusCode
-            );
+            status = 'Success';
+            statusCode = 200;
+            responseBody = '{"status":"success","message":"Call log received."}';
+            res.statusCode = statusCode;
+            res.responseBody = Blob.valueOf(responseBody);
 
+            IntegrationLogUtil.insertLog('Runo call log initiated', requestBody, responseBody, 'Runo call log received', status, statusCode);
+            return new ApiResponse(true, 'Call log received', null);
         } catch (Exception ex) {
             errorMessage = ex.getMessage();
             statusCode = 500;
             responseBody = '{"error":"Internal Server Error"}';
             res.statusCode = statusCode;
             res.responseBody = Blob.valueOf(responseBody);
+            IntegrationLogUtil.insertLog('Runo call log initiated', requestBody, responseBody, errorMessage, 'Failed', statusCode);
+            return new ApiResponse(false, 'Error: ' + errorMessage, null);
+        }
+    }
 
-            IntegrationLogUtil.insertLog(
-                'Miles Force → Runo (Click-to-Call)',
-                requestBody,
-                responseBody,
-                errorMessage,
-                'Failed',
-                statusCode
-            );
+    public class ClickToCallPayload {
+        public String callerId;
+        public String contactPhone;
+        public String timestamp;
+        public String type;
+    }
+
+    global class ApiResponse {
+        public Boolean success;
+        public String message;
+        public String recordId;
+        public ApiResponse(Boolean success, String message, String recordId) {
+            this.success = success;
+            this.message = message;
+            this.recordId = recordId;
         }
     }
 }

@@ -1,17 +1,44 @@
-import { LightningElement, api, track } from 'lwc';
+import { LightningElement, api, track, wire } from 'lwc';
 import initializeEligibility from '@salesforce/apex/EligibilityQuickActionController.initializeEligibility';
+import getEligibilityStatus from '@salesforce/apex/EligibilityQuickActionController.getEligibilityStatus';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { CloseActionScreenEvent } from 'lightning/actions';
 
 export default class EligibilityQuickAction extends LightningElement {
     @api recordId;
     @track isProcessing = false;
+    @track eligibilityStatus;
+    @track statusLoaded = false;
+
+    @wire(getEligibilityStatus, { recordId: '$recordId' })
+    wiredStatus({ data, error }) {
+        this.statusLoaded = true;
+        if (data !== undefined) {
+            this.eligibilityStatus = data;
+        } else if (error) {
+            // eslint-disable-next-line no-console
+            console.error(error);
+            this.eligibilityStatus = null;
+        }
+    }
+
+    get isAlreadyInitiated() {
+        const status = (this.eligibilityStatus || '').toLowerCase();
+        return status && status !== 'yet to initiate';
+    }
+
+    get isConfirmDisabled() {
+        return this.isProcessing || !this.statusLoaded || this.isAlreadyInitiated;
+    }
 
     handleCancel() {
         this.dispatchEvent(new CloseActionScreenEvent());
     }
 
     handleConfirm() {
+        if (this.isConfirmDisabled) {
+            return;
+        }
         this.isProcessing = true;
 
         initializeEligibility({ recordId: this.recordId })

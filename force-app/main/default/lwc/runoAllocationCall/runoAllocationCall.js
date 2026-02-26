@@ -1,9 +1,7 @@
 import { api, LightningElement, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
-
 import allocateLeadNow from '@salesforce/apex/Webservice_RunoAllocationAPI.allocateLeadNow';
 import updateCallFeedback from '@salesforce/apex/Webservice_RunoAllocationAPI.updateCallFeedback';
-import getL1L2Values from '@salesforce/apex/Webservice_RunoAllocationAPI.getL1L2Values';
 import getCallHistory from '@salesforce/apex/Webservice_RunoAllocationAPI.getCallHistory';
 import getIdentity from '@salesforce/apex/RunoCallIdentityService.getIdentity';
 import getStageLevelValues from '@salesforce/apex/Webservice_RunoAllocationAPI.getStageLevelValues';
@@ -17,8 +15,7 @@ import LEAD_OBJECT from '@salesforce/schema/Lead__c';
 import LEAD_RECORDTYPE_FIELD from '@salesforce/schema/Lead__c.RecordTypeId';
 import getWebinarMembers from '@salesforce/apex/Webservice_RunoAllocationAPI.getWebinarMembers';
 import getLeadEvents from '@salesforce/apex/Webservice_RunoAllocationAPI.getLeadEvents';
-
-
+import getDispositions from '@salesforce/apex/CallDispositionConfigService.getDispositions';
 
 
 export default class RunoAllocationCall extends NavigationMixin(LightningElement) {
@@ -45,10 +42,9 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     l2Value = '';
     l1Options = [];
     l2Options = [];
-    fullMap = {};
-    isL2Disabled = true;
 
-    // 🔥 NEW: auto-set next follow up date flag (like good LWC)
+    isL2Disabled = true;
+    l1L2Map = {};
     autoSetFollowUp = true;
     userChangedStage = false;
 
@@ -87,13 +83,8 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
 
     eventHistory = [];
     eventLoaded = false;
-    // courseValue = '';
-    // courseOptions = [];
     isDnd = false;
     isSpam = false;
-
-
-
     // call state
     isLive = false;
     callStatus = 'Idle';
@@ -104,8 +95,6 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     timerId = null;
     webinarHistory = [];
     webinarLoaded = false;
-
-
     // feedback
     showFeedback = false;
     savingFeedback = false;
@@ -124,36 +113,10 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         this.notifyMe = event.target.checked;
     }
 
-
     // comment box always visible; mandatory controlled by isCommentMandatory
     showCommentBox = true;
     isCommentMandatory = false;
-    mandatoryCommentRules = {
-        'Connected:Discussed': true,
-        'Connected:Request Call Back': true,
-        'Connected:Not Eligible': true,
-        'Connected:Wrong Number': true,
-        'Connected:Language Barrier': true,
-        'Connected:Visit Confirmed': true,
-        'Connected:Visit Completed': true,
-        'Connected:Visit Rescheduled': true,
-        'Connected:Visit Cancelled': true,
-        'Connected:Visit Booked By Mistake': true,
-        'Connected:Google Meet Completed': true,
-        'Connected:Google Meet Rescheduled': true,
-        'Connected:Google Meet Cancelled': true,
-        'Connected:Attended And Disconnected': true,
-        'Connected:Voice Mail': true,
-        'Connected:Not Interested (DND)': true,
-        'Connected:Postponed': true,
-
-        'Not-Connected:Not Lifting': false,
-        'Not-Connected:Switched Off': false,
-        'Not-Connected:Not Reachable': false,
-        'Not-Connected:Busy': false,
-        'Not-Connected:Invalid Number': true
-    };
-
+    dispositionConfigMap = {};
     // ---------------- WIRE ----------------
 
     @wire(getIdentity, { recordId: '$recordId' })
@@ -184,33 +147,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         }
     }
 
-    //   @wire(getPicklistValuesByRecordType, {
-    //     objectApiName: LEAD_OBJECT,
-    //     recordTypeId: '$recordTypeId'
-    // })
-    // wiredPicklists({ data, error }) {
-    //     if (data && data.picklistFieldValues) {
 
-    //         // Stage
-    //         if (data.picklistFieldValues.Stage__c) {
-    //             this.stageOptions = data.picklistFieldValues.Stage__c.values.map(v => ({
-    //                 label: v.label,
-    //                 value: v.value
-    //             }));
-    //         }
-
-    //         // Course (GLOBAL PICKLIST)
-    //         if (data.picklistFieldValues.Course__c) {
-    //             this.courseOptions = data.picklistFieldValues.Course__c.values.map(v => ({
-    //                 label: v.label,
-    //                 value: v.value
-    //             }));
-    //         }
-    //     } 
-    //     else if (error) {
-    //         console.error('Picklist load failed:', error);
-    //     }
-    // }
 
     // -------------- PAGE REFERENCE (URL SAFE) --------------
 
@@ -224,7 +161,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         // resolve recordId (already your logic)
         this.resolveRecordIdFromPageRef();
 
-        // ✅ AUTO CALL FLAG
+        //  AUTO CALL FLAG
         if (state.c__autoCall === 'true') {
             this.autoCall = true;
         }
@@ -330,9 +267,6 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
             minute: '2-digit'
         }).format(date);
     }
-
-
-
     // -------------- URL RECORD ID (SAFE FALLBACK) --------------
     resolveRecordIdFromPageRef() {
         if (this.recordId) {
@@ -356,26 +290,6 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         }
     }
 
-    // async loadCourses() {
-    //     try {
-    //         const rows = await getCourses({ recordId: this.recordId });
-
-    //         this.courseOptions = (rows || []).map(c => ({
-    //             label: c.Name,
-    //             value: c.Id   
-    //         }));
-
-    //     } catch (e) {
-    //         console.error('Course load failed', e);
-    //     }
-    // }
-
-
-
-
-
-
-
 
     // --------------- LIFECYCLE -------------
 
@@ -383,8 +297,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
 
 
         this.resolveRecordIdFromPageRef();
-        this.loadPicklists();
-
+        this.loadDispositionConfig();
         this.loadStageAndCourse();
 
         this.loadCallHistory();
@@ -442,15 +355,50 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
 
     // -------------- DATA LOAD --------------
 
-    async loadPicklists() {
+
+    async loadDispositionConfig() {
         try {
-            this.fullMap = await getL1L2Values();
-            this.l1Options = Object.keys(this.fullMap).map(k => ({
-                label: k,
-                value: k
+            const data = await getDispositions();
+
+            this.dispositionConfigMap = {};
+            this.l1Options = [];
+            this.l2Options = [];
+
+            const l1Set = new Set();
+            const l1L2Map = {};
+
+            (data || []).forEach(row => {
+
+                // Build comment mandatory map
+                const key = `${row.l1}:${row.l2}`;
+                this.dispositionConfigMap[key] = row.commentNeeded;
+
+                if (row.l1) {
+                    l1Set.add(row.l1);
+                }
+
+                if (!l1L2Map[row.l1]) {
+                    l1L2Map[row.l1] = new Set();
+                }
+                if (row.l2) {
+                    l1L2Map[row.l1].add(row.l2);
+                }
+            });
+
+            this.l1Options = [...l1Set].map(val => ({
+                label: val,
+                value: val
             }));
+
+            this.l1L2Map = {};
+            Object.keys(l1L2Map).forEach(l1 => {
+                this.l1L2Map[l1] = [...l1L2Map[l1]];
+            });
+
+            console.log('Metadata L1/L2 loaded successfully');
+
         } catch (e) {
-            console.error('Picklist load failed:', e);
+            console.error('Disposition metadata load failed:', e);
         }
     }
 
@@ -486,10 +434,6 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
             console.error('Event load failed:', e);
         }
     }
-
-
-
-
 
     async loadCallHistory() {
         if (!this.recordId) return;
@@ -554,35 +498,26 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         }
     }
 
-
-
-
-
-
-
-
-
     updateCommentVisibility() {
         const key = `${this.l1Value}:${this.l2Value}`;
-        this.isCommentMandatory = this.mandatoryCommentRules[key] === true;
+        this.isCommentMandatory = this.dispositionConfigMap[key] === true;
     }
 
     handleL1Change(e) {
         this.l1Value = e.target.value;
         this.userChangedStage = false;
-        this.l2Options = (this.fullMap[this.l1Value] || []).map(v => ({
+
+        const l2List = this.l1L2Map[this.l1Value] || [];
+
+        this.l2Options = l2List.map(v => ({
             label: v,
             value: v
         }));
+
         this.isL2Disabled = this.l2Options.length === 0;
         this.l2Value = '';
 
-
-        if (this.l1Value === 'Not-Connected') {
-            this.isStageDisabled = true;
-        } else {
-            this.isStageDisabled = false;
-        }
+        this.isStageDisabled = this.l1Value === 'Not-Connected';
 
         this.updateCommentVisibility();
     }
@@ -609,7 +544,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         this.feedback = e.target.value;
     }
 
-    // 🔥 NEW: checkbox handler for "Auto set next follow up"
+    // checkbox handler for "Auto set next follow up"
     handleAutoSetChange(e) {
         this.autoSetFollowUp = e.target.checked;
 
@@ -618,7 +553,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         }
     }
 
-    // 🔥 UPDATED: only allow manual date change when autoSetFollowUp is false
+    //  only allow manual date change when autoSetFollowUp is false
     handleNextFollowUpDateChange(e) {
         if (!this.autoSetFollowUp) {
             this.nextFollowUpDate = e.target.value;
@@ -691,6 +626,10 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         this.isLive = false;
         this.showFeedback = false;
         this.showCallPopup = true;
+
+        this.l1Value = 'Not-Connected';
+        this.l2Value = '';
+        this.updateCommentVisibility();
         this.canEndCall = false;
 
         this.setElapsed(0);
@@ -720,7 +659,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
                     this.canEndCall = true;
                     this.callStatus = 'No Response';
 
-                    // ✅ Automatically show feedback after 30s
+                    //  Automatically show feedback after 30s
                     this.showFeedbackSection();
                     this.callButtonDisabled = true; // optional, disable call button
                 }
@@ -771,7 +710,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         return this.savingFeedback || !this.showFeedback;
     }
 
-    // 🔥 UPDATED: use autoSetFollowUp + setAutoDate24 (same as good LWC)
+    // use autoSetFollowUp + setAutoDate24 (same as good LWC)
     showFeedbackSection() {
         this.showFeedback = true;
         this.disableCancel = false;
@@ -781,7 +720,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         }
     }
 
-    // 🔥 NEW: helper to set nextFollowUpDate = now + 24h in ISO format
+    //  helper to set nextFollowUpDate = now + 24h in ISO format
     setAutoDate24() {
         const next = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
@@ -1040,13 +979,13 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     }
 
     onRunoEvent(msg) {
-        debugger;
         const p = (msg && msg.data && msg.data.payload) || {};
 
         const evtLeadId =
             p.Lead_Id__c || p.LeadId__c || p.leadId || null;
         const evtCallId =
             p.Call_Id__c || p.CallId__c || p.callId || null;
+
 
         if (evtLeadId && String(evtLeadId) !== String(this.recordId)) {
             return;
@@ -1056,35 +995,57 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
             this.lastCallId = String(evtCallId);
         }
 
-        const s = Number(
+        const duration = Number(
             p.Duration_Seconds__c ||
             p.Duration__c ||
             p.durationSeconds
         );
 
-        if (!Number.isNaN(s) && s > 0) {
-            const totalSec = Math.floor(s);
+        const status = p.Status__c || p.status || '';
+
+        let totalSec = 0;
+
+        //  FINAL CORRECT LOGIC
+        if (status === 'Completed' && !Number.isNaN(duration) && duration > 0) {
+
+            this.l1Value = 'Connected';
+
+            totalSec = Math.floor(duration);
             const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
             const ss = String(totalSec % 60).padStart(2, '0');
             this.elapsedLabel = `${mm}:${ss}`;
+
         } else {
+
+            this.l1Value = 'Not-Connected';
             this.elapsedLabel = '00:00';
         }
+        const l2List = this.l1L2Map[this.l1Value] || [];
 
+        this.l2Options = l2List.map(v => ({
+            label: v,
+            value: v
+        }));
+
+        this.isL2Disabled = this.l2Options.length === 0;
+
+        this.l2Value = '';
+        this.updateCommentVisibility();
+
+        // Stop call UI
         this.callStatus = 'Ended';
         this.isLive = false;
         this.showCallPopup = false;
 
         this.stopTimer();
-
         this.clearFeedbackTimers();
 
-        // show feedback when platform event says call ended
+        // Show feedback section
         this.showFeedbackSection();
-
         this.callButtonDisabled = true;
 
-        console.log('RUNO EVENT => CALL ENDED (UI updated)');
+        console.log('RUNO EVENT => CALL ENDED');
+        console.log('Platform Event Payload:', JSON.stringify(p));
     }
 
     // -------------- UTIL -------------------

@@ -1,4 +1,4 @@
-import { api, LightningElement, wire } from 'lwc';
+import { api, LightningElement, track, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 import allocateLeadNow from '@salesforce/apex/Webservice_RunoAllocationAPI.allocateLeadNow';
@@ -7,6 +7,7 @@ import getL1L2Values from '@salesforce/apex/Webservice_RunoAllocationAPI.getL1L2
 import getCallHistory from '@salesforce/apex/Webservice_RunoAllocationAPI.getCallHistory';
 import getIdentity from '@salesforce/apex/RunoCallIdentityService.getIdentity';
 import getStageLevelValues from '@salesforce/apex/Webservice_RunoAllocationAPI.getStageLevelValues';
+import getDispositions from '@salesforce/apex/CallDispositionConfigService.getDispositions';
 import { CurrentPageReference } from 'lightning/navigation';
 import { NavigationMixin } from 'lightning/navigation';
 import { CloseActionScreenEvent } from 'lightning/actions';
@@ -21,6 +22,17 @@ import getLeadEvents from '@salesforce/apex/Webservice_RunoAllocationAPI.getLead
 export default class RunoAllocationCallQ1 extends NavigationMixin(LightningElement) {
 
     @api recordId;
+    _dispositions;
+    @api
+    get dispositions() {
+        return this._dispositions;
+    }
+    set dispositions(value) {
+        this._dispositions = value;
+        if (value && Array.isArray(value)) {
+            this.processDispositions(value);
+        }
+    }
 
     loading = false;
     disableCancel = false;
@@ -30,12 +42,12 @@ export default class RunoAllocationCallQ1 extends NavigationMixin(LightningEleme
     isStageDisabled = false;
     activeTab = 'lead';
     expectedPaymentDate;
+    notifyMe = false;
 
     l1Value = '';
     l2Value = '';
-    l1Options = [];
-    l2Options = [];
-    fullMap = {};
+    @track _allL1Options = [];
+    @track fullMap = {};
     isL2Disabled = true;
 
     autoSetFollowUp = true;
@@ -46,6 +58,7 @@ export default class RunoAllocationCallQ1 extends NavigationMixin(LightningEleme
     stageOptions = [];
     levelOptions = [];
     leadRecordTypeId = null;
+    @track hasActualConnection = false;
 
     @api autoCall = false;
     hasAutoCalled = false;
@@ -92,30 +105,7 @@ export default class RunoAllocationCallQ1 extends NavigationMixin(LightningEleme
     CALL_NO_RESPONSE_MS = 30000;
     noResponseTimer = null;
 
-    mandatoryCommentRules = {
-        'Connected:Discussed': true,
-        'Connected:Request Call Back': true,
-        'Connected:Not Eligible': true,
-        'Connected:Wrong Number': true,
-        'Connected:Language Barrier': true,
-        'Connected:Visit Confirmed': true,
-        'Connected:Visit Completed': true,
-        'Connected:Visit Rescheduled': true,
-        'Connected:Visit Cancelled': true,
-        'Connected:Visit Booked By Mistake': true,
-        'Connected:Google Meet Completed': true,
-        'Connected:Google Meet Rescheduled': true,
-        'Connected:Google Meet Cancelled': true,
-        'Connected:Attended And Disconnected': true,
-        'Connected:Voice Mail': true,
-        'Connected:Not Interested (DND)': true,
-        'Connected:Postponed': true,
-        'Not-Connected:Not Lifting': false,
-        'Not-Connected:Switched Off': false,
-        'Not-Connected:Not Reachable': false,
-        'Not-Connected:Busy': false,
-        'Not-Connected:Invalid Number': true
-    };
+    mandatoryCommentRules = {};
 
     @wire(getIdentity, { recordId: '$recordId' })
     wiredIdentity({ data, error }) {
@@ -165,6 +155,19 @@ export default class RunoAllocationCallQ1 extends NavigationMixin(LightningEleme
         return this.activeTab === 'history';
     }
 
+    get l1Options() {
+        const options = (this._allL1Options || []);
+        if (this.hasActualConnection) {
+            return options.filter(opt => opt.value === 'Connected');
+        }
+        return options.filter(opt => opt.value === 'Not-Connected');
+    }
+
+    get l2Options() {
+        if (!this.l1Value || !this.fullMap) return [];
+        return (this.fullMap[this.l1Value] || []).map(v => ({ label: v, value: v }));
+    }
+
     handleTabClick(event) {
         this.activeTab = event.target.dataset.tab;
         if (this.activeTab === 'webinar' && !this.webinarLoaded) {
@@ -201,6 +204,10 @@ export default class RunoAllocationCallQ1 extends NavigationMixin(LightningEleme
 
     get isEventTab() {
         return this.activeTab === 'event';
+    }
+
+    get isDndSpamDisabled() {
+        return this.l1Value !== 'Connected';
     }
 
     get hasEvents() {
@@ -285,6 +292,32 @@ export default class RunoAllocationCallQ1 extends NavigationMixin(LightningEleme
         }
     }
 
+    processDispositions(data) {
+        if (!data || !Array.isArray(data)) return;
+
+        const fMap = {};
+        const cRules = {};
+        const stageMap = {};
+
+        data.forEach(item => {
+            if (!fMap[item.l1]) fMap[item.l1] = [];
+            if (!fMap[item.l1].includes(item.l2)) {
+                fMap[item.l1].push(item.l2);
+            }
+
+            const key = `${item.l1}:${item.l2}`;
+            cRules[key] = item.commentNeeded;
+            if (item.tagLevel) {
+                stageMap[key] = item.tagLevel;
+            }
+        });
+
+        this.fullMap = fMap;
+        this.mandatoryCommentRules = cRules;
+        this.autoStageMap = stageMap;
+        this._allL1Options = Object.keys(fMap).map(k => ({ label: k, value: k }));
+    }
+
     handleCourseChange(e) {
         this.courseValue = e.target.value;
     }
@@ -299,9 +332,20 @@ export default class RunoAllocationCallQ1 extends NavigationMixin(LightningEleme
     }
 
     async loadPicklists() {
+        if (this.dispositions && Array.isArray(this.dispositions)) {
+            this.processDispositions(this.dispositions);
+            return;
+        }
         try {
-            this.fullMap = await getL1L2Values();
-            this.l1Options = Object.keys(this.fullMap).map(k => ({ label: k, value: k }));
+            // Fallback to fetch dispositions if not passed via props
+            const data = await getDispositions();
+            if (data && data.length > 0) {
+                this.processDispositions(data);
+            } else {
+                // Legacy fallback just in case
+                this.fullMap = await getL1L2Values();
+                this._allL1Options = Object.keys(this.fullMap).map(k => ({ label: k, value: k }));
+            }
         } catch (e) {
             console.error('Picklist load failed:', e);
         }
@@ -377,11 +421,14 @@ export default class RunoAllocationCallQ1 extends NavigationMixin(LightningEleme
     }
 
     handleL1Change(e) {
-        this.l1Value = e.target.value;
+        this.updateL1(e.target.value);
+    }
+
+    updateL1(val) {
+        this.l1Value = val;
         this.userChangedStage = false;
-        this.l2Options = (this.fullMap[this.l1Value] || []).map(v => ({ label: v, value: v }));
-        this.isL2Disabled = this.l2Options.length === 0;
         this.l2Value = '';
+        this.isL2Disabled = !this.l1Value || (this.fullMap && !this.fullMap[this.l1Value]);
         this.isStageDisabled = this.l1Value === 'Not-Connected';
         this.updateCommentVisibility();
     }
@@ -405,6 +452,10 @@ export default class RunoAllocationCallQ1 extends NavigationMixin(LightningEleme
 
     handleFeedbackChange(e) {
         this.feedback = e.target.value;
+    }
+
+    handleNotifyChange(event) {
+        this.notifyMe = event.target.checked;
     }
 
     handleAutoSetChange(e) {
@@ -441,6 +492,7 @@ export default class RunoAllocationCallQ1 extends NavigationMixin(LightningEleme
         this.setElapsed(0);
         this.startTimer();
         this.lastCallId = null;
+        this.hasActualConnection = false;
         this.clearFeedbackTimers();
         try {
             const response = await allocateLeadNow({ recordId: this.recordId });
@@ -490,6 +542,9 @@ export default class RunoAllocationCallQ1 extends NavigationMixin(LightningEleme
     }
 
     showFeedbackSection() {
+        if (!this.l1Value) {
+            this.updateL1('Not-Connected');
+        }
         this.showFeedback = true;
         this.disableCancel = false;
         if (this.autoSetFollowUp) {
@@ -509,6 +564,15 @@ export default class RunoAllocationCallQ1 extends NavigationMixin(LightningEleme
 
     applyAutoStageLogic() {
         if (this.userChangedStage) return;
+        const key = `${this.l1Value}:${this.l2Value}`;
+
+        // Use the map built from dispositions if available
+        if (this.autoStageMap && this.autoStageMap[key]) {
+            this.stageValue = this.autoStageMap[key];
+            return;
+        }
+
+        // Fallback to existing logic if no dispositions provided
         if (this.l1Value === 'Connected') {
             const connectedStageMap = {
                 'Not Eligible': 'M1',
@@ -536,6 +600,10 @@ export default class RunoAllocationCallQ1 extends NavigationMixin(LightningEleme
             this.toast('Mandatory', 'Feedback comment is required.', 'warning');
             return;
         }
+        if (this.l1Value && !this.l2Value) {
+            this.toast('Mandatory', 'Sub Status (L2) is required.', 'warning');
+            return;
+        }
         if (this.l1Value === 'Connected' && !this.stageValue) {
             this.toast('Required', 'Stage is required when call is connected.', 'warning');
             return;
@@ -552,7 +620,7 @@ export default class RunoAllocationCallQ1 extends NavigationMixin(LightningEleme
                 nextFollowUpDate: this.nextFollowUpDate,
                 l1: this.l1Value,
                 l2: this.l2Value,
-                notifyMe: false,
+                notifyMe: this.notifyMe,
                 isDnd: this.isDnd,
                 isSpam: this.isSpam,
                 expectedPaymentDate: this.expectedPaymentDate
@@ -565,7 +633,7 @@ export default class RunoAllocationCallQ1 extends NavigationMixin(LightningEleme
 
             // 🔥 DISPATCH CUSTOM EVENT
             this.dispatchEvent(new CustomEvent('callcomplete', {
-                detail: { recordId: this.recordId, callId: this.lastCallId, feedback: this.feedback },
+                detail: { recordId: this.recordId, callId: this.lastCallId, feedback: this.feedback, l1: this.l1Value },
                 bubbles: true,
                 composed: true
             }));
@@ -653,8 +721,12 @@ export default class RunoAllocationCallQ1 extends NavigationMixin(LightningEleme
             const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
             const ss = String(totalSec % 60).padStart(2, '0');
             this.elapsedLabel = `${mm}:${ss}`;
+            this.hasActualConnection = true;
+            this.updateL1('Connected');
         } else {
             this.elapsedLabel = '00:00';
+            this.hasActualConnection = false;
+            this.updateL1('Not-Connected');
         }
         this.callStatus = 'Ended';
         this.isLive = false;
