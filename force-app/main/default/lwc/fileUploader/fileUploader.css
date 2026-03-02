@@ -3,6 +3,108 @@
   display: none;
 }
 
+:host {
+  display: block;
+  --miles-brand-primary: #0b5cab;
+  --miles-brand-accent: #e6f0ff;
+  --miles-box-type: #eef6ff;
+  --miles-box-title: #f4f9ff;
+  --miles-box-category: #eef3fb;
+}
+
+.uploader-wrapper {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding-top: 10px;
+}
+
+.uploader-card {
+  width: 100%;
+  max-width: 900px;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e6e9f0;
+  overflow: hidden;
+}
+
+.uploader-header {
+  background: var(--miles-brand-primary);
+  color: #ffffff;
+  padding: 18px 24px;
+}
+
+.uploader-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.uploader-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.picklist-section {
+  background: var(--miles-brand-accent);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.picklist-box {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 12px;
+  border: 1px solid #dde5f2;
+}
+
+.picklist-box--type {
+  background: var(--miles-box-type);
+}
+
+.picklist-box--title {
+  background: var(--miles-box-title);
+}
+
+.picklist-box--category {
+  background: var(--miles-box-category);
+}
+
+.folder-path {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #1f2d3d;
+  font-weight: 600;
+}
+
+.file-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.action-row {
+  display: flex;
+  justify-content: center;
+}
+
+.file-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.spinner-row,
+.result-row {
+  display: flex;
+  justify-content: center;
+}
+
 /* File pill container */
 .file-pill {
   display: inline-flex;

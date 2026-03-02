@@ -2,11 +2,11 @@
 public without sharing class EligibilityFileService {
 
     public class IncomingFile {
-        public String uuid;
-        public String path;
-        public String format;
-        public String fileType; // "Certificate" / "Marksheet"
-        public String fileName;
+        @AuraEnabled public String uuid;
+        @AuraEnabled public String path;
+        @AuraEnabled public String format;
+        @AuraEnabled public String fileType; // "Certificate" / "Marksheet"
+        @AuraEnabled public String fileName;
     }
 
     public class NewQualificationRequest {
@@ -29,23 +29,21 @@ public without sharing class EligibilityFileService {
         res.success = false;
         res.message = 'Unknown error';
 
-        if (String.isBlank(inputJson)) {
-            res.message = 'Empty payload';
-            return res;
-        }
-
-        NewQualificationRequest input;
         try {
-            input = (NewQualificationRequest) JSON.deserialize(inputJson, NewQualificationRequest.class);
-        } catch (Exception e) {
-            res.message = 'Invalid payload: ' + e.getMessage();
-            return res;
-        }
+            if (String.isBlank(inputJson)) {
+                return fail(res, 'Empty payload', inputJson, 'Eligibility File Service - NewQualification');
+            }
 
-        if (input == null || String.isBlank(input.salesforceId)) {
-            res.message = 'Missing UUID (salesforceId).';
-            return res;
-        }
+            NewQualificationRequest input;
+            try {
+                input = (NewQualificationRequest) JSON.deserialize(inputJson, NewQualificationRequest.class);
+            } catch (Exception e) {
+                return fail(res, 'Invalid payload: ' + e.getMessage(), inputJson, 'Eligibility File Service - NewQualification');
+            }
+
+            if (input == null || String.isBlank(input.salesforceId)) {
+                return fail(res, 'Missing UUID (salesforceId).', inputJson, 'Eligibility File Service - NewQualification');
+            }
 
         // Derive qualification info from first file path if not provided
         if ((String.isBlank(input.qualificationType) || String.isBlank(input.qualificationTitle))
@@ -65,107 +63,131 @@ public without sharing class EligibilityFileService {
             }
         }
 
-        if (String.isBlank(input.qualificationType) || String.isBlank(input.qualificationTitle)) {
-            res.message = 'Missing qualification type/title.';
-            return res;
-        }
+            if (String.isBlank(input.qualificationType) || String.isBlank(input.qualificationTitle)) {
+                return fail(res, 'Missing qualification type/title.', inputJson, 'Eligibility File Service - NewQualification');
+            }
 
-        EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByKey(input.salesforceId);
-        if (ctx == null || (ctx.studentId == null && ctx.candidateId == null)) {
-            res.message = 'No Candidate or Student found for provided UUID.';
-            return res;
-        }
-        Id candidateId = ctx.candidateId;
-        Id studentId = ctx.studentId;
+            EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByKey(input.salesforceId);
+            if (ctx == null || (ctx.studentId == null && ctx.candidateId == null)) {
+                return fail(res, 'No Candidate or Student found for provided UUID.', inputJson, 'Eligibility File Service - NewQualification');
+            }
+            Id candidateId = ctx.candidateId;
+            Id studentId = ctx.studentId;
 
         // Find or create the degree folder and its child folders (Certificates/Marksheets)
-        Eligibility_Folder__c degreeFolder =
-            EligibilityFolderService.findDegreeFolderForContext(
-                candidateId,
-                studentId,
-                input.qualificationType,
-                input.qualificationTitle,
-                input.qualificationMonthYear
-            );
-        if (degreeFolder == null) {
-            degreeFolder = EligibilityFolderService.createDynamicDegreeFolders(
-                candidateId,
-                studentId,
-                input.qualificationType,
-                input.qualificationTitle
-            );
+            Eligibility_Folder__c degreeFolder =
+                EligibilityFolderService.findDegreeFolderForContext(
+                    candidateId,
+                    studentId,
+                    input.qualificationType,
+                    input.qualificationTitle,
+                    input.qualificationMonthYear
+                );
+            if (degreeFolder == null) {
+                degreeFolder = EligibilityFolderService.createDynamicDegreeFolders(
+                    candidateId,
+                    studentId,
+                    input.qualificationType,
+                    input.qualificationTitle
+                );
+            }
+            EligibilityFolderService.ensureFolderLookups(degreeFolder, candidateId, studentId);
+
+            Eligibility_Folder__c certFolder =
+                EligibilityFolderService.findCategoryFolderForDoc(
+                    candidateId,
+                    studentId,
+                    input.qualificationType,
+                    input.qualificationTitle,
+                    'Certificate'
+                );
+
+            Eligibility_Folder__c markFolder =
+                EligibilityFolderService.findCategoryFolderForDoc(
+                    candidateId,
+                    studentId,
+                    input.qualificationType,
+                    input.qualificationTitle,
+                    'Marksheet'
+                );
+            EligibilityFolderService.ensureFolderLookups(certFolder, candidateId, studentId);
+            EligibilityFolderService.ensureFolderLookups(markFolder, candidateId, studentId);
+
+            List<Eligibility_File__c> toUpsert = new List<Eligibility_File__c>();
+            List<Eligibility_File__c> toDelete = new List<Eligibility_File__c>();
+            Set<Id> affectedFolderIds = new Set<Id>();
+
+            if (certFolder != null) {
+                syncFilesForFolder(
+                    candidateId,
+                    studentId,
+                    certFolder.Id,
+                    'Certificate',
+                    input.certificateFiles,
+                    toUpsert,
+                    toDelete,
+                    affectedFolderIds
+                );
+            }
+
+            if (markFolder != null) {
+                syncFilesForFolder(
+                    candidateId,
+                    studentId,
+                    markFolder.Id,
+                    'Marksheet',
+                    input.marksheetFiles,
+                    toUpsert,
+                    toDelete,
+                    affectedFolderIds
+                );
+            }
+
+            if (!toUpsert.isEmpty()) {
+                upsert toUpsert;
+            }
+            if (!toDelete.isEmpty()) {
+                delete toDelete;
+            }
+
+            if (!affectedFolderIds.isEmpty()) {
+                try {
+                    EligibilityFolderService.recalcFromFileFolders(affectedFolderIds);
+                } catch (Exception e) {
+                    IntegrationLogUtil.insertLog(
+                        'Eligibility File Service - NewQualification',
+                        null,
+                        null,
+                        truncate('Recalc failed: ' + e.getMessage()),
+                        'Warning',
+                        null
+                    );
+                }
+            }
+
+            // Create "Upload document" Tasks for Student/GP user or Candidate
+            try {
+                createUploadDocTasks(candidateId, studentId, input);
+            } catch (Exception e) {
+                IntegrationLogUtil.insertLog(
+                    'Eligibility File Service - NewQualification',
+                    null,
+                    null,
+                    truncate('Task creation failed: ' + e.getMessage()),
+                    'Warning',
+                    null
+                );
+            }
+
+            res.success = true;
+            res.message = 'Qualification files synced successfully.';
+            return res;
+        } catch (Exception e) {
+            return fail(res, 'Error syncing qualification files: ' + e.getMessage(), inputJson, 'Eligibility File Service - NewQualification', e);
         }
-        EligibilityFolderService.ensureFolderLookups(degreeFolder, candidateId, studentId);
-
-        Eligibility_Folder__c certFolder =
-            EligibilityFolderService.findCategoryFolderForDoc(
-                candidateId,
-                studentId,
-                input.qualificationType,
-                input.qualificationTitle,
-                'Certificate'
-            );
-
-        Eligibility_Folder__c markFolder =
-            EligibilityFolderService.findCategoryFolderForDoc(
-                candidateId,
-                studentId,
-                input.qualificationType,
-                input.qualificationTitle,
-                'Marksheet'
-            );
-        EligibilityFolderService.ensureFolderLookups(certFolder, candidateId, studentId);
-        EligibilityFolderService.ensureFolderLookups(markFolder, candidateId, studentId);
-
-        List<Eligibility_File__c> toUpsert = new List<Eligibility_File__c>();
-        List<Eligibility_File__c> toDelete = new List<Eligibility_File__c>();
-        Set<Id> affectedFolderIds = new Set<Id>();
-
-        if (certFolder != null) {
-            syncFilesForFolder(
-                candidateId,
-                studentId,
-                certFolder.Id,
-                'Certificate',
-                input.certificateFiles,
-                toUpsert,
-                toDelete,
-                affectedFolderIds
-            );
-        }
-
-        if (markFolder != null) {
-            syncFilesForFolder(
-                candidateId,
-                studentId,
-                markFolder.Id,
-                'Marksheet',
-                input.marksheetFiles,
-                toUpsert,
-                toDelete,
-                affectedFolderIds
-            );
-        }
-
-        if (!toUpsert.isEmpty()) {
-            upsert toUpsert;
-        }
-        if (!toDelete.isEmpty()) {
-            delete toDelete;
-        }
-
-        if (!affectedFolderIds.isEmpty()) {
-            EligibilityFolderService.recalcFromFileFolders(affectedFolderIds);
-        }
-
-        // Create "Upload document" Tasks for Student/GP user or Candidate
-        createUploadDocTasks(candidateId, studentId, input);
-
-        res.success = true;
-        res.message = 'Qualification files synced successfully.';
-        return res;
     }
 
+    @AuraEnabled
     public static SimpleResponse handleMainFolderFiles(
         String salesforceId,
         String flatFolderKey,
@@ -175,70 +197,202 @@ public without sharing class EligibilityFileService {
         res.success = false;
         res.message = 'Unknown error';
 
-        if (String.isBlank(salesforceId)) {
-            res.message = 'Missing UUID (salesforceId).';
+        try {
+            if (String.isBlank(salesforceId)) {
+                return fail(res, 'Missing UUID (salesforceId).', null, 'Eligibility File Service - MainFolder');
+            }
+
+            if (incoming == null || incoming.isEmpty()) {
+                return fail(res, 'No files provided for upload.', null, 'Eligibility File Service - MainFolder');
+            }
+            Integer validIncoming = 0;
+            for (IncomingFile inf : incoming) {
+                if (inf != null && String.isNotBlank(inf.uuid) && String.isNotBlank(inf.path)) {
+                    validIncoming++;
+                }
+            }
+            if (validIncoming == 0) {
+                return fail(res, 'No valid file entries (uuid/path missing).', null, 'Eligibility File Service - MainFolder');
+            }
+
+            String key = EligibilityPathParser.normalizeFlatFolderKey(flatFolderKey);
+            if (String.isBlank(key)) {
+                return fail(res, 'Invalid main folder type.', null, 'Eligibility File Service - MainFolder');
+            }
+
+            EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByKey(salesforceId);
+            if (ctx == null || (ctx.studentId == null && ctx.candidateId == null)) {
+                return fail(res, 'No Candidate or Student found for provided UUID.', null, 'Eligibility File Service - MainFolder');
+            }
+            Id candidateId = ctx.candidateId;
+            Id studentId = ctx.studentId;
+
+            String label = EligibilityPathParser.flatFolderLabel(key);
+            Eligibility_Folder__c mainFolder =
+                EligibilityFolderService.findMainFolderForFlatType(candidateId, studentId, key, label);
+            if (mainFolder == null) {
+                return fail(res, 'Main folder not found for ' + (label != null ? label : key) + '.', null, 'Eligibility File Service - MainFolder');
+            }
+            EligibilityFolderService.ensureFolderLookups(mainFolder, candidateId, studentId);
+
+            List<Eligibility_File__c> toUpsert = new List<Eligibility_File__c>();
+            List<Eligibility_File__c> toDelete = new List<Eligibility_File__c>();
+            Set<Id> affectedFolderIds = new Set<Id>();
+
+            String logicalType = String.isNotBlank(label) ? label : key;
+            syncFilesForFolder(
+                candidateId,
+                studentId,
+                mainFolder.Id,
+                logicalType,
+                incoming,
+                toUpsert,
+                toDelete,
+                affectedFolderIds
+            );
+
+            if (toUpsert.isEmpty()) {
+                return fail(res, 'No files were saved for the main folder.', null, 'Eligibility File Service - MainFolder');
+            }
+
+            if (!toUpsert.isEmpty()) {
+                upsert toUpsert;
+            }
+            if (!toDelete.isEmpty()) {
+                delete toDelete;
+            }
+
+            if (!affectedFolderIds.isEmpty()) {
+                try {
+                    EligibilityFolderService.recalcFromFileFolders(affectedFolderIds);
+                } catch (Exception e) {
+                    IntegrationLogUtil.insertLog(
+                        'Eligibility File Service - MainFolder',
+                        null,
+                        null,
+                        truncate('Recalc failed: ' + e.getMessage()),
+                        'Warning',
+                        null
+                    );
+                }
+            }
+
+            NewQualificationRequest req = new NewQualificationRequest();
+            req.qualificationTitle = logicalType;
+            req.qualificationType = logicalType;
+            req.qualificationMonthYear = null;
+            try {
+                createUploadDocTasks(candidateId, studentId, req);
+            } catch (Exception e) {
+                IntegrationLogUtil.insertLog(
+                    'Eligibility File Service - MainFolder',
+                    null,
+                    null,
+                    truncate('Task creation failed: ' + e.getMessage()),
+                    'Warning',
+                    null
+                );
+            }
+
+            res.success = true;
+            res.message = 'Main folder files synced successfully.';
+            return res;
+        } catch (Exception e) {
+            return fail(res, 'Error syncing main folder files: ' + e.getMessage(), null, 'Eligibility File Service - MainFolder', e);
+        }
+    }
+
+    @AuraEnabled
+    public static SimpleResponse handleMainFolderFilesJson(
+        String salesforceId,
+        String flatFolderKey,
+        String incomingJson
+    ) {
+        if (String.isBlank(incomingJson)) {
+            SimpleResponse res = new SimpleResponse();
+            res.success = false;
+            res.message = 'Empty file list payload.';
+            IntegrationLogUtil.insertLog(
+                'Eligibility File Service - MainFolder',
+                truncate(incomingJson),
+                null,
+                res.message,
+                'Failed',
+                null
+            );
             return res;
         }
 
-        String key = EligibilityPathParser.normalizeFlatFolderKey(flatFolderKey);
-        if (String.isBlank(key)) {
-            res.message = 'Invalid main folder type.';
+        List<IncomingFile> incoming;
+        try {
+            incoming = (List<IncomingFile>) JSON.deserialize(incomingJson, List<IncomingFile>.class);
+        } catch (Exception e) {
+            SimpleResponse res = new SimpleResponse();
+            res.success = false;
+            res.message = 'Invalid file list payload: ' + e.getMessage();
+            IntegrationLogUtil.insertLog(
+                'Eligibility File Service - MainFolder',
+                truncate(incomingJson),
+                null,
+                truncate(res.message),
+                'Failed',
+                null
+            );
             return res;
         }
 
-        EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByKey(salesforceId);
-        if (ctx == null || (ctx.studentId == null && ctx.candidateId == null)) {
-            res.message = 'No Candidate or Student found for provided UUID.';
-            return res;
-        }
-        Id candidateId = ctx.candidateId;
-        Id studentId = ctx.studentId;
+        return handleMainFolderFiles(salesforceId, flatFolderKey, incoming);
+    }
 
-        String label = EligibilityPathParser.flatFolderLabel(key);
-        Eligibility_Folder__c mainFolder =
-            EligibilityFolderService.findMainFolderForFlatType(candidateId, studentId, key, label);
-        if (mainFolder == null) {
-            res.message = 'Main folder not found for ' + (label != null ? label : key) + '.';
-            return res;
-        }
-        EligibilityFolderService.ensureFolderLookups(mainFolder, candidateId, studentId);
-
-        List<Eligibility_File__c> toUpsert = new List<Eligibility_File__c>();
-        List<Eligibility_File__c> toDelete = new List<Eligibility_File__c>();
-        Set<Id> affectedFolderIds = new Set<Id>();
-
-        String logicalType = String.isNotBlank(label) ? label : key;
-        syncFilesForFolder(
-            candidateId,
-            studentId,
-            mainFolder.Id,
-            logicalType,
-            incoming,
-            toUpsert,
-            toDelete,
-            affectedFolderIds
+    private static SimpleResponse fail(
+        SimpleResponse res,
+        String message,
+        String requestPayload,
+        String integrationType
+    ) {
+        res.success = false;
+        res.message = message;
+        IntegrationLogUtil.insertLog(
+            integrationType,
+            truncate(requestPayload),
+            null,
+            message,
+            'Failed',
+            null
         );
-
-        if (!toUpsert.isEmpty()) {
-            upsert toUpsert;
-        }
-        if (!toDelete.isEmpty()) {
-            delete toDelete;
-        }
-
-        if (!affectedFolderIds.isEmpty()) {
-            EligibilityFolderService.recalcFromFileFolders(affectedFolderIds);
-        }
-
-        NewQualificationRequest req = new NewQualificationRequest();
-        req.qualificationTitle = logicalType;
-        req.qualificationType = logicalType;
-        req.qualificationMonthYear = null;
-        createUploadDocTasks(candidateId, studentId, req);
-
-        res.success = true;
-        res.message = 'Main folder files synced successfully.';
         return res;
+    }
+
+    private static SimpleResponse fail(
+        SimpleResponse res,
+        String message,
+        String requestPayload,
+        String integrationType,
+        Exception e
+    ) {
+        String err = message;
+        if (e != null) {
+            String stack = e.getStackTraceString();
+            if (String.isNotBlank(stack)) {
+                err += ' | ' + stack;
+            }
+        }
+        IntegrationLogUtil.insertLog(
+            integrationType,
+            truncate(requestPayload),
+            null,
+            truncate(err),
+            'Failed',
+            null
+        );
+        res.success = false;
+        res.message = message;
+        return res;
+    }
+
+    private static String truncate(String value) {
+        if (String.isBlank(value)) return value;
+        return value.length() > 3000 ? value.substring(0, 3000) : value;
     }
 
     // Extracts the file name from a full path (supports "/" and "\" separators).

@@ -1,71 +1,125 @@
 <template>
-  <lightning-card title="Upload to S3" icon-name="utility:upload">
-    <div class="slds-p-around_medium">
+  <div class="uploader-wrapper">
+    <section class="uploader-card">
+      <div class="uploader-header">
+        <div class="uploader-title">Upload to S3</div>
+      </div>
+      <div class="uploader-body">
 
-      <!-- Hidden native file input -->
-      <input
-        type="file"
-        multiple
-        accept="*/*"
-        onchange={handleFileChange}
-        class="hidden-file-input"
-      />
+        <!-- Path selection -->
+        <div class="picklist-section">
+          <div class="slds-grid slds-wrap slds-gutters">
+            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3">
+              <div class="picklist-box picklist-box--type">
+                <lightning-combobox
+                  label="Qualification Type"
+                  placeholder="Select type"
+                  value={selectedQualificationType}
+                  options={qualificationTypeOptions}
+                  onchange={handleQualificationTypeChange}>
+                </lightning-combobox>
+              </div>
+            </div>
+            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3">
+              <div class="picklist-box picklist-box--title">
+                <lightning-combobox
+                  label="Qualification Title"
+                  placeholder="Select title"
+                  value={selectedQualificationTitle}
+                  options={qualificationTitleOptions}
+                  disabled={isTitleDisabled}
+                  onchange={handleQualificationTitleChange}>
+                </lightning-combobox>
+              </div>
+            </div>
+            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3">
+              <div class="picklist-box picklist-box--category">
+                <lightning-combobox
+                  label="Document Category"
+                  placeholder="Select category"
+                  value={selectedCategory}
+                  options={categoryOptions}
+                  disabled={isCategoryDisabled}
+                  onchange={handleCategoryChange}>
+                </lightning-combobox>
+              </div>
+            </div>
+          </div>
 
-      <!-- Choose File Button -->
-      <lightning-button
-        label="Choose File"
-        icon-name="utility:attach"
-        onclick={openFilePicker}>
-      </lightning-button>
-
-      <!-- Selected files list -->
-      <template if:true={hasFiles}>
-        <div class="slds-m-top_small">
-          <template for:each={files} for:item="file" for:index="index">
-            <div
-              key={file.name}
-              class="slds-pill slds-m-bottom_x-small file-pill"
-            >
-              <span class="slds-pill__label">{file.name}</span>
-              <button
-                class="slds-button slds-button_icon slds-pill__remove"
-                title="Remove"
-                data-index={index}
-                onclick={removeFile}
-              >
-                ✕
-              </button>
+          <template if:true={hasPathSelection}>
+            <div class="folder-path">
+              Folder path: {folderPath}
             </div>
           </template>
         </div>
-      </template>
 
-      <!-- Upload button -->
-      <div class="slds-m-top_medium slds-text-align_right">
-        <lightning-button
-          label="Upload"
-          variant="brand"
-          onclick={upload}
-          disabled={isUploadDisabled}>
-        </lightning-button>
+        <div class="file-section">
+          <!-- Hidden native file input -->
+          <input
+            type="file"
+            multiple
+            accept="*/*"
+            onchange={handleFileChange}
+            class="hidden-file-input"
+          />
+
+          <!-- Choose File Button -->
+          <lightning-button
+            label="Choose File"
+            icon-name="utility:attach"
+            onclick={openFilePicker}>
+          </lightning-button>
+
+          <!-- Selected files list -->
+          <template if:true={hasFiles}>
+            <div class="file-list">
+              <template for:each={files} for:item="file" for:index="index">
+                <div
+                  key={file.name}
+                  class="slds-pill slds-m-bottom_x-small file-pill"
+                >
+                  <span class="slds-pill__label">{file.name}</span>
+                  <button
+                    class="slds-button slds-button_icon slds-pill__remove"
+                    title="Remove"
+                    data-index={index}
+                    onclick={removeFile}
+                  >
+                    x
+                  </button>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+
+        <!-- Upload button -->
+        <div class="action-row">
+          <lightning-button
+            label="Upload"
+            variant="brand"
+            onclick={upload}
+            disabled={isUploadDisabled}>
+          </lightning-button>
+        </div>
+
+        <!-- Spinner -->
+        <template if:true={uploading}>
+          <div class="spinner-row">
+            <lightning-spinner alternative-text="Uploading..." size="small">
+            </lightning-spinner>
+          </div>
+        </template>
+
+        <!-- Result message -->
+        <template if:true={lastResultMessage}>
+          <div class="result-row">
+            <lightning-formatted-text value={lastResultMessage}>
+            </lightning-formatted-text>
+          </div>
+        </template>
+
       </div>
-
-      <!-- Spinner -->
-      <template if:true={uploading}>
-        <div class="slds-m-top_medium">
-          <lightning-spinner alternative-text="Uploading..." size="small">
-          </lightning-spinner>
-        </div>
-      </template>
-
-      <!-- Result message -->
-      <template if:true={lastResultMessage}>
-        <div class="slds-m-top_small">
-          <lightning-formatted-text value={lastResultMessage}>
-          </lightning-formatted-text>
-        </div>
-      </template>
-
-    </div>
-  </lightning-card>
+    </section>
+  </div>
 </template>

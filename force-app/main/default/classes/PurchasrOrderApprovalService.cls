@@ -134,19 +134,41 @@ public without sharing class PurchasrOrderApprovalService {
                     Product2 p = productMap.get(line.Product__c);
                     if (p != null && p.Type__c == 'Training') hasTraining = true;
                     if (p != null && p.Type__c == 'Study Material') hasStudyMaterial = true;
+                }
 
-                    String skuVal =
-                        (p != null && !String.isBlank(p.ProductCode)) ? p.ProductCode :
-                        (p != null ? p.Name : null);
-                    if (!String.isBlank(skuVal)) item.skus.add(skuVal);
+                List<PurchaseOrderService.SimpleLineItem> baseItems = new List<PurchaseOrderService.SimpleLineItem>();
+                for (Purchase_Order_Line_Item__c line : poLines) {
+                    if (line.Product__c == null) continue;
+                    baseItems.add(new PurchaseOrderService.SimpleLineItem(
+                        line.Product__c,
+                        line.Unit_Price__c,
+                        line.Quantity__c
+                    ));
+                }
 
+                List<PurchaseOrderService.ExpandedProduct> expandedItems =
+                    PurchaseOrderService.expandBundleItems(baseItems);
+                List<PurchaseOrderService.ExpandedProduct> enrolmentItems =
+                    PurchaseOrderService.buildImmediateOptionItems(baseItems);
+
+                Set<String> seenSkus = new Set<String>();
+                for (PurchaseOrderService.ExpandedProduct ep : expandedItems) {
+                    if (ep == null) continue;
+                    if (!String.isBlank(ep.sku) && !seenSkus.contains(ep.sku)) {
+                        item.skus.add(ep.sku);
+                        seenSkus.add(ep.sku);
+                    }
+                }
+
+                for (PurchaseOrderService.ExpandedProduct ep : enrolmentItems) {
+                    if (ep == null) continue;
                     Decimal lineAmount =
-                        (line.Unit_Price__c != null ? line.Unit_Price__c : 0) *
-                        (line.Quantity__c != null ? line.Quantity__c : 0);
+                        (ep.unitPrice != null ? ep.unitPrice : 0) *
+                        (ep.qty != null ? ep.qty : 0);
 
                     Callout_PurchaseOrderService.EnrolmentLineItem eli =
                         new Callout_PurchaseOrderService.EnrolmentLineItem();
-                    eli.item_name = (p != null ? p.Name : 'Item');
+                    eli.item_name = !String.isBlank(ep.name) ? ep.name : 'Item';
                     eli.price          = lineAmount;
                     eli.price_with_gst = lineAmount;
                     eli.discound       = 0;

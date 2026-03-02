@@ -182,6 +182,13 @@ export default class PurchaseOrderProductSelector extends LightningElement {
         return this.isApprovalRequired ? 'Submit for Approval' : 'Confirm Purchase';
     }
 
+    get approvalHint() {
+        if (this.discountThreshold && this.discountThreshold > 0) {
+            return `Approval required when discount > ${this.discountThreshold}% (current ${this.discountPercent}%).`;
+        }
+        return 'Approval threshold not set for this course.';
+    }
+
     get finalPayable() {
         return Math.max(0, this.subTotal - this.discountAmount);
     }

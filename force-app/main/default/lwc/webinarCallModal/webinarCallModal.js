@@ -4,7 +4,7 @@ import { subscribe, unsubscribe, onError } from 'lightning/empApi';
 
 import allocateLeadNow from '@salesforce/apex/Webservice_RunoAllocationAPI.allocateLeadNow';
 import updateCallFeedback from '@salesforce/apex/Webservice_RunoAllocationAPI.updateCallFeedback';
-import getL1L2Values from '@salesforce/apex/Webservice_RunoAllocationAPI.getL1L2Values';
+import getDispositions from '@salesforce/apex/CallDispositionConfigService.getDispositions';
 import getStageLevelValues from '@salesforce/apex/Webservice_RunoAllocationAPI.getStageLevelValues';
 import getIdentity from '@salesforce/apex/RunoCallIdentityService.getIdentity';
 import getWebinarMembers from '@salesforce/apex/Webservice_RunoAllocationAPI.getWebinarMembers';
@@ -26,39 +26,12 @@ export default class WebinarCallModal extends LightningElement {
     @api leadEmail;
     @api leadPhone;
 
-    // UI State
     @track loading = false;
-    @track showCallPopup = false;
-    @track showFeedback = false;
-    @track savingFeedback = false;
-    @track errorText = null;
+    @track callStatus = STATUS.IDLE;
+    @track callTitle = 'Calling via Runo';
+    @track elapsedLabel = '00:00';
+    @track activeTab = 'lead';
 
-    // L1/L2 Picklists
-    @track l1Value = '';
-    @track l2Value = '';
-    @track l1Options = [];
-    @track l2Options = [];
-    @track fullMap = {};
-    @track isL2Disabled = true;
-
-
-
-    @track callHistory = [];
-@track webinarMembers = [];
-@track eventHistory = [];
-
-@track historyLoaded = false;
-@track webinarLoaded = false;
-@track eventLoaded = false;
-
-
-    // Stage/Level Picklists
-    @track stageValue = '';
-    @track levelValue = '';
-    @track stageOptions = [];
-    @track levelOptions = [];
-
-    // Identity
     @track identity = {
         name: '',
         email: '',
@@ -67,102 +40,76 @@ export default class WebinarCallModal extends LightningElement {
         source: '',
         stage: '',
         level: '',
-         canId: '',
-        createdDate: '',
-    mhpTag: '',
-    leadOwner: ''
+        canId: '',
+        leadOwner: '',
+        createdDate: ''
     };
 
-    @track activeTab = 'lead';
+    @track callHistory = [];
+    @track webinarMembers = [];
+    @track eventHistory = [];
 
-    // Call State
-    @track isLive = false;
-    @track callStatus = STATUS.IDLE;
-    @track callTitle = 'Calling via Runo';
-    @track elapsedMs = 0;
-    @track elapsedLabel = '00:00';
-    @track lastCallId = null;
-
-    // Timers
-    timerId = null;
-    noResponseTimer = null;
-    canEndCall = false;
-    CALL_NO_RESPONSE_MS = 30000;
-
-    // Feedback
+    // Feedback Related
+    @track showFeedback = false;
     @track feedback = '';
     @track nextFollowUpDate = null;
+    @track expectedPaymentDate = null;
+    @track notifyMe = false;
+    @track isDnd = false;
+    @track isSpam = false;
+    @track autoSetFollowUp = true;
+    @track hasActualConnection = false;
+    @track showPopup = false;
+    @track l1Value = '';
+    @track l2Value = '';
+    @track stageValue = '';
+    @track levelValue = '';
+    @track isL2Disabled = true;
+    @track isStageDisabled = false;
+    @track savingFeedback = false;
 
-    // Comment Mandatory Rules
-    @track isCommentMandatory = false;
-    mandatoryCommentRules = {
-        'Connected:Discussed': true,
-        'Connected:Request Call Back': true,
-        'Connected:Not Eligible': true,
-        'Connected:Wrong Number': true,
-        'Connected:Language Barrier': true,
-        'Connected:Visit Confirmed': true,
-        'Connected:Visit Completed': true,
-        'Connected:Visit Rescheduled': true,
-        'Connected:Visit Cancelled': true,
-        'Connected:Visit Booked By Mistake': true,
-        'Connected:Google Meet Completed': true,
-        'Connected:Google Meet Rescheduled': true,
-        'Connected:Google Meet Cancelled': true,
-        'Connected:Attended And Disconnected': true,
-        'Connected:Voice Mail': true,
-        'Connected:Not Interested (DND)': true,
-        'Connected:Postponed': true,
-        'Not-Connected:Not Lifting': false,
-        'Not-Connected:Switched Off': false,
-        'Not-Connected:Not Reachable': false,
-        'Not-Connected:Busy': false,
-        'Not-Connected:Invalid Number': true
-    };
+    @track _allL1Options = [];
+    @track fullMap = {};
+    @track mandatoryCommentRules = {};
+    @track autoStageMap = {};
+    @track userChangedStage = false;
 
-    // Platform Event
-    channelName = '/event/Runo_Call_Completed__e';
+    @track stageOptions = [];
+    @track levelOptions = [];
+
+    @track callButtonLabel = 'Call Now';
+    @track callButtonDisabled = false;
+
+    // State Variables
+    isLive = false;
+    elapsedMs = 0;
+    timerId = null;
+    lastCallId = null;
+    canEndCall = false;
+    CALL_NO_RESPONSE_MS = 30000;
+    noResponseTimer = null;
     subscription = null;
 
-    // -------------------------
-    // LIFECYCLE
-    // -------------------------
     connectedCallback() {
+        this.identity.name = this.leadName;
+        this.identity.email = this.leadEmail;
+        this.identity.phone = this.leadPhone;
+
         this.loadIdentity();
         this.loadPicklists();
         this.loadStageLevel();
-        this.subscribeToEvents();
-        onError(err => console.warn('EMP API Error:', JSON.stringify(err)));
+        this.loadHistory();
+        this.handleSubscribe();
     }
-    handleCall() {
-        this.showCallPopup = true;
-    }
-
 
     disconnectedCallback() {
         this.stopTimer();
         this.clearTimers();
-        if (this.subscription) {
+        if (this.subscription && this.subscription.id) {
             unsubscribe(this.subscription, () => { });
-            this.subscription = null;
         }
     }
 
-
-get formattedCreatedDate() {
-    if (!this.identity.createdDate) return '';
-
-    const date = new Date(this.identity.createdDate);
-
-    return new Intl.DateTimeFormat('en-IN', {
-        year: 'numeric',
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-    }).format(date);
-}
- 
     async loadIdentity() {
         try {
             const data = await getIdentity({ recordId: this.leadId });
@@ -172,301 +119,261 @@ get formattedCreatedDate() {
                 if (data.level) this.levelValue = data.level;
             }
         } catch (error) {
-            console.error('Failed to load identity:', error);
+            console.error('Identity load failed:', error);
         }
     }
 
     async loadPicklists() {
         try {
-            this.fullMap = await getL1L2Values();
-            this.l1Options = Object.keys(this.fullMap).map(k => ({
-                label: k,
-                value: k
-            }));
+            const data = await getDispositions();
+            if (data && data.length > 0) {
+                this.processDispositions(data);
+            }
         } catch (error) {
             console.error('Picklist load failed:', error);
         }
     }
 
+    processDispositions(data) {
+        const fMap = {};
+        const cRules = {};
+        const sMap = {};
+
+        data.forEach(item => {
+            if (!fMap[item.l1]) fMap[item.l1] = [];
+            if (!fMap[item.l1].includes(item.l2)) fMap[item.l1].push(item.l2);
+
+            const key = `${item.l1}:${item.l2}`;
+            cRules[key] = item.commentNeeded;
+            if (item.tagLevel) sMap[key] = item.tagLevel;
+        });
+
+        this.fullMap = fMap;
+        this.mandatoryCommentRules = cRules;
+        this.autoStageMap = sMap;
+        this._allL1Options = Object.keys(fMap).map(k => ({ label: k, value: k }));
+    }
+
     async loadStageLevel() {
         try {
             const mapData = await getStageLevelValues();
-            this.stageOptions = (mapData.stage || []).map(v => ({
-                label: v,
-                value: v
-            }));
-            this.levelOptions = (mapData.level || []).map(v => ({
-                label: v,
-                value: v
-            }));
+            this.stageOptions = (mapData.stage || []).map(v => ({ label: v, value: v }));
+            this.levelOptions = (mapData.level || []).map(v => ({ label: v, value: v }));
         } catch (error) {
             console.error('Stage/Level load failed:', error);
         }
     }
 
-    updateCommentVisibility() {
+    async loadHistory() {
+        try {
+            const [calls, webinars, events] = await Promise.all([
+                getCallHistory({ candidateId: this.leadId }),
+                getWebinarMembers({ candidateId: this.leadId }),
+                getLeadEvents({ recordId: this.leadId })
+            ]);
+            this.callHistory = this.formatCallHistory(calls);
+            this.webinarMembers = this.formatWebinarHistory(webinars);
+            this.eventHistory = events;
+        } catch (error) {
+            console.error('History load failed:', error);
+        }
+    }
+
+    formatCallHistory(data) {
+        return (data || []).map(cl => {
+            const dt = new Date(cl.createdDate);
+            return {
+                ...cl,
+                dateLabel: dt.toLocaleDateString(),
+                timeLabel: dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                durationLabel: `${Math.floor(cl.durationInSec / 60)}:${String(cl.durationInSec % 60).padStart(2, '0')}`
+            };
+        });
+    }
+
+    formatWebinarHistory(data) {
+        return (data || []).map(wm => {
+            const dt = new Date(wm.createdDate);
+            return {
+                id: wm.id,
+                webinar: wm.webinar,
+                date: dt.toLocaleDateString(),
+                attendance: wm.attendanceStatus
+            };
+        });
+    }
+
+    get l1Options() {
+        const options = (this._allL1Options || []);
+        if (this.hasActualConnection) {
+            return options.filter(opt => opt.value === 'Connected');
+        }
+        return options.filter(opt => opt.value === 'Not-Connected');
+    }
+
+    get l2Options() {
+        if (!this.l1Value || !this.fullMap) return [];
+        return (this.fullMap[this.l1Value] || []).map(v => ({ label: v, value: v }));
+    }
+
+    get isSaveDisabled() {
+        return this.savingFeedback || !this.showFeedback;
+    }
+
+    get isCommentMandatory() {
         const key = `${this.l1Value}:${this.l2Value}`;
-        this.isCommentMandatory = this.mandatoryCommentRules[key] === true;
+        return this.mandatoryCommentRules[key] === true;
+    }
+
+    get formattedCreatedDate() {
+        if (!this.identity.createdDate) return 'N/A';
+        const d = new Date(this.identity.createdDate);
+        return d.toLocaleDateString();
+    }
+
+    get isLeadTab() { return this.activeTab === 'lead'; }
+    get isHistoryTab() { return this.activeTab === 'history'; }
+    get isWebinarTab() { return this.activeTab === 'webinar'; }
+    get isEventTab() { return this.activeTab === 'event'; }
+
+    get leadTabClass() { return `tab-item ${this.activeTab === 'lead' ? 'active' : ''}`; }
+    get historyTabClass() { return `tab-item ${this.activeTab === 'history' ? 'active' : ''}`; }
+    get webinarTabClass() { return `tab-item ${this.activeTab === 'webinar' ? 'active' : ''}`; }
+    get eventTabClass() { return `tab-item ${this.activeTab === 'event' ? 'active' : ''}`; }
+
+    get hasCallHistory() { return this.callHistory && this.callHistory.length > 0; }
+    get hasEvents() { return this.eventHistory && this.eventHistory.length > 0; }
+
+    get isDndSpamDisabled() { return this.l1Value !== 'Connected'; }
+
+    handleTabClick(event) {
+        this.activeTab = event.currentTarget.dataset.tab;
     }
 
     handleL1Change(event) {
-        this.l1Value = event.target.value;
-        this.l2Options = (this.fullMap[this.l1Value] || []).map(v => ({
-            label: v,
-            value: v
-        }));
-        this.isL2Disabled = this.l2Options.length === 0;
+        this.updateL1(event.target.value);
+    }
+
+    updateL1(val) {
+        this.l1Value = val;
         this.l2Value = '';
-        this.updateCommentVisibility();
+        this.isL2Disabled = !this.l1Value || (this.fullMap && !this.fullMap[this.l1Value]);
+        this.isStageDisabled = this.l1Value === 'Not-Connected';
+        this.userChangedStage = false;
     }
 
     handleL2Change(event) {
         this.l2Value = event.target.value;
-        this.updateCommentVisibility();
+        this.applyAutoStageLogic();
+    }
+
+    applyAutoStageLogic() {
+        if (this.userChangedStage) return;
+        const key = `${this.l1Value}:${this.l2Value}`;
+        if (this.autoStageMap && this.autoStageMap[key]) {
+            this.stageValue = this.autoStageMap[key];
+        }
     }
 
     handleStageChange(event) {
         this.stageValue = event.target.value;
+        this.userChangedStage = true;
     }
 
-    handleLevelChange(event) {
-        this.levelValue = event.target.value;
+    handleExpectedDateChange(event) { this.expectedPaymentDate = event.target.value; }
+    handleNotifyChange(event) { this.notifyMe = event.target.checked; }
+    handleDndChange(event) { this.isDnd = event.target.checked; }
+    handleSpamChange(event) { this.isSpam = event.target.checked; }
+    handleAutoSetChange(event) {
+        this.autoSetFollowUp = event.target.checked;
+        if (this.autoSetFollowUp) this.setAutoDate24();
+    }
+    handleFeedbackChange(event) { this.feedback = event.target.value; }
+
+    setAutoDate24() {
+        const next = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        const yyyy = next.getFullYear();
+        const mm = String(next.getMonth() + 1).padStart(2, '0');
+        const dd = String(next.getDate()).padStart(2, '0');
+        const hh = String(next.getHours()).padStart(2, '0');
+        const mi = String(next.getMinutes()).padStart(2, '0');
+        this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
     }
 
-    handleFeedbackChange(event) {
-        this.feedback = event.target.value;
-    }
-
-    handleNextFollowUpDateChange(event) {
-        this.nextFollowUpDate = event.target.value;
-    }
-
-    handleClose() {
-        this.dispatchEvent(new CustomEvent('close'));
-    }
-
-    
- get isLeadTab() {
-    return this.activeTab === 'lead';
-}
-get isHistoryTab() {
-    return this.activeTab === 'history';
-}
-get isWebinarTab() {
-    return this.activeTab === 'webinar';
-}
-get isEventTab() {
-    return this.activeTab === 'event';
-}
-
-get leadTabClass() {
-    return `tab ${this.activeTab === 'lead' ? 'active' : ''}`;
-}
-
-get historyTabClass() {
-    return `tab ${this.activeTab === 'history' ? 'active' : ''}`;
-}
-
-get webinarTabClass() {
-    return `tab ${this.activeTab === 'webinar' ? 'active' : ''}`;
-}
-
-get eventTabClass() {
-    return `tab ${this.activeTab === 'event' ? 'active' : ''}`;
-}
-
-
-get hasEvents() {
-    return this.eventHistory.length > 0;
-}
-
-get hasCallHistory() {
-    return this.callHistory.length > 0;
-}
-
-
-
-async handleTabClick(event) {
-    const tab = event.currentTarget.dataset.tab;
-    this.activeTab = tab;
-
-    if (tab === 'history' && !this.historyLoaded) {
-        await this.loadCallHistory();
-    }
-
-    if (tab === 'webinar' && !this.webinarLoaded) {
-        await this.loadWebinars();
-    }
-
-    if (tab === 'event' && !this.eventLoaded) {
-        await this.loadEventHistory();
-    }
-}
-
-async loadCallHistory() {
-    try {
-        const rows = await getCallHistory({ recordId: this.leadId });
-
-        this.callHistory = (rows || []).map(r => {
-            const dt = new Date(r.startTime || r.createdDate);
-
-            return {
-                id: r.id,
-                dateLabel: dt.toLocaleDateString('en-IN'),
-                timeLabel: dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-                durationLabel: `${Math.floor((r.durationSeconds || 0) / 60)}m ${(r.durationSeconds || 0) % 60}s`,
-                status: r.status,
-                l1: r.l1,
-                l2: r.l2,
-                stage: r.stage
-            };
-        });
-
-        this.historyLoaded = true;
-    } catch (e) {
-        console.error('History load failed', e);
-    }
-}
-
-
-
-async loadWebinars() {
-    try {
-        const rows = await getWebinarMembers({ recordId: this.leadId });
-
-        this.webinarMembers = (rows || []).map(r => ({
-            id: r.id,
-            webinar: r.webinarName,
-            attendance: r.attendanceStatus,
-            date: r.createdDate
-        }));
-
-        this.webinarLoaded = true;
-    } catch (e) {
-        console.error('Webinar load failed', e);
-    }
-}
-
-
-async loadEventHistory() {
-    try {
-        const rows = await getLeadEvents({ recordId: this.leadId });
-
-        this.eventHistory = (rows || []).map(r => ({
-            id: r.id,
-            subject: r.subject,
-            attendance: r.attendance || 'NA'
-        }));
-
-        this.eventLoaded = true;
-    } catch (e) {
-        console.error('Event load failed', e);
-    }
-}
-
-
-
-
-
-
-
-
-
-
-handleViewMoreLead() {
-    window.open('/' + this.leadId, '_blank');
-}
-
-
-    async handleCall() {
+    handleCall() {
+        if (this.callButtonDisabled) return;
+        this.callButtonDisabled = true;
         this.loading = true;
         this.errorText = null;
         this.callStatus = STATUS.DIALING;
-        this.isLive = false;
+        this.elapsedMs = 0;
+        this.elapsedLabel = '00:00';
         this.showFeedback = false;
-        this.showCallPopup = true;
         this.canEndCall = false;
-
-        this.setElapsed(0);
-        this.startTimer();
         this.lastCallId = null;
-        this.clearTimers();
+        this.hasActualConnection = false;
 
-        try {
-            const response = await allocateLeadNow({ recordId: this.leadId });
-            const parsed = typeof response === 'string' ? JSON.parse(response) : response || {};
+        allocateLeadNow({ recordId: this.leadId })
+            .then(res => {
+                const parsed = typeof res === 'string' ? JSON.parse(res) : res || {};
+                this.lastCallId = parsed.callId;
+                this.callTitle = parsed.displayName || 'Calling via Runo';
+                this.callStatus = STATUS.IN_CALL;
+                this.isLive = true;
+                this.showPopup = true;
+                setTimeout(() => { this.showPopup = false; }, 4200);
 
-            this.lastCallId = parsed?.callId || this.lastCallId;
-            this.callTitle = parsed?.displayName || 'Calling via Runo';
-            this.callStatus = STATUS.IN_CALL;
-            this.isLive = true;
-
-            this.showToast('Success', 'Call initiated successfully', 'success');
-
-            // Start no-response timer
-            this.noResponseTimer = setTimeout(() => {
-                if (this.isLive && this.callStatus !== STATUS.ENDED) {
-                    this.canEndCall = true;
-                    this.callStatus = STATUS.NO_RESPONSE;
-                }
-            }, this.CALL_NO_RESPONSE_MS);
-
-        } catch (error) {
-            this.errorText = error?.body?.message || error?.message || 'Failed to dial';
-            this.callStatus = STATUS.FAILED;
-            this.isLive = false;
-            this.showCallPopup = false;
-            this.stopTimer();
-            this.showFeedback = true;
-
-            this.showToast('Error', this.errorText, 'error');
-        } finally {
-            this.loading = false;
-        }
+                this.startTimer();
+                this.noResponseTimer = setTimeout(() => {
+                    if (this.isLive && this.callStatus !== STATUS.ENDED) {
+                        this.canEndCall = true;
+                        this.callStatus = STATUS.NO_RESPONSE;
+                        this.showFeedbackSection();
+                        this.callButtonDisabled = true;
+                    }
+                }, this.CALL_NO_RESPONSE_MS);
+            })
+            .catch(error => {
+                this.callStatus = STATUS.FAILED;
+                this.callButtonDisabled = false;
+                this.showToast('Error', error?.body?.message || 'Call failed', 'error');
+            })
+            .finally(() => {
+                this.loading = false;
+            });
     }
 
     handleEndCall() {
-        if (!this.canEndCall && !this.isLive) return;
-
         this.callStatus = STATUS.ENDED;
         this.isLive = false;
-        this.showCallPopup = false;
         this.stopTimer();
         this.clearTimers();
         this.showFeedbackSection();
+        this.callButtonDisabled = true;
     }
 
-    // -------------------------
-    // FEEDBACK
-    // -------------------------
     showFeedbackSection() {
+        if (!this.l1Value) {
+            this.updateL1('Not-Connected');
+        }
         this.showFeedback = true;
-
-        if (!this.nextFollowUpDate) {
-            const now = new Date();
-            const nextDay = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-            const yyyy = nextDay.getFullYear();
-            const mm = String(nextDay.getMonth() + 1).padStart(2, '0');
-            const dd = String(nextDay.getDate()).padStart(2, '0');
-            const hh = String(nextDay.getHours()).padStart(2, '0');
-            const min = String(nextDay.getMinutes()).padStart(2, '0');
-            this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+        if (this.autoSetFollowUp) {
+            this.setAutoDate24();
         }
     }
 
     async handleSaveFeedback() {
         if (this.isCommentMandatory && !this.feedback?.trim()) {
-            this.showToast('Required', 'Feedback comment is required.', 'warning');
+            this.showToast('Warning', 'Comment is mandatory', 'warning');
             return;
         }
 
-        if (!this.stageValue) {
-            this.showToast('Required', 'Stage is required.', 'warning');
+        if (this.l1Value === 'Connected' && !this.stageValue) {
+            this.showToast('Warning', 'Stage is required', 'warning');
             return;
         }
 
         this.savingFeedback = true;
-
         try {
             const payload = {
                 recordId: this.leadId,
@@ -475,119 +382,87 @@ handleViewMoreLead() {
                 nextFollowUpDate: this.nextFollowUpDate,
                 l1: this.l1Value,
                 l2: this.l2Value,
-                stage: this.stageValue,
+                stage: this.l1Value === 'Connected' ? this.stageValue : null,
                 level: this.levelValue,
-                notifyMe: false
+                notifyMe: this.notifyMe,
+                isDnd: this.isDnd,
+                isSpam: this.isSpam,
+                expectedPaymentDate: this.expectedPaymentDate
             };
-
-            await updateCallFeedback({
-                jsonBody: JSON.stringify(payload)
-            });
-
-            this.showToast('Success', 'Feedback saved successfully.', 'success');
-
-            // Notify parent to refresh data
+            await updateCallFeedback({ jsonBody: JSON.stringify(payload) });
+            this.showToast('Success', 'Feedback saved', 'success');
             this.dispatchEvent(new CustomEvent('feedbacksaved'));
-
-            // Close modal
             this.handleClose();
-
         } catch (error) {
-            this.showToast('Error', error?.body?.message || 'Failed to save feedback.', 'error');
+            this.showToast('Error', error?.body?.message || 'Save failed', 'error');
         } finally {
             this.savingFeedback = false;
         }
     }
 
- 
     startTimer() {
-        if (this.timerId) return;
-        const start = Date.now() - this.elapsedMs;
+        const start = Date.now();
         this.timerId = setInterval(() => {
-            this.setElapsed(Date.now() - start);
-        }, 500);
-    }
-
-    stopTimer() {
-        if (this.timerId) {
-            clearInterval(this.timerId);
-            this.timerId = null;
-        }
-    }
-
-    setElapsed(ms) {
-        this.elapsedMs = ms;
-        const totalSec = Math.floor(ms / 1000);
-        const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
-        const ss = String(totalSec % 60).padStart(2, '0');
-        this.elapsedLabel = `${mm}:${ss}`;
-    }
-
-    clearTimers() {
-        if (this.noResponseTimer) {
-            clearTimeout(this.noResponseTimer);
-            this.noResponseTimer = null;
-        }
-        this.canEndCall = false;
-    }
-
-    // -------------------------
-    // PLATFORM EVENT
-    // -------------------------
-    subscribeToEvents() {
-        if (this.subscription) return;
-
-        subscribe(this.channelName, -1, msg => this.onRunoEvent(msg))
-            .then(resp => {
-                this.subscription = resp;
-            })
-            .catch(error => {
-                console.error('Failed to subscribe:', error);
-            });
-    }
-
-    onRunoEvent(msg) {
-        const p = (msg && msg.data && msg.data.payload) || {};
-        const evtLeadId = p.Lead_Id__c || p.LeadId__c || p.leadId || null;
-        const evtCallId = p.Call_Id__c || p.CallId__c || p.callId || null;
-
-        if (evtLeadId && String(evtLeadId) !== String(this.leadId)) {
-            return;
-        }
-
-        if (evtCallId) {
-            this.lastCallId = String(evtCallId);
-        }
-
-        const s = Number(p.Duration_Seconds__c || p.Duration__c || p.durationSeconds);
-        if (!Number.isNaN(s) && s > 0) {
-            const totalSec = Math.floor(s);
+            this.elapsedMs = Date.now() - start;
+            const totalSec = Math.floor(this.elapsedMs / 1000);
             const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
             const ss = String(totalSec % 60).padStart(2, '0');
             this.elapsedLabel = `${mm}:${ss}`;
-        } else {
-            this.elapsedLabel = '00:00';
-        }
-
-        this.callStatus = STATUS.ENDED;
-        this.isLive = false;
-        this.showCallPopup = false;
-        this.stopTimer();
-        this.clearTimers();
-        this.showFeedbackSection();
-
-        console.log('RUNO EVENT => CALL ENDED');
+        }, 1000);
     }
 
-    // -------------------------
-    // UTILITIES
-    // -------------------------
-    get isSaveDisabled() {
-        return this.savingFeedback || !this.showFeedback;
+    stopTimer() {
+        if (this.timerId) clearInterval(this.timerId);
+        this.timerId = null;
     }
 
-    get showCallButton() {
-        return !this.isLive && this.callStatus !== STATUS.IN_CALL;
+    clearTimers() {
+        if (this.noResponseTimer) clearTimeout(this.noResponseTimer);
+        this.noResponseTimer = null;
+    }
+
+    handleSubscribe() {
+        if (this.subscription) return;
+        const messageCallback = (msg) => {
+            const p = (msg && msg.data && msg.data.payload) || {};
+            // Match by Call ID if available
+            const evtCallId = p.Call_Id__c || p.CallId__c || p.callId || null;
+            if (evtCallId && String(evtCallId) !== String(this.lastCallId)) return;
+
+            const s = Number(p.Duration_Seconds__c || p.Duration__c || p.durationSeconds);
+            if (!Number.isNaN(s) && s > 0) {
+                const totalSec = Math.floor(s);
+                const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+                const ss = String(totalSec % 60).padStart(2, '0');
+                this.elapsedLabel = `${mm}:${ss}`;
+                this.hasActualConnection = true;
+                this.updateL1('Connected');
+            } else {
+                this.elapsedLabel = '00:00';
+                this.hasActualConnection = false;
+                this.updateL1('Not-Connected');
+            }
+
+            this.callStatus = STATUS.ENDED;
+            this.isLive = false;
+            this.showPopup = false;
+            this.stopTimer();
+            this.clearTimers();
+            this.showFeedbackSection();
+            this.callButtonDisabled = true;
+        };
+
+        subscribe('/event/Runo_Call_Completed__e', -1, messageCallback)
+            .then(sub => {
+                this.subscription = sub;
+            })
+            .catch(error => {
+                console.error('Subscription error:', error);
+            });
+    }
+
+    handleClose() {
+        this.dispatchEvent(new CustomEvent('close'));
     }
 
     showToast(title, message, variant) {

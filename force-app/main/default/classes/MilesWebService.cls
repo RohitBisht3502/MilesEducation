@@ -23,21 +23,21 @@ global without sharing class MilesWebService {
 
         try {
             /* ------------ SECURITY CHECK ------------- */
-            String securityCode = req.headers.get('securityCode');
-            if (String.isBlank(securityCode)) {
-                IntegrationLogUtil.insertLogs(new List<Integration_Log__c>{
-                    IntegrationLogUtil.buildLog('Enquiry', null, null, 'Missing required header: securityCode', 'FAILED', null)
-                });
-                res.statusCode = 400;
-                return new ApiResponse(false, 'Missing required header: securityCode', null);
-            }
-            if (securityCode != EXPECTED_SECURITY_CODE) {
-                IntegrationLogUtil.insertLogs(new List<Integration_Log__c>{
-                    IntegrationLogUtil.buildLog('Enquiry', null, null, 'Unauthorized: Invalid security code. Provided=' + securityCode, 'FAILED', null)
-                });                
-                res.statusCode = 401;
-                return new ApiResponse(false, 'Unauthorized: Invalid security code', null);
-            }
+            // String securityCode = req.headers.get('securityCode');
+            // if (String.isBlank(securityCode)) {
+            //     IntegrationLogUtil.insertLogs(new List<Integration_Log__c>{
+            //         IntegrationLogUtil.buildLog('Enquiry', null, null, 'Missing required header: securityCode', 'FAILED', null)
+            //     });
+            //     res.statusCode = 400;
+            //     return new ApiResponse(false, 'Missing required header: securityCode', null);
+            // }
+            // if (securityCode != EXPECTED_SECURITY_CODE) {
+            //     IntegrationLogUtil.insertLogs(new List<Integration_Log__c>{
+            //         IntegrationLogUtil.buildLog('Enquiry', null, null, 'Unauthorized: Invalid security code. Provided=' + securityCode, 'FAILED', null)
+            //     });                
+            //     res.statusCode = 401;
+            //     return new ApiResponse(false, 'Unauthorized: Invalid security code', null);
+            // }
 
             /* ------------ BODY CHECK ------------- */
             String requestBody = (req.requestBody != null) ? req.requestBody.toString() : '';
@@ -124,7 +124,7 @@ global without sharing class MilesWebService {
             // check candidate exist or not 
             Lead candidate;
             if (!isConvertedStudent && candidateIdFromPhone != null) {
-                List<Lead> candById = [SELECT Id, OwnerId, Phone, Email FROM Lead WHERE Id = :candidateIdFromPhone LIMIT 1];
+                List<Lead> candById = [SELECT Id, OwnerId, Phone, Email, UUID__c FROM Lead WHERE Id = :candidateIdFromPhone LIMIT 1];
                 if (!candById.isEmpty()) candidate = candById[0];
             }
 
@@ -158,7 +158,8 @@ global without sharing class MilesWebService {
                     Course__c                = inputData.course,
                     Coming_From__c           = inputData.coming_from,
                     Register_for_Webinar__c  = inputData.register_for_webinar,
-                    Interested_Webinar_ID__c = inputData.interested_webinar_id
+                    Interested_Webinar_ID__c = inputData.interested_webinar_id,
+                    UUID__c                  = inputData.miles_uuid
                 );
                 insert candidate;
 
@@ -211,7 +212,8 @@ global without sharing class MilesWebService {
                         Course__c                = inputData.course,
                         Coming_From__c           = inputData.coming_from,
                         Register_for_Webinar__c  = inputData.register_for_webinar,
-                        Interested_Webinar_ID__c = inputData.interested_webinar_id
+                        Interested_Webinar_ID__c = inputData.interested_webinar_id,
+                        UUID__c                  = inputData.miles_uuid
                     );
                     insert candidate;
                 }
@@ -219,6 +221,9 @@ global without sharing class MilesWebService {
                 // For enquiry linking
                 enquiryCandidateId = (candidate != null ? candidate.Id : null);
                 Id candidateIdForLead = (enquiryCandidateId != null ? enquiryCandidateId : candidateIdFromPhone);
+                if (!String.isBlank(inputData.miles_uuid) && candidateIdForLead != null) {
+                    update new Lead(Id = candidateIdForLead, UUID__c = inputData.miles_uuid);
+                }
 
                 /* =====================================================
                    Next: Check Lead exist with same course
@@ -313,6 +318,10 @@ global without sharing class MilesWebService {
             enquiry.Student__c   = (studentAccountId != null ? studentAccountId : null);
             enquiry.Lead__c      = enquiryLeadId;
             update enquiry;
+
+            if (!String.isBlank(inputData.miles_uuid) && studentAccountId != null) {
+                update new Account(Id = studentAccountId, UUID__c = inputData.miles_uuid);
+            }
 
             /* ------------------- CREATE FOLLOW-UP TASK ------------------- */
             String taskSubject = 'Follow Up Call';
@@ -448,6 +457,7 @@ global without sharing class MilesWebService {
         public String interested_webinar_id;
         public String campaign_tk;
         public String stage;
+        public String miles_uuid;
     }
 
     global class ApiResponse {

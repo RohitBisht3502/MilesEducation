@@ -282,12 +282,15 @@
                         message-when-range-overflow="Down payment cannot exceed total payable."
                         message-when-range-underflow={downPaymentMinMessage} onchange={handleDownPaymentChange}>
                     </lightning-input>
+                    <div class="approval-note">
+                        {approvalHint}
+                    </div>
 
                     <template if:true={isApprovalRequired}>
                         <div class="approval-note">
                             Discount exceeds allowed {discountThreshold}% for this course. Approval required.
                         </div>
-                        <lightning-textarea label="Approval Comments" value={approvalComments}
+                        <lightning-textarea label="Approval Comments" value={approvalComments} required
                             onchange={handleApprovalComments}>
                         </lightning-textarea>
                     </template>

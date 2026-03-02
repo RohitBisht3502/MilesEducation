@@ -8,8 +8,10 @@ import getIdentity from '@salesforce/apex/RunoCallIdentityService.getIdentity';
 import getRelatedLeads from '@salesforce/apex/RunoCallIdentityService.getRelatedLeads';
 import updateRelatedLeadStages from '@salesforce/apex/RunoCallIdentityService.updateRelatedLeadStages';
 import createRelatedLead from '@salesforce/apex/RunoCallIdentityService.createRelatedLead';
-import getStageLevelValues from '@salesforce/apex/Webservice_RunoAllocationAPI.getStageLevelValues';
+// import getStageLevelValues from '@salesforce/apex/Webservice_RunoAllocationAPI.getStageLevelValues';
 import getCallHistory from '@salesforce/apex/Webservice_RunoAllocationAPI.getCallHistory';
+import { getPicklistValuesByRecordType }
+    from 'lightning/uiObjectInfoApi';
 import getWebinarMembers from '@salesforce/apex/Webservice_RunoAllocationAPI.getWebinarMembers';
 import getLeadEvents from '@salesforce/apex/Webservice_RunoAllocationAPI.getLeadEvents';
 import { NavigationMixin } from 'lightning/navigation';
@@ -121,7 +123,7 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
 
     isDnd = false;
     isSpam = false;
-    recordTypeStageMap = {};
+    // recordTypeStageMap = {};
 
     // call state
     isLive = false;
@@ -179,9 +181,9 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
             this.identity = data;
             if (data.stage) this.stageValue = data.stage;
             if (data.level) this.levelValue = data.level;
-            if (!this.stageOptions.length) {
-                this.loadStageLevel();
-            }
+            // if (!this.stageOptions.length) {
+            //     this.loadStageLevel();
+            // }
             if (!this.candidateId && data.candidateId) {
                 this.candidateId = data.candidateId;
                 console.log('Candidate Id:', this.candidateId);
@@ -207,6 +209,10 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
             console.error('Error fetching RecordTypeId', error);
         }
     }
+
+
+
+
 
 
 
@@ -359,48 +365,51 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
                 candidateId: this.candidateId
             });
 
-            // Just reuse already loaded stageOptions
-            const commonStageOptions = this.stageOptions || [];
+            this.relatedLeads = (rows || []).map(r => {
+                const options =
+                    this.recordTypeStageMap[r.recordTypeId] ||
+                    this.stageOptions || [];
 
-            this.relatedLeads = (rows || []).map(r => ({
-                id: r.id,
-                course: r.course || 'NA',
-                stage: r.stage || '',
-                stageOptions: commonStageOptions
-            }));
+                return {
+                    id: r.id,
+                    course: r.course || 'NA',
+                    stage: r.stage || '',
+                    stageOptions: options
+                };
+            });
+
+            this.relatedLeadsLoaded = true;
 
         } catch (e) {
             console.error('Related leads load failed:', e);
             this.relatedLeads = [];
-        } finally {
             this.relatedLeadsLoaded = true;
-            this.relatedLeadEdits = {};
         }
     }
-    async loadStageOptionsForRecordType(recordTypeId) {
-        if (this.recordTypeStageMap[recordTypeId]) {
-            return this.recordTypeStageMap[recordTypeId];
-        }
+    // async loadStageOptionsForRecordType(recordTypeId) {
+    //     if (this.recordTypeStageMap[recordTypeId]) {
+    //         return this.recordTypeStageMap[recordTypeId];
+    //     }
 
-        const result = await getPicklistValuesByRecordType({
-            objectApiName: LEAD_OBJECT,
-            recordTypeId: recordTypeId
-        });
+    //     const result = await getPicklistValuesByRecordType({
+    //         objectApiName: LEAD_OBJECT,
+    //         recordTypeId: recordTypeId
+    //     });
 
-        const stageField = result.picklistFieldValues.Stage__c;
+    //     const stageField = result.picklistFieldValues.Stage__c;
 
-        const options = (stageField?.values || []).map(v => ({
-            label: v.label,
-            value: v.value
-        }));
+    //     const options = (stageField?.values || []).map(v => ({
+    //         label: v.label,
+    //         value: v.value
+    //     }));
 
-        this.recordTypeStageMap = {
-            ...this.recordTypeStageMap,
-            [recordTypeId]: options
-        };
+    //     this.recordTypeStageMap = {
+    //         ...this.recordTypeStageMap,
+    //         [recordTypeId]: options
+    //     };
 
-        return options;
-    }
+    //     return options;
+    // }
 
 
     handleRelatedStageChange(event) {
@@ -549,28 +558,28 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
     }
 
 
-    async loadStageLevel() {
-        if (!this.recordId) return;
+    // async loadStageLevel() {
+    //     if (!this.recordId) return;
 
-        try {
-            const mapData = await getStageLevelValues({
-                recordId: this.recordId
-            });
+    //     try {
+    //         const mapData = await getStageLevelValues({
+    //             recordId: this.recordId
+    //         });
 
-            this.stageOptions = (mapData.stage || []).map(v => ({
-                label: v,
-                value: v
-            }));
+    //         this.stageOptions = (mapData.stage || []).map(v => ({
+    //             label: v,
+    //             value: v
+    //         }));
 
-            this.levelOptions = (mapData.level || []).map(v => ({
-                label: v,
-                value: v
-            }));
+    //         this.levelOptions = (mapData.level || []).map(v => ({
+    //             label: v,
+    //             value: v
+    //         }));
 
-        } catch (e) {
-            console.error('Stage/Level load failed:', e);
-        }
-    }
+    //     } catch (e) {
+    //         console.error('Stage/Level load failed:', e);
+    //     }
+    // }
 
 
     async loadEventHistory() {
@@ -666,6 +675,17 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
         return this.isCallLog === true && !this.candidateId;
     }
 
+    get filteredL1Options() {
+    if (!this.isApiResponseReceived) {
+        return this.l1Options;
+    }
+
+    // After API response → remove Not-Connected
+    return (this.l1Options || []).filter(
+        opt => opt.value !== 'Not-Connected'
+    );
+}
+
     get isMissedCall() {
         const tag = this.normalizedPrimaryTag;
 
@@ -736,10 +756,19 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
         this.userChangedStage = true;
     }
 
-    handleLevelChange(e) {
-        this.levelValue = e.target.value;
-    }
+    handleLevelChange(event) {
+        this.levelValue = event.detail.value;
 
+        if (!this.objectInfo?.recordTypeInfos) return;
+
+        const matchedRt = Object.values(this.objectInfo.recordTypeInfos)
+            .find(rt => rt.name.trim() === this.levelValue.trim());
+
+        if (matchedRt) {
+            this.recordTypeId = matchedRt.recordTypeId;
+            this.stageValue = null;   // reset stage
+        }
+    }
     handleFeedbackChange(e) {
         this.feedback = e.target.value;
     }
@@ -772,9 +801,12 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
         this.callButtonDisabled = true;
         this.loading = true;
         this.errorText = null;
-    this.isApiResponseReceived = false;  
-    this.l1Value = 'Not-Connected';   
-     this.handleL1Change({ target: { value: this.l1Value } });
+        this.isApiResponseReceived = false;
+        this.l1Value = 'Not-Connected';
+        this.handleL1Change({ target: { value: this.l1Value } });
+        if (this.l2Options.length > 0) {
+            this.l2Value = this.l2Options[0].value;
+        }
         this.callStatus = 'Dialing…';
         this.isLive = false;
         this.showFeedback = false;
@@ -1202,7 +1234,7 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
     onRunoEvent(msg) {
         debugger;
         const p = (msg && msg.data && msg.data.payload) || {};
-          this.isApiResponseReceived = true;
+        this.isApiResponseReceived = true;
 
         const evtLeadId = p.Lead_Id__c || p.LeadId__c || p.leadId || null;
         const evtCallId = p.Call_Id__c || p.CallId__c || p.callId || null;
@@ -1302,21 +1334,21 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
 
 
 
-get disableUntilApi() {
-    return !this.isApiResponseReceived;
-}
+    get disableUntilApi() {
+        return !this.isApiResponseReceived;
+    }
 
-get disableFollowUpDateTime() {
-    return this.disableUntilApi || this.autoSetFollowUp;
-}
+    get disableFollowUpDateTime() {
+        return this.disableUntilApi || this.autoSetFollowUp;
+    }
 
-get disableL1() {
-    return !this.isApiResponseReceived;
-}
+    get disableL1() {
+        return !this.isApiResponseReceived;
+    }
+    get disableL2Final() {
 
-get disableL2Final() {
-    return !this.isApiResponseReceived || this.isL2Disabled;
-}
+        return this.isL2Disabled;
+    }
     get statusPillClass() {
         const status = (this.callStatus || '').toLowerCase();
         if (status.includes('in call') || status.includes('dialing')) return 'status-pill live';

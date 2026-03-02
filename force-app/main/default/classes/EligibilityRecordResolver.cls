@@ -18,7 +18,7 @@ public without sharing class EligibilityRecordResolver {
 
         Id parsedId = null;
         try {
-            parsedId = (Id) key;
+            parsedId = key;
         } catch (Exception e) {
             parsedId = null;
         }

@@ -9,19 +9,7 @@ public without sharing class Callout_AWSFileUploader {
         if (String.isBlank(uuid)) throw new AuraHandledException('uuid is required.');
         if (String.isBlank(contentType)) contentType = 'application/octet-stream';
         
-        External_Service_Config__mdt cfg;
-        try {
-            cfg = [
-                SELECT Endpoint_URL__c, Http_Method__c, Api_Key__c, Api_Key_Header__c, Is_Active__c FROM External_Service_Config__mdt WHERE DeveloperName = 'AWS_File_Uploader' LIMIT 1 ];
-        } catch (Exception e) {
-            IntegrationLogUtil.insertLog('AWS File Uploader', null, null, 'Config load error: ' + e.getMessage(), 'Failed', null);
-            throw new AuraHandledException('Failed to load external service config: ' + e.getMessage());
-        }
-        
-        if (cfg == null || !cfg.Is_Active__c || String.isBlank(cfg.Endpoint_URL__c)) {
-            IntegrationLogUtil.insertLog('AWS File Uploader', null, null, 'Config inactive or missing Endpoint_URL__c', 'Failed', null);
-            throw new AuraHandledException('Service is not configured or inactive.');
-        }
+        External_Service_Config__mdt cfg = loadConfig();
         
         String method = String.isBlank(cfg.Http_Method__c) ? 'GET' : cfg.Http_Method__c.trim().toUpperCase();
         if (method != 'GET') method = 'GET';
@@ -62,5 +50,198 @@ public without sharing class Callout_AWSFileUploader {
         
         IntegrationLogUtil.insertLog('AWS File Uploader',null,(body != null && body.length() > 3000 ? body.substring(0, 3000) : body),'Success','Success',200 );
         return url;
+    }
+
+    @AuraEnabled(cacheable=false)
+    public static String getUploadUuid() {
+        External_Service_Config__mdt cfg = loadConfig();
+        String endpoint = buildEndpoint(cfg.Endpoint_URL__c, '/getUUID');
+
+        HttpRequest req = new HttpRequest();
+        req.setEndpoint(endpoint);
+        req.setMethod('GET');
+        if (!String.isBlank(cfg.Api_Key__c) && !String.isBlank(cfg.Api_Key_Header__c)) {
+            req.setHeader(cfg.Api_Key_Header__c, cfg.Api_Key__c);
+        }
+
+        Http http = new Http();
+        HttpResponse res;
+        try {
+            res = http.send(req);
+        } catch (Exception e) {
+            IntegrationLogUtil.insertLog('AWS File Uploader - UUID', null, null, 'Callout error: ' + e.getMessage(), 'Failed', null);
+            throw new AuraHandledException('Callout failed: ' + e.getMessage());
+        }
+
+        Integer code = res.getStatusCode();
+        String body = res.getBody();
+
+        if (code != 200 || String.isBlank(body)) {
+            IntegrationLogUtil.insertLog('AWS File Uploader - UUID', null, body, 'Non-200 or empty body', 'Failed', code);
+            throw new AuraHandledException('UUID API returned error. Status: ' + code);
+        }
+
+        Map<String, Object> payload = unwrapBody(body);
+        String uuid = (payload == null) ? null : (String) payload.get('uuid');
+        if (String.isBlank(uuid)) {
+            IntegrationLogUtil.insertLog('AWS File Uploader - UUID', null, body, 'Missing uuid in response', 'Failed', code);
+            throw new AuraHandledException('Invalid UUID response.');
+        }
+
+        IntegrationLogUtil.insertLog('AWS File Uploader - UUID', null, (body != null && body.length() > 3000 ? body.substring(0, 3000) : body), 'Success', 'Success', 200);
+        return uuid;
+    }
+
+    @AuraEnabled(cacheable=false)
+    public static String getPresignedUrlForUpload(
+        String studentUuid,
+        String contentType,
+        String fileUuid,
+        String folderPath
+    ) {
+        if (String.isBlank(studentUuid)) throw new AuraHandledException('studentUuid is required.');
+        if (String.isBlank(fileUuid)) throw new AuraHandledException('fileUuid is required.');
+        if (String.isBlank(folderPath)) throw new AuraHandledException('folderPath is required.');
+        if (String.isBlank(contentType)) contentType = 'application/octet-stream';
+
+        External_Service_Config__mdt cfg = loadConfig();
+        String endpoint = buildEndpoint(cfg.Endpoint_URL__c, '/getPresignedUrlForFileUpload');
+
+        String urlWithParam = endpoint
+            + (endpoint.contains('?') ? '&' : '?')
+            + 'student_uuid=' + EncodingUtil.urlEncode(studentUuid, 'UTF-8')
+            + '&content_type=' + EncodingUtil.urlEncode(contentType, 'UTF-8')
+            + '&file_uuid=' + EncodingUtil.urlEncode(fileUuid, 'UTF-8')
+            + '&folder_path=' + EncodingUtil.urlEncode(folderPath, 'UTF-8');
+
+        HttpRequest req = new HttpRequest();
+        req.setEndpoint(urlWithParam);
+        req.setMethod('GET');
+        if (!String.isBlank(cfg.Api_Key__c) && !String.isBlank(cfg.Api_Key_Header__c)) {
+            req.setHeader(cfg.Api_Key_Header__c, cfg.Api_Key__c);
+        }
+
+        Http http = new Http();
+        HttpResponse res;
+        try {
+            res = http.send(req);
+        } catch (Exception e) {
+            IntegrationLogUtil.insertLog('AWS File Uploader - Presign', null, null, 'Callout error: ' + e.getMessage(), 'Failed', null);
+            throw new AuraHandledException('Callout failed: ' + e.getMessage());
+        }
+
+        Integer code = res.getStatusCode();
+        String body = res.getBody();
+
+        if (code != 200 || String.isBlank(body)) {
+            IntegrationLogUtil.insertLog('AWS File Uploader - Presign', null, body, 'Non-200 or empty body', 'Failed', code);
+            throw new AuraHandledException('Upload presign API returned error. Status: ' + code);
+        }
+
+        Map<String, Object> payload = unwrapBody(body);
+        String url = (payload == null) ? null : (String) payload.get('url');
+        if (String.isBlank(url)) {
+            IntegrationLogUtil.insertLog('AWS File Uploader - Presign', null, body, 'Missing url in response', 'Failed', code);
+            throw new AuraHandledException('Invalid pre-signed URL response.');
+        }
+
+        IntegrationLogUtil.insertLog('AWS File Uploader - Presign', null, (body != null && body.length() > 3000 ? body.substring(0, 3000) : body), 'Success', 'Success', 200);
+        return url;
+    }
+
+    @AuraEnabled(cacheable=false)
+    public static Integer uploadFileToS3(
+        String presignedUrl,
+        String base64Body,
+        String contentType,
+        String fileUuid
+    ) {
+        if (String.isBlank(presignedUrl)) throw new AuraHandledException('presignedUrl is required.');
+        if (String.isBlank(base64Body)) throw new AuraHandledException('file body is required.');
+        if (String.isBlank(contentType)) contentType = 'application/octet-stream';
+
+        Blob body = EncodingUtil.base64Decode(base64Body);
+
+        HttpRequest req = new HttpRequest();
+        req.setEndpoint(presignedUrl);
+        req.setMethod('PUT');
+        req.setHeader('Content-Type', contentType);
+        req.setBodyAsBlob(body);
+
+        Http http = new Http();
+        HttpResponse res;
+        try {
+            res = http.send(req);
+        } catch (Exception e) {
+            IntegrationLogUtil.insertLog('AWS File Uploader - S3 PUT', fileUuid, null, 'Callout error: ' + e.getMessage(), 'Failed', null);
+            throw new AuraHandledException('S3 upload callout failed: ' + e.getMessage());
+        }
+
+        Integer code = res.getStatusCode();
+        String responseBody = res.getBody();
+
+        if (code < 200 || code >= 300) {
+            IntegrationLogUtil.insertLog(
+                'AWS File Uploader - S3 PUT',
+                fileUuid,
+                (responseBody != null && responseBody.length() > 3000 ? responseBody.substring(0, 3000) : responseBody),
+                'Non-2xx response',
+                'Failed',
+                code
+            );
+            throw new AuraHandledException('S3 upload failed. Status: ' + code);
+        }
+
+        IntegrationLogUtil.insertLog('AWS File Uploader - S3 PUT', fileUuid, null, 'Success', 'Success', code);
+        return code;
+    }
+
+    private static External_Service_Config__mdt loadConfig() {
+        External_Service_Config__mdt cfg;
+        try {
+            cfg = [
+                SELECT Endpoint_URL__c, Http_Method__c, Api_Key__c, Api_Key_Header__c, Is_Active__c
+                FROM External_Service_Config__mdt
+                WHERE DeveloperName = 'AWS_File_Uploader'
+                LIMIT 1
+            ];
+        } catch (Exception e) {
+            IntegrationLogUtil.insertLog('AWS File Uploader', null, null, 'Config load error: ' + e.getMessage(), 'Failed', null);
+            throw new AuraHandledException('Failed to load external service config: ' + e.getMessage());
+        }
+
+        if (cfg == null || !cfg.Is_Active__c || String.isBlank(cfg.Endpoint_URL__c)) {
+            IntegrationLogUtil.insertLog('AWS File Uploader', null, null, 'Config inactive or missing Endpoint_URL__c', 'Failed', null);
+            throw new AuraHandledException('Service is not configured or inactive.');
+        }
+        return cfg;
+    }
+
+    private static String buildEndpoint(String baseUrl, String path) {
+        if (String.isBlank(baseUrl)) return baseUrl;
+        if (String.isBlank(path)) return baseUrl;
+        if (baseUrl.endsWith(path)) return baseUrl;
+        if (baseUrl.endsWith('/')) {
+            return baseUrl + path.substring(1);
+        }
+        return baseUrl + path;
+    }
+
+    private static Map<String, Object> unwrapBody(String body) {
+        if (String.isBlank(body)) return null;
+        Object raw = JSON.deserializeUntyped(body);
+        if (!(raw instanceof Map<String, Object>)) return null;
+
+        Map<String, Object> untyped = (Map<String, Object>) raw;
+        if (untyped.containsKey('body')) {
+            Object payload = untyped.get('body');
+            if (payload instanceof String) {
+                payload = JSON.deserializeUntyped((String) payload);
+            }
+            if (payload instanceof Map<String, Object>) {
+                return (Map<String, Object>) payload;
+            }
+        }
+        return untyped;
     }
 }

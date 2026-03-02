@@ -2,10 +2,9 @@ import { api, LightningElement, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 import updateCallFeedback from '@salesforce/apex/Webservice_RunoAllocationAPI.updateCallFeedback';
-import getL1L2Values from '@salesforce/apex/Webservice_RunoAllocationAPI.getL1L2Values';
 import getIdentity from '@salesforce/apex/RunoCallIdentityService.getIdentity';
 import getStageLevelValues from '@salesforce/apex/Webservice_RunoAllocationAPI.getStageLevelValues';
-
+import getDispositions from '@salesforce/apex/CallDispositionConfigService.getDispositions';
 import { CloseActionScreenEvent } from 'lightning/actions';
 import { subscribe, unsubscribe, onError } from 'lightning/empApi';
 import {
@@ -62,31 +61,8 @@ export default class RunoCallFeedbackUtility extends LightningElement {
     // Comment box rules
     showCommentBox = false;
     isCommentMandatory = false;
-    mandatoryCommentRules = {
-        'Connected:Discussed': true,
-        'Connected:Request Call Back': true,
-        'Connected:Not Eligible': true,
-        'Connected:Wrong Number': true,
-        'Connected:Language Barrier': true,
-        'Connected:Visit Confirmed': true,
-        'Connected:Visit Completed': true,
-        'Connected:Visit Rescheduled': true,
-        'Connected:Visit Cancelled': true,
-        'Connected:Visit Booked By Mistake': true,
-        'Connected:Google Meet Completed': true,
-        'Connected:Google Meet Rescheduled': true,
-        'Connected:Google Meet Cancelled': true,
-        'Connected:Attended And Disconnected': true,
-        'Connected:Voice Mail': true,
-        'Connected:Not Interested (DND)': true,
-        'Connected:Postponed': true,
-        'Not-Connected:Not Lifting': false,
-        'Not-Connected:Switched Off': false,
-        'Not-Connected:Not Reachable': false,
-        'Not-Connected:Busy': false,
-        'Not-Connected:Invalid Number': true
-    };
-
+    dispositionData = [];
+    commentRuleMap = {};
     lastCallId = null;
     subscription = null;
     errorText;
@@ -96,14 +72,19 @@ export default class RunoCallFeedbackUtility extends LightningElement {
     }
 
     connectedCallback() {
-        // 🔹 Use recordId initially if utility was opened from a record
-        this.leadIdForIdentity = this.recordId || null;
+    this.leadIdForIdentity = this.recordId || null;
 
-        this.loadPicklists();
-        this.loadStageLevel();
-        this.subscribeToEvents();
-        onError(() => {});
+    this.loadDispositions();
+    this.subscribeToEvents();
+
+  
+    this.loadStageLevel();
+
+    if (this.leadIdForIdentity) {
+        this.showFeedback = true;
+        this.loadIdentity();
     }
+}
 
     disconnectedCallback() {
         if (this.subscription) {
@@ -114,17 +95,21 @@ export default class RunoCallFeedbackUtility extends LightningElement {
         }
     }
 
-    // 🔹 Wire uses leadIdForIdentity (can be set by recordId OR platform event)
-    @wire(getIdentity, { recordId: '$leadIdForIdentity' })
-    wiredIdentity({ data, error }) {
-        if (data) {
-            this.identity = data;
-            if (data.stage) this.stageValue = data.stage;
-            if (data.level) this.levelValue = data.level;
-        } else if (error) {
-            this.errorText = error?.body?.message || 'Failed to load identity';
-        }
-    }
+    //     // 🔹 Wire uses leadIdForIdentity (can be set by recordId OR platform event)
+    //     @wire(getIdentity, { recordId: '$leadIdForIdentity' })
+    // // wiredIdentity({ data, error }) {
+    // //     if (data) {
+    // //         this.identity = data;
+
+    // //         if (data.stage) this.stageValue = data.stage;
+    // //         if (data.level) this.levelValue = data.level;
+    // //       // ALWAYS reload picklists when identity loads
+    // //         this.loadStageLevel();
+    // //     } 
+    // //     else if (error) {
+    // //         this.errorText = error?.body?.message || 'Failed to load identity';
+    // //     }
+    // // }
 
     async loadPicklists() {
         try {
@@ -138,25 +123,64 @@ export default class RunoCallFeedbackUtility extends LightningElement {
         }
     }
 
-    async loadStageLevel() {
-        try {
-            const mapData = await getStageLevelValues();
-            this.stageOptions = (mapData.stage || []).map(v => ({
-                label: v,
-                value: v
-            }));
-            this.levelOptions = (mapData.level || []).map(v => ({
-                label: v,
-                value: v
-            }));
-        } catch (e) {
-            console.error('Stage/Level load failed:', e);
-        }
+ async loadIdentity() {
+    if (!this.leadIdForIdentity) {
+        return;
     }
+
+    try {
+        const data = await getIdentity({
+            recordId: this.leadIdForIdentity
+        });
+
+        if (data) {
+            this.identity = data;
+
+            await this.loadStageLevel();
+
+            this.stageValue = data.stage || '';
+            this.levelValue = data.level || '';
+        }
+
+    } catch (error) {
+        console.error('Identity load failed:', error);
+        this.errorText = error?.body?.message || 'Failed to load identity';
+    }
+}
+
+    async loadStageLevel() {
+    try {
+        const mapData = await getStageLevelValues({
+            recordId: this.leadIdForIdentity || this.recordId
+        });
+
+        console.log('StageLevel Response:', mapData);
+
+        this.stageOptions = [];
+        this.levelOptions = [];
+
+        if (mapData && mapData.stage) {
+            this.stageOptions = mapData.stage.map(v => ({
+                label: v,
+                value: v
+            }));
+        }
+
+        if (mapData && mapData.level) {
+            this.levelOptions = mapData.level.map(v => ({
+                label: v,
+                value: v
+            }));
+        }
+
+    } catch (error) {
+        console.error('Stage/Level load failed:', error);
+    }
+}
 
     updateCommentVisibility() {
         const key = `${this.l1Value}:${this.l2Value}`;
-        this.isCommentMandatory = this.mandatoryCommentRules[key] === true;
+        this.isCommentMandatory = this.commentRuleMap[key] === true;
     }
 
     handleL1Change(e) {
@@ -230,16 +254,20 @@ export default class RunoCallFeedbackUtility extends LightningElement {
 
         try {
             await updateCallFeedback({
-                // 🔹 Use leadId from event if available, fallback to recordId
-                leadId: this.leadIdForIdentity || this.recordId,
-                callId: this.lastCallId,
-                feedback: this.feedback?.trim(),
-                nextFollowUpDate: this.nextFollowUpDate,
-                l1: this.l1Value,
-                l2: this.l2Value,
-                stage: this.stageValue,
-                level: this.levelValue
-            });
+    jsonBody: JSON.stringify({
+        recordId: this.leadIdForIdentity || this.recordId,
+        callId: this.lastCallId,
+        feedback: this.feedback?.trim(),
+        nextFollowUpDate: this.nextFollowUpDate,
+        l1: this.l1Value,
+        l2: this.l2Value,
+        stage: this.stageValue,
+        level: this.levelValue,
+        notifyMe: false,
+        isDnd: false,
+        isSpam: false
+    })
+});
 
             this.toast(
                 isAuto ? 'Auto Saved' : 'Saved',
@@ -262,6 +290,43 @@ export default class RunoCallFeedbackUtility extends LightningElement {
         }
     }
 
+
+    async loadDispositions() {
+        try {
+            const data = await getDispositions();
+            this.dispositionData = data;
+
+            const l1Set = new Set();
+            const l1L2Map = {};
+            const commentMap = {};
+
+            data.forEach(row => {
+                l1Set.add(row.l1);
+
+                if (!l1L2Map[row.l1]) {
+                    l1L2Map[row.l1] = [];
+                }
+
+                if (row.l2 && !l1L2Map[row.l1].includes(row.l2)) {
+                    l1L2Map[row.l1].push(row.l2);
+                }
+
+                const key = `${row.l1}:${row.l2}`;
+                commentMap[key] = row.commentNeeded === true;
+            });
+
+            this.l1Options = [...l1Set].map(v => ({
+                label: v,
+                value: v
+            }));
+
+            this.fullMap = l1L2Map;
+            this.commentRuleMap = commentMap;
+
+        } catch (e) {
+            console.error('Disposition load failed:', e);
+        }
+    }
     subscribeToEvents() {
         if (this.subscription) return;
 
@@ -285,9 +350,10 @@ export default class RunoCallFeedbackUtility extends LightningElement {
         }
 
         const evtLeadId = p.Lead_Id__c || p.LeadId__c || p.leadId || null;
+        const evtCandidateId = p.Candidate_Id__c || p.CandidateId__c || p.candidateId || null;
         const evtCallId = p.Call_Id__c || p.CallId__c || p.callId || null;
 
-        // 🔹 If component was opened from a record, keep old protection.
+    
         if (
             this.recordId &&
             evtLeadId &&
@@ -296,16 +362,22 @@ export default class RunoCallFeedbackUtility extends LightningElement {
             return;
         }
 
-        // 🔹 Use lead id from event for identity + save
         if (evtLeadId) {
-            this.leadIdForIdentity = evtLeadId;
+           this.leadIdForIdentity = evtLeadId;
+            this.loadIdentity();
         }
+        else if (evtCandidateId) {
+
+            this.leadIdForIdentity = evtCandidateId;
+            this.loadIdentity();
+        }
+
+        this.showFeedbackSection();
 
         if (evtCallId) {
             this.lastCallId = String(evtCallId);
         }
 
-        // Optional: if event has a duration label, you can populate it
         if (p.Duration_Label__c) {
             this.elapsedLabel = p.Duration_Label__c;
         }

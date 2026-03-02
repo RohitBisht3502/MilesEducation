@@ -91,6 +91,26 @@ public without sharing class RunoCallIdentityService {
 
             return dto;
         }
+        if (sObjType == Lead.SObjectType) {
+
+    Lead c = [
+        SELECT Id, Name, Email, Phone, City
+        FROM Lead
+        WHERE Id = :recordId
+        LIMIT 1
+    ];
+
+    IdentityDTO dto = new IdentityDTO();
+    dto.name  = c.Name;
+    dto.email = c.Email;
+    dto.phone = c.Phone;
+    dto.city  = c.City;
+    dto.source = 'Candidate';
+    dto.stage = null;
+    dto.candidateId = c.Id;
+
+    return dto;
+}
 
         return null;
     }

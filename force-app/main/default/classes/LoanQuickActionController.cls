@@ -1,4 +1,22 @@
+// Author: Rohitng Singh Bisht
 public with sharing class LoanQuickActionController {
+    private static final String KEY_CANDIDATE = 'candidate';
+    private static final String KEY_COURSE = 'course';
+    private static final String KEY_EMAIL = 'email';
+    private static final String KEY_MOBILE = 'mobile';
+    private static final String KEY_NAME = 'name';
+    private static final String KEY_LEAD_LOOKUP = 'leadLookup';
+    private static final String KEY_FIRST_NAME = 'firstName';
+
+    private static final List<String> CANDIDATE_FIELDS = new List<String>{ 'Candidate__c', 'Candidate_Id__c' };
+    private static final List<String> COURSE_FIELDS = new List<String>{ 'Program_Name__c', 'Course__c' };
+    private static final List<String> LEAD_LOOKUP_FIELDS = new List<String>{ 'Lead__c', 'Lead_Lookup__c' };
+    private static final List<String> EMAIL_FIELDS = new List<String>{ 'Email__c' };
+    private static final List<String> MOBILE_FIELDS = new List<String>{ 'Mobile__c', 'Phone__c' };
+    private static final List<String> LEAD_NAME_FIELDS = new List<String>{ 'First_Name__c', 'Name' };
+    private static final List<String> LOAN_FIRST_NAME_FIELDS = new List<String>{ 'First_Name__c' };
+    private static final List<String> AMOUNT_FIELDS = new List<String>{ 'Amount_requested__c' };
+
     public class ValidationResult {
         @AuraEnabled public Boolean isValid;
         @AuraEnabled public String message;
@@ -29,6 +47,11 @@ public with sharing class LoanQuickActionController {
         @AuraEnabled public String leadLookupFieldApi;
         @AuraEnabled public String emailFieldApi;
         @AuraEnabled public String mobileFieldApi;
+
+        public InitData() {
+            this.recordTypes = new List<RecordTypeOption>();
+            this.prefillValues = new Map<String, Object>();
+        }
     }
 
     public class LayoutResponse {
@@ -77,60 +100,69 @@ public with sharing class LoanQuickActionController {
     public static InitData getInitData(Id leadId) {
         System.debug('LoanQuickActionController.getInitData leadId=' + leadId);
         InitData data = new InitData();
-        data.recordTypes = new List<RecordTypeOption>();
-        data.prefillValues = new Map<String, Object>();
 
         Schema.DescribeSObjectResult loanDescribe = Loan__c.SObjectType.getDescribe();
-        Map<Id, Schema.RecordTypeInfo> rtInfos = loanDescribe.getRecordTypeInfosById();
-        System.debug('RecordType count=' + rtInfos.size());
-        for (Id rtId : rtInfos.keySet()) {
-            Schema.RecordTypeInfo info = rtInfos.get(rtId);
-            if (info != null && info.isAvailable() && !info.isMaster()) {
-                System.debug('RecordType available: ' + info.getDeveloperName() + ' (' + info.getName() + ')');
-                data.recordTypes.add(new RecordTypeOption(info.getName(), String.valueOf(rtId), info.getDeveloperName()));
-            }
-        }
+        data.recordTypes = buildRecordTypeOptions(loanDescribe);
 
-
-        Map<String, Schema.SObjectField> fieldMap = loanDescribe.fields.getMap();
-        data.candidateFieldApi = getFirstExistingField(fieldMap, new List<String>{ 'Candidate__c', 'Candidate_Id__c' });
-        data.courseFieldApi = getFirstExistingField(fieldMap, new List<String>{ 'Program_Name__c', 'Course__c' });
-        data.leadLookupFieldApi = getFirstExistingField(fieldMap, new List<String>{ 'Lead__c', 'Lead_Lookup__c' });
-        data.emailFieldApi = getFirstExistingField(fieldMap, new List<String>{ 'Email__c' });
-        data.mobileFieldApi = getFirstExistingField(fieldMap, new List<String>{ 'Mobile__c', 'Phone__c' });
+        Map<String, Schema.SObjectField> loanFieldMap = loanDescribe.fields.getMap();
+        data.candidateFieldApi = getFirstExistingField(loanFieldMap, CANDIDATE_FIELDS);
+        data.courseFieldApi = getFirstExistingField(loanFieldMap, COURSE_FIELDS);
+        data.leadLookupFieldApi = getFirstExistingField(loanFieldMap, LEAD_LOOKUP_FIELDS);
+        data.emailFieldApi = getFirstExistingField(loanFieldMap, EMAIL_FIELDS);
+        data.mobileFieldApi = getFirstExistingField(loanFieldMap, MOBILE_FIELDS);
         System.debug('Field mapping candidate=' + data.candidateFieldApi + ' course=' + data.courseFieldApi +
             ' leadLookup=' + data.leadLookupFieldApi + ' email=' + data.emailFieldApi + ' mobile=' + data.mobileFieldApi);
 
         Schema.DescribeSObjectResult leadDescribe = Lead__c.SObjectType.getDescribe();
         Map<String, Schema.SObjectField> leadFieldMap = leadDescribe.fields.getMap();
-        String leadCandidateField = getFirstExistingField(leadFieldMap, new List<String>{ 'Candidate__c', 'Candidate_Id__c' });
-        String leadCourseField = getFirstExistingField(leadFieldMap, new List<String>{ 'Program_Name__c', 'Course__c' });
-        String leadEmailField = getFirstExistingField(leadFieldMap, new List<String>{ 'Email__c' });
-        String leadMobileField = getFirstExistingField(leadFieldMap, new List<String>{ 'Mobile__c', 'Phone__c' });
-        String leadNameField = getFirstExistingField(leadFieldMap, new List<String>{ 'First_Name__c', 'Name' });
+        Map<String, String> leadApis = resolveLeadFieldApis(leadFieldMap);
 
         if (leadId != null) {
             List<String> leadFieldsToQuery = new List<String>{ 'Id' };
-            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadCandidateField);
-            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadCourseField);
-            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadEmailField);
-            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadMobileField);
-            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadNameField);
+            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadApis.get(KEY_CANDIDATE));
+            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadApis.get(KEY_COURSE));
+            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadApis.get(KEY_EMAIL));
+            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadApis.get(KEY_MOBILE));
+            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadApis.get(KEY_NAME));
 
             String leadSoql = 'SELECT ' + String.join(leadFieldsToQuery, ',') + ' FROM Lead__c WHERE Id = :leadId LIMIT 1';
             Lead__c leadRec = Database.query(leadSoql);
 
-            Id leadCandidateId = (Id) (leadCandidateField != null ? leadRec.get(leadCandidateField) : null);
-            String leadCourseValue = getTextValue(leadRec, leadCourseField);
-            String leadEmailValue = getTextValue(leadRec, leadEmailField);
-            String leadMobileValue = getTextValue(leadRec, leadMobileField);
-            String leadNameValue = getTextValue(leadRec, leadNameField);
+            Id leadCandidateId = (Id) (leadApis.get(KEY_CANDIDATE) != null ? leadRec.get(leadApis.get(KEY_CANDIDATE)) : null);
+            String leadCourseField = leadApis.get(KEY_COURSE);
+            Schema.DescribeFieldResult leadCourseDescribe = leadCourseField != null && leadFieldMap.containsKey(leadCourseField)
+                ? leadFieldMap.get(leadCourseField).getDescribe()
+                : null;
+            Object leadCourseRaw = !String.isBlank(leadCourseField) ? leadRec.get(leadCourseField) : null;
+            String leadCourseValue = leadCourseRaw == null ? null : String.valueOf(leadCourseRaw);
+            Id leadCourseId = leadCourseRaw instanceof Id ? (Id) leadCourseRaw : null;
+            String leadCourseName = leadCourseId != null ? resolveReferenceName(leadCourseDescribe, leadCourseId) : null;
+            String leadEmailValue = getTextValue(leadRec, leadApis.get(KEY_EMAIL));
+            String leadMobileValue = getTextValue(leadRec, leadApis.get(KEY_MOBILE));
+            String leadNameValue = getTextValue(leadRec, leadApis.get(KEY_NAME));
 
             if (data.candidateFieldApi != null && leadCandidateId != null) {
                 data.prefillValues.put(data.candidateFieldApi, leadCandidateId);
             }
-            if (data.courseFieldApi != null && !String.isBlank(leadCourseValue)) {
-                data.prefillValues.put(data.courseFieldApi, leadCourseValue);
+            if (leadCourseId != null || !String.isBlank(leadCourseValue)) {
+                List<String> loanCourseFields = getExistingFields(loanFieldMap, COURSE_FIELDS);
+                for (String loanCourseField : loanCourseFields) {
+                    Schema.DescribeFieldResult loanCourseDescribe = loanFieldMap.containsKey(loanCourseField)
+                        ? loanFieldMap.get(loanCourseField).getDescribe()
+                        : null;
+                    Boolean loanCourseIsRef = loanCourseDescribe != null && loanCourseDescribe.getType() == Schema.DisplayType.Reference;
+
+                    if (loanCourseIsRef) {
+                        if (leadCourseId != null) {
+                            data.prefillValues.put(loanCourseField, leadCourseId);
+                        }
+                    } else {
+                        String courseText = leadCourseId != null ? leadCourseName : leadCourseValue;
+                        if (!String.isBlank(courseText)) {
+                            data.prefillValues.put(loanCourseField, courseText);
+                        }
+                    }
+                }
             }
             if (data.leadLookupFieldApi != null) {
                 data.prefillValues.put(data.leadLookupFieldApi, leadRec.Id);
@@ -142,14 +174,14 @@ public with sharing class LoanQuickActionController {
                 data.prefillValues.put(data.mobileFieldApi, leadMobileValue);
             }
 
-            String loanFirstNameField = getFirstExistingField(fieldMap, new List<String>{ 'First_Name__c' });
+            String loanFirstNameField = getFirstExistingField(loanFieldMap, LOAN_FIRST_NAME_FIELDS);
             if (!String.isBlank(loanFirstNameField) && !String.isBlank(leadNameValue)) {
                 data.prefillValues.put(loanFirstNameField, leadNameValue);
             }
 
             Id candidateId = leadCandidateId;
             if (candidateId != null) {
-                populateCandidateAddressPrefill(data.prefillValues, fieldMap, candidateId);
+                populateCandidateAddressPrefill(data.prefillValues, loanFieldMap, candidateId);
             }
 
             System.debug('Prefill values: ' + data.prefillValues);
@@ -164,10 +196,7 @@ public with sharing class LoanQuickActionController {
 
         Schema.DescribeSObjectResult loanDescribe = Loan__c.SObjectType.getDescribe();
         Map<String, Schema.SObjectField> loanFieldMap = loanDescribe.fields.getMap();
-        Map<String, String> loanLowerMap = new Map<String, String>();
-        for (String api : loanFieldMap.keySet()) {
-            loanLowerMap.put(api.toLowerCase(), api);
-        }
+        Map<String, String> loanLowerMap = buildLowercaseApiMap(loanFieldMap.keySet());
 
         Loan__c loan = new Loan__c();
         if (recordTypeId != null) {
@@ -186,50 +215,51 @@ public with sharing class LoanQuickActionController {
         if (leadId != null) {
             Schema.DescribeSObjectResult leadDescribe = Lead__c.SObjectType.getDescribe();
             Map<String, Schema.SObjectField> leadFieldMap = leadDescribe.fields.getMap();
-            String leadCandidateField = getFirstExistingField(leadFieldMap, new List<String>{ 'Candidate__c', 'Candidate_Id__c' });
-            String leadCourseField = getFirstExistingField(leadFieldMap, new List<String>{ 'Program_Name__c', 'Course__c' });
-            String leadEmailField = getFirstExistingField(leadFieldMap, new List<String>{ 'Email__c' });
-            String leadMobileField = getFirstExistingField(leadFieldMap, new List<String>{ 'Mobile__c', 'Phone__c' });
-            String leadNameField = getFirstExistingField(leadFieldMap, new List<String>{ 'First_Name__c', 'Name' });
+            Map<String, String> leadApis = resolveLeadFieldApis(leadFieldMap);
 
             List<String> leadFieldsToQuery = new List<String>{ 'Id' };
-            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadCandidateField);
-            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadCourseField);
-            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadEmailField);
-            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadMobileField);
-            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadNameField);
+            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadApis.get(KEY_CANDIDATE));
+            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadApis.get(KEY_COURSE));
+            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadApis.get(KEY_EMAIL));
+            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadApis.get(KEY_MOBILE));
+            addIfFieldExists(leadFieldsToQuery, leadFieldMap, leadApis.get(KEY_NAME));
 
             String leadSoql = 'SELECT ' + String.join(leadFieldsToQuery, ',') + ' FROM Lead__c WHERE Id = :leadId LIMIT 1';
             Lead__c leadRec = Database.query(leadSoql);
 
-            String candidateField = getFirstExistingField(loanFieldMap, new List<String>{ 'Candidate__c', 'Candidate_Id__c' });
-            String courseField = getFirstExistingField(loanFieldMap, new List<String>{ 'Program_Name__c', 'Course__c' });
-            String emailField = getFirstExistingField(loanFieldMap, new List<String>{ 'Email__c' });
-            String mobileField = getFirstExistingField(loanFieldMap, new List<String>{ 'Mobile__c', 'Phone__c' });
-            String leadLookupField = getFirstExistingField(loanFieldMap, new List<String>{ 'Lead__c', 'Lead_Lookup__c' });
+            Map<String, String> loanApis = resolveLoanFieldApis(loanFieldMap);
+            String leadLookupField = loanApis.get(KEY_LEAD_LOOKUP);
+            String candidateField = loanApis.get(KEY_CANDIDATE);
+            String courseField = loanApis.get(KEY_COURSE);
+            String emailField = loanApis.get(KEY_EMAIL);
+            String mobileField = loanApis.get(KEY_MOBILE);
+            String loanFirstNameField = loanApis.get(KEY_FIRST_NAME);
 
             if (!String.isBlank(leadLookupField) && loan.get(leadLookupField) == null) {
                 loan.put(leadLookupField, leadRec.Id);
             }
-            Id leadCandidateId = (Id) (leadCandidateField != null ? leadRec.get(leadCandidateField) : null);
+
+            Id leadCandidateId = (Id) (leadApis.get(KEY_CANDIDATE) != null ? leadRec.get(leadApis.get(KEY_CANDIDATE)) : null);
             if (!String.isBlank(candidateField) && loan.get(candidateField) == null && leadCandidateId != null) {
                 loan.put(candidateField, leadCandidateId);
             }
-            String leadCourseValue = getTextValue(leadRec, leadCourseField);
+
+            String leadCourseValue = getTextValue(leadRec, leadApis.get(KEY_COURSE));
             if (!String.isBlank(courseField) && loan.get(courseField) == null && !String.isBlank(leadCourseValue)) {
                 loan.put(courseField, leadCourseValue);
             }
-            String leadEmailValue = getTextValue(leadRec, leadEmailField);
+
+            String leadEmailValue = getTextValue(leadRec, leadApis.get(KEY_EMAIL));
             if (!String.isBlank(emailField) && loan.get(emailField) == null && !String.isBlank(leadEmailValue)) {
                 loan.put(emailField, leadEmailValue);
             }
-            String leadMobileValue = getTextValue(leadRec, leadMobileField);
+
+            String leadMobileValue = getTextValue(leadRec, leadApis.get(KEY_MOBILE));
             if (!String.isBlank(mobileField) && loan.get(mobileField) == null && !String.isBlank(leadMobileValue)) {
                 loan.put(mobileField, leadMobileValue);
             }
 
-            String loanFirstNameField = getFirstExistingField(loanFieldMap, new List<String>{ 'First_Name__c' });
-            String leadNameValue = getTextValue(leadRec, leadNameField);
+            String leadNameValue = getTextValue(leadRec, leadApis.get(KEY_NAME));
             if (!String.isBlank(loanFirstNameField) && loan.get(loanFirstNameField) == null && !String.isBlank(leadNameValue)) {
                 loan.put(loanFirstNameField, leadNameValue);
             }
@@ -240,119 +270,100 @@ public with sharing class LoanQuickActionController {
             }
 
             if (leadId != null && recordTypeId != null) {
+                List<Loan__c> existingLoans = [
+                    SELECT Id, Loan_Status__c
+                    FROM Loan__c
+                    WHERE Lead__c = :leadId
+                      AND RecordTypeId = :recordTypeId
+                      AND Loan_Status__c IN ('In Progress', 'Approved')
+                    LIMIT 1
+                ];
 
-    List<Loan__c> existingLoans = [
-        SELECT Id, Loan_Status__c
-        FROM Loan__c
-        WHERE Lead__c = :leadId
-        AND RecordTypeId = :recordTypeId
-        AND Loan_Status__c IN ('In Progress', 'Approved')
-        LIMIT 1
-    ];
-
-    if (!existingLoans.isEmpty()) {
-        throw new AuraHandledException(
-            'A Loan is already In Progress or Approved for this Lead and Loan Provider.'
-        );
-    }
-        }
+                if (!existingLoans.isEmpty()) {
+                    throw new AuraHandledException(
+                        'A Loan is already In Progress or Approved for this Lead and Loan Provider.'
+                    );
+                }
+            }
         }
 
         applyCurrentAddressFromPermanentSingle(loan);
 
         // Validate candidate + course
-        String candField = getFirstExistingField(loanFieldMap, new List<String>{ 'Candidate__c', 'Candidate_Id__c' });
-        String crsField = getFirstExistingField(loanFieldMap, new List<String>{ 'Program_Name__c', 'Course__c' });
+        String candField = getFirstExistingField(loanFieldMap, CANDIDATE_FIELDS);
+        String crsField = getFirstExistingField(loanFieldMap, COURSE_FIELDS);
         if (!String.isBlank(candField) && !String.isBlank(crsField)) {
             Id candIdForValidation = (Id) loan.get(candField);
             String course = (String) loan.get(crsField);
-           ValidationResult vr = validateLeadCandidateCourse(candIdForValidation, course);
+            ValidationResult vr = validateLeadCandidateCourse(candIdForValidation, course);
             if (vr != null && vr.isValid == false) {
                 throw new AuraHandledException(vr.message);
             }
         }
 
+        // ================= PROGRAM AMOUNT VALIDATION =================
+        String programField = getFirstExistingField(loanFieldMap, COURSE_FIELDS);
+        String amountField = getFirstExistingField(loanFieldMap, AMOUNT_FIELDS);
 
+        if (!String.isBlank(programField) && !String.isBlank(amountField)) {
+            String program = (String) loan.get(programField);
+            Decimal amount = (Decimal) loan.get(amountField);
 
-// ================= PROGRAM AMOUNT VALIDATION =================
+            if (!String.isBlank(program) && amount != null) {
+                // CPA / CMA -> Max 79,000
+                if ((program == 'CPA' || program == 'CMA') && amount > 79000) {
+                    throw new AuraHandledException(
+                        'Requested amount exceeds the maximum limit for the selected Program.\n' +
+                        'CPA/CMA: Max 79,000'
+                    );
+                }
 
-String programField = getFirstExistingField(
-    loanFieldMap,
-    new List<String>{ 'Program_Name__c', 'Course__c' }
-);
-
-String amountField = getFirstExistingField(
-    loanFieldMap,
-    new List<String>{ 'Amount_requested__c' }
-);
-
-if (!String.isBlank(programField) && !String.isBlank(amountField)) {
-
-    String program = (String) loan.get(programField);
-    Decimal amount = (Decimal) loan.get(amountField);
-
-    if (!String.isBlank(program) && amount != null) {
-
-        // CPA / CMA → Max 79,000
-        if ((program == 'CPA' || program == 'CMA') && amount > 79000) {
-            throw new AuraHandledException(
-                'Requested amount exceeds the maximum limit for the selected Program.\n' +
-                'CPA/CMA: Max 79,000'
-            );
+                // CAIRA -> Max 40,000
+                if (program == 'CAIRA' && amount > 40000) {
+                    throw new AuraHandledException(
+                        'Requested amount exceeds the maximum limit for the selected Program.\n' +
+                        'CAIRA: Max 40,000'
+                    );
+                }
+            }
         }
-
-        // CAIRA → Max 40,000
-        if (program == 'CAIRA' && amount > 40000) {
-            throw new AuraHandledException(
-                'Requested amount exceeds the maximum limit for the selected Program.\n' +
-                'CAIRA: Max 40,000'
-            );
-        }
-    }
-}
-
 
         // ================= AKSHAR VALIDATION =================
-if (recordTypeId != null) {
+        if (recordTypeId != null) {
+            Schema.RecordTypeInfo rtInfo = Loan__c.SObjectType
+                .getDescribe()
+                .getRecordTypeInfosById()
+                .get(recordTypeId);
 
-    Schema.RecordTypeInfo rtInfo = Loan__c.SObjectType
-        .getDescribe()
-        .getRecordTypeInfosById()
-        .get(recordTypeId);
+            if (rtInfo != null && rtInfo.getDeveloperName() == 'AKSHAR') {
+                // PAN Validation
+                String pan = (String) loan.get('PAN_Number__c');
+                if (String.isBlank(pan)) {
+                    throw new AuraHandledException('PAN Number is required for AKSHAR.');
+                }
 
-    if (rtInfo != null && rtInfo.getDeveloperName() == 'AKSHAR') {
+                // PAN Format: 5 letters + 4 digits + 1 letter
+                Pattern panPattern = Pattern.compile('^[A-Z]{5}[0-9]{4}[A-Z]{1}$');
+                if (!panPattern.matcher(pan).matches()) {
+                    throw new AuraHandledException('Invalid PAN format. Example: ABCDE1234F');
+                }
 
-        // PAN Validation
-        String pan = (String) loan.get('PAN_Number__c');
-        if (String.isBlank(pan)) {
-            throw new AuraHandledException('PAN Number is required for AKSHAR.');
+                // DOB Validation (Minimum 18 years)
+                Date dob = (Date) loan.get('Date_of_Birth__c');
+                if (dob == null) {
+                    throw new AuraHandledException('Date of Birth is required for AKSHAR.');
+                }
+
+                Integer age = Date.today().year() - dob.year();
+                if (Date.today().addYears(-age) < dob) {
+                    age--;
+                }
+
+                if (age < 18) {
+                    throw new AuraHandledException('Applicant must be at least 18 years old for AKSHAR.');
+                }
+            }
         }
-
-        // PAN Format: 5 letters + 4 digits + 1 letter
-        Pattern panPattern = Pattern.compile('^[A-Z]{5}[0-9]{4}[A-Z]{1}$');
-        if (!panPattern.matcher(pan).matches()) {
-            throw new AuraHandledException('Invalid PAN format. Example: ABCDE1234F');
-        }
-
-       
-       // DOB Validation (Minimum 18 years)
-Date dob = (Date) loan.get('Date_of_Birth__c');
-if (dob == null) {
-    throw new AuraHandledException('Date of Birth is required for AKSHAR.');
-}
-
-Integer age = Date.today().year() - dob.year();
-
-if (Date.today().addYears(-age) < dob) {
-    age--;
-}
-
-if (age < 18) {
-    throw new AuraHandledException('Applicant must be at least 18 years old for AKSHAR.');
-}
-    }
-}
-
 
         // Call vendor API before insert. Throw if it fails.
         Callout_CreationApiService.callAndPopulate(loan);
@@ -360,7 +371,6 @@ if (age < 18) {
         insert loan;
         return loan.Id;
     }
-    
 
     @AuraEnabled(cacheable=true)
     public static Map<String, String> getLoanFieldApiCaseMap() {
@@ -455,6 +465,49 @@ if (age < 18) {
         return response;
     }
 
+    private static List<RecordTypeOption> buildRecordTypeOptions(Schema.DescribeSObjectResult loanDescribe) {
+        List<RecordTypeOption> options = new List<RecordTypeOption>();
+        Map<Id, Schema.RecordTypeInfo> rtInfos = loanDescribe.getRecordTypeInfosById();
+        System.debug('RecordType count=' + rtInfos.size());
+        for (Id rtId : rtInfos.keySet()) {
+            Schema.RecordTypeInfo info = rtInfos.get(rtId);
+            if (info != null && info.isAvailable() && !info.isMaster()) {
+                System.debug('RecordType available: ' + info.getDeveloperName() + ' (' + info.getName() + ')');
+                options.add(new RecordTypeOption(info.getName(), String.valueOf(rtId), info.getDeveloperName()));
+            }
+        }
+        return options;
+    }
+
+    private static Map<String, String> buildLowercaseApiMap(Set<String> apis) {
+        Map<String, String> lowerMap = new Map<String, String>();
+        for (String api : apis) {
+            lowerMap.put(api.toLowerCase(), api);
+        }
+        return lowerMap;
+    }
+
+    private static Map<String, String> resolveLeadFieldApis(Map<String, Schema.SObjectField> fieldMap) {
+        Map<String, String> result = new Map<String, String>();
+        result.put(KEY_CANDIDATE, getFirstExistingField(fieldMap, CANDIDATE_FIELDS));
+        result.put(KEY_COURSE, getFirstExistingField(fieldMap, COURSE_FIELDS));
+        result.put(KEY_EMAIL, getFirstExistingField(fieldMap, EMAIL_FIELDS));
+        result.put(KEY_MOBILE, getFirstExistingField(fieldMap, MOBILE_FIELDS));
+        result.put(KEY_NAME, getFirstExistingField(fieldMap, LEAD_NAME_FIELDS));
+        return result;
+    }
+
+    private static Map<String, String> resolveLoanFieldApis(Map<String, Schema.SObjectField> fieldMap) {
+        Map<String, String> result = new Map<String, String>();
+        result.put(KEY_CANDIDATE, getFirstExistingField(fieldMap, CANDIDATE_FIELDS));
+        result.put(KEY_COURSE, getFirstExistingField(fieldMap, COURSE_FIELDS));
+        result.put(KEY_EMAIL, getFirstExistingField(fieldMap, EMAIL_FIELDS));
+        result.put(KEY_MOBILE, getFirstExistingField(fieldMap, MOBILE_FIELDS));
+        result.put(KEY_LEAD_LOOKUP, getFirstExistingField(fieldMap, LEAD_LOOKUP_FIELDS));
+        result.put(KEY_FIRST_NAME, getFirstExistingField(fieldMap, LOAN_FIRST_NAME_FIELDS));
+        return result;
+    }
+
     private static String getFirstExistingField(
         Map<String, Schema.SObjectField> fieldMap,
         List<String> candidates
@@ -479,6 +532,28 @@ if (age < 18) {
             }
         }
         return null;
+    }
+
+    private static List<String> getExistingFields(
+        Map<String, Schema.SObjectField> fieldMap,
+        List<String> candidates
+    ) {
+        List<String> result = new List<String>();
+        if (fieldMap == null || fieldMap.isEmpty() || candidates == null || candidates.isEmpty()) {
+            return result;
+        }
+        Map<String, String> lowerToActual = new Map<String, String>();
+        for (String api : fieldMap.keySet()) {
+            lowerToActual.put(api.toLowerCase(), api);
+        }
+        for (String fieldApi : candidates) {
+            if (String.isBlank(fieldApi)) continue;
+            String key = fieldApi.toLowerCase();
+            if (lowerToActual.containsKey(key)) {
+                result.add(lowerToActual.get(key));
+            }
+        }
+        return result;
     }
 
     private static String normalizeFieldApi(String fieldPath, Map<String, String> fieldMapLower) {
@@ -604,6 +679,34 @@ if (age < 18) {
         }
     }
 
+    private static String resolveReferenceName(Schema.DescribeFieldResult fieldDescribe, Id recordId) {
+        if (fieldDescribe == null || recordId == null) return null;
+        if (fieldDescribe.getType() != Schema.DisplayType.Reference) return null;
+        List<Schema.SObjectType> refTypes = fieldDescribe.getReferenceTo();
+        if (refTypes == null || refTypes.isEmpty()) return null;
+        Schema.DescribeSObjectResult refDescribe = refTypes[0].getDescribe();
+        Map<String, Schema.SObjectField> refFieldMap = refDescribe.fields.getMap();
+        String nameField = null;
+        if (refFieldMap != null) {
+            if (refFieldMap.containsKey('Name')) {
+                nameField = 'Name';
+            } else {
+                for (String api : refFieldMap.keySet()) {
+                    Schema.DescribeFieldResult d = refFieldMap.get(api).getDescribe();
+                    if (d != null && d.isNameField()) {
+                        nameField = api;
+                        break;
+                    }
+                }
+            }
+        }
+        if (String.isBlank(nameField)) return null;
+        String soql = 'SELECT ' + nameField + ' FROM ' + refDescribe.getName() + ' WHERE Id = :recordId LIMIT 1';
+        SObject refRec = Database.query(soql);
+        Object nameVal = refRec.get(nameField);
+        return nameVal == null ? null : String.valueOf(nameVal);
+    }
+
     private static Object coerceFieldValue(Object rawValue, Schema.SObjectField fieldRef) {
         if (rawValue == null || fieldRef == null) return rawValue;
         Schema.DescribeFieldResult d = fieldRef.getDescribe();
@@ -638,5 +741,4 @@ if (age < 18) {
         }
         return rawValue;
     }
-
 }

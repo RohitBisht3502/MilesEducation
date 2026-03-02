@@ -21,7 +21,7 @@ import getDispositions from '@salesforce/apex/CallDispositionConfigService.getDi
 export default class RunoAllocationCall extends NavigationMixin(LightningElement) {
 
     @api recordId;
-
+    isFeedbackDisabled = true;
     // UI / state
     loading = false;
     disableCancel = false;
@@ -36,6 +36,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     activeTab = 'lead';
     expectedPaymentDate;
     notifyMe = false;
+    isApiResponseReceived = false;
 
     // L1/L2
     l1Value = '';
@@ -621,6 +622,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         this.callButtonDisabled = true;
         this.loading = true;
         this.errorText = null;
+        this.isFeedbackDisabled = true;
 
         this.callStatus = 'Dialing…';
         this.isLive = false;
@@ -629,6 +631,17 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
 
         this.l1Value = 'Not-Connected';
         this.l2Value = '';
+
+        // Load L2 options immediately
+        const l2List = this.l1L2Map[this.l1Value] || [];
+
+        this.l2Options = l2List.map(v => ({
+            label: v,
+            value: v
+        }));
+
+        this.isL2Disabled = this.l2Options.length === 0;
+
         this.updateCommentVisibility();
         this.canEndCall = false;
 
@@ -675,7 +688,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
             // still allow feedback when call setup fails
             this.showFeedback = true;
             this.callButtonDisabled = false;
-
+            this.isFeedbackDisabled = false;
             this.dispatchEvent(
                 new ShowToastEvent({
                     title: 'Failed',
@@ -710,6 +723,13 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         return this.savingFeedback || !this.showFeedback;
     }
 
+
+
+
+    get disableL2Final() {
+
+        return this.isL2Disabled;
+    }
     // use autoSetFollowUp + setAutoDate24 (same as good LWC)
     showFeedbackSection() {
         this.showFeedback = true;
@@ -718,6 +738,31 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         if (this.autoSetFollowUp) {
             this.setAutoDate24();
         }
+    }
+
+    get isL2FinalDisabled() {
+        return this.isL2Disabled || this.isFeedbackDisabled;
+    }
+
+    get isStageFinalDisabled() {
+        return this.isStageDisabled || this.isFeedbackDisabled;
+    }
+    get isFollowUpFinalDisabled() {
+        return this.autoSetFollowUp || this.isFeedbackDisabled;
+    }
+
+
+    get filteredL1Options() {
+
+        if (!this.isApiResponseReceived) {
+            return this.l1Options;
+        }
+
+        if (this.l1Value === 'Connected') {
+            return this.l1Options.filter(opt => opt.value === 'Connected');
+        }
+
+        return this.l1Options;
     }
 
     //  helper to set nextFollowUpDate = now + 24h in ISO format
@@ -829,6 +874,13 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
                     variant: 'success'
                 })
             );
+
+            this.dispatchEvent(new CloseActionScreenEvent());
+
+
+setTimeout(() => {
+    window.location.reload();
+}, 500);
 
             this.clearFeedbackTimers();
             // payload.courseId = this.courseValue;
@@ -979,6 +1031,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     }
 
     onRunoEvent(msg) {
+        this.isApiResponseReceived = true;
         const p = (msg && msg.data && msg.data.payload) || {};
 
         const evtLeadId =
@@ -1043,7 +1096,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         // Show feedback section
         this.showFeedbackSection();
         this.callButtonDisabled = true;
-
+        this.isFeedbackDisabled = false;
         console.log('RUNO EVENT => CALL ENDED');
         console.log('Platform Event Payload:', JSON.stringify(p));
     }

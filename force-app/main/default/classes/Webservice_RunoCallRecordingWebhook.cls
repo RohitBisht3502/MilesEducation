@@ -8,7 +8,7 @@ global without sharing class Webservice_RunoCallRecordingWebhook {
 
     global class RecordingDTO {
         public String callId;
-        public String recordingUrl;
+        public String filePath;
     }
 
     global class ApiResponse {
@@ -34,7 +34,7 @@ global without sharing class Webservice_RunoCallRecordingWebhook {
             //     responseBody = '{"error":"Unauthorized - Invalid token"}';
             //     res.statusCode = statusCode;
             //     res.responseBody = Blob.valueOf(responseBody);
-            //     IntegrationLogUtil.insertLog( 'Runo → Miles Force',  null,  responseBody, 'Invalid or missing token in request header', 'Failed',  statusCode );
+            //     IntegrationLogUtil.insertLog( 'Runo Call Recording',  null,  responseBody, 'Invalid or missing token in request header', 'Failed',  statusCode );
             //     return;
             // }
 
@@ -43,17 +43,17 @@ global without sharing class Webservice_RunoCallRecordingWebhook {
             if (String.isBlank(requestBody)) {
                 statusCode = 400;
                 out.message = 'Missing request body';
-                IntegrationLogUtil.insertLog('Runo → Miles Force', null, null, out.message, 'Failed', statusCode );
+                IntegrationLogUtil.insertLog('Runo Call Recording', null, null, out.message, 'Failed', statusCode );
                 if (res != null) res.statusCode = statusCode;
                 return out;
             }
 
             RecordingDTO dto = (RecordingDTO)JSON.deserialize(requestBody, RecordingDTO.class);
 
-            if (String.isBlank(dto.callId) || String.isBlank(dto.recordingUrl)) {
+            if (String.isBlank(dto.callId) || String.isBlank(dto.filePath)) {
                 statusCode = 400;
-                out.message = 'Missing callId or recordingUrl';
-                IntegrationLogUtil.insertLog('Runo → Miles Force', requestBody, null, out.message, 'Failed', statusCode );
+                out.message = 'Missing callId or filePath';
+                IntegrationLogUtil.insertLog('Runo Call Recording', requestBody, null, out.message, 'Failed', statusCode );
                 if (res != null) res.statusCode = statusCode;
                 return out;
             }
@@ -65,20 +65,20 @@ global without sharing class Webservice_RunoCallRecordingWebhook {
             if (logs.isEmpty()) {
                 statusCode = 404;
                 out.message = 'Call log not found for callId';
-                IntegrationLogUtil.insertLog('Runo → Miles Force', requestBody, null, out.message, 'Failed', statusCode );
+                IntegrationLogUtil.insertLog('Runo Call Recording', requestBody, null, out.message, 'Failed', statusCode );
                 if (res != null) res.statusCode = statusCode;
                 return out;
             }
 
             update new Call_Log__c(
                 Id = logs[0].Id,
-                Recording_Url__c = dto.recordingUrl
+                Recording_Url__c = dto.filePath
             );
 
             statusCode = 200;
             out.success = true;
             out.message = 'Recording received and processed successfully';
-            IntegrationLogUtil.insertLog( 'Runo → Miles Force', requestBody, JSON.serialize(out), out.message, 'Success', statusCode );
+            IntegrationLogUtil.insertLog( 'Runo Call Recording', requestBody, JSON.serialize(out), out.message, 'Success', statusCode );
             if (res != null) res.statusCode = statusCode;
             return out;
            //RunoCallLogHandler.ApiResponse apiResponse = RunoCallLogHandler.processCallLog(requestBody);
@@ -88,7 +88,7 @@ global without sharing class Webservice_RunoCallRecordingWebhook {
         } catch (QueryException qe) {
             statusCode = 404;
             out.message = 'Call log not found for callId';
-            IntegrationLogUtil.insertLog( 'Runo → Miles Force',  requestBody, null, out.message, 'Failed', statusCode );
+            IntegrationLogUtil.insertLog( 'Runo Call Recording',  requestBody, null, out.message, 'Failed', statusCode );
             if (res != null) res.statusCode = statusCode;
             return out;
 
@@ -96,7 +96,7 @@ global without sharing class Webservice_RunoCallRecordingWebhook {
             statusCode = 500;
             out.message = 'Unhandled error: ' + ex.getMessage();
             IntegrationLogUtil.insertLog(
-                'Runo → Miles Force',
+                'Runo Call Recording',
                 requestBody,
                 null,
                 out.message,

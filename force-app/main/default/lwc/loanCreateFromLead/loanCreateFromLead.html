@@ -48,13 +48,43 @@
                                             <template for:each={row.cols} for:item="col">
                                                 <div key={col.key} class="slds-col slds-size_1-of-2 slds-p-around_x-small">
                                                     <template if:true={col.fieldApiName}>
-                                                        <lightning-input-field
-                                                            field-name={col.fieldApiName}
-                                                            value={col.prefillValue}
-                                                            disabled={col.disabled}
-                                                            required={col.required}
-                                                            onchange={handleFieldChange}>
-                                                        </lightning-input-field>
+                                                        <template if:true={col.isMobileField}>
+                                                            <div class="slds-form-element slds-form-element_horizontal">
+                                                                <label class="slds-form-element__label">
+                                                                    <template if:true={col.required}>
+                                                                        <abbr class="slds-required" title="required">*</abbr>
+                                                                    </template>
+                                                                    Mobile
+                                                                </label>
+                                                                <div class="slds-form-element__control">
+                                                                    <lightning-input
+                                                                        data-id="mobileInput"
+                                                                        type="tel"
+                                                                        label="Mobile"
+                                                                        variant="label-hidden"
+                                                                        value={col.prefillValue}
+                                                                        disabled={col.disabled}
+                                                                        required={col.required}
+                                                                        minlength="10"
+                                                                        maxlength="10"
+                                                                        pattern="\\d{10}"
+                                                                        message-when-pattern-mismatch="Mobile number must be exactly 10 digits."
+                                                                        message-when-too-short="Mobile number must be exactly 10 digits."
+                                                                        message-when-too-long="Mobile number must be exactly 10 digits."
+                                                                        onchange={handleMobileChange}>
+                                                                    </lightning-input>
+                                                                </div>
+                                                            </div>
+                                                        </template>
+                                                        <template if:false={col.isMobileField}>
+                                                            <lightning-input-field
+                                                                field-name={col.fieldApiName}
+                                                                value={col.prefillValue}
+                                                                disabled={col.disabled}
+                                                                required={col.required}
+                                                                onchange={handleFieldChange}>
+                                                            </lightning-input-field>
+                                                        </template>
                                                     </template>
                                                 </div>
                                             </template>

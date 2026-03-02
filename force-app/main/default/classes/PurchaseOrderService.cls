@@ -1,4 +1,20 @@
 public without sharing class PurchaseOrderService {
+    private static final String ADDRESS_TYPE_BILLING = 'billing';
+    private static final String ADDRESS_TYPE_SHIPPING = 'shipping';
+    private static final String RECORDTYPE_CAIRA = 'CAIRA';
+    private static final String LEARNING_TYPE_TRAINING = 'Training';
+    private static final String LEARNING_TYPE_STUDY = 'Study Material';
+    private static final String STATUS_PENDING = 'Pending';
+    private static final String STATUS_INITIATED = 'Initiated';
+    private static final String SOURCE_SF = 'sf';
+    private static final String CREATED_BY_DEFAULT = 'MPE226';
+    private static final String CAIRA_LEVEL_1 = 'Level 1';
+    private static final String CAIRA_LEVEL_2 = 'Level 2';
+    private static final String CAIRA_LEVEL_3 = 'Level 3';
+
+    private static final Set<String> ALLOWED_RECORD_TYPES = new Set<String>{
+        RECORDTYPE_CAIRA, 'CMA', 'CPA', 'MCOM', 'US Pathway'
+    };
 
     public class PurchaseOrderRequest {
         @AuraEnabled public Id leadId;
@@ -18,14 +34,50 @@ public without sharing class PurchaseOrderService {
         @AuraEnabled public String learningType;
     }
 
+    public class SimpleLineItem {
+        public Id productId;
+        public Decimal unitPrice;
+        public Decimal qty;
+        public SimpleLineItem(Id productId, Decimal unitPrice, Decimal qty) {
+            this.productId = productId;
+            this.unitPrice = unitPrice;
+            this.qty = qty;
+        }
+    }
+
+    public class ExpandedProduct {
+        public Id productId;
+        public String name;
+        public String sku;
+        public Decimal unitPrice;
+        public Decimal qty;
+        public ExpandedProduct(Id productId, String name, String sku, Decimal unitPrice, Decimal qty) {
+            this.productId = productId;
+            this.name = name;
+            this.sku = sku;
+            this.unitPrice = unitPrice;
+            this.qty = qty;
+        }
+    }
+
     public class AddressStatusDTO {
         @AuraEnabled public Boolean hasBilling;
         @AuraEnabled public Boolean hasShipping;
+
+        public AddressStatusDTO() {
+            this.hasBilling = false;
+            this.hasShipping = false;
+        }
     }
 
     public class AddressDetailsDTO {
         @AuraEnabled public Map<String, String> billing;
         @AuraEnabled public Map<String, String> shipping;
+
+        public AddressDetailsDTO() {
+            this.billing = new Map<String, String>();
+            this.shipping = new Map<String, String>();
+        }
     }
 
     public class ProductDTO {
@@ -67,17 +119,13 @@ public without sharing class PurchaseOrderService {
                 }
             }
 
-            Set<String> allowedRecordTypes = new Set<String>{
-                'CAIRA', 'CMA', 'CPA', 'MCOM', 'US Pathway'
-            };
-
-            if (!String.isBlank(recordTypeName) && allowedRecordTypes.contains(recordTypeName)) {
+            if (!String.isBlank(recordTypeName) && ALLOWED_RECORD_TYPES.contains(recordTypeName)) {
                 familyFilter = recordTypeName;
             } else {
                 familyFilter = leadRec.Course__c;
             }
 
-            isCairaRecordType = (recordTypeName == 'CAIRA');
+            isCairaRecordType = (recordTypeName == RECORDTYPE_CAIRA);
         }
 
         if (String.isBlank(familyFilter)) {
@@ -91,8 +139,8 @@ public without sharing class PurchaseOrderService {
 
             if (isConvertedStudent && isCairaRecordType &&
                 pbe.Product2 != null &&
-                pbe.Product2.Family == 'CAIRA' &&
-                pbe.Product2.CAIRA_Level__c == 'Level 1') {
+                pbe.Product2.Family == RECORDTYPE_CAIRA &&
+                pbe.Product2.CAIRA_Level__c == CAIRA_LEVEL_1) {
                 unitPrice = 0;
             }
 
@@ -112,7 +160,6 @@ public without sharing class PurchaseOrderService {
     @AuraEnabled(cacheable=true)
     public static Decimal getMinimumDownPayment(Id recordId) {
         String course;
-        List<Course_Down_Payment_Detail__mdt> rows = [SELECT Amount__c FROM Course_Down_Payment_Detail__mdt WHERE Course__c = :course LIMIT 1];
         if (recordId == null) return 0;
 
         Schema.SObjectType sobType = recordId.getSObjectType();
@@ -126,6 +173,7 @@ public without sharing class PurchaseOrderService {
 
         if (String.isBlank(course)) return 0;
 
+        List<Course_Down_Payment_Detail__mdt> rows = [SELECT Amount__c FROM Course_Down_Payment_Detail__mdt WHERE Course__c = :course LIMIT 1];
 
         System.debug('Course Down Payment Detail: ' +  rows[0].Amount__c);
 
@@ -135,7 +183,6 @@ public without sharing class PurchaseOrderService {
     @AuraEnabled(cacheable=true)
     public static Decimal getDiscountThreshold(Id recordId) {
         String course;
-        List<Course_Down_Payment_Detail__mdt> rows = [SELECT Discount__c FROM Course_Down_Payment_Detail__mdt WHERE Course__c = :course LIMIT 1];
         if (recordId == null) return 0;
 
         Schema.SObjectType sobType = recordId.getSObjectType();
@@ -149,6 +196,7 @@ public without sharing class PurchaseOrderService {
 
         if (String.isBlank(course)) return 0;
 
+        List<Course_Down_Payment_Detail__mdt> rows = [SELECT Discount__c FROM Course_Down_Payment_Detail__mdt WHERE Course__c = :course LIMIT 1];
 
         return rows.isEmpty() || rows[0].Discount__c == null ? 0 : rows[0].Discount__c;
     }
@@ -192,7 +240,7 @@ public without sharing class PurchaseOrderService {
                 po.Response_Payload__c  = calloutRes.responseBody;
             }
             if (requiresApproval) {
-                po.Approval_Status__c = 'Pending';
+                po.Approval_Status__c = STATUS_PENDING;
             }
             insert po;
 
@@ -236,7 +284,7 @@ public without sharing class PurchaseOrderService {
             if (leadRec.Student__c != null) {
                 Account acc = [SELECT Id FROM Account WHERE Id = :leadRec.Student__c];
 
-                if (addressType == 'billing') {
+                if (addressType == ADDRESS_TYPE_BILLING) {
                     acc.BillingStreet = address.get('street');
                     acc.BillingCity = address.get('city');
                     acc.BillingState = address.get('state');
@@ -256,7 +304,7 @@ public without sharing class PurchaseOrderService {
             if (leadRec.Candidate__c != null) {
                 Lead candidate = [SELECT Id FROM Lead WHERE Id = :leadRec.Candidate__c];
 
-                if (addressType == 'billing') {
+                if (addressType == ADDRESS_TYPE_BILLING) {
                     candidate.Street = address.get('street');
                     candidate.City = address.get('city');
                     candidate.State = address.get('state');
@@ -289,7 +337,7 @@ public without sharing class PurchaseOrderService {
         txn.Purchase_Orders__c = purchaseOrderId;
 
         txn.Payment__c = amountReceived;
-        txn.Status__c  = 'Initiated';
+        txn.Status__c  = STATUS_INITIATED;
         txn.Is_Down_Payment__c = true;
         insert txn;
     }
@@ -313,15 +361,15 @@ public without sharing class PurchaseOrderService {
     }
 
     private static RecordContext identifyRecordContext(Id recordId) {
-        RecordContext context = new RecordContext();
         if (recordId == null) {
             throw new AuraHandledException('Record Id is required');
         }
+        RecordContext context = new RecordContext(recordId);
 
         Schema.SObjectType sobType = recordId.getSObjectType();
 
         if (sobType == Lead__c.SObjectType) {
-            context.leadRecordId = recordId;
+            // leadRecordId already set via constructor
         } else {
             throw new AuraHandledException('Unsupported record type for Purchase Order creation');
         }
@@ -372,7 +420,7 @@ public without sharing class PurchaseOrderService {
         if (items == null) return false;
 
         for (LineItemRequest li : items) {
-            if (li != null && li.learningType == 'Study Material') {
+            if (li != null && li.learningType == LEARNING_TYPE_STUDY) {
                 return true;
             }
         }
@@ -441,9 +489,6 @@ public without sharing class PurchaseOrderService {
             throw new AuraHandledException('Record Id is required');
         }
 
-        res.billing = new Map<String, String>();
-        res.shipping = new Map<String, String>();
-
         Schema.SObjectType sobType = recordId.getSObjectType();
 
         if (sobType == Lead__c.SObjectType) {
@@ -500,7 +545,7 @@ public without sharing class PurchaseOrderService {
         Account student
     ) {
         if (student != null && context.leadRecordId != null) {
-            if (addressType == 'billing') {
+            if (addressType == ADDRESS_TYPE_BILLING) {
                 po.Shipping_Street__c = student.BillingStreet;
                 po.Shipping_City__c = student.BillingCity;
                 po.Shipping_State__c = student.BillingState;
@@ -514,7 +559,7 @@ public without sharing class PurchaseOrderService {
                 po.Shipping_Country__c = student.ShippingCountry;
             }
         } else if (candidate != null) {
-            if (addressType == 'billing') {
+            if (addressType == ADDRESS_TYPE_BILLING) {
                 po.Shipping_Street__c = candidate.Street;
                 po.Shipping_City__c = candidate.City;
                 po.Shipping_State__c = candidate.State;
@@ -636,25 +681,23 @@ public without sharing class PurchaseOrderService {
 
     private static Callout_PurchaseOrderService.CalloutResult callExternalPurchaseService( PurchaseOrderRequest req, Lead__c lead, Lead candidate ) {
 
-        Set<Id> prodIds = new Set<Id>();
+        List<SimpleLineItem> baseItems = new List<SimpleLineItem>();
         for (LineItemRequest li : req.items) {
-            if (li != null && li.productId != null)
-                prodIds.add(li.productId);
+            if (li != null && li.productId != null) {
+                baseItems.add(new SimpleLineItem(li.productId, li.unitPrice, li.qty));
+            }
         }
-
-        Map<Id, Product2> prodMap = new Map<Id, Product2>();
-        if (!prodIds.isEmpty()) {
-            prodMap = new Map<Id, Product2>([SELECT Id, Name, ProductCode FROM Product2 WHERE Id IN :prodIds]);
-        }
+        List<ExpandedProduct> expandedItems = expandBundleItems(baseItems);
+        List<ExpandedProduct> enrolmentItems = buildImmediateOptionItems(baseItems);
 
         Callout_PurchaseOrderService.Request extReq = new Callout_PurchaseOrderService.Request();
-        extReq.source       = 'sf';
+        extReq.source       = SOURCE_SF;
         extReq.sf_id        = String.valueOf(candidate.Id);
         extReq.sf_lead_id   = String.valueOf(req.leadId);
         extReq.uuid         = candidate.UUID__c;
         extReq.down_payment = req.downPayment;
         //extReq.created_by   = UserInfo.getName();
-        extReq.created_by   = 'MPE226';
+        extReq.created_by   = CREATED_BY_DEFAULT;
 
         Callout_PurchaseOrderService.RequestItem item = new Callout_PurchaseOrderService.RequestItem();
         item.program = (lead != null ? String.valueOf(lead.Course__c) : null);
@@ -670,27 +713,30 @@ public without sharing class PurchaseOrderService {
             if (li == null) continue;
 
             if (!String.isBlank(li.learningType)) {
-                if (li.learningType == 'Training') hasTraining = true;
-                if (li.learningType == 'Study Material') hasStudyMaterial = true;
+                if (li.learningType == LEARNING_TYPE_TRAINING) hasTraining = true;
+                if (li.learningType == LEARNING_TYPE_STUDY) hasStudyMaterial = true;
             }
+        }
 
-            Product2 p = prodMap.get(li.productId);
+        Set<String> seenSkus = new Set<String>();
+        for (ExpandedProduct ep : expandedItems) {
+            if (ep == null) continue;
+            if (!String.isBlank(ep.sku) && !seenSkus.contains(ep.sku)) {
+                item.skus.add(ep.sku);
+                seenSkus.add(ep.sku);
+            }
+        }
 
-            String skuVal =
-                (p != null && !String.isBlank(p.ProductCode)) ? p.ProductCode :
-                (p != null ? p.Name : null);
-
-            if (!String.isBlank(skuVal))
-                item.skus.add(skuVal);
-
+        for (ExpandedProduct ep : enrolmentItems) {
+            if (ep == null) continue;
             Callout_PurchaseOrderService.EnrolmentLineItem eli =
                 new Callout_PurchaseOrderService.EnrolmentLineItem();
 
-            eli.item_name = (p != null ? p.Name : 'Item');
+            eli.item_name = !String.isBlank(ep.name) ? ep.name : 'Item';
 
             Decimal lineAmount =
-                (li.unitPrice != null ? li.unitPrice : 0) *
-                (li.qty != null ? li.qty : 0);
+                (ep.unitPrice != null ? ep.unitPrice : 0) *
+                (ep.qty != null ? ep.qty : 0);
 
             eli.price          = lineAmount;
             eli.price_with_gst = lineAmount;
@@ -698,7 +744,6 @@ public without sharing class PurchaseOrderService {
             eli.final_price    = lineAmount;
 
             item.enrolment_line_items.add(eli);
-
             total += lineAmount;
         }
 
@@ -738,9 +783,221 @@ public without sharing class PurchaseOrderService {
         return result;
     }
 
+    public static List<ExpandedProduct> expandBundleItems(List<SimpleLineItem> items) {
+        List<ExpandedProduct> result = new List<ExpandedProduct>();
+        if (items == null || items.isEmpty()) return result;
+
+        Set<Id> seedIds = new Set<Id>();
+        for (SimpleLineItem li : items) {
+            if (li != null && li.productId != null) seedIds.add(li.productId);
+        }
+        if (seedIds.isEmpty()) return result;
+
+        Map<Id, Product2> prodMap = new Map<Id, Product2>([
+            SELECT Id, Name, ProductCode, Is_Bundle__c
+            FROM Product2
+            WHERE Id IN :seedIds
+        ]);
+
+        Map<Id, List<Product_Option__c>> optionsByBundle = buildOptionsByBundle(seedIds, prodMap);
+
+        for (SimpleLineItem li : items) {
+            if (li == null || li.productId == null) continue;
+            expandItemRecursive(
+                li.productId,
+                li.qty != null ? li.qty : 0,
+                li.unitPrice,
+                prodMap,
+                optionsByBundle,
+                result,
+                new Set<Id>()
+            );
+        }
+
+        return result;
+    }
+
+    public static List<ExpandedProduct> buildImmediateOptionItems(List<SimpleLineItem> items) {
+        List<ExpandedProduct> result = new List<ExpandedProduct>();
+        if (items == null || items.isEmpty()) return result;
+
+        Set<Id> seedIds = new Set<Id>();
+        for (SimpleLineItem li : items) {
+            if (li != null && li.productId != null) seedIds.add(li.productId);
+        }
+        if (seedIds.isEmpty()) return result;
+
+        Map<Id, Product2> prodMap = new Map<Id, Product2>([SELECT Id, Name, ProductCode, Is_Bundle__c FROM Product2 WHERE Id IN :seedIds]);
+        Map<Id, List<Product_Option__c>> optionsByBundle = new Map<Id, List<Product_Option__c>>();
+
+        List<Product_Option__c> options = [SELECT Id, Bundle_Product__c, Product__c, Qty__c, Unit_Price__c FROM Product_Option__c WHERE Bundle_Product__c IN :seedIds];
+        Set<Id> childIds = new Set<Id>();
+        for (Product_Option__c opt : options) {
+            if (opt.Bundle_Product__c == null) continue;
+            if (!optionsByBundle.containsKey(opt.Bundle_Product__c)) {
+                optionsByBundle.put(opt.Bundle_Product__c, new List<Product_Option__c>());
+            }
+            optionsByBundle.get(opt.Bundle_Product__c).add(opt);
+            if (opt.Product__c != null) childIds.add(opt.Product__c);
+        }
+
+        if (!childIds.isEmpty()) {
+            for (Product2 p : [SELECT Id, Name, ProductCode, Is_Bundle__c FROM Product2 WHERE Id IN :childIds]) {
+                prodMap.put(p.Id, p);
+            }
+        }
+
+        for (SimpleLineItem li : items) {
+            if (li == null || li.productId == null) continue;
+            Product2 p = prodMap.get(li.productId);
+            if (p != null && p.Is_Bundle__c && optionsByBundle.containsKey(li.productId)) {
+                for (Product_Option__c opt : optionsByBundle.get(li.productId)) {
+                    Product2 child = prodMap.get(opt.Product__c);
+                    if (child == null) continue;
+                    Decimal childQty = (opt.Qty__c != null ? opt.Qty__c : 1);
+                    Decimal effectiveQty = (li.qty != null ? li.qty : 0) * childQty;
+                    result.add(new ExpandedProduct(
+                        child.Id,
+                        child.Name,
+                        child.ProductCode,
+                        opt.Unit_Price__c,
+                        effectiveQty
+                    ));
+                }
+            } else {
+                result.add(new ExpandedProduct(
+                    li.productId,
+                    p != null ? p.Name : null,
+                    p != null ? p.ProductCode : null,
+                    li.unitPrice,
+                    li.qty
+                ));
+            }
+        }
+
+        return result;
+    }
+
+    private static Map<Id, List<Product_Option__c>> buildOptionsByBundle(
+        Set<Id> seedIds,
+        Map<Id, Product2> prodMap
+    ) {
+        Map<Id, List<Product_Option__c>> optionsByBundle = new Map<Id, List<Product_Option__c>>();
+        Set<Id> toProcess = new Set<Id>();
+        for (Id pid : seedIds) {
+            Product2 p = prodMap.get(pid);
+            if (p != null && p.Is_Bundle__c) toProcess.add(pid);
+        }
+
+        Set<Id> processed = new Set<Id>();
+        Integer guard = 0;
+
+        while (!toProcess.isEmpty() && guard < 10) {
+            guard++;
+            Set<Id> current = new Set<Id>(toProcess);
+            toProcess.clear();
+
+            List<Product_Option__c> options = [
+                SELECT Id, Bundle_Product__c, Product__c, Qty__c, Unit_Price__c
+                FROM Product_Option__c
+                WHERE Bundle_Product__c IN :current
+            ];
+
+            Set<Id> childIds = new Set<Id>();
+            for (Product_Option__c opt : options) {
+                if (opt.Bundle_Product__c == null) continue;
+                if (!optionsByBundle.containsKey(opt.Bundle_Product__c)) {
+                    optionsByBundle.put(opt.Bundle_Product__c, new List<Product_Option__c>());
+                }
+                optionsByBundle.get(opt.Bundle_Product__c).add(opt);
+                if (opt.Product__c != null) childIds.add(opt.Product__c);
+            }
+
+            if (!childIds.isEmpty()) {
+                Set<Id> missing = new Set<Id>();
+                for (Id cid : childIds) if (!prodMap.containsKey(cid)) missing.add(cid);
+                if (!missing.isEmpty()) {
+                    for (Product2 p : [
+                        SELECT Id, Name, ProductCode, Is_Bundle__c
+                        FROM Product2
+                        WHERE Id IN :missing
+                    ]) {
+                        prodMap.put(p.Id, p);
+                    }
+                }
+            }
+
+            for (Id cid : childIds) {
+                Product2 cp = prodMap.get(cid);
+                if (cp != null && cp.Is_Bundle__c && !processed.contains(cid)) {
+                    toProcess.add(cid);
+                }
+            }
+
+            processed.addAll(current);
+        }
+
+        return optionsByBundle;
+    }
+
+    private static void expandItemRecursive(
+        Id productId,
+        Decimal qty,
+        Decimal unitPrice,
+        Map<Id, Product2> prodMap,
+        Map<Id, List<Product_Option__c>> optionsByBundle,
+        List<ExpandedProduct> out,
+        Set<Id> path
+    ) {
+        if (productId == null || qty == null || qty <= 0) return;
+        if (path.contains(productId)) return;
+        path.add(productId);
+
+        Product2 prod = prodMap.get(productId);
+        if (prod == null) {
+            path.remove(productId);
+            return;
+        }
+
+        List<Product_Option__c> opts = optionsByBundle.get(productId);
+        if (prod.Is_Bundle__c && opts != null && !opts.isEmpty()) {
+            for (Product_Option__c opt : opts) {
+                Id childId = opt.Product__c;
+                if (childId == null) continue;
+                Decimal childQty = (opt.Qty__c != null ? opt.Qty__c : 1);
+                Decimal effectiveQty = qty * childQty;
+                Decimal childUnitPrice = opt.Unit_Price__c;
+                expandItemRecursive(
+                    childId,
+                    effectiveQty,
+                    childUnitPrice,
+                    prodMap,
+                    optionsByBundle,
+                    out,
+                    path
+                );
+            }
+            path.remove(productId);
+            return;
+        }
+
+        out.add(new ExpandedProduct(
+            productId,
+            prod.Name,
+            prod.ProductCode,
+            unitPrice,
+            qty
+        ));
+        path.remove(productId);
+    }
+
     private class RecordContext {
         public Id leadRecordId;
         public String course;
+
+        public RecordContext(Id leadRecordId) {
+            this.leadRecordId = leadRecordId;
+        }
     }
 
     private static void updateCairaLevelIfNeeded(
@@ -759,7 +1016,7 @@ public without sharing class PurchaseOrderService {
                 recordTypeName = rti.getName();
             }
         }
-        if (recordTypeName != 'CAIRA') return;
+        if (recordTypeName != RECORDTYPE_CAIRA) return;
 
         Set<Id> prodIds = new Set<Id>();
         for (LineItemRequest li : items) {
@@ -785,15 +1042,15 @@ public without sharing class PurchaseOrderService {
                 continue;
             }
 
-            if (p.CAIRA_Level__c == 'Level 1') hasLevel1 = true;
-            if (p.CAIRA_Level__c == 'Level 2') hasLevel2 = true;
-            if (p.CAIRA_Level__c == 'Level 3') hasLevel3 = true;
+            if (p.CAIRA_Level__c == CAIRA_LEVEL_1) hasLevel1 = true;
+            if (p.CAIRA_Level__c == CAIRA_LEVEL_2) hasLevel2 = true;
+            if (p.CAIRA_Level__c == CAIRA_LEVEL_3) hasLevel3 = true;
         }
 
         List<String> levels = new List<String>();
-        if (hasLevel1) levels.add('Level 1');
-        if (hasLevel2) levels.add('Level 2');
-        if (hasLevel3) levels.add('Level 3');
+        if (hasLevel1) levels.add(CAIRA_LEVEL_1);
+        if (hasLevel2) levels.add(CAIRA_LEVEL_2);
+        if (hasLevel3) levels.add(CAIRA_LEVEL_3);
         if (levels.isEmpty()) return;
 
         Lead__c upd = new Lead__c(

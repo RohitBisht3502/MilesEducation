@@ -281,13 +281,6 @@ public without sharing class LeadMergeController {
         if (isSameGM) {
             // Case 2: Same GM (Current User is everyone's manager)
             requiresApproval = false; 
-            // Validate Comment
-            if (String.isBlank(mergeComments)) {
-                throw new AuraHandledException('Comment is required for this merge.');
-            }
-            // Store comment on Main Lead
-            // Assuming field Lead_Merge_Comments__c exists
-            currentLead.put('Lead_Merge_Comments__c', mergeComments);
         } else {
             // Case 1: Different GM -> Send to Admin
             requiresApproval = true;
@@ -297,6 +290,12 @@ public without sharing class LeadMergeController {
         // EXECUTE MERGE
         // -------------------------
         Lead__c mainLead = currentLead; 
+
+        // Always require and store comment on Main Lead for audit
+        if (String.isBlank(mergeComments)) {
+            throw new AuraHandledException('Comment is required for this merge.');
+        }
+        mainLead.put('Lead_Merge_Comments__c', mergeComments);
 
         for (Lead__c lead : leadsToMerge) {
             lead.Lead__c = mainLeadId;
@@ -318,6 +317,7 @@ public without sharing class LeadMergeController {
             Approval.ProcessSubmitRequest req = new Approval.ProcessSubmitRequest();
             req.setObjectId(mainLeadId);
             req.setProcessDefinitionNameOrId('Lead_merge');
+            req.setComments(mergeComments); // Pass user comment to Approval Process
             req.setNextApproverIds(new Id[]{ approverId });  
 
             try {

@@ -502,6 +502,7 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
 
     @AuraEnabled(cacheable=true)
     public static Map<String, List<String>> getStageLevelValues(Id recordId) {
+         System.debug('RecordId Received: ' + recordId);
         if (recordId == null) return new Map<String, List<String>>();
 
         Map<String, List<String>> result = new Map<String, List<String>>();
@@ -516,8 +517,15 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
             getPicklistValues(Lead__c.Course__c)
         );
 
+         System.debug('Stage Values: ' + result.get('stage'));
+    System.debug('Level Values: ' + result.get('level'));
+
+
         return result;
     }
+
+
+    
 
     private static List<String> getPicklistValues(Schema.SObjectField fieldRef) {
         List<String> values = new List<String>();

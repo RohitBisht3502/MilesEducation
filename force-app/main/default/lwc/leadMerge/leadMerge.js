@@ -184,36 +184,6 @@ export default class LeadMerge extends LightningElement {
     }
 
     get showComments() {
-        if (!this.selectedLeads.length || !this.mainLeadWrapper) {
-            return false;
-        }
-
-        console.log('--- showComments Debug ---');
-        console.log('Current User ID:', this.currentUserId);
-
-        // Logic: The Current User must be the Manager of the Main Lead's Owner AND the Selected Lead's Owner.
-
-        // 1. Check Main Lead
-        const mainManagerId = this.mainLeadWrapper.ownerManagerId;
-        const amIMainManager = mainManagerId === this.currentUserId;
-
-        if (!amIMainManager) {
-            console.log('ShowComments: Current user is not Manager of Main Lead.');
-            return false;
-        }
-
-        // 2. Check All Selected Leads
-        for (let lead of this.selectedLeads) {
-            const leadManagerId = lead.ownerManagerId;
-            const amILeadManager = leadManagerId === this.currentUserId;
-
-            if (!amILeadManager) {
-                console.log('ShowComments: Current user is not Manager of Selected Lead:', lead.Name);
-                return false;
-            }
-        }
-
-        console.log('All checks passed -> SHOW COMMENTS (GM Scenario)');
-        return true;
+        return this.hasSelectedLeads;
     }
 }
