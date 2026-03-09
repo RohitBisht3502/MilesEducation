@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customValue>
+        <fullName>Round Robin</fullName>
+        <default>false</default>
+        <label>Round Robin</label>
+    </customValue>
+    <customValue>
+        <fullName>Eligibility Criteria</fullName>
+        <default>false</default>
+        <label>Eligibility Criteria</label>
+    </customValue>
+    <customValue>
+        <fullName>MCOM</fullName>
+        <default>false</default>
+        <label>MCOM</label>
+    </customValue>
+    <customValue>
+        <fullName>CC - Pre Enrollment</fullName>
+        <default>false</default>
+        <label>CC - Pre Enrollment</label>
+    </customValue>
+    <customValue>
+        <fullName>SR - Post Enrollment</fullName>
+        <default>false</default>
+        <label>SR - Post Enrollment</label>
+    </customValue>
+    <customValue>
+        <fullName>GP</fullName>
+        <default>false</default>
+        <label>GP</label>
+    </customValue>
+    <masterLabel>Round Robin Pool Type</masterLabel>
+    <sorted>false</sorted>
+</GlobalValueSet>

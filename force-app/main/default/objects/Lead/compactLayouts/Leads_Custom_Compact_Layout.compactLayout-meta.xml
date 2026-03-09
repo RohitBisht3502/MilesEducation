@@ -3,5 +3,10 @@
     <fullName>Leads_Custom_Compact_Layout</fullName>
     <fields>Name</fields>
     <fields>Candidate_ID__c</fields>
+    <fields>CPA_Level__c</fields>
+    <fields>CMA_Level__c</fields>
+    <fields>CAIRA_Level__c</fields>
+    <fields>USP_Level__c</fields>
+    <fields>Highest_Level__c</fields>
     <label>Leads Custom Compact Layout</label>
 </CompactLayout>

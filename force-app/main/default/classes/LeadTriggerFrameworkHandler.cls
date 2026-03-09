@@ -1,6 +1,11 @@
 public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHandler {
 
-    public LeadTriggerFrameworkHandler(List<Lead__c> newList,List<Lead__c> oldList,Map<Id, Lead__c> newMap,Map<Id, Lead__c> oldMap) {
+    public LeadTriggerFrameworkHandler(
+        List<Lead__c> newList,
+        List<Lead__c> oldList,
+        Map<Id, Lead__c> newMap,
+        Map<Id, Lead__c> oldMap
+    ) {
         super(
             (List<SObject>)newList,
             (List<SObject>)oldList,
@@ -24,38 +29,47 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
     public override void beforeInsert() {
         LeadTriggerHelperClass.updateLevelSequence(getNewLeads(), null);
         LeadTriggerHelperClass.handleBeforeInsert(getNewLeads());
+
         // If you want M1 owner logic on insert:
         // LeadTriggerHelperClass.assignOwnerForM1(getNewLeads(), null, true);
     }
 
-   public override void beforeUpdate() {
-    List<Lead__c> newLeads = getNewLeads();
-    Map<Id, Lead__c> oldMapLead = getOldLeadMap();
+    public override void beforeUpdate() {
+        List<Lead__c> newLeads = getNewLeads();
+        Map<Id, Lead__c> oldMapLead = getOldLeadMap();
 
-   // LeadTriggerHelperClass.validateCallLogBeforeStageChange(newLeads, oldMapLead);
+        // LeadTriggerHelperClass.validateCallLogBeforeStageChange(newLeads, oldMapLead);
 
-    LeadTriggerHelperClass.updateLevelSequence(newLeads, oldMapLead);
-    LeadTriggerHelperClass.handleBeforeUpdate(newLeads, oldMapLead);
+        LeadTriggerHelperClass.updateLevelSequence(newLeads, oldMapLead);
+        LeadTriggerHelperClass.handleBeforeUpdate(newLeads, oldMapLead);
 
-    LeadPostEnrollmentRoundRobinHandler.handleBeforeUpdate(newLeads, oldMapLead);
-}
-
+        LeadPostEnrollmentRoundRobinHandler.handleBeforeUpdate(newLeads, oldMapLead);
+    }
 
     public override void afterInsert() {
         List<Lead__c> newLeads = getNewLeads();
 
-        LeadTriggerHelperClass.handleAfterInsert(newLeads);
+        // removed this because data lake will send city as well 
+        // LeadTriggerHelperClass.handleAfterInsert(newLeads);
         LeadTriggerHelperClass.handleAfterInsert1(newLeads);
 
         // LeadTriggerHelperClass.registerLeadForUpcomingWebinars(getNewLeads());
         LeadTriggerHelperClass.afterInsertAutoRegisterWebinar(newLeads);
-       // LeadTriggerHandler.createLeadActivityLogs(newLeads, null, true);
+
+        // LeadTriggerHandler.createLeadActivityLogs(newLeads, null, true);
 
         // Gp tool tasks updates
         LeadStageTaskHandlerService.checkAndCreateNewTaskForInsert(newLeads);
-        
+
+        // Update highest level on candidate
+        LeadTriggerHelperClass.updateHighestLevelOnCandidateWhenStageChanges(newLeads, null);
+
+        // sync owner to ()
+        LeadSyncOwnerChange.syncOnOwnerChange(new Map<Id, Lead__c>(), (Map<Id, Lead__c>)newMap);
+        LeadRelatedSyncService.syncOnOwnerChange(new Map<Id, Lead__c>(), (Map<Id, Lead__c>)newMap);
+
         // M.Com Bridge Course Tasks
-       // LeadTriggerHelperClass.createMComTasks(newLeads, null);
+        // LeadTriggerHelperClass.createMComTasks(newLeads, null);
     }
 
     public override void afterUpdate() {
@@ -64,33 +78,33 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
 
         LeadStageService.validateStageTransitions(newLeads, oldMapLead);
 
-       // LeadTriggerHandler.createLeadActivityLogs(newLeads, oldMapLead, false);
+        // LeadTriggerHandler.createLeadActivityLogs(newLeads, oldMapLead, false);
 
-        LeadTriggerHelperClass.afterUpdateMergeLead((List<Lead__c>)newList, (Map<Id, Lead__c>)oldMap);  
+        LeadTriggerHelperClass.afterUpdateMergeLead((List<Lead__c>)newList, (Map<Id, Lead__c>)oldMap);
 
-        // Auto-register only when Is_ReEnquiry__c flips to true 
+        // Auto-register only when Is_ReEnquiry__c flips to true
         LeadTriggerHelperClass.afterUpdateAutoRegisterWebinar((Map<Id, Lead__c>)newMap, oldMapLead);
 
         // 3. Create activity logs for Merged Leads (AFTER merge logic completes)
         LeadTriggerHandler.createMergeLeadActivityLogs(newLeads, oldMapLead);
 
-        // sync city on candidate 
+        // sync city on candidate
         LeadTriggerHelperClass.syncParentCityOnChildCityChange(newLeads, oldMapLead);
 
-        // Update highest level on candidate 
+        // Update highest level on candidate
         LeadTriggerHelperClass.updateHighestLevelOnCandidateWhenStageChanges(newLeads, oldMapLead);
 
-        // Assign Downgrade Re-Enquiry leads 
+        // Assign Downgrade Re-Enquiry leads
         ReInquiryDowngradeReallocationService.handleAfterUpdate(newLeads, oldMapLead);
 
         // sync owner to ()
-        LeadSyncOwnerChange.syncOnOwnerChange(oldMapLead, (Map<Id, Lead__c>)newMap);
+        // LeadSyncOwnerChange.syncOnOwnerChange(oldMapLead, (Map<Id, Lead__c>)newMap);
 
-        //sync owner to related records 
-        LeadRelatedSyncService.syncOnOwnerChange(oldMapLead, (Map<Id, Lead__c>)newMap); 
+        // sync owner to related records
+        LeadRelatedSyncService.syncOnOwnerChange(oldMapLead, (Map<Id, Lead__c>)newMap);
 
         // log owner change activity
-       // LeadTriggerHandler.createOwnerChangeActivityLogs(newLeads, oldMapLead);
+        // LeadTriggerHandler.createOwnerChangeActivityLogs(newLeads, oldMapLead);
 
         // M.Com Bridge Course Tasks (Status changes)
         LeadTriggerHelperClass.createMComTasks(newLeads, oldMapLead);
@@ -101,7 +115,7 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         // Gp tool tasks updates
         LeadStageTaskHandlerService.checkAndCreateNewTaskForStatusChange((Map<Id, Lead__c>)newMap, oldMapLead);
 
-       // conversion
+        // conversion
         LeadTriggerConversionClass.convertCandidateOnFullPayment(newLeads, oldMapLead);
     }
 

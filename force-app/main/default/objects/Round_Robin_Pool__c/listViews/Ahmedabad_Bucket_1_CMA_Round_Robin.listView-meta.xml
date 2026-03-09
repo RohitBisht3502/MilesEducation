@@ -24,7 +24,7 @@
     <filters>
         <field>Type__c</field>
         <operation>equals</operation>
-        <value>CC - Pre Enrollment</value>
+        <value>Round Robin</value>
     </filters>
     <filters>
         <field>Bucket__c</field>

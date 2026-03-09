@@ -18,7 +18,7 @@ public without sharing class EnquiryCreationForZoomWebinar {
             Id currentUserId = UserInfo.getUserId();
 
             // Step 1: Get live attendees from service
-            String responseBody = Webservice_WebinarAttendee.getLiveWebinarAttendees(webinarId);
+            String responseBody = Callout_WebinarAttendee.getLiveWebinarAttendees(webinarId);
 
             // Step 2: Parse response => { "registrants": [ { participant_email, registrant_id }, ... ] }
             Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(responseBody);

@@ -154,7 +154,7 @@ global without sharing class EligibilityApi {
 
             for (EligibilityFileService.NewQualificationRequest nq : grouped.values()) {
                 EligibilityFileService.SimpleResponse svcRes =
-                    EligibilityFileService.handleNewQualification(JSON.serialize(nq));
+                    EligibilityFileService.handleNewQualificationApi(JSON.serialize(nq));
 
                 if (!svcRes.success) {
                     res.success = false;
@@ -167,7 +167,7 @@ global without sharing class EligibilityApi {
 
             for (String flatKey : flatGrouped.keySet()) {
                 EligibilityFileService.SimpleResponse svcRes =
-                    EligibilityFileService.handleMainFolderFiles(sfId, flatKey, flatGrouped.get(flatKey));
+                    EligibilityFileService.handleMainFolderFilesApi(sfId, flatKey, flatGrouped.get(flatKey));
 
                 if (!svcRes.success) {
                     res.success = false;

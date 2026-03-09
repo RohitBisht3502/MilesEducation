@@ -18,7 +18,7 @@ public without sharing class LoanTriggerFrameworkHandler extends BaseTriggerHand
     }
 
     public override void beforeInsert() {
-        LoanUpdateTriggerHandler.validateBeforeInsert(getNewLoans());
+      //  LoanUpdateTriggerHandler.validateBeforeInsert(getNewLoans());
     }
 
     public override void afterInsert() {

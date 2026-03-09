@@ -16,9 +16,9 @@
                 <label>New lead</label>
             </value>
             <value>
-                <fullName>Verification</fullName>
+                <fullName>Under Verification</fullName>
                 <default>false</default>
-                <label>Verification</label>
+                <label>Under Verification</label>
             </value>
             <value>
                 <fullName>Verified</fullName>

@@ -25,9 +25,9 @@
                 <label>Under Verification</label>
             </value>
             <value>
-                <fullName>Verfied</fullName>
+                <fullName>Verified</fullName>
                 <default>false</default>
-                <label>Verfied</label>
+                <label>Verified</label>
             </value>
             <value>
                 <fullName>Eligibility Report Generated</fullName>

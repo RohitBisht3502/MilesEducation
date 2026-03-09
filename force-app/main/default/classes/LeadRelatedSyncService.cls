@@ -10,13 +10,17 @@ public without sharing class LeadRelatedSyncService {
 
         Set<Id> leadIdsToSync = new Set<Id>();
 
+        if (oldMap == null) {
+            oldMap = new Map<Id, Lead__c>();
+        }
+
 
         for (Id lid : newMap.keySet()) {
             Lead__c oldRec = oldMap.get(lid);
             Lead__c newRec = newMap.get(lid);
 
-            // Sync when Owner changes 
-            if (oldRec.OwnerId != newRec.OwnerId) {
+            // Insert should sync immediately; updates sync on owner change.
+            if (oldRec == null || oldRec.OwnerId != newRec.OwnerId) {
                 if (newRec.OwnerId != null) leadIdsToSync.add(lid);
             }
 
@@ -87,11 +91,17 @@ public without sharing class LeadRelatedSyncService {
         // 3. Phone Number Owner Sync
         if (!phones.isEmpty()) {
             List<Phone_Number__c> phs = [
-                SELECT Id, OwnerId, Lead__c, Phone__c, CreatedDate, LastModifiedDate FROM Phone_Number__c WHERE Lead__c IN :leadIdsToSync OR Phone__c IN :phones];
+                SELECT Id, OwnerId, Lead__c, Candidate__c, Phone__c, CreatedDate, LastModifiedDate
+                FROM Phone_Number__c
+                WHERE Candidate__c IN :candidateIdToLeadIds.keySet() OR Phone__c IN :phones
+            ];
             for (Phone_Number__c p : phs) {
                 // Updated: Removed cutoff check.
 
-                Id target = (p.Lead__c != null) ? leadIdToOwner.get(p.Lead__c) : null;
+                Id mappedLeadId = (p.Candidate__c != null && candidateIdToLeadIds.containsKey(p.Candidate__c))
+                    ? (Id)candidateIdToLeadIds.get(p.Candidate__c).iterator().next()
+                    : ((p.Lead__c != null) ? p.Lead__c : null);
+                Id target = (mappedLeadId != null) ? leadIdToOwner.get(mappedLeadId) : null;
                 if (target != null && p.OwnerId != target) {
                     p.OwnerId = target;
                     upd.add(p);
@@ -102,11 +112,17 @@ public without sharing class LeadRelatedSyncService {
         // 4. Email Owner Sync
         if (!emails.isEmpty()) {
             List<Email__c> ems = [
-                SELECT Id, OwnerId, Lead__c, Email__c, CreatedDate, LastModifiedDate FROM Email__c WHERE Lead__c IN :leadIdsToSync OR Email__c IN :emails];
+                SELECT Id, OwnerId, Lead__c, Candidate__c, Email__c, CreatedDate, LastModifiedDate
+                FROM Email__c
+                WHERE Candidate__c IN :candidateIdToLeadIds.keySet() OR Email__c IN :emails
+            ];
             for (Email__c em : ems) {
                 // Updated: Removed cutoff check.
 
-                Id target = (em.Lead__c != null) ? leadIdToOwner.get(em.Lead__c) : null;
+                Id mappedLeadId = (em.Candidate__c != null && candidateIdToLeadIds.containsKey(em.Candidate__c))
+                    ? (Id)candidateIdToLeadIds.get(em.Candidate__c).iterator().next()
+                    : ((em.Lead__c != null) ? em.Lead__c : null);
+                Id target = (mappedLeadId != null) ? leadIdToOwner.get(mappedLeadId) : null;
                 if (target != null && em.OwnerId != target) {
                     em.OwnerId = target;
                     upd.add(em);
@@ -114,10 +130,32 @@ public without sharing class LeadRelatedSyncService {
             }
         }
 
-        // 5. Activity Log Owner Sync
         Set<Id> candidateIds = new Set<Id>();
         candidateIds.addAll(candidateIdToLeadIds.keySet());
 
+        // 5. Webinar Member Owner Sync
+        if (!candidateIds.isEmpty() || !leadIdsToSync.isEmpty()) {
+            List<Webinar_Member__c> members = [
+                SELECT Id, OwnerId, Lead__c, Candidate__c
+                FROM Webinar_Member__c
+                WHERE Lead__c IN :leadIdsToSync OR Candidate__c IN :candidateIds
+            ];
+
+            for (Webinar_Member__c wm : members) {
+                Id mappedLeadId = wm.Lead__c;
+                if (mappedLeadId == null && wm.Candidate__c != null && candidateIdToLeadIds.containsKey(wm.Candidate__c)) {
+                    mappedLeadId = (Id)candidateIdToLeadIds.get(wm.Candidate__c).iterator().next();
+                }
+
+                Id targetOwner = mappedLeadId != null ? leadIdToOwner.get(mappedLeadId) : null;
+                if (targetOwner != null && wm.OwnerId != targetOwner) {
+                    wm.OwnerId = targetOwner;
+                    upd.add(wm);
+                }
+            }
+        }
+
+        // 6. Activity Log Owner Sync
         if (!candidateIds.isEmpty() || !leadIdsToSync.isEmpty()) {
 
             List<Activity_Log__c> logs = [

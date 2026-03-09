@@ -8,8 +8,8 @@
 
 import { LightningElement, api, wire, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
-import getMembersByWebinar from '@salesforce/apex/WebinarController.getMembersByWebinar';
-import getSpocOptions from '@salesforce/apex/WebinarController.getSpocOptions';
+import getMembersByWebinar from '@salesforce/apex/WebinarDashboard.getMembersByWebinar';
+import getSpocOptions from '@salesforce/apex/WebinarDashboard.getSpocOptions';
 
 // Constants
 const STATUS = {

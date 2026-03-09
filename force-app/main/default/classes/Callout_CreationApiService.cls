@@ -11,6 +11,14 @@ public with sharing class Callout_CreationApiService {
 
         External_Service_Config__mdt cfg = loadConfig();
         if (cfg == null) {
+            IntegrationLogUtil.insertLog(
+                'Loan Process API',
+                null,
+                null,
+                'Config inactive or missing Endpoint_URL__c',
+                'Failed',
+                500
+            );
             throw new AuraHandledException('Loan vendor service is unavailable. Please try again later.');
         }
 
@@ -23,9 +31,11 @@ public with sharing class Callout_CreationApiService {
         // Mandatory validation before callout
         validateRequiredFields(loan, provider);
 
+        String candidateUuid = resolveCandidateUuid(loan.Candidate__c);
+
         Map<String, Object> body = new Map<String, Object>{
             'loan_provider' => provider,
-            'sf_id' => loan.Candidate__c,
+            'miles_uuid' => candidateUuid,
             'program_name' => loan.Program_Name__c,
             'first_name' => loan.First_Name__c,
             'last_name' => loan.First_Name__c,
@@ -38,10 +48,10 @@ public with sharing class Callout_CreationApiService {
         if (provider == 'AVANSE') {
             body.put(
                 'current_address_same_as_permanent',
-                loan.Current_Address_Same_As_Permanent__c
+                loan.Permanent_address_same_as_Current__c
             );
 
-            if (loan.Current_Address_Same_As_Permanent__c == true) {
+            if (loan.Permanent_address_same_as_Current__c == true) {
                 putPermanentAddress(body, loan);
             } else {
                 putCurrentAddress(body, loan);
@@ -91,6 +101,14 @@ public with sharing class Callout_CreationApiService {
         try {
             res = http.send(req);
         } catch (Exception e) {
+            IntegrationLogUtil.insertLog(
+                'Loan Process API',
+                requestPayload,
+                null,
+                'Callout error: ' + e.getMessage(),
+                'Failed',
+                500
+            );
             throw new AuraHandledException('Loan vendor service is unavailable. Please try again later.');
         }
 
@@ -101,12 +119,28 @@ public with sharing class Callout_CreationApiService {
             ', body: ' + responsePayload
         );
         if (res == null || res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
+            IntegrationLogUtil.insertLog(
+                'Loan Process API',
+                requestPayload,
+                truncateResponse(responsePayload),
+                'HTTP ' + (res != null ? res.getStatusCode() : null) + ' ' + (res != null ? res.getStatus() : null),
+                'Failed',
+                (res != null ? res.getStatusCode() : 500)
+            );
             throw new AuraHandledException(buildFriendlyErrorFromPayload(responsePayload));
         }
 
         ApiResult parsed = parseResponse(responsePayload);
         if (parsed == null || parsed.success != true) {
             String msg = parsed != null ? parsed.message : null;
+            IntegrationLogUtil.insertLog(
+                'Loan Process API',
+                requestPayload,
+                truncateResponse(responsePayload),
+                'API failure: ' + (msg != null ? msg : 'Unknown error'),
+                'Failed',
+                (res != null ? res.getStatusCode() : 500)
+            );
             throw new AuraHandledException(buildFriendlyErrorFromPayload(msg));
         }
 
@@ -114,8 +148,18 @@ public with sharing class Callout_CreationApiService {
             loan.miles_loan_code__c = toStringValue(parsed.data.get('miles_loan_code'));
             loan.application_id__c = toStringValue(parsed.data.get('application_id'));
             loan.Loan_status__c = toStringValue(parsed.data.get('loan_status'));
-            loan.redirection_url__c = toStringValue(parsed.data.get('redirection_url'));
+            loan.Redirection_URL__c = toStringValue(parsed.data.get('redirection_url'));
+            loan.Loan_Id__c = toStringValue(parsed.data.get('loan_id'));
         }
+
+        IntegrationLogUtil.insertLog(
+            'Loan Process API',
+            requestPayload,
+            truncateResponse(responsePayload),
+            'Success',
+            'Success',
+            (res != null ? res.getStatusCode() : 200)
+        );
     }
 
     private static External_Service_Config__mdt loadConfig() {
@@ -128,6 +172,14 @@ public with sharing class Callout_CreationApiService {
                 LIMIT 1
             ];
         } catch (Exception e) {
+            IntegrationLogUtil.insertLog(
+                'Loan Process API',
+                null,
+                null,
+                'Config load error: ' + e.getMessage(),
+                'Failed',
+                500
+            );
             return null;
         }
         if (cfg == null || !cfg.Is_Active__c || String.isBlank(cfg.Endpoint_URL__c)) {
@@ -198,6 +250,21 @@ public with sharing class Callout_CreationApiService {
         return v == null ? null : String.valueOf(v);
     }
 
+    private static String truncateResponse(String payload) {
+        if (payload == null) return null;
+        return (payload.length() > 3000) ? payload.substring(0, 3000) : payload;
+    }
+
+    private static String resolveCandidateUuid(Id candidateId) {
+        if (candidateId == null) return null;
+        try {
+            Lead cand = [SELECT UUID__c FROM Lead WHERE Id = :candidateId LIMIT 1];
+            return cand.UUID__c;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private static void validateRequiredFields(Loan__c loan, String provider) {
         List<String> missing = new List<String>();
 
@@ -213,17 +280,17 @@ public with sharing class Callout_CreationApiService {
             // Only common fields required
         } else if (provider == 'AVANSE') {
             // Permanent address required
-            addIfMissing(missing, loan.permanent_flat_no__c, 'Permanent Flat No');
-            addIfMissing(missing, loan.permanent_street__c, 'Permanent Street');
-            addIfMissing(missing, loan.permanent_land_mark__c, 'Permanent Landmark');
-            addIfMissing(missing, loan.permanent_pincode__c, 'Permanent Pincode');
+            addIfMissing(missing, loan.flat_no__c, 'Current Flat No');
+            addIfMissing(missing, loan.street__c, 'Current Street');
+            addIfMissing(missing, loan.land_mark__c, 'Current Landmark');
+            addIfMissing(missing, loan.pincode__c, 'Current Pincode');
 
-            // Current address required only if not same as permanent
-            if (loan.Current_Address_Same_As_Permanent__c != true) {
-                addIfMissing(missing, loan.flat_no__c, 'Current Flat No');
-                addIfMissing(missing, loan.street__c, 'Current Street');
-                addIfMissing(missing, loan.land_mark__c, 'Current Landmark');
-                addIfMissing(missing, loan.pincode__c, 'Current Pincode');
+            // Permanent address required only if not same as current
+            if (loan.Permanent_address_same_as_Current__c != true) {
+                addIfMissing(missing, loan.permanent_flat_no__c, 'Permanent Flat No');
+                addIfMissing(missing, loan.permanent_street__c, 'Permanent Street');
+                addIfMissing(missing, loan.permanent_land_mark__c, 'Permanent Landmark');
+                addIfMissing(missing, loan.permanent_pincode__c, 'Permanent Pincode');
             }
 
             // Applicant details

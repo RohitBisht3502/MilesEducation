@@ -3,6 +3,58 @@ public without sharing class LeadCityClassifier {
     private static final String API_ENDPOINT = 'https://gvqz37ay7d.execute-api.ap-south-1.amazonaws.com/miles360/city_classifier';
     private static final String API_KEY = 'gAkgs8n3PQ8QnanrfsueA5KpXNOlpwJw6WtjD2hR';
 
+    public static String fetchCityForLeadWithLogging(Lead ld, List<Integration_Log__c> logs) {
+        Http http = new Http();
+        String requestPayload = '';
+        String responsePayload = '';
+        String city = null;
+
+        try {
+            HttpRequest request = new HttpRequest();
+            request.setEndpoint(API_ENDPOINT);
+            request.setMethod('POST');
+            request.setHeader('Content-Type', 'application/json');
+            request.setHeader('x-api-key', API_KEY);
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'email' => ld.Email,
+                'phone' => ld.Phone
+            };
+
+            requestPayload = JSON.serialize(payload);
+            request.setBody(requestPayload);
+
+            HttpResponse response = http.send(request);
+            responsePayload = response.getBody();
+
+            if (response.getStatusCode() == 200 && String.isNotBlank(responsePayload)) {
+                Map<String, Object> result = (Map<String, Object>) JSON.deserializeUntyped(responsePayload);
+                city = extractCityFromResponse(result);
+            }
+
+            logs.add(IntegrationLogUtil.buildLog(
+                'Lead City',
+                requestPayload,
+                responsePayload,
+                String.isBlank(city) ? 'No city found in API response' : null,
+                String.isNotBlank(city) ? 'Success' : 'Failed',
+                response.getStatusCode()
+            ));
+
+        } catch (Exception ex) {
+            logs.add(IntegrationLogUtil.buildLog(
+                'Lead City',
+                requestPayload,
+                responsePayload,
+                'Exception: ' + ex.getMessage(),
+                'Failed',
+                null
+            ));
+        }
+
+        return 'Delhi';
+    }
+
     // Fetch city for a given custom Lead__c and log the process
     public static String fetchCityForLeadWithLogging(Lead__c ld, List<Integration_Log__c> logs) {
         Http http = new Http();

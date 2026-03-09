@@ -285,6 +285,7 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
             if (existing == null) {
                 Webinar_Member__c wm = new Webinar_Member__c();
                 wm.Webinar__c = wid;
+                wm.OwnerId = ownerId;
                 wm.Meeting_Details__c = details;
                 wm.Registrant_Id__c = extractRegistrantId(details);
 
@@ -297,6 +298,7 @@ public without sharing class LeadZoomRegistrationJob implements Queueable, Datab
 
                 toInsert.add(wm);
             } else {
+                existing.OwnerId = ownerId;
                 existing.Meeting_Details__c = details;
                 existing.Registrant_Id__c = extractRegistrantId(details);
 

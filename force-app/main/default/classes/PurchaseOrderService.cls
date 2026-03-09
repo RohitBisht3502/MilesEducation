@@ -20,6 +20,7 @@ public without sharing class PurchaseOrderService {
         @AuraEnabled public Id leadId;
         @AuraEnabled public Decimal discount;
         @AuraEnabled public Decimal downPayment;
+        @AuraEnabled public Decimal processingFee;
         @AuraEnabled public String phoneNumber;
         @AuraEnabled public String addressType;
         @AuraEnabled public String approvalComments;
@@ -73,10 +74,12 @@ public without sharing class PurchaseOrderService {
     public class AddressDetailsDTO {
         @AuraEnabled public Map<String, String> billing;
         @AuraEnabled public Map<String, String> shipping;
+        @AuraEnabled public String phone;
 
         public AddressDetailsDTO() {
             this.billing = new Map<String, String>();
             this.shipping = new Map<String, String>();
+            this.phone = null;
         }
     }
 
@@ -230,11 +233,11 @@ public without sharing class PurchaseOrderService {
             Callout_PurchaseOrderService.CalloutResult calloutRes;
             if (!requiresApproval) {
                 // api callout to miles
-               calloutRes = callExternalPurchaseService(req, lead, candidate);
+              calloutRes = callExternalPurchaseService(req, lead, candidate);
             }
 
             Purchase_Order__c po    = createPurchaseOrder(req, context, lead, candidate, student);
-            // po.Purchase_Order_Id__c = 'Testing 123';
+            // po.Purchase_Order_Id__c = '41';
             if (calloutRes != null) {
                 po.Purchase_Order_Id__c = String.valueOf(calloutRes.purchaseId);
                 po.Response_Payload__c  = calloutRes.responseBody;
@@ -247,6 +250,12 @@ public without sharing class PurchaseOrderService {
             createLineItems(po.Id, req.items);
             updateCairaLevelIfNeeded(context, lead, req.items);
             createTransaction(po.Id, req.downPayment, req.leadId);
+            if (!String.isBlank(req.loanId)) {
+                createLoanTransaction(po.Id, req.loanId);
+            }
+            if (req.processingFee != null && req.processingFee > 0 && !String.isBlank(req.loanId)) {
+                createProcessingFeeTransaction(po.Id, req.loanId, req.processingFee);
+            }
             if (requiresApproval) {
                 String course = context != null ? context.course : null;
                 if (String.isBlank(course) && lead != null) {
@@ -339,6 +348,30 @@ public without sharing class PurchaseOrderService {
         txn.Payment__c = amountReceived;
         txn.Status__c  = STATUS_INITIATED;
         txn.Is_Down_Payment__c = true;
+        insert txn;
+    }
+
+    private static void createLoanTransaction(Id purchaseOrderId, Id loanId) {
+        if (purchaseOrderId == null || loanId == null) return;
+
+        Loan__c loan = [SELECT Amount_requested__c FROM Loan__c WHERE Id = :loanId LIMIT 1];
+
+        Transcation__c txn = new Transcation__c();
+        txn.Purchase_Orders__c = purchaseOrderId;
+        txn.Loan__c = loanId;
+        txn.Payment__c = loan != null ? loan.Amount_requested__c : null;
+        txn.Status__c = 'Received';
+        insert txn;
+    }
+
+    private static void createProcessingFeeTransaction(Id purchaseOrderId, Id loanId, Decimal feeAmount) {
+        if (purchaseOrderId == null || loanId == null || feeAmount == null || feeAmount <= 0) return;
+
+        Transcation__c txn = new Transcation__c();
+        txn.Purchase_Orders__c = purchaseOrderId;
+        txn.Loan__c = loanId;
+        txn.Payment__c = feeAmount;
+        txn.Status__c = 'Received';
         insert txn;
     }
 
@@ -472,6 +505,10 @@ public without sharing class PurchaseOrderService {
             po.Candidate__c = lead.Candidate__c;
         }
 
+        if (!String.isBlank(req.loanId)) {
+            po.Loan__c = req.loanId;
+        }
+
         po.Discount_Amount__c = req.discount;
         po.Phone_Number__c = req.phoneNumber;
         // po.Down_Payment__c = req.downPayment;
@@ -496,17 +533,18 @@ public without sharing class PurchaseOrderService {
 
             Lead candidate;
             if (leadRec.Candidate__c != null) {
-                candidate = [SELECT Street, City, State, PostalCode, Country, Shipping_Street__c, Shipping_City__c, Shipping_State__c, Shipping_Postal_Code__c, Shipping_Country__c FROM Lead WHERE Id = :leadRec.Candidate__c];
+                candidate = [SELECT Street, City, State, PostalCode, Country, Shipping_Street__c, Shipping_City__c, Shipping_State__c, Shipping_Postal_Code__c, Shipping_Country__c, Phone FROM Lead WHERE Id = :leadRec.Candidate__c];
             }
 
             if (leadRec.Student__c != null) {
-                Account acc = [SELECT BillingStreet, BillingCity, BillingState, BillingPostalCode, BillingCountry, ShippingStreet, ShippingCity, ShippingState, ShippingPostalCode, ShippingCountry FROM Account WHERE Id = :leadRec.Student__c];
+                Account acc = [SELECT BillingStreet, BillingCity, BillingState, BillingPostalCode, BillingCountry, ShippingStreet, ShippingCity, ShippingState, ShippingPostalCode, ShippingCountry, Phone FROM Account WHERE Id = :leadRec.Student__c];
 
                 res.billing.put('street', acc.BillingStreet);
                 res.billing.put('city', acc.BillingCity);
                 res.billing.put('state', acc.BillingState);
                 res.billing.put('postal', acc.BillingPostalCode);
                 res.billing.put('country', acc.BillingCountry);
+                res.phone = acc.Phone;
 
             } else if (candidate != null) {
                 res.billing.put('street', candidate.Street);
@@ -514,6 +552,7 @@ public without sharing class PurchaseOrderService {
                 res.billing.put('state', candidate.State);
                 res.billing.put('postal', candidate.PostalCode);
                 res.billing.put('country', candidate.Country);
+                res.phone = candidate.Phone;
             }
 
             if (candidate != null) {
@@ -577,7 +616,6 @@ public without sharing class PurchaseOrderService {
 
     private static void createLineItems(Id purchaseOrderId, List<LineItemRequest> items) {
         List<Purchase_Order_Line_Item__c> lines = new List<Purchase_Order_Line_Item__c>();
-        insert lines;
 
         for (LineItemRequest li : items) {
             Purchase_Order_Line_Item__c row = new Purchase_Order_Line_Item__c();
@@ -588,6 +626,9 @@ public without sharing class PurchaseOrderService {
             lines.add(row);
         }
 
+        if (!lines.isEmpty()) {
+            insert lines;
+        }
     }
 
     @AuraEnabled
@@ -625,7 +666,7 @@ public without sharing class PurchaseOrderService {
     @AuraEnabled(cacheable=true)
     public static List<Loan__c> getLoansForLead(Id recordId) {
         if (recordId == null) return new List<Loan__c>();
-        return [SELECT Id, Name, Loan_Provider__c, loan_status__c, application_id__c, Loan_Id__c FROM Loan__c WHERE Lead__c = :recordId];
+        return [SELECT Id, Name, Loan_Provider__c, loan_status__c, application_id__c, Loan_Id__c, Tenure__c FROM Loan__c WHERE Lead__c = :recordId AND loan_status__c IN ('Approved')];
     }
 
     @AuraEnabled
@@ -759,7 +800,17 @@ public without sharing class PurchaseOrderService {
                 // req.loanId is the Salesforce Id of the Loan record from LWC
                 List<Loan__c> loans = [SELECT Loan_Id__c FROM Loan__c WHERE Id = :req.loanId LIMIT 1];
                 if (!loans.isEmpty() && !String.isBlank(loans[0].Loan_Id__c)) {
-                    item.loan_id = loans[0].Loan_Id__c;
+                    String loanIdRaw = loans[0].Loan_Id__c;
+                    try {
+                        item.loan_id = Integer.valueOf(loanIdRaw);
+                    } catch (Exception ex) {
+                        try {
+                            Decimal loanDec = Decimal.valueOf(loanIdRaw);
+                            item.loan_id = loanDec != null ? Integer.valueOf(loanDec) : null;
+                        } catch (Exception ex2) {
+                            item.loan_id = null;
+                        }
+                    }
                 } else {
                     item.loan_id = null;
                 }

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Date_of_Birth_validation</fullName>
+    <active>true</active>
+    <errorConditionFormula>Date_Of_Birth__c &gt; ADDMONTHS(TODAY(), -216)</errorConditionFormula>
+    <errorMessage>Date of birth must be atleast 18 years old</errorMessage>
+</ValidationRule>

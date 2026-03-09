@@ -5,11 +5,11 @@
     <columns>LEAD.COMPANY</columns>
     <columns>LEAD.TITLE</columns>
     <columns>LEAD.STATE</columns>
+    <columns>LEAD.CREATED_DATE</columns>
     <columns>LEAD.EMAIL</columns>
     <columns>LEAD.STATUS</columns>
     <columns>CORE.USERS.FIRST_NAME</columns>
     <columns>CORE.USERS.LAST_NAME</columns>
-    <columns>LEAD.CREATED_DATE</columns>
     <columns>LEAD.CITY</columns>
     <columns>City__c</columns>
     <columns>LEAD.COUNTRY</columns>

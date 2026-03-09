@@ -5,13 +5,16 @@
     <columns>Click_to_Call__c</columns>
     <columns>Source__c</columns>
     <columns>Stage__c</columns>
+    <columns>CREATEDBY_USER</columns>
     <columns>Course__c</columns>
     <columns>Email__c</columns>
     <columns>CREATED_DATE</columns>
+    <columns>OWNER.LAST_NAME</columns>
     <columns>City__c</columns>
     <columns>Is_ReEnquiry__c</columns>
     <columns>Next_Follow_Up_Date__c</columns>
-    <columns>OWNER.LAST_NAME</columns>
+    <columns>Phone__c</columns>
+    <columns>Masked_Phone__c</columns>
     <filterScope>Everything</filterScope>
     <label>All</label>
 </ListView>

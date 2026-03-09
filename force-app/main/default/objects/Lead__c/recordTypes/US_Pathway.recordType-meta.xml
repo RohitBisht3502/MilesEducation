@@ -1,0 +1,569 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RecordType xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>US_Pathway</fullName>
+    <active>true</active>
+    <label>US Pathway</label>
+    <picklistValues>
+        <picklist>CAIRA_Level__c</picklist>
+        <values>
+            <fullName>Level 1</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Level 2</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Level 3</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>CPA_Eligibility_Status__c</picklist>
+        <values>
+            <fullName>Conditional Eligible</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Eligible for Exams</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Eligible for Exams and License</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Not Eligible</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Course_Bucket__c</picklist>
+        <values>
+            <fullName>Accounting Vertical</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>NA</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Course__c</picklist>
+        <values>
+            <fullName>US Pathway</fullName>
+            <default>true</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Engagement_Bucket__c</picklist>
+        <values>
+            <fullName>Enrolled</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Negative</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Neutral</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Positive</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Enrollment_Type__c</picklist>
+        <values>
+            <fullName>Enrolled %E2%80%93 No Payment</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Standard %E2%80%93 %E2%82%B910%2C000 Enrollment</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>GP_Lead_Status__c</picklist>
+        <values>
+            <fullName>Crosscheck %28USP Process%29</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>New lead</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Not eligible</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Recheck</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Refund</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Under Verification</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Verified</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Payment_Received__c</picklist>
+        <values>
+            <fullName>Fully Received</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Not Received</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Partially Received</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Primary_tag__c</picklist>
+        <values>
+            <fullName>All</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Delays</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>MHP</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Missed calls</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>NE</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Todays</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Untracked calls</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Queue_Stage__c</picklist>
+        <values>
+            <fullName>Q1</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Q2</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Source_Bucket__c</picklist>
+        <values>
+            <fullName>Bucket 1</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Bucket 2</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Bucket 3</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Bucket 4</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>NA</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Source__c</picklist>
+        <values>
+            <fullName>Advertisement</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Blog Marketing</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>CA-DB</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Email Marketing</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Facebook</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Facebook Ads</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Google Ads</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>IVR</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Incoming Call</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Instagram</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>LMS</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Linkedin InMails</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Live Chat</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Live Chat on Website</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>MF</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Manual Upload</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Miles One App</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Naukri</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Newsletter Marketing</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Organic</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Placement Drive</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Pre-Enrolled Leads</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Purchased Data</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Quora</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Referral</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Referral - Manual</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>SMS Marketing</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Social</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>SuperBot</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Times Jobs</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>TimesInternet</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Voice SMS</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Webinar Attended</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Website</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>WhatsApp BOT on Website</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Whatsapp Marketing</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Youtube</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Zoom Webinar</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>website-contact_us</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Stage__c</picklist>
+        <values>
+            <fullName>%28U7Drop%29 -Dropped</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U1</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U10</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U10-</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U11</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U12</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U13A</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U13B</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U13C</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U14</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U15</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U16</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U16%2B</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U17</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U17-</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U17D</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U17R</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U2</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U3</fullName>
+            <default>true</default>
+        </values>
+        <values>
+            <fullName>U3%2B</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U3%2B%2B</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U4</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U4-</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U5</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U6</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U7</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U7%2B</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U7A</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U7D</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U7R</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U8</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U8-</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U9</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>U9%2B</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Status_Change_Reason__c</picklist>
+        <values>
+            <fullName>Already Has Sufficient Credits</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Budget Constraints</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Course Not Suitable</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Joining Another University</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Other</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Timing Not Right</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Status__c</picklist>
+        <values>
+            <fullName>Approved</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Pending</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Rejected</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>USP_Eligibility_Status__c</picklist>
+        <values>
+            <fullName>Conditional Eligible</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Eligible</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Not Eligible</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>enrollment_status__c</picklist>
+        <values>
+            <fullName>Accepted</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Draft</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Sent</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+</RecordType>

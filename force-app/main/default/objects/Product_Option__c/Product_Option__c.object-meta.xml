@@ -148,15 +148,15 @@
     <enableFeeds>false</enableFeeds>
     <enableHistory>false</enableHistory>
     <enableLicensing>false</enableLicensing>
-    <enableReports>true</enableReports>
+    <enableReports>false</enableReports>
     <enableSearch>true</enableSearch>
     <enableSharing>true</enableSharing>
     <enableStreamingApi>true</enableStreamingApi>
-    <externalSharingModel>ReadWrite</externalSharingModel>
+    <externalSharingModel>Private</externalSharingModel>
     <label>Product Option</label>
     <nameField>
-        <displayFormat>POPT-{0000}</displayFormat>
-        <label>Name</label>
+        <displayFormat>Product Option - {0000}</displayFormat>
+        <label>Product Option Name</label>
         <type>AutoNumber</type>
     </nameField>
     <pluralLabel>Product Options</pluralLabel>

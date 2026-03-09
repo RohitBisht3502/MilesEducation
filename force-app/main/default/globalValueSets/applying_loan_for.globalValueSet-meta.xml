@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customValue>
+        <fullName>MYSELF</fullName>
+        <default>false</default>
+        <label>MYSELF</label>
+    </customValue>
+    <customValue>
+        <fullName>CHILD</fullName>
+        <default>false</default>
+        <label>CHILD</label>
+    </customValue>
+    <customValue>
+        <fullName>OTHER</fullName>
+        <default>false</default>
+        <label>OTHER</label>
+    </customValue>
+    <masterLabel>applying_loan_for</masterLabel>
+    <sorted>false</sorted>
+</GlobalValueSet>

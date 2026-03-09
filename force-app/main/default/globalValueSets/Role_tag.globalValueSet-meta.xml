@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customValue>
+        <fullName>CC</fullName>
+        <default>false</default>
+        <label>CC</label>
+    </customValue>
+    <customValue>
+        <fullName>SR</fullName>
+        <default>false</default>
+        <label>SR</label>
+    </customValue>
+    <customValue>
+        <fullName>GP</fullName>
+        <default>false</default>
+        <isActive>false</isActive>
+        <label>GP</label>
+    </customValue>
+    <customValue>
+        <fullName>MCom</fullName>
+        <default>false</default>
+        <isActive>false</isActive>
+        <label>MCom</label>
+    </customValue>
+    <customValue>
+        <fullName>DPP</fullName>
+        <default>false</default>
+        <isActive>false</isActive>
+        <label>DPP</label>
+    </customValue>
+    <masterLabel>Role tag</masterLabel>
+    <sorted>false</sorted>
+</GlobalValueSet>

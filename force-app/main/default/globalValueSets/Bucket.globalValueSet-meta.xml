@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customValue>
+        <fullName>Bucket 1</fullName>
+        <default>false</default>
+        <label>Bucket 1</label>
+    </customValue>
+    <customValue>
+        <fullName>Bucket 2</fullName>
+        <default>false</default>
+        <label>Bucket 2</label>
+    </customValue>
+    <customValue>
+        <fullName>Bucket 3</fullName>
+        <default>false</default>
+        <label>Bucket 3</label>
+    </customValue>
+    <customValue>
+        <fullName>Bucket 4</fullName>
+        <default>false</default>
+        <label>Bucket 4</label>
+    </customValue>
+    <customValue>
+        <fullName>NA</fullName>
+        <default>false</default>
+        <label>NA</label>
+    </customValue>
+    <masterLabel>Bucket</masterLabel>
+    <sorted>false</sorted>
+</GlobalValueSet>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customValue>
+        <fullName>Todays</fullName>
+        <default>false</default>
+        <label>Todays</label>
+    </customValue>
+    <customValue>
+        <fullName>Delays</fullName>
+        <default>false</default>
+        <label>Delays</label>
+    </customValue>
+    <customValue>
+        <fullName>Missed calls</fullName>
+        <default>false</default>
+        <label>Missed calls</label>
+    </customValue>
+    <customValue>
+        <fullName>Untracked calls</fullName>
+        <default>false</default>
+        <label>Untracked calls</label>
+    </customValue>
+    <customValue>
+        <fullName>NE</fullName>
+        <default>false</default>
+        <label>NE</label>
+    </customValue>
+    <customValue>
+        <fullName>MHP</fullName>
+        <default>false</default>
+        <label>MHP</label>
+    </customValue>
+    <customValue>
+        <fullName>All</fullName>
+        <default>false</default>
+        <label>All</label>
+    </customValue>
+    <masterLabel>Primary tag</masterLabel>
+    <sorted>false</sorted>
+</GlobalValueSet>

@@ -51,6 +51,9 @@ export default class EligibilityQuickAction extends LightningElement {
                     })
                 );
                 this.dispatchEvent(new CloseActionScreenEvent());
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);
             })
             .catch(error => {
                 let message = 'Something went wrong while enabling eligibility.';

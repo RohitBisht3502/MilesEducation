@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Applying_loan_for_other</fullName>
+    <active>true</active>
+    <errorConditionFormula>AND(
+    ISPICKVAL(Applying_loan_For__c, &quot;OTHER&quot;),
+    ISBLANK(Relationship_With_Applicant__c)
+)</errorConditionFormula>
+    <errorMessage>Please fill Relationship With Applicant when Applying Loan For is OTHER.</errorMessage>
+</ValidationRule>

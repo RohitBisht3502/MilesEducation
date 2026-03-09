@@ -282,6 +282,9 @@
                         message-when-range-overflow="Down payment cannot exceed total payable."
                         message-when-range-underflow={downPaymentMinMessage} onchange={handleDownPaymentChange}>
                     </lightning-input>
+                    <template if:true={processingFeeMessage}>
+                        <div class="approval-note">{processingFeeMessage} Total down payment: ₹{totalDownPayment}</div>
+                    </template>
                     <div class="approval-note">
                         {approvalHint}
                     </div>

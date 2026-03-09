@@ -7,13 +7,38 @@ Last Modified Date : 1 DEC 2025
 @RestResource(urlMapping='/milessite/*')
 global without sharing class MilesWebService {
 
-    private static final String EXPECTED_SECURITY_CODE = 'MY_SECURE_CODE_123';
-
     private enum EmailDecision {
         SAME_LEAD,              // Email exists with SAME Lead
         DIFFERENT_LEAD,         // Email exists with DIFFERENT Lead
         CREATED_AND_ASSOCIATED, // Email not exist -> created & associated
         ASSOCIATED_TO_LEAD      // Email existed but unlinked -> now linked (safe case)
+    }
+
+    private static String getFullFirstName(String firstName, String lastName) {
+        String combinedName = String.isBlank(lastName) ? firstName : firstName + ' ' + lastName;
+        return combinedName != null ? combinedName.trim() : null;
+    }
+
+    private static String getCourseFromCourseId(Integer courseId) {
+        if (courseId == null) return null;
+
+        switch on courseId {
+            when 1 {
+                return 'CPA';
+            }
+            when 2 {
+                return 'CMA';
+            }
+            when 3 {
+                return 'US Pathway';
+            }
+            when 4 {
+                return 'CAIRA';
+            }
+            when else {
+                return null;
+            }
+        }
     }
 
     @HttpPost
@@ -22,22 +47,6 @@ global without sharing class MilesWebService {
         RestResponse res = RestContext.response;
 
         try {
-            /* ------------ SECURITY CHECK ------------- */
-            // String securityCode = req.headers.get('securityCode');
-            // if (String.isBlank(securityCode)) {
-            //     IntegrationLogUtil.insertLogs(new List<Integration_Log__c>{
-            //         IntegrationLogUtil.buildLog('Enquiry', null, null, 'Missing required header: securityCode', 'FAILED', null)
-            //     });
-            //     res.statusCode = 400;
-            //     return new ApiResponse(false, 'Missing required header: securityCode', null);
-            // }
-            // if (securityCode != EXPECTED_SECURITY_CODE) {
-            //     IntegrationLogUtil.insertLogs(new List<Integration_Log__c>{
-            //         IntegrationLogUtil.buildLog('Enquiry', null, null, 'Unauthorized: Invalid security code. Provided=' + securityCode, 'FAILED', null)
-            //     });                
-            //     res.statusCode = 401;
-            //     return new ApiResponse(false, 'Unauthorized: Invalid security code', null);
-            // }
 
             /* ------------ BODY CHECK ------------- */
             String requestBody = (req.requestBody != null) ? req.requestBody.toString() : '';
@@ -58,17 +67,15 @@ global without sharing class MilesWebService {
             EnquiryWrapper inputData = (EnquiryWrapper) JSON.deserialize(requestBody, EnquiryWrapper.class);
 
             // ================= DUMMY DEFAULT VALUES =================
-            if (String.isBlank(inputData.city)) inputData.city = 'Mumbai';
-            if (String.isBlank(inputData.course)) inputData.course = 'CMA';
-            if (inputData.city_id == null) inputData.city_id = 8;
-            if (inputData.smsAllow == null) inputData.smsAllow = 1;
-            if (String.isBlank(inputData.coming_from)) inputData.coming_from = 'Facebook';
-            if (inputData.whatsappAllow == null) inputData.whatsappAllow = 1;
-            if (inputData.whatsapp_opt_in == null) inputData.whatsapp_opt_in = true;
-            if (String.isBlank(inputData.highestEducation)) inputData.highestEducation = 'Graduate';
-            if (String.isBlank(inputData.country_of_residence)) inputData.country_of_residence = 'India';
-            if (inputData.register_for_webinar == null) inputData.register_for_webinar = false;
-            if (String.isBlank(inputData.interested_webinar_id)) inputData.interested_webinar_id = 'ROMAN';
+            if (String.isBlank(inputData.city)) inputData.city = 'Delhi';
+            String derivedCourse = getCourseFromCourseId(inputData.course_id);
+            if (!String.isBlank(derivedCourse)) {
+                System.debug('MilesWebService derived course from course_id ' + inputData.course_id + ': ' + derivedCourse);
+                inputData.course = derivedCourse;
+            } else if (String.isBlank(inputData.course)) {
+                System.debug('MilesWebService no course mapping for course_id ' + inputData.course_id + '; defaulting course to CMA');
+                inputData.course = 'CMA';
+            }
             // ========================================================
 
             if (String.isBlank(inputData.first_name) || String.isBlank(inputData.phone)) {
@@ -79,12 +86,13 @@ global without sharing class MilesWebService {
                 return new ApiResponse(false, 'Missing required fields: first_name or phone', null);
             }
 
+            String fullFirstName = getFullFirstName(inputData.first_name, inputData.last_name);
             Boolean whatsappAllow = (inputData.whatsappAllow != null && inputData.whatsappAllow == 1);
 
             /* ------------ CREATE ENQUIRY ------------- */
             Enquiry__c enquiry = new Enquiry__c(
-                Name                     = inputData.first_name,
-                First_Name__c            = inputData.first_name,
+                Name                     = fullFirstName,
+                First_Name__c            = fullFirstName,
                 Phone_Number__c          = inputData.phone,
                 Email__c                 = inputData.email,
                 City__c                  = inputData.city,
@@ -151,10 +159,11 @@ global without sharing class MilesWebService {
 
                 // Create Candidate (Lead)
                 candidate = new Lead(
-                    LastName                 = inputData.first_name,
+                    LastName                 = fullFirstName,
                     Company                  = 'Miles Education',
                     Phone                    = inputData.phone,
                     Email                    = inputData.email,
+                    City__c                  = inputData.city,
                     Course__c                = inputData.course,
                     Coming_From__c           = inputData.coming_from,
                     Register_for_Webinar__c  = inputData.register_for_webinar,
@@ -165,9 +174,10 @@ global without sharing class MilesWebService {
 
                 // Create Lead__c
                 Lead__c newLead = new Lead__c(
-                    Name                     = inputData.first_name,
+                    Name                     = fullFirstName,
                     Phone__c                 = inputData.phone,
                     Email__c                 = inputData.email,
+                    City__c                  = inputData.city,
                     Stage__c                 = leadDefaultStage,
                     Course__c                = inputData.course,
                     Source__c                = inputData.coming_from,
@@ -205,10 +215,11 @@ global without sharing class MilesWebService {
                 if (!isConvertedStudent && shouldCreateCandidate) {
                     // Candidate Not Exist -> Create Candidate
                     candidate = new Lead(
-                        LastName                 = inputData.first_name,
+                        LastName                 = fullFirstName,
                         Company                  = 'Miles Education',
                         Phone                    = inputData.phone,
                         Email                    = inputData.email,
+                        City__c                  = inputData.city,
                         Course__c                = inputData.course,
                         Coming_From__c           = inputData.coming_from,
                         Register_for_Webinar__c  = inputData.register_for_webinar,
@@ -221,8 +232,22 @@ global without sharing class MilesWebService {
                 // For enquiry linking
                 enquiryCandidateId = (candidate != null ? candidate.Id : null);
                 Id candidateIdForLead = (enquiryCandidateId != null ? enquiryCandidateId : candidateIdFromPhone);
-                if (!String.isBlank(inputData.miles_uuid) && candidateIdForLead != null) {
-                    update new Lead(Id = candidateIdForLead, UUID__c = inputData.miles_uuid);
+                if (candidateIdForLead != null) {
+                    Lead candidateUpdate = new Lead(Id = candidateIdForLead);
+                    Boolean shouldUpdateCandidate = false;
+
+                    if (!String.isBlank(inputData.miles_uuid)) {
+                        candidateUpdate.UUID__c = inputData.miles_uuid;
+                        shouldUpdateCandidate = true;
+                    }
+                    if (!String.isBlank(inputData.city)) {
+                        candidateUpdate.City__c = inputData.city;
+                        shouldUpdateCandidate = true;
+                    }
+
+                    if (shouldUpdateCandidate) {
+                        update candidateUpdate;
+                    }
                 }
 
                 /* =====================================================
@@ -254,8 +279,16 @@ global without sharing class MilesWebService {
 
                     enquiryLeadId = existingLeadC.Id;
                     leadToReturn  = existingLeadC;
+                    Boolean shouldUpdateExistingLead = false;
                     if (existingLeadC.Candidate__c == null && candidateIdForLead != null) {
                         existingLeadC.Candidate__c = candidateIdForLead;
+                        shouldUpdateExistingLead = true;
+                    }
+                    if (!String.isBlank(inputData.city)) {
+                        existingLeadC.City__c = inputData.city;
+                        shouldUpdateExistingLead = true;
+                    }
+                    if (shouldUpdateExistingLead) {
                         update existingLeadC;
                     }
 
@@ -278,9 +311,10 @@ global without sharing class MilesWebService {
                     // Create lead with that course + tag the phone number + email associations
 
                     Lead__c newLead2 = new Lead__c(
-                        Name                     = inputData.first_name,
+                        Name                     = fullFirstName,
                         Phone__c                 = inputData.phone,
                         Email__c                 = inputData.email,
+                        City__c                  = inputData.city,
                         Stage__c                 = leadDefaultStage,
                         Course__c                = inputData.course,
                         Source__c                = inputData.coming_from,
@@ -319,8 +353,22 @@ global without sharing class MilesWebService {
             enquiry.Lead__c      = enquiryLeadId;
             update enquiry;
 
-            if (!String.isBlank(inputData.miles_uuid) && studentAccountId != null) {
-                update new Account(Id = studentAccountId, UUID__c = inputData.miles_uuid);
+            if (studentAccountId != null) {
+                Account studentUpdate = new Account(Id = studentAccountId);
+                Boolean shouldUpdateStudent = false;
+
+                if (!String.isBlank(inputData.miles_uuid)) {
+                    studentUpdate.UUID__c = inputData.miles_uuid;
+                    shouldUpdateStudent = true;
+                }
+                if (!String.isBlank(inputData.city)) {
+                    studentUpdate.City__c = inputData.city;
+                    shouldUpdateStudent = true;
+                }
+
+                if (shouldUpdateStudent) {
+                    update studentUpdate;
+                }
             }
 
             /* ------------------- CREATE FOLLOW-UP TASK ------------------- */
@@ -409,7 +457,7 @@ global without sharing class MilesWebService {
         if (String.isBlank(course)) return null;
         String courseKey = course.trim().toUpperCase();
         String rtName;
-        if (courseKey.contains('US PATHWAY')) {
+        if (courseKey.contains('US PATHWAY') || courseKey == 'USP') {
             rtName = 'US Pathway';
         } else if (courseKey.contains('CPA')) {
             rtName = 'CPA';
@@ -433,7 +481,7 @@ global without sharing class MilesWebService {
     private static String getDefaultStageForCourse(String course) {
         if (String.isBlank(course)) return 'M3';
         String courseKey = course.trim().toUpperCase();
-        if (courseKey.contains('US PATHWAY')) return 'U3';
+        if (courseKey.contains('US PATHWAY') || courseKey == 'USP') return 'U3';
         if (courseKey.contains('MCOM')) return 'B3';
         if (courseKey.contains('CPA') || courseKey.contains('CMA') || courseKey.contains('CAIRA')) return 'M3';
         return 'M3';
@@ -445,9 +493,11 @@ global without sharing class MilesWebService {
         public String email;
         public String phone;
         public String course;
+        public Integer course_id;
         public Integer city_id;
         public Integer smsAllow;
         public String first_name;
+        public String last_name;
         public String coming_from;
         public Integer whatsappAllow;
         public Boolean whatsapp_opt_in;
@@ -458,6 +508,7 @@ global without sharing class MilesWebService {
         public String campaign_tk;
         public String stage;
         public String miles_uuid;
+
     }
 
     global class ApiResponse {

@@ -155,8 +155,9 @@
     <externalSharingModel>Private</externalSharingModel>
     <label>Level Managment</label>
     <nameField>
+        <displayFormat>Level - {0000}</displayFormat>
         <label>LevelManagment Name</label>
-        <type>Text</type>
+        <type>AutoNumber</type>
     </nameField>
     <pluralLabel>Level Managments</pluralLabel>
     <searchLayouts></searchLayouts>

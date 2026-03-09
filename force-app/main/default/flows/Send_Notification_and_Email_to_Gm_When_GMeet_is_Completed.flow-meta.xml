@@ -233,15 +233,15 @@
             </value>
         </inputAssignments>
         <inputAssignments>
-            <field>Comment__c</field>
+            <field>Approver__c</field>
             <value>
-                <elementReference>Comment</elementReference>
+                <elementReference>Get_Event.Owner:User.Manager.Manager.Id</elementReference>
             </value>
         </inputAssignments>
         <inputAssignments>
-            <field>Approver__c</field>
+            <field>Comment__c</field>
             <value>
-                <elementReference>Get_Lead_Related_to_Event_Record.Owner:User.ManagerId</elementReference>
+                <elementReference>Comment</elementReference>
             </value>
         </inputAssignments>
         <object>Event</object>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Request_Amount_Validation</fullName>
+    <active>true</active>
+    <errorConditionFormula>OR(
+    AND(
+        OR(
+            ISPICKVAL(program_name__c , &quot;CPA&quot;),
+            ISPICKVAL(program_name__c , &quot;CMA&quot;)
+        ),
+        Amount_requested__c &gt; 79000
+    ),
+    AND(
+        ISPICKVAL(program_name__c , &quot;CAIRA&quot;),
+        Amount_requested__c &gt; 40000
+    )
+)</errorConditionFormula>
+    <errorMessage>Requested amount exceeds the maximum limit for the selected Program.
+CPA/CMA: Max 79,000
+CAIRA: Max 40,000</errorMessage>
+</ValidationRule>

@@ -61,6 +61,7 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
             dto.l1 = cl.L1__c;
             dto.l2 = cl.L2__c;
             dto.stage = cl.Stage__c;
+            
             res.add(dto);
         }
 

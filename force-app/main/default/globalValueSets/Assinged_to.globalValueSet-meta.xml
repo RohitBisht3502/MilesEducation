@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customValue>
+        <fullName>CC Spoc</fullName>
+        <default>false</default>
+        <label>CC Spoc</label>
+    </customValue>
+    <customValue>
+        <fullName>GP team</fullName>
+        <default>false</default>
+        <label>GP team</label>
+    </customValue>
+    <customValue>
+        <fullName>GP Spoc</fullName>
+        <default>false</default>
+        <label>GP Spoc</label>
+    </customValue>
+    <customValue>
+        <fullName>SR spoc</fullName>
+        <default>false</default>
+        <label>SR spoc</label>
+    </customValue>
+    <masterLabel>Assinged to</masterLabel>
+    <sorted>false</sorted>
+</GlobalValueSet>

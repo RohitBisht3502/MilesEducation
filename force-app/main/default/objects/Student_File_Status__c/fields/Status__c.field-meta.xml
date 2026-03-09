@@ -6,7 +6,6 @@
     <trackTrending>false</trackTrending>
     <type>Picklist</type>
     <valueSet>
-        <restricted>true</restricted>
         <valueSetDefinition>
             <sorted>false</sorted>
             <value>
@@ -18,6 +17,21 @@
                 <fullName>Yet to upload</fullName>
                 <default>false</default>
                 <label>Yet to upload</label>
+            </value>
+            <value>
+                <fullName>Pending to upload</fullName>
+                <default>false</default>
+                <label>Pending to upload</label>
+            </value>
+            <value>
+                <fullName>Re-upload</fullName>
+                <default>false</default>
+                <label>Re-upload</label>
+            </value>
+            <value>
+                <fullName>Approved</fullName>
+                <default>false</default>
+                <label>Approved</label>
             </value>
         </valueSetDefinition>
     </valueSet>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customValue>
+        <fullName>Connected</fullName>
+        <default>false</default>
+        <label>Connected</label>
+    </customValue>
+    <customValue>
+        <fullName>Not-Connected</fullName>
+        <default>false</default>
+        <label>Not-Connected</label>
+    </customValue>
+    <description>call disposition picklist</description>
+    <masterLabel>L1</masterLabel>
+    <sorted>false</sorted>
+</GlobalValueSet>

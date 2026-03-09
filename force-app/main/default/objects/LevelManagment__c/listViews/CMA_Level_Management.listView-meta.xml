@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>CMA_Level_Management</fullName>
+    <columns>NAME</columns>
+    <columns>Stages__c</columns>
+    <columns>New_Stage__c</columns>
+    <columns>Program_Name__c</columns>
+    <filterScope>Everything</filterScope>
+    <filters>
+        <field>Program_Name__c</field>
+        <operation>equals</operation>
+        <value>CMA</value>
+    </filters>
+    <label>CMA Level Management</label>
+</ListView>

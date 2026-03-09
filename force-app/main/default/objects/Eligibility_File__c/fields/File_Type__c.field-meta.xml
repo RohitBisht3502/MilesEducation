@@ -20,6 +20,16 @@
                 <default>false</default>
                 <label>Marksheet</label>
             </value>
+            <value>
+                <fullName>Resume</fullName>
+                <default>false</default>
+                <label>Resume</label>
+            </value>
+            <value>
+                <fullName>Work Experience</fullName>
+                <default>false</default>
+                <label>Work Experience</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

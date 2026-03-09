@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Bengaluru_Queue_Email</fullName>
+    <filterScope>Queue</filterScope>
+    <label>Bengaluru High Priority Queue</label>
+    <queue>Bengaluru_High_Priority_Queue</queue>
+    <sharedTo>
+        <allInternalUsers></allInternalUsers>
+    </sharedTo>
+</ListView>

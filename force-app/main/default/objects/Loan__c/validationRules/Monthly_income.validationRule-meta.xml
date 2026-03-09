@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Monthly_income</fullName>
+    <active>true</active>
+    <errorConditionFormula>AND(
+ ISPICKVAL(Earning_Status__c , &quot;Earning&quot;),
+ OR( ISBLANK(Monthly_Income__c),
+        Monthly_Income__c &lt; 1000)  
+)</errorConditionFormula>
+    <errorMessage>Please enter Monthly Income of at least 1000 when Earning Status is Earning.</errorMessage>
+</ValidationRule>

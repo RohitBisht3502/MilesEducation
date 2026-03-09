@@ -1,3 +1,4 @@
+// Author : Rohit singh bisht
 @RestResource(urlMapping='/Enrollment/Status/*')
 global without sharing class Webhook_EnrollmentFormStatus {
 
@@ -10,14 +11,7 @@ global without sharing class Webhook_EnrollmentFormStatus {
                 (Map<String, Object>) JSON.deserializeUntyped(requestBody);
 
             if (!payload.containsKey('purchaseOrderId') || !payload.containsKey('status')) {
-                IntegrationLogUtil.insertLog(
-                    'Enrollment Webhook',
-                    requestBody,
-                    'Missing required fields',
-                    null,
-                    'Failed',
-                    400
-                );
+                IntegrationLogUtil.insertLog('Enrollment Webhook', requestBody, 'Missing required fields', null, 'Failed', 400);
 
                 RestContext.response.statusCode = 400;
                 return new ApiResponse(false, 'Missing required fields', null, null);
@@ -28,42 +22,23 @@ global without sharing class Webhook_EnrollmentFormStatus {
 
             Set<String> allowedStatuses = new Set<String>{ 'Draft', 'Sent', 'Accepted' };
             if (!allowedStatuses.contains(status)) {
-                IntegrationLogUtil.insertLog(
-                    'Enrollment Webhook',
-                    requestBody,
-                    'Invalid status value: ' + status,
-                    'Invalid picklist value received',
-                    'Failed',
-                    400
-                );
+                IntegrationLogUtil.insertLog('Enrollment Webhook', requestBody, 'Invalid status value: ' + status, 'Invalid picklist value received', 'Failed', 400);
 
                 RestContext.response.statusCode = 400;
                 return new ApiResponse(false, 'Invalid status value: ' + status, externalPOId, status);
             }
 
-            List<Purchase_Order__c> poList = [
-                SELECT Id, Lead__c
-                FROM Purchase_Order__c
-                WHERE Purchase_Order_Id__c = :externalPOId
-                LIMIT 1
-            ];
+            List<Purchase_Order__c> poList = [SELECT Id, Lead__c,EF_Status__c FROM Purchase_Order__c WHERE Purchase_Order_Id__c = :externalPOId LIMIT 1];
 
             if (poList.isEmpty()) {
-                IntegrationLogUtil.insertLog(
-                    'Enrollment Webhook',
-                    requestBody,
-                    'Purchase order id not found',
-                    null,
-                    'Failed',
-                    404
-                );
+                IntegrationLogUtil.insertLog('Enrollment Webhook', requestBody, 'Purchase order id not found', null, 'Failed', 404);
 
                 RestContext.response.statusCode = 404;
                 return new ApiResponse(false, 'Purchase order id not found', externalPOId, status);
             }
 
             Purchase_Order__c po = poList[0];
-            po.Enrollment_Status__c = status;
+            po.EF_Status__c = status;
             update po;
 
             if (po.Lead__c != null) {
@@ -73,27 +48,13 @@ global without sharing class Webhook_EnrollmentFormStatus {
                 );
             }
 
-            IntegrationLogUtil.insertLog(
-                'Enrollment Webhook',
-                requestBody,
-                'Enrollment status updated successfully',
-                null,
-                'Success',
-                200
-            );
+            IntegrationLogUtil.insertLog('Enrollment Webhook', requestBody, 'Enrollment status updated successfully', null, 'Success', 200);
 
             RestContext.response.statusCode = 200;
             return new ApiResponse(true, 'Enrollment status updated successfully', externalPOId, status);
 
         } catch (Exception e) {
-            IntegrationLogUtil.insertLog(
-                'Enrollment Webhook',
-                requestBody,
-                null,
-                e.getMessage(),
-                'Failed',
-                500
-            );
+            IntegrationLogUtil.insertLog('Enrollment Webhook', requestBody, null, e.getMessage(), 'Failed', 500);
 
             RestContext.response.statusCode = 500;
             return new ApiResponse(false, 'Error: ' + e.getMessage(), null, null);

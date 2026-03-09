@@ -10,8 +10,23 @@
         <valueSetDefinition>
             <sorted>false</sorted>
             <value>
-                <fullName>CC - Pre Enrollment</fullName>
+                <fullName>Round Robin</fullName>
                 <default>true</default>
+                <label>Round Robin</label>
+            </value>
+            <value>
+                <fullName>Eligibility Criteria</fullName>
+                <default>false</default>
+                <label>Eligibility Criteria</label>
+            </value>
+            <value>
+                <fullName>MCOM</fullName>
+                <default>false</default>
+                <label>MCOM</label>
+            </value>
+            <value>
+                <fullName>CC - Pre Enrollment</fullName>
+                <default>false</default>
                 <label>CC - Pre Enrollment</label>
             </value>
             <value>
@@ -23,11 +38,6 @@
                 <fullName>GP</fullName>
                 <default>false</default>
                 <label>GP</label>
-            </value>
-            <value>
-                <fullName>MCOM</fullName>
-                <default>false</default>
-                <label>MCOM</label>
             </value>
         </valueSetDefinition>
     </valueSet>

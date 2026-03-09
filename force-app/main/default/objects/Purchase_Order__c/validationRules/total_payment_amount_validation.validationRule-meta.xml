@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>total_payment_amount_validation</fullName>
+    <active>false</active>
+    <errorConditionFormula>Total_Payment_Received__c &gt; Net_Payable_Amount__c</errorConditionFormula>
+    <errorMessage>Total Payment Received must be equal to Net Payable Amount.</errorMessage>
+</ValidationRule>

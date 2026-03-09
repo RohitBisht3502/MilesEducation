@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customValue>
+        <fullName>Earning</fullName>
+        <default>false</default>
+        <label>Earning</label>
+    </customValue>
+    <customValue>
+        <fullName>Not Earning</fullName>
+        <default>false</default>
+        <label>Not Earning</label>
+    </customValue>
+    <masterLabel>earning_status</masterLabel>
+    <sorted>false</sorted>
+</GlobalValueSet>

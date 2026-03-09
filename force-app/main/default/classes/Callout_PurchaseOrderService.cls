@@ -27,7 +27,7 @@ public without sharing class Callout_PurchaseOrderService {
         public Decimal agreed_fee;
         public Decimal discount;
 
-        public String loan_id;
+        public Integer loan_id;
 
         public Boolean has_training;
         public Boolean has_study_material;

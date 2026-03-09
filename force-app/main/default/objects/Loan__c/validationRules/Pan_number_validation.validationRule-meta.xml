@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Pan_number_validation</fullName>
+    <active>false</active>
+    <errorConditionFormula>NOT(
+    REGEX(PAN_number__c , &quot;^[A-Z]{5}[0-9]{4}[A-Z]{1}$&quot;)
+)</errorConditionFormula>
+    <errorMessage>pan number format is not correct</errorMessage>
+</ValidationRule>

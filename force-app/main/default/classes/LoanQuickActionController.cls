@@ -642,11 +642,11 @@ public with sharing class LoanQuickActionController {
 
     private static void applyCurrentAddressFromPermanentSingle(Loan__c loan) {
         if (loan == null) return;
-        if (loan.Current_Address_Same_As_Permanent__c == true) {
-            loan.flat_no__c = loan.permanent_flat_no__c;
-            loan.street__c = loan.permanent_street__c;
-            loan.land_mark__c = loan.permanent_land_mark__c;
-            loan.pincode__c = loan.permanent_pincode__c;
+        if (loan.Permanent_address_same_as_Current__c == true) {
+            loan.permanent_flat_no__c = loan.flat_no__c;
+            loan.permanent_street__c = loan.street__c;
+            loan.permanent_land_mark__c = loan.land_mark__c;
+            loan.permanent_pincode__c = loan.pincode__c;
         }
     }
 

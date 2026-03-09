@@ -4,6 +4,21 @@
     <active>true</active>
     <label>MCOM</label>
     <picklistValues>
+        <picklist>CAIRA_Level__c</picklist>
+        <values>
+            <fullName>Level 1</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Level 2</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Level 3</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
         <picklist>CPA_Eligibility_Status__c</picklist>
         <values>
             <fullName>Conditional Eligible</fullName>
@@ -60,6 +75,17 @@
         </values>
     </picklistValues>
     <picklistValues>
+        <picklist>Enrollment_Type__c</picklist>
+        <values>
+            <fullName>Enrolled %E2%80%93 No Payment</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Standard %E2%80%93 %E2%82%B910%2C000 Enrollment</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
         <picklist>GP_Lead_Status__c</picklist>
         <values>
             <fullName>Crosscheck %28USP Process%29</fullName>
@@ -82,11 +108,26 @@
             <default>false</default>
         </values>
         <values>
-            <fullName>Verification</fullName>
+            <fullName>Under Verification</fullName>
             <default>false</default>
         </values>
         <values>
             <fullName>Verified</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Payment_Received__c</picklist>
+        <values>
+            <fullName>Fully Received</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Not Received</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Partially Received</fullName>
             <default>false</default>
         </values>
     </picklistValues>
@@ -162,7 +203,95 @@
             <default>false</default>
         </values>
         <values>
+            <fullName>Blog Marketing</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>CA-DB</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Email Marketing</fullName>
+            <default>false</default>
+        </values>
+        <values>
             <fullName>Facebook</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Facebook Ads</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Google Ads</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>IVR</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Incoming Call</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Instagram</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>LMS</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Linkedin InMails</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Live Chat</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Live Chat on Website</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>MF</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Manual Upload</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Miles One App</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Naukri</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Newsletter Marketing</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Organic</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Placement Drive</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Pre-Enrolled Leads</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Purchased Data</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Quora</fullName>
             <default>false</default>
         </values>
         <values>
@@ -170,7 +299,55 @@
             <default>false</default>
         </values>
         <values>
+            <fullName>Referral - Manual</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>SMS Marketing</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Social</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>SuperBot</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Times Jobs</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>TimesInternet</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Voice SMS</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Webinar Attended</fullName>
+            <default>false</default>
+        </values>
+        <values>
             <fullName>Website</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>WhatsApp BOT on Website</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Whatsapp Marketing</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Youtube</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Zoom Webinar</fullName>
             <default>false</default>
         </values>
         <values>
@@ -275,6 +452,21 @@
         </values>
         <values>
             <fullName>Not Eligible</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>enrollment_status__c</picklist>
+        <values>
+            <fullName>Accepted</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Draft</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Sent</fullName>
             <default>false</default>
         </values>
     </picklistValues>

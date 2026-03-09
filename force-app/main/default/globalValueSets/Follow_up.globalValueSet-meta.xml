@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customValue>
+        <fullName>24 hours</fullName>
+        <default>false</default>
+        <label>24 hours</label>
+    </customValue>
+    <customValue>
+        <fullName>48 hours</fullName>
+        <default>false</default>
+        <label>48 hours</label>
+    </customValue>
+    <masterLabel>Follow up</masterLabel>
+    <sorted>false</sorted>
+</GlobalValueSet>

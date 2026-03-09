@@ -1,5 +1,14 @@
 // file: force-app/main/default/classes/EligibilityReviewController.cls
 public without sharing class EligibilityReviewController {
+    // Prevent duplicate outbound callouts within the same transaction.
+    private static Set<String> outboundDedupKeys = new Set<String>();
+
+    private static Boolean shouldSendOutbound(String key) {
+        if (String.isBlank(key)) return false;
+        if (outboundDedupKeys.contains(key)) return false;
+        outboundDedupKeys.add(key);
+        return true;
+    }
 
     // ----------- DTOs for LWC -----------
 
@@ -558,7 +567,12 @@ public without sharing class EligibilityReviewController {
         // Post to Datalake (async) except when Verified
         if (oldStatus != newStatus && (newStatusLower == null || newStatusLower != 'verified')) {
             try {
-                EligibilityResponseService.sendForFile(file.Id);
+                String dedupKey = 'file:' + String.valueOf(file.Id) + ':' + String.valueOf(newStatus);
+                if (shouldSendOutbound(dedupKey)) {
+                    EligibilityResponseService.sendForFile(file.Id);
+                } else {
+                    System.debug('Skipping duplicate outbound call for file: ' + file.Id);
+                }
             } catch (Exception e) {
                 System.debug('EligibilityReviewController.saveFile callout failed: ' + e.getMessage());
             }
@@ -656,7 +670,12 @@ public without sharing class EligibilityReviewController {
             && finalStatus != 'Approved'
             && finalStatus != 'Pending review') {
             try {
-                EligibilityResponseService.sendForDegreeFolder(oldFolder.Id);
+                String dedupKey = 'folder:' + String.valueOf(oldFolder.Id) + ':' + String.valueOf(finalStatus);
+                if (shouldSendOutbound(dedupKey)) {
+                    EligibilityResponseService.sendForDegreeFolder(oldFolder.Id);
+                } else {
+                    System.debug('Skipping duplicate outbound call for folder: ' + oldFolder.Id);
+                }
             } catch (Exception e) {
                 System.debug('EligibilityReviewController.updateFolderStatus callout failed: ' + e.getMessage());
             }

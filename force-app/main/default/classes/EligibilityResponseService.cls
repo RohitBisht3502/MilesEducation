@@ -3,7 +3,10 @@ public without sharing class EligibilityResponseService {
 
     @future(callout=true)
     public static void sendForFile(Id fileId) {
-        if (fileId == null) return;
+        if (fileId == null) {
+            logSkipped('sendForFile: missing fileId', null);
+            return;
+        }
 
         Eligibility_File__c file = [
             SELECT Id, Candidate__c, Student__c, Folder__c, File_UUID__c, Storage_Key__c, File_Format__c,
@@ -13,18 +16,14 @@ public without sharing class EligibilityResponseService {
             LIMIT 1
         ];
 
-        if ((file.Candidate__c == null && file.Student__c == null) || file.Folder__c == null) return;
-
-        Id primaryId = (file.Student__c != null) ? file.Student__c : file.Candidate__c;
-        EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByRecordId(primaryId);
-        String uuid = EligibilityRecordResolver.resolveUuid(ctx);
-        if (String.isBlank(uuid)) {
-            uuid = String.valueOf(primaryId);
+        if ((file.Candidate__c == null && file.Student__c == null) || file.Folder__c == null) {
+            logSkipped('sendForFile: missing candidate/student or folder', '{"fileId":"' + String.valueOf(fileId) + '"}');
+            return;
         }
 
-        // Get category + degree folders
         Eligibility_Folder__c fileFolder = [
-            SELECT Id, Name, Folder_Type__c, Parent_Folder__c, Qualification_Type__c, Degree_Title__c, Status__c, Comments__c
+            SELECT Id, Name, Folder_Type__c, Parent_Folder__c, Qualification_Type__c, Degree_Title__c, Status__c, Comments__c,
+                   Candidate__c, Student__c
             FROM Eligibility_Folder__c
             WHERE Id = :file.Folder__c
             LIMIT 1
@@ -32,85 +31,45 @@ public without sharing class EligibilityResponseService {
 
         String flatKey = resolveFlatFolderKey(fileFolder);
         if (String.isNotBlank(flatKey)) {
-            EligibilityDatalakeClient.FlatEligibilityResponsePayload payload = new EligibilityDatalakeClient.FlatEligibilityResponsePayload();
-            payload.sf_id = uuid;
-            payload.qualification_title = flatKey;
-            payload.qualification_comment = fileFolder.Comments__c;
-            payload.qualification_status = fileFolder.Status__c;
-
-            EligibilityDatalakeClient.FilePayload fp = mapFileToPayload(file);
-            payload.files = new List<EligibilityDatalakeClient.FilePayload>{ fp };
-
-            IntegrationLogService.LogParams logParams = new IntegrationLogService.LogParams();
-            logParams.integrationType = 'Outbound status file';
-            logParams.requestPayload = JSON.serialize(payload);
-
-            try {
-                EligibilityDatalakeClient.CalloutResult result =
-                    EligibilityDatalakeClient.postEligibilityResponseFlat(payload);
-                logParams.status = result.success ? 'Success' : 'failed';
-                logParams.responsePayload = result.body;
-                logParams.statusCode = result.statusCode;
-                logParams.errorMessage = result.success ? null : result.message;
-            } catch (Exception e) {
-                logParams.status = 'failed';
-                logParams.errorMessage = e.getMessage();
-            } finally {
-                IntegrationLogService.log(logParams);
+            String uuid = resolveUuidForRecord(file.Student__c, file.Candidate__c);
+            if (String.isBlank(uuid)) {
+                logSkipped('sendForFile: missing uuid for flat folder', '{"fileId":"' + String.valueOf(fileId) + '"}');
+                return;
             }
+            sendFlatFolderPayload(fileFolder, uuid);
             return;
         }
 
-        Eligibility_Folder__c degreeFolder = null;
-        if (fileFolder.Parent_Folder__c != null) {
-            degreeFolder = [
-                SELECT Id, Name, Degree_Title__c, Status__c, Comments__c
-                FROM Eligibility_Folder__c
-                WHERE Id = :fileFolder.Parent_Folder__c
-                LIMIT 1
-            ];
+        if (fileFolder.Parent_Folder__c == null) {
+            logSkipped('sendForFile: missing parent degree folder', '{"fileId":"' + String.valueOf(fileId) + '"}');
+            return;
         }
 
-        if (degreeFolder == null) return;
-
-        EligibilityDatalakeClient.EligibilityResponsePayload payload = new EligibilityDatalakeClient.EligibilityResponsePayload();
-        payload.sf_id = uuid;
-        payload.qualification_title = String.isNotBlank(degreeFolder.Degree_Title__c) ? degreeFolder.Degree_Title__c : degreeFolder.Name;
-        payload.qualification_comment = degreeFolder.Comments__c;
-        payload.qualification_status = degreeFolder.Status__c;
-
-        EligibilityDatalakeClient.FilePayload fp = mapFileToPayload(file);
-
-        payload.files = new EligibilityDatalakeClient.FilesPayload();
-        if (isCertificate(fileFolder)) {
-            payload.files.certificates = new List<EligibilityDatalakeClient.FilePayload>{ fp };
-            payload.files.mark_sheets = new List<EligibilityDatalakeClient.FilePayload>();
-        } else {
-            payload.files.mark_sheets = new List<EligibilityDatalakeClient.FilePayload>{ fp };
-            payload.files.certificates = new List<EligibilityDatalakeClient.FilePayload>();
+        Eligibility_Folder__c degreeFolder = [
+            SELECT Id, Candidate__c, Student__c, Name, Degree_Title__c, Status__c, Comments__c
+            FROM Eligibility_Folder__c
+            WHERE Id = :fileFolder.Parent_Folder__c
+            LIMIT 1
+        ];
+        if (degreeFolder == null) {
+            logSkipped('sendForFile: degree folder not found', '{"fileId":"' + String.valueOf(fileId) + '"}');
+            return;
         }
 
-        IntegrationLogService.LogParams logParams = new IntegrationLogService.LogParams();
-        logParams.integrationType = 'Outbound status file';
-        logParams.requestPayload = JSON.serialize(payload);
-
-        try {
-            EligibilityDatalakeClient.CalloutResult result = EligibilityDatalakeClient.postEligibilityResponse(payload);
-            logParams.status = result.success ? 'Success' : 'failed';
-            logParams.responsePayload = result.body;
-            logParams.statusCode = result.statusCode;
-            logParams.errorMessage = result.success ? null : result.message;
-        } catch (Exception e) {
-            logParams.status = 'failed';
-            logParams.errorMessage = e.getMessage();
-        } finally {
-            IntegrationLogService.log(logParams);
+        String uuid = resolveUuidForRecord(degreeFolder.Student__c, degreeFolder.Candidate__c);
+        if (String.isBlank(uuid)) {
+            logSkipped('sendForFile: missing uuid for degree folder', '{"fileId":"' + String.valueOf(fileId) + '"}');
+            return;
         }
+        sendDegreeFolderPayload(degreeFolder, uuid);
     }
 
     @future(callout=true)
     public static void sendForDegreeFolder(Id folderId) {
-        if (folderId == null) return;
+        if (folderId == null) {
+            logSkipped('sendForDegreeFolder: missing folderId', null);
+            return;
+        }
 
         Eligibility_Folder__c degreeFolder = [
             SELECT Id, Candidate__c, Student__c, Name, Degree_Title__c, Status__c, Comments__c
@@ -118,16 +77,52 @@ public without sharing class EligibilityResponseService {
             WHERE Id = :folderId
             LIMIT 1
         ];
-        if (degreeFolder.Candidate__c == null && degreeFolder.Student__c == null) return;
-
-        Id primaryId = (degreeFolder.Student__c != null) ? degreeFolder.Student__c : degreeFolder.Candidate__c;
-        EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByRecordId(primaryId);
-        String uuid = EligibilityRecordResolver.resolveUuid(ctx);
-        if (String.isBlank(uuid)) {
-            uuid = String.valueOf(primaryId);
+        if (degreeFolder.Candidate__c == null && degreeFolder.Student__c == null) {
+            logSkipped('sendForDegreeFolder: missing candidate/student', '{"folderId":"' + String.valueOf(folderId) + '"}');
+            return;
         }
 
-        // Collect category folders and their files
+        String uuid = resolveUuidForRecord(degreeFolder.Student__c, degreeFolder.Candidate__c);
+        if (String.isBlank(uuid)) {
+            logSkipped('sendForDegreeFolder: missing uuid', '{"folderId":"' + String.valueOf(folderId) + '"}');
+            return;
+        }
+        sendDegreeFolderPayload(degreeFolder, uuid);
+    }
+
+    @future(callout=true)
+    public static void sendForFlatFolder(Id folderId) {
+        if (folderId == null) {
+            logSkipped('sendForFlatFolder: missing folderId', null);
+            return;
+        }
+
+        Eligibility_Folder__c flatFolder = [
+            SELECT Id, Candidate__c, Student__c, Name, Folder_Type__c, Qualification_Type__c,
+                   Degree_Title__c, Status__c, Comments__c
+            FROM Eligibility_Folder__c
+            WHERE Id = :folderId
+            LIMIT 1
+        ];
+        if (flatFolder.Candidate__c == null && flatFolder.Student__c == null) {
+            logSkipped('sendForFlatFolder: missing candidate/student', '{"folderId":"' + String.valueOf(folderId) + '"}');
+            return;
+        }
+
+        String uuid = resolveUuidForRecord(flatFolder.Student__c, flatFolder.Candidate__c);
+        if (String.isBlank(uuid)) {
+            logSkipped('sendForFlatFolder: missing uuid', '{"folderId":"' + String.valueOf(folderId) + '"}');
+            return;
+        }
+        sendFlatFolderPayload(flatFolder, uuid);
+    }
+
+    private static void sendDegreeFolderPayload(Eligibility_Folder__c degreeFolder, String uuid) {
+        if (degreeFolder == null || String.isBlank(uuid)) {
+            logSkipped('sendDegreeFolderPayload: missing folder/uuid', null);
+            return;
+        }
+
         Map<String, Id> categoryIds = new Map<String, Id>();
         for (Eligibility_Folder__c cf : [
             SELECT Id, Folder_Type__c
@@ -187,22 +182,89 @@ public without sharing class EligibilityResponseService {
         payload.files.certificates = certs;
         payload.files.mark_sheets = marks;
 
-        IntegrationLogService.LogParams logParams = new IntegrationLogService.LogParams();
-        logParams.integrationType = 'Outbound status file';
-        logParams.requestPayload = JSON.serialize(payload);
+        // Datalake client already logs request/response for this outbound call.
+        EligibilityDatalakeClient.postEligibilityResponse(payload);
+    }
 
-        try {
-            EligibilityDatalakeClient.CalloutResult result = EligibilityDatalakeClient.postEligibilityResponse(payload);
-            logParams.status = result.success ? 'Success' : 'failed';
-            logParams.responsePayload = result.body;
-            logParams.statusCode = result.statusCode;
-            logParams.errorMessage = result.success ? null : result.message;
-        } catch (Exception e) {
-            logParams.status = 'failed';
-            logParams.errorMessage = e.getMessage();
-        } finally {
-            IntegrationLogService.log(logParams);
+    private static void sendFlatFolderPayload(Eligibility_Folder__c flatFolder, String uuid) {
+        if (flatFolder == null || String.isBlank(uuid)) {
+            logSkipped('sendFlatFolderPayload: missing folder/uuid', null);
+            return;
         }
+
+        List<Eligibility_File__c> files;
+        if (flatFolder.Student__c != null && flatFolder.Candidate__c != null) {
+            files = [
+                SELECT Id, Candidate__c, Student__c, Folder__c, File_UUID__c, Storage_Key__c, File_Format__c,
+                       Status__c, Comment__c, Name, File_Type__c
+                FROM Eligibility_File__c
+                WHERE (Student__c = :flatFolder.Student__c OR Candidate__c = :flatFolder.Candidate__c)
+                  AND Folder__c = :flatFolder.Id
+            ];
+        } else if (flatFolder.Student__c != null) {
+            files = [
+                SELECT Id, Candidate__c, Student__c, Folder__c, File_UUID__c, Storage_Key__c, File_Format__c,
+                       Status__c, Comment__c, Name, File_Type__c
+                FROM Eligibility_File__c
+                WHERE Student__c = :flatFolder.Student__c
+                  AND Folder__c = :flatFolder.Id
+            ];
+        } else {
+            files = [
+                SELECT Id, Candidate__c, Student__c, Folder__c, File_UUID__c, Storage_Key__c, File_Format__c,
+                       Status__c, Comment__c, Name, File_Type__c
+                FROM Eligibility_File__c
+                WHERE Candidate__c = :flatFolder.Candidate__c
+                  AND Folder__c = :flatFolder.Id
+            ];
+        }
+
+        List<EligibilityDatalakeClient.FilePayload> payloadFiles = new List<EligibilityDatalakeClient.FilePayload>();
+        for (Eligibility_File__c f : files) {
+            payloadFiles.add(mapFileToPayload(f));
+        }
+
+        String flatKey = resolveFlatFolderKey(flatFolder);
+        if (String.isBlank(flatKey)) {
+            flatKey = flatFolder.Name;
+        }
+
+        EligibilityDatalakeClient.FlatEligibilityResponsePayload payload = new EligibilityDatalakeClient.FlatEligibilityResponsePayload();
+        payload.sf_id = uuid;
+        payload.qualification_title = flatKey;
+        payload.qualification_comment = flatFolder.Comments__c;
+        payload.qualification_status = flatFolder.Status__c;
+        payload.files = payloadFiles;
+
+        // Datalake client already logs request/response for this outbound call.
+        EligibilityDatalakeClient.postEligibilityResponseFlat(payload);
+    }
+
+    private static String resolveUuidForRecord(Id studentId, Id candidateId) {
+        Id primaryId = (studentId != null) ? studentId : candidateId;
+        if (primaryId == null) return null;
+        EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByRecordId(primaryId);
+        String uuid = EligibilityRecordResolver.resolveUuid(ctx);
+        if (String.isBlank(uuid)) {
+            uuid = String.valueOf(primaryId);
+        }
+        return uuid;
+    }
+
+    private static void logSkipped(String reason, String requestPayload) {
+        IntegrationLogService.log(
+            'Outbound status file',
+            'Skipped',
+            truncate(requestPayload),
+            null,
+            null,
+            reason
+        );
+    }
+
+    private static String truncate(String value) {
+        if (String.isBlank(value)) return value;
+        return value.length() > 3000 ? value.substring(0, 3000) : value;
     }
 
     private static EligibilityDatalakeClient.FilePayload mapFileToPayload(Eligibility_File__c f) {

@@ -178,6 +178,10 @@ public without sharing class EligibilityUploadPathService {
         if (String.isBlank(raw)) return raw;
         String seg = raw.trim().toLowerCase();
         seg = seg.replace(' ', '_').replace('-', '_');
+        // Normalize marksheet variants to match expected folder path segment.
+        if (seg == 'marksheet' || seg == 'marksheets' || seg == 'mark_sheet' || seg == 'mark_sheets') {
+            return 'mark_sheets';
+        }
         return seg;
     }
 }

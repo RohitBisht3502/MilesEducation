@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customValue>
+        <fullName>Ascending</fullName>
+        <default>false</default>
+        <label>Ascending</label>
+    </customValue>
+    <customValue>
+        <fullName>Descending</fullName>
+        <default>false</default>
+        <label>Descending</label>
+    </customValue>
+    <customValue>
+        <fullName>Ascending (FIFO)</fullName>
+        <default>false</default>
+        <label>Ascending (FIFO)</label>
+    </customValue>
+    <customValue>
+        <fullName>Descending (LIFO)</fullName>
+        <default>false</default>
+        <label>Descending (LIFO)</label>
+    </customValue>
+    <masterLabel>Sequence Tag</masterLabel>
+    <sorted>false</sorted>
+</GlobalValueSet>

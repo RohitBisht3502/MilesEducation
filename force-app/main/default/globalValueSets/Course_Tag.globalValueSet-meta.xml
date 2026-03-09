@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customValue>
+        <fullName>CPA</fullName>
+        <default>false</default>
+        <label>CPA</label>
+    </customValue>
+    <customValue>
+        <fullName>CMA</fullName>
+        <default>false</default>
+        <label>CMA</label>
+    </customValue>
+    <customValue>
+        <fullName>MCOM</fullName>
+        <default>false</default>
+        <label>MCOM</label>
+    </customValue>
+    <customValue>
+        <fullName>CAIRA</fullName>
+        <default>false</default>
+        <label>CAIRA</label>
+    </customValue>
+    <customValue>
+        <fullName>US Pathway</fullName>
+        <default>false</default>
+        <label>US Pathway</label>
+    </customValue>
+    <customValue>
+        <fullName>NA</fullName>
+        <default>false</default>
+        <label>NA</label>
+    </customValue>
+    <masterLabel>Course Tag</masterLabel>
+    <sorted>false</sorted>
+</GlobalValueSet>

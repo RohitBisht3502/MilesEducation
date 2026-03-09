@@ -3,7 +3,7 @@ global class LeadCityUpdateBatch implements Database.Batchable<SObject>, Databas
     global Set<Id> leadIds;
 
     global LeadCityUpdateBatch(Set<Id> leadIds) {
-        this.leadIds = leadIds;
+        this.leadIds = leadIds;  
     }
 
     // -----------------------------

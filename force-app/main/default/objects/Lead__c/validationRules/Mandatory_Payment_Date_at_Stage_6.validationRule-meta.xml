@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Mandatory_Payment_Date_at_Stage_6</fullName>
+    <active>true</active>
+    <errorConditionFormula>AND(
+    ISBLANK(Expected_payment_date__c),
+    OR(
+        AND(
+            OR(
+                ISPICKVAL(Course__c, &quot;CPA&quot;),
+                ISPICKVAL(Course__c, &quot;CMA&quot;),
+                ISPICKVAL(Course__c, &quot;CAIRA&quot;)
+            ),
+            ISPICKVAL(Stage__c, &quot;M6&quot;)
+        ),
+        AND(
+            ISPICKVAL(Course__c, &quot;US Pathway&quot;),
+            ISPICKVAL(Stage__c, &quot;U6&quot;)
+        )
+    )
+)</errorConditionFormula>
+    <errorMessage>Expected Payment Date is mandatory at this Stage.</errorMessage>
+</ValidationRule>

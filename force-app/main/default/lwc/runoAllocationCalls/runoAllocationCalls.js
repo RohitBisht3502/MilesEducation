@@ -123,7 +123,7 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
 
     isDnd = false;
     isSpam = false;
-    // recordTypeStageMap = {};
+    recordTypeStageMap = {};
 
     // call state
     isLive = false;
@@ -145,6 +145,7 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
     savingFeedback = false;
     feedback = '';
     nextFollowUpDate = null;
+    expectedDate = null;
     notifyMe = false;
 
     handleNotifyChange(event) {
@@ -220,6 +221,13 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
     wiredObjectInfo({ data, error }) {
         if (data) {
             this.objectInfo = data;
+            if (!this.recordTypeId && data.defaultRecordTypeId) {
+                this.recordTypeId = data.defaultRecordTypeId;
+            }
+            const rts = Object.values(data.recordTypeInfos || {});
+            this.levelOptions = rts
+                .filter(rt => rt.available && !rt.master)
+                .map(rt => ({ label: rt.name, value: rt.name }));
         } else if (error) {
             console.error('Object info error', error);
         }
@@ -249,6 +257,12 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
                 label: v.label,
                 value: v.value
             }));
+            if (this.relatedLeadsLoaded) {
+                this.relatedLeads = (this.relatedLeads || []).map(r => ({
+                    ...r,
+                    stageOptions: this.stageOptions
+                }));
+            }
         } else if (error) {
             console.error('Stage load error', error);
         }
@@ -353,39 +367,35 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
         }
     }
 
-    async loadRelatedLeads() {
-        if (!this.candidateId) {
-            this.relatedLeads = [];
-            this.relatedLeadsLoaded = true;
-            return;
-        }
-
-        try {
-            const rows = await getRelatedLeads({
-                candidateId: this.candidateId
-            });
-
-            this.relatedLeads = (rows || []).map(r => {
-                const options =
-                    this.recordTypeStageMap[r.recordTypeId] ||
-                    this.stageOptions || [];
-
-                return {
-                    id: r.id,
-                    course: r.course || 'NA',
-                    stage: r.stage || '',
-                    stageOptions: options
-                };
-            });
-
-            this.relatedLeadsLoaded = true;
-
-        } catch (e) {
-            console.error('Related leads load failed:', e);
-            this.relatedLeads = [];
-            this.relatedLeadsLoaded = true;
-        }
+   async loadRelatedLeads() {
+    if (!this.candidateId) {
+        this.relatedLeads = [];
+        this.relatedLeadsLoaded = true;
+        return;
     }
+
+    try {
+        const rows = await getRelatedLeads({
+            candidateId: this.candidateId
+        });
+
+        this.relatedLeads = (rows || []).map(r => {
+            return {
+                id: r.id,
+                course: r.course || 'NA',
+                stage: r.stage || '',
+                stageOptions: this.stageOptions
+            };
+        });
+
+        this.relatedLeadsLoaded = true;
+
+    } catch (e) {
+        console.error('Related leads load failed:', e);
+        this.relatedLeads = [];
+        this.relatedLeadsLoaded = true;
+    }
+}
     // async loadStageOptionsForRecordType(recordTypeId) {
     //     if (this.recordTypeStageMap[recordTypeId]) {
     //         return this.recordTypeStageMap[recordTypeId];
@@ -676,15 +686,15 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
     }
 
     get filteredL1Options() {
-    if (!this.isApiResponseReceived) {
-        return this.l1Options;
-    }
+        if (!this.isApiResponseReceived) {
+            return this.l1Options;
+        }
 
-    // After API response → remove Not-Connected
-    return (this.l1Options || []).filter(
-        opt => opt.value !== 'Not-Connected'
-    );
-}
+        // After API response → remove Not-Connected
+        return (this.l1Options || []).filter(
+            opt => opt.value !== 'Not-Connected'
+        );
+    }
 
     get isMissedCall() {
         const tag = this.normalizedPrimaryTag;
@@ -774,9 +784,28 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
     }
 
     handleNextFollowUpDateChange(e) {
-        if (!this.autoSetFollowUp) {
-            this.nextFollowUpDate = e.target.value;
+        if (this.autoSetFollowUp) return;
+        const dateVal = e.target.value;
+        if (!dateVal) {
+            this.nextFollowUpDate = null;
+            return;
         }
+        const timeVal = this.nextFollowUpTimeOnly || '00:00';
+        this.nextFollowUpDate = `${dateVal}T${timeVal}`;
+    }
+
+    handleNextFollowUpTimeChange(e) {
+        if (this.autoSetFollowUp) return;
+        const timeVal = e.target.value;
+        if (!timeVal) {
+            return;
+        }
+        const dateVal = this.nextFollowUpDateOnly || new Date().toISOString().slice(0, 10);
+        this.nextFollowUpDate = `${dateVal}T${timeVal}`;
+    }
+
+    handleExpectedDateChange(e) {
+        this.expectedDate = e.target.value;
     }
 
     close() {
@@ -1340,6 +1369,19 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
 
     get disableFollowUpDateTime() {
         return this.disableUntilApi || this.autoSetFollowUp;
+    }
+
+    get nextFollowUpDateOnly() {
+        if (!this.nextFollowUpDate) return '';
+        const val = String(this.nextFollowUpDate);
+        return val.includes('T') ? val.split('T')[0] : val;
+    }
+
+    get nextFollowUpTimeOnly() {
+        if (!this.nextFollowUpDate) return '';
+        const val = String(this.nextFollowUpDate);
+        if (!val.includes('T')) return '';
+        return val.split('T')[1].slice(0, 5);
     }
 
     get disableL1() {

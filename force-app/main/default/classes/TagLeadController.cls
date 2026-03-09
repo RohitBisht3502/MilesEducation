@@ -52,7 +52,8 @@ public without sharing class TagLeadController {
         String l1, 
         String l2, 
         String feedback,
-        String nextFollowUpDate
+        String nextFollowUpDate,
+        Id recordTypeId
     ) {
         Lead__c customLeadRecord;
         
@@ -96,7 +97,44 @@ public without sharing class TagLeadController {
             
             customLeadRecord = new Lead__c();
             customLeadRecord.Name = name;
-            customLeadRecord.Course__c = course;
+            
+            // Determine Record Type based on Course Name
+            Id finalRecordTypeId = null;
+            if (String.isNotBlank(course)) {
+                String trimmedCourse = course.trim();
+                Schema.DescribeSObjectResult dsr = Lead__c.SObjectType.getDescribe();
+                
+                // Try to find Record Type that matches the Course Label
+                Schema.RecordTypeInfo matchRti = dsr.getRecordTypeInfosByName().get(trimmedCourse);
+                if (matchRti != null && matchRti.isAvailable() && !matchRti.isMaster()) {
+                    finalRecordTypeId = matchRti.getRecordTypeId();
+                }
+            }
+
+            // Fallback: If no course-specific record type, use passed ID or find default
+            if (finalRecordTypeId == null) {
+                finalRecordTypeId = recordTypeId;
+                if (finalRecordTypeId == null || String.valueOf(finalRecordTypeId).endsWith('AAA')) {
+                    Schema.DescribeSObjectResult dsr = Lead__c.SObjectType.getDescribe();
+                    for (Schema.RecordTypeInfo rti : dsr.getRecordTypeInfos()) {
+                        if (rti.isAvailable() && !rti.isMaster() && rti.isDefaultRecordTypeMapping()) {
+                            finalRecordTypeId = rti.getRecordTypeId();
+                            break;
+                        }
+                    }
+                    if (finalRecordTypeId == null || String.valueOf(finalRecordTypeId).endsWith('AAA')) {
+                        for (Schema.RecordTypeInfo rti : dsr.getRecordTypeInfos()) {
+                            if (rti.isAvailable() && !rti.isMaster()) {
+                                finalRecordTypeId = rti.getRecordTypeId();
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            customLeadRecord.RecordTypeId = finalRecordTypeId;
+            
+            customLeadRecord.Course__c = String.isNotBlank(course) ? course.trim() : null;
             customLeadRecord.Stage__c = 'M3';
             customLeadRecord.Email__c = email;
             customLeadRecord.Phone__c = phone;
@@ -107,7 +145,11 @@ public without sharing class TagLeadController {
                 customLeadRecord.Next_Follow_Up_Date__c = parseUiDateTime(nextFollowUpDate);
             }
             
-            insert customLeadRecord;
+            try {
+                insert customLeadRecord;
+            } catch (DmlException e) {
+                throw new AuraHandledException('Error creating Custom Lead: ' + e.getDmlMessage(0) + ' (Value passed: ' + course + ')');
+            }
             
             callLog.Lead__c = customLeadRecord.Id;
             callLog.L1__c = l1;

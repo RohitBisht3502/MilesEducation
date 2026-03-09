@@ -23,12 +23,12 @@
     <filters>
         <field>Type__c</field>
         <operation>equals</operation>
-        <value>CC - Pre Enrollment</value>
+        <value>Round Robin</value>
     </filters>
     <filters>
         <field>Lead_Source__c</field>
         <operation>equals</operation>
-        <value>Facebook</value>
+        <value>Google Ads</value>
     </filters>
     <filters>
         <field>Course_Bucket__c</field>

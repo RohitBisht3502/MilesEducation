@@ -5,7 +5,7 @@ import { getLayout } from 'lightning/uiLayoutApi';
 import getInitData from '@salesforce/apex/LoanQuickActionController.getInitData';
 import createLoan from '@salesforce/apex/LoanQuickActionController.createLoan';
 
-const CURRENT_ADDRESS_FLAG = 'Current_Address_Same_As_Permanent__c';
+const CURRENT_ADDRESS_FLAG = 'Permanent_address_same_as_Current__c';
 const CURRENT_FIELDS = ['flat_no__c', 'street__c', 'land_mark__c', 'pincode__c'];
 const PERMANENT_FIELDS = ['permanent_flat_no__c', 'permanent_street__c', 'permanent_land_mark__c', 'permanent_pincode__c'];
 
@@ -13,7 +13,7 @@ const EXCLUDED_FIELDS = new Set([
     'miles_loan_code__c',
     'loan_status__c',
     'application_id__c',
-    'redirection_url__c',
+    'Redirection_URL__c',
     'loan_id__c'
 ]);
 
@@ -257,7 +257,7 @@ export default class LoanCreateFromLead extends LightningElement {
             const currentField = CURRENT_FIELDS[i];
             const permanentField = PERMANENT_FIELDS[i];
             if (fields[permanentField] !== undefined) {
-                fields[currentField] = fields[permanentField];
+                fields[permanentField] = fields[currentField];
             }
         }
     }
@@ -316,6 +316,9 @@ export default class LoanCreateFromLead extends LightningElement {
                 if (typeof mobileInput.setCustomValidity === 'function') {
                     mobileInput.setCustomValidity('');
                 }
+                if (typeof mobileInput.reportValidity === 'function') {
+                    mobileInput.reportValidity();
+                }
                 if (String(mobileInput.value) !== value) {
                     mobileInput.value = value;
                     this.formValues[mobileApi] = value;
@@ -324,6 +327,9 @@ export default class LoanCreateFromLead extends LightningElement {
         } else {
             if (typeof mobileInput.setCustomValidity === 'function') {
                 mobileInput.setCustomValidity('');
+            }
+            if (typeof mobileInput.reportValidity === 'function') {
+                mobileInput.reportValidity();
             }
         }
         return true;
@@ -554,11 +560,13 @@ export default class LoanCreateFromLead extends LightningElement {
         if (provider === PROVIDERS.AVANSE) {
             if (AVANSE_PERMANENT_REQUIRED.has(key)) return true;
 
-            const sameAsPermanent = this.isTruthy(v['current_address_same_as_permanent__c']);
-            if (!sameAsPermanent && AVANSE_CURRENT_REQUIRED.has(key)) {
+            const sameAsCurrent = this.isTruthy(v['permanent_address_same_as_current__c']);
+            if (AVANSE_CURRENT_REQUIRED.has(key)) {
                 return true;
             }
-
+            if (!sameAsCurrent && AVANSE_PERMANENT_REQUIRED.has(key)) {
+                return true;
+            }
             if (key === 'applying_loan_for__c') return true;
             if (key === 'relationship_with_applicant__c') {
                 return v['applying_loan_for__c'] === 'OTHER';

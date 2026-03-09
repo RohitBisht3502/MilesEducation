@@ -3,6 +3,7 @@
     <fullName>AllAccounts</fullName>
     <columns>ACCOUNT.NAME</columns>
     <columns>ACCOUNT.ADDRESS1_STATE</columns>
+    <columns>ACCOUNT.CREATED_DATE</columns>
     <columns>ACCOUNT.TYPE</columns>
     <columns>CORE.USERS.FIRST_NAME</columns>
     <columns>CORE.USERS.LAST_NAME</columns>

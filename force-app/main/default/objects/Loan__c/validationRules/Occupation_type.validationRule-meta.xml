@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Occupation_type</fullName>
+    <active>true</active>
+    <errorConditionFormula>AND(
+    ISPICKVAL(Earning_Status__c, &quot;Earning&quot;),
+    ISBLANK(TEXT(Occupation_type__c))
+)</errorConditionFormula>
+    <errorMessage>Please fill occuption type  when earning status is earning</errorMessage>
+</ValidationRule>

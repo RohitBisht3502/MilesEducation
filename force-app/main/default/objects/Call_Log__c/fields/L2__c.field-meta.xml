@@ -6,7 +6,92 @@
     <trackTrending>false</trackTrending>
     <type>Picklist</type>
     <valueSet>
+        <controllingField>L1__c</controllingField>
         <restricted>true</restricted>
         <valueSetName>L2</valueSetName>
+        <valueSettings>
+            <controllingFieldValue>Connected</controllingFieldValue>
+            <valueName>Discussed</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Connected</controllingFieldValue>
+            <valueName>Request Call Back</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Connected</controllingFieldValue>
+            <valueName>Not Eligible</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Connected</controllingFieldValue>
+            <valueName>Wrong Number</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Connected</controllingFieldValue>
+            <valueName>Language Barrier</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Connected</controllingFieldValue>
+            <valueName>Visit Confirmed</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Connected</controllingFieldValue>
+            <valueName>Visit Completed</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Connected</controllingFieldValue>
+            <valueName>Visit Rescheduled</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Connected</controllingFieldValue>
+            <valueName>Visit Cancelled</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Connected</controllingFieldValue>
+            <valueName>Visit Booked By Mistake</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Connected</controllingFieldValue>
+            <valueName>Google Meet Completed</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Connected</controllingFieldValue>
+            <valueName>Google Meet Rescheduled</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Connected</controllingFieldValue>
+            <valueName>Google Meet Cancelled</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Connected</controllingFieldValue>
+            <valueName>Attended And Disconnected</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Connected</controllingFieldValue>
+            <valueName>Voice Mail</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Connected</controllingFieldValue>
+            <valueName>Not Interested (DND)</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Not-Connected</controllingFieldValue>
+            <valueName>Not Lifting</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Not-Connected</controllingFieldValue>
+            <valueName>Switched Off</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Not-Connected</controllingFieldValue>
+            <valueName>Not Reachable</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Not-Connected</controllingFieldValue>
+            <valueName>Busy</valueName>
+        </valueSettings>
+        <valueSettings>
+            <controllingFieldValue>Not-Connected</controllingFieldValue>
+            <valueName>Invalid Number</valueName>
+        </valueSettings>
     </valueSet>
 </CustomField>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Total_Payment_Received__c</fullName>
+    <label>Total Payment Received</label>
+    <summarizedField>Transcation__c.Payment__c</summarizedField>
+    <summaryFilterItems>
+        <field>Transcation__c.Status__c</field>
+        <operation>equals</operation>
+        <value>Received</value>
+    </summaryFilterItems>
+    <summaryForeignKey>Transcation__c.Purchase_Orders__c</summaryForeignKey>
+    <summaryOperation>sum</summaryOperation>
+    <trackTrending>false</trackTrending>
+    <type>Summary</type>
+</CustomField>

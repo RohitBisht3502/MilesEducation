@@ -146,6 +146,23 @@ export default class PurchaseOrderProductSelector extends LightningElement {
         return this.loans && this.loans.length > 0;
     }
 
+    get processingFee() {
+        const tenureMonths = this.getSelectedLoanTenureMonths();
+        if (tenureMonths === 6) return 2500;
+        if (tenureMonths === 12) return 5000;
+        return 0;
+    }
+
+    get processingFeeMessage() {
+        const fee = this.processingFee;
+        if (!fee) return '';
+        return `Processing fee â‚¹${fee} applied.`;
+    }
+
+    get totalDownPayment() {
+        return (Number(this.downPayment) || 0) + (Number(this.processingFee) || 0);
+    }
+
     get formattedLoans() {
         return this.loans.map(l => ({
             ...l,
@@ -312,7 +329,8 @@ export default class PurchaseOrderProductSelector extends LightningElement {
                 name: l.Name,
                 provider: l.Loan_Provider__c,
                 status: l.loan_status__c,
-                appId: l.application_id__c
+                appId: l.application_id__c,
+                tenure: l.Tenure__c
             }));
 
             const addressStatus = await checkAddressByRecordId({ recordId: this.recordId });
@@ -471,6 +489,7 @@ export default class PurchaseOrderProductSelector extends LightningElement {
             leadId: this.recordId,
             discount: this.discountAmount,
             downPayment: this.downPayment,
+            processingFee: this.processingFee,
             phoneNumber: this.shippingPhone,
             addressType: 'shipping',
             approvalComments: this.approvalComments,
@@ -554,6 +573,7 @@ export default class PurchaseOrderProductSelector extends LightningElement {
                     country: shipping.country || ''
                 }
             };
+            this.shippingPhone = res?.phone || '';
         } catch (error) {
             this.showToast('Error', error.body?.message || error.message, 'error');
         }
@@ -596,6 +616,15 @@ export default class PurchaseOrderProductSelector extends LightningElement {
         input.setCustomValidity(message);
         input.reportValidity();
         return !message;
+    }
+
+    getSelectedLoanTenureMonths() {
+        if (!this.selectedLoanId || !this.loans || !this.loans.length) return null;
+        const loan = this.loans.find(l => l.id === this.selectedLoanId);
+        if (!loan || !loan.tenure) return null;
+        const match = String(loan.tenure).match(/(\d+)/);
+        if (!match) return null;
+        return Number(match[1]) || null;
     }
     syncDownPayment() {
         const input = this.template.querySelector('lightning-input[data-id="downPayment"]');

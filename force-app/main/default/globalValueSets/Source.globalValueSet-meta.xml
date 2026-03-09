@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customValue>
+        <fullName>Facebook</fullName>
+        <default>false</default>
+        <label>Facebook</label>
+    </customValue>
+    <customValue>
+        <fullName>Advertisement</fullName>
+        <default>false</default>
+        <label>Advertisement</label>
+    </customValue>
+    <customValue>
+        <fullName>website-contact_us</fullName>
+        <default>false</default>
+        <label>website-contact_us</label>
+    </customValue>
+    <customValue>
+        <fullName>Website</fullName>
+        <default>false</default>
+        <label>Website</label>
+    </customValue>
+    <customValue>
+        <fullName>Referral</fullName>
+        <default>false</default>
+        <label>Referral</label>
+    </customValue>
+    <customValue>
+        <fullName>Google Ads</fullName>
+        <default>false</default>
+        <label>Google Ads</label>
+    </customValue>
+    <customValue>
+        <fullName>IVR</fullName>
+        <default>false</default>
+        <label>IVR</label>
+    </customValue>
+    <customValue>
+        <fullName>Organic</fullName>
+        <default>false</default>
+        <label>Organic</label>
+    </customValue>
+    <customValue>
+        <fullName>Whatsapp Marketing</fullName>
+        <default>false</default>
+        <label>Whatsapp Marketing</label>
+    </customValue>
+    <customValue>
+        <fullName>WhatsApp BOT on Website</fullName>
+        <default>false</default>
+        <label>WhatsApp BOT on Website</label>
+    </customValue>
+    <customValue>
+        <fullName>Live Chat on Website</fullName>
+        <default>false</default>
+        <label>Live Chat on Website</label>
+    </customValue>
+    <customValue>
+        <fullName>SuperBot</fullName>
+        <default>false</default>
+        <label>SuperBot</label>
+    </customValue>
+    <customValue>
+        <fullName>Facebook Ads</fullName>
+        <default>false</default>
+        <label>Facebook Ads</label>
+    </customValue>
+    <customValue>
+        <fullName>Email Marketing</fullName>
+        <default>false</default>
+        <label>Email Marketing</label>
+    </customValue>
+    <customValue>
+        <fullName>Miles One App</fullName>
+        <default>false</default>
+        <label>Miles One App</label>
+    </customValue>
+    <customValue>
+        <fullName>Referral - Manual</fullName>
+        <default>false</default>
+        <label>Referral - Manual</label>
+    </customValue>
+    <customValue>
+        <fullName>Zoom Webinar</fullName>
+        <default>false</default>
+        <label>Zoom Webinar</label>
+    </customValue>
+    <customValue>
+        <fullName>Social</fullName>
+        <default>false</default>
+        <label>Social</label>
+    </customValue>
+    <customValue>
+        <fullName>TimesInternet</fullName>
+        <default>false</default>
+        <label>TimesInternet</label>
+    </customValue>
+    <customValue>
+        <fullName>SMS Marketing</fullName>
+        <default>false</default>
+        <label>SMS Marketing</label>
+    </customValue>
+    <customValue>
+        <fullName>Newsletter Marketing</fullName>
+        <default>false</default>
+        <label>Newsletter Marketing</label>
+    </customValue>
+    <customValue>
+        <fullName>Youtube</fullName>
+        <default>false</default>
+        <label>Youtube</label>
+    </customValue>
+    <customValue>
+        <fullName>Live Chat</fullName>
+        <default>false</default>
+        <label>Live Chat</label>
+    </customValue>
+    <customValue>
+        <fullName>Incoming Call</fullName>
+        <default>false</default>
+        <label>Incoming Call</label>
+    </customValue>
+    <customValue>
+        <fullName>Instagram</fullName>
+        <default>false</default>
+        <label>Instagram</label>
+    </customValue>
+    <customValue>
+        <fullName>CA-DB</fullName>
+        <default>false</default>
+        <label>CA-DB</label>
+    </customValue>
+    <customValue>
+        <fullName>Blog Marketing</fullName>
+        <default>false</default>
+        <label>Blog Marketing</label>
+    </customValue>
+    <customValue>
+        <fullName>Times Jobs</fullName>
+        <default>false</default>
+        <label>Times Jobs</label>
+    </customValue>
+    <customValue>
+        <fullName>Placement Drive</fullName>
+        <default>false</default>
+        <label>Placement Drive</label>
+    </customValue>
+    <customValue>
+        <fullName>Naukri</fullName>
+        <default>false</default>
+        <label>Naukri</label>
+    </customValue>
+    <customValue>
+        <fullName>Quora</fullName>
+        <default>false</default>
+        <label>Quora</label>
+    </customValue>
+    <customValue>
+        <fullName>Purchased Data</fullName>
+        <default>false</default>
+        <label>Purchased Data</label>
+    </customValue>
+    <customValue>
+        <fullName>Voice SMS</fullName>
+        <default>false</default>
+        <label>Voice SMS</label>
+    </customValue>
+    <customValue>
+        <fullName>LMS</fullName>
+        <default>false</default>
+        <label>LMS</label>
+    </customValue>
+    <customValue>
+        <fullName>Manual Upload</fullName>
+        <default>false</default>
+        <label>Manual Upload</label>
+    </customValue>
+    <customValue>
+        <fullName>Webinar Attended</fullName>
+        <default>false</default>
+        <label>Webinar Attended</label>
+    </customValue>
+    <customValue>
+        <fullName>MF</fullName>
+        <default>false</default>
+        <label>MF</label>
+    </customValue>
+    <customValue>
+        <fullName>Linkedin InMails</fullName>
+        <default>false</default>
+        <label>Linkedin InMails</label>
+    </customValue>
+    <customValue>
+        <fullName>Pre-Enrolled Leads</fullName>
+        <default>false</default>
+        <label>Pre-Enrolled Leads</label>
+    </customValue>
+    <masterLabel>Source</masterLabel>
+    <sorted>false</sorted>
+</GlobalValueSet>

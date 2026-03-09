@@ -155,8 +155,9 @@
     <externalSharingModel>Private</externalSharingModel>
     <label>Email</label>
     <nameField>
+        <displayFormat>Email - {0000}</displayFormat>
         <label>Email Name</label>
-        <type>Text</type>
+        <type>AutoNumber</type>
     </nameField>
     <pluralLabel>Emails</pluralLabel>
     <searchLayouts></searchLayouts>

@@ -25,6 +25,19 @@ public without sharing class EligibilityFileService {
 
     @AuraEnabled
     public static SimpleResponse handleNewQualification(String inputJson) {
+        return handleNewQualificationInternal(inputJson, true, false);
+    }
+
+    // For API-driven uploads (skip outbound folder sync)
+    public static SimpleResponse handleNewQualificationApi(String inputJson) {
+        return handleNewQualificationInternal(inputJson, false, true);
+    }
+
+    private static SimpleResponse handleNewQualificationInternal(
+        String inputJson,
+        Boolean triggerOutboundSync,
+        Boolean deleteMissingFiles
+    ) {
         SimpleResponse res = new SimpleResponse();
         res.success = false;
         res.message = 'Unknown error';
@@ -126,7 +139,8 @@ public without sharing class EligibilityFileService {
                     input.certificateFiles,
                     toUpsert,
                     toDelete,
-                    affectedFolderIds
+                    affectedFolderIds,
+                    deleteMissingFiles
                 );
             }
 
@@ -139,7 +153,8 @@ public without sharing class EligibilityFileService {
                     input.marksheetFiles,
                     toUpsert,
                     toDelete,
-                    affectedFolderIds
+                    affectedFolderIds,
+                    deleteMissingFiles
                 );
             }
 
@@ -179,6 +194,21 @@ public without sharing class EligibilityFileService {
                 );
             }
 
+            if (triggerOutboundSync && (!toUpsert.isEmpty() || !toDelete.isEmpty())) {
+                try {
+                    EligibilityResponseService.sendForDegreeFolder(degreeFolder.Id);
+                } catch (Exception e) {
+                    IntegrationLogUtil.insertLog(
+                        'Eligibility File Service - NewQualification',
+                        null,
+                        null,
+                        truncate('Datalake sync failed: ' + e.getMessage()),
+                        'Warning',
+                        null
+                    );
+                }
+            }
+
             res.success = true;
             res.message = 'Qualification files synced successfully.';
             return res;
@@ -192,6 +222,25 @@ public without sharing class EligibilityFileService {
         String salesforceId,
         String flatFolderKey,
         List<IncomingFile> incoming
+    ) {
+        return handleMainFolderFilesInternal(salesforceId, flatFolderKey, incoming, true, false);
+    }
+
+    // For API-driven uploads (skip outbound folder sync)
+    public static SimpleResponse handleMainFolderFilesApi(
+        String salesforceId,
+        String flatFolderKey,
+        List<IncomingFile> incoming
+    ) {
+        return handleMainFolderFilesInternal(salesforceId, flatFolderKey, incoming, false, true);
+    }
+
+    private static SimpleResponse handleMainFolderFilesInternal(
+        String salesforceId,
+        String flatFolderKey,
+        List<IncomingFile> incoming,
+        Boolean triggerOutboundSync,
+        Boolean deleteMissingFiles
     ) {
         SimpleResponse res = new SimpleResponse();
         res.success = false;
@@ -248,7 +297,8 @@ public without sharing class EligibilityFileService {
                 incoming,
                 toUpsert,
                 toDelete,
-                affectedFolderIds
+                affectedFolderIds,
+                deleteMissingFiles
             );
 
             if (toUpsert.isEmpty()) {
@@ -292,6 +342,21 @@ public without sharing class EligibilityFileService {
                     'Warning',
                     null
                 );
+            }
+
+            if (triggerOutboundSync && (!toUpsert.isEmpty() || !toDelete.isEmpty())) {
+                try {
+                    EligibilityResponseService.sendForFlatFolder(mainFolder.Id);
+                } catch (Exception e) {
+                    IntegrationLogUtil.insertLog(
+                        'Eligibility File Service - MainFolder',
+                        null,
+                        null,
+                        truncate('Datalake sync failed: ' + e.getMessage()),
+                        'Warning',
+                        null
+                    );
+                }
             }
 
             res.success = true;
@@ -341,7 +406,7 @@ public without sharing class EligibilityFileService {
             return res;
         }
 
-        return handleMainFolderFiles(salesforceId, flatFolderKey, incoming);
+        return handleMainFolderFilesInternal(salesforceId, flatFolderKey, incoming, true, false);
     }
 
     private static SimpleResponse fail(
@@ -415,9 +480,17 @@ public without sharing class EligibilityFileService {
         List<IncomingFile> incoming,
         List<Eligibility_File__c> toUpsert,
         List<Eligibility_File__c> toDelete,
-        Set<Id> affectedFolderIds
+        Set<Id> affectedFolderIds,
+        Boolean deleteMissingFiles
     ) {
         if (incoming == null) incoming = new List<IncomingFile>();
+
+        List<IncomingFile> validIncoming = new List<IncomingFile>();
+        for (IncomingFile inf : incoming) {
+            if (inf == null) continue;
+            if (String.isBlank(inf.uuid) || String.isBlank(inf.path)) continue;
+            validIncoming.add(inf);
+        }
 
         List<Eligibility_File__c> existing;
         if (studentId != null && candidateId != null) {
@@ -457,21 +530,24 @@ public without sharing class EligibilityFileService {
         }
 
         Set<String> incomingUuids = new Set<String>();
-        for (IncomingFile inf : incoming) {
-            if (String.isBlank(inf.uuid)) continue;
+        for (IncomingFile inf : validIncoming) {
             incomingUuids.add(inf.uuid);
 
             Eligibility_File__c existingFile = existingByUuid.get(inf.uuid);
             String fileName = !String.isBlank(inf.fileName) ? inf.fileName : extractFileName(inf.path);
 
             if (existingFile != null) {
+                String statusToSet = existingFile.Status__c;
+                if (String.isBlank(statusToSet)) {
+                    statusToSet = 'Submitted';
+                }
                 Eligibility_File__c upd = new Eligibility_File__c(
                     Id = existingFile.Id,
                     Name = fileName,
                     Storage_Key__c = inf.path,
                     File_Format__c = inf.format,
                     File_Type__c = logicalFileType,
-                    Status__c = 'Submitted'
+                    Status__c = statusToSet
                 );
                 if (candidateId != null) {
                     upd.Candidate__c = candidateId;
@@ -499,15 +575,29 @@ public without sharing class EligibilityFileService {
             }
         }
 
-        for (Eligibility_File__c ef : existing) {
-            if (!String.isBlank(ef.File_UUID__c) && !incomingUuids.contains(ef.File_UUID__c)) {
-                toDelete.add(ef);
+        if (deleteMissingFiles) {
+            for (Eligibility_File__c ef : existing) {
+                if (String.isBlank(ef.File_UUID__c) || !incomingUuids.contains(ef.File_UUID__c)) {
+                    toDelete.add(ef);
+                }
+            }
+        } else if (!incomingUuids.isEmpty()) {
+            for (Eligibility_File__c ef : existing) {
+                if (isRecheckStatus(ef.Status__c) && !incomingUuids.contains(ef.File_UUID__c)) {
+                    toDelete.add(ef);
+                }
             }
         }
 
-        if (!incoming.isEmpty() || !existing.isEmpty()) {
+        if (!validIncoming.isEmpty() || !existing.isEmpty()) {
             affectedFolderIds.add(folderId);
         }
+    }
+
+    private static Boolean isRecheckStatus(String status) {
+        if (String.isBlank(status)) return false;
+        String normalized = status.toLowerCase().replace(' ', '');
+        return normalized == 'recheck/reupload' || normalized == 'recheckreupload';
     }
 
     private static void createUploadDocTasks(Id candidateId, Id studentId, NewQualificationRequest req) {

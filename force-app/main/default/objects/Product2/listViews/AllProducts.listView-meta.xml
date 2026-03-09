@@ -6,7 +6,6 @@
     <columns>PRODUCT2.DESCRIPTION</columns>
     <columns>PRODUCT2.FAMILY</columns>
     <columns>PRODUCT2.ACTIVE</columns>
-    <columns>Bundle_Product__c</columns>
     <columns>Type__c</columns>
     <columns>PRODUCT2.QTY_UNIT_OF_MEASURE</columns>
     <columns>PRODUCT2.SKU</columns>
