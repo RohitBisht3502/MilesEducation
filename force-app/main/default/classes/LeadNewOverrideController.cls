@@ -141,7 +141,6 @@ public with sharing class LeadNewOverrideController {
 
             if (existingPhone == null) {
                 Phone_Number__c phoneRec = new Phone_Number__c(
-                    Name         = phone,
                     Phone__c     = phone,
                     Lead__c      = newLead.Id,
                     Candidate__c = candidate.Id,
@@ -273,7 +272,6 @@ public with sharing class LeadNewOverrideController {
 
             if (existingPhone == null) {
                 Phone_Number__c phoneRec = new Phone_Number__c(
-                    Name         = phone,
                     Phone__c     = phone,
                     Lead__c      = newLead.Id,
                     Candidate__c = candidate.Id,

@@ -2,7 +2,7 @@ import { LightningElement, wire, track } from 'lwc';
 import { CurrentPageReference } from 'lightning/navigation';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { CloseActionScreenEvent } from 'lightning/actions';
-
+import { NavigationMixin } from 'lightning/navigation';
 import getActiveProducts from '@salesforce/apex/PurchaseOrderService.getActiveProducts';
 import savePurchaseOrder from '@salesforce/apex/PurchaseOrderService.save';
 import checkAddressByRecordId from '@salesforce/apex/PurchaseOrderService.checkAddressByRecordId';
@@ -12,17 +12,18 @@ import getMinimumDownPayment from '@salesforce/apex/PurchaseOrderService.getMini
 import getDiscountThreshold from '@salesforce/apex/PurchaseOrderService.getDiscountThreshold';
 import getLoansForLead from '@salesforce/apex/PurchaseOrderService.getLoansForLead';
 import MINIMUM_DOWNPAYMENT from '@salesforce/label/c.Minimum_Downpayment';
+import { refreshApex } from '@salesforce/apex';
 
 const MAX_DISCOUNT_PERCENT = 100;
 
-export default class PurchaseOrderProductSelector extends LightningElement {
+export default class PurchaseOrderProductSelector extends NavigationMixin(LightningElement){
     @track products = [];
     @track loans = [];
     selectedLoanId = null;
     searchKey = '';
     showCheckout = false;
     discountType = 'fixed';
-
+wiredProductsResult;
     discountValue = 0;
     downPayment = 0;
     selectedAddressType = 'billing';
@@ -67,22 +68,26 @@ export default class PurchaseOrderProductSelector extends LightningElement {
     }
 
     @wire(getActiveProducts, { recordId: '$recordId' })
-    wiredProducts({ data, error }) {
-        if (data) {
-            this.products = data.map(p => ({
-                id: p.id,
-                name: p.name || '',
-                sku: p.productCode || '',
-                category: p.family || '',
-                price: Number(p.unitPrice) || 0,
-                type: p.type || '',
-                quantity: 1,
-                selected: false
-            }));
-        } else if (error) {
-            this.showToast('Error', error.body?.message || 'Failed to load products', 'error');
-        }
+wiredProducts(result) {
+    this.wiredProductsResult = result;
+    const { data, error } = result;
+
+    if (data) {
+        this.products = data.map(p => ({
+            id: p.id,
+            name: p.name || '',
+            sku: p.productCode || '',
+            category: p.family || '',
+            price: Number(p.unitPrice) || 0,
+            type: p.type || '',
+            quantity: 1,
+            selected: false
+        }));
+    } else if (error) {
+        this.showToast('Error', error.body?.message || 'Failed to load products', 'error');
     }
+}
+
     get isBillingModal() {
         return this.missingAddressType === 'billing';
     }
@@ -434,8 +439,9 @@ export default class PurchaseOrderProductSelector extends LightningElement {
 
                 this.showAddressModal = false;
                 this.sameAsBilling = false;
-                await this.loadAddresses();
-
+              
+window.location.reload();
+  await this.loadAddresses();
                 this.proceedToCheckout();
 
             })
@@ -544,12 +550,14 @@ export default class PurchaseOrderProductSelector extends LightningElement {
         this.showAddressModal = false;
     }
 
-    openEditAddressModal() {
-        this.missingAddressType = 'edit';
-        this.sameAsBilling = false;
-        this.showAddressModal = true;
-        this.loadAddresses();
-    }
+   async openEditAddressModal() {
+    this.missingAddressType = 'edit';
+    this.sameAsBilling = false;
+
+    await this.loadAddresses();
+
+    this.showAddressModal = true;
+}
 
     async loadAddresses() {
         if (!this.recordId) return;
