@@ -235,7 +235,7 @@
         <inputAssignments>
             <field>Approver__c</field>
             <value>
-                <elementReference>Get_Event.Owner:User.Manager.Manager.Id</elementReference>
+                <elementReference>Get_Lead_Related_to_Event_Record.Owner:User.ManagerId</elementReference>
             </value>
         </inputAssignments>
         <inputAssignments>

@@ -249,8 +249,8 @@ public without sharing class LeadMergeController {
             ownerIds.add(l.OwnerId);
         }
         
-        // Fetch Owner Details (ManagerId)
-        Map<Id, User> ownerMap = new Map<Id, User>([SELECT Id, ManagerId FROM User WHERE Id IN :ownerIds]);
+        // Fetch Owner Details (ManagerId and Manager's ManagerId)
+        Map<Id, User> ownerMap = new Map<Id, User>([SELECT Id, ManagerId, Manager.ManagerId FROM User WHERE Id IN :ownerIds]);
 
         // Scenario Logic
         // 1. Admin: Merge directly, no approval.
@@ -341,31 +341,37 @@ public without sharing class LeadMergeController {
 
     private static Id determineApprover(Lead__c mainLead, List<Lead__c> leadsToMerge, Map<Id, User> userMap) {
         User mainLeadOwner = userMap.get(mainLead.OwnerId);
-        
-        Boolean sameOwner = true;
-        for (Lead__c lead : leadsToMerge) {
-            if (lead.OwnerId != mainLead.OwnerId) {
-                sameOwner = false; 
-                break;
-            }
-        }
+        Id adminId = '005C1000005Qn8fIAC';
 
-        if (sameOwner) {
-            if (mainLeadOwner.ManagerId != null) return mainLeadOwner.ManagerId;
-        }
-
+        // Collect unique manager IDs from all owners (Main + Merged)
         Set<Id> managerIds = new Set<Id>();
-        if (mainLeadOwner.ManagerId != null) managerIds.add(mainLeadOwner.ManagerId);
+        if (mainLeadOwner != null && mainLeadOwner.ManagerId != null) {
+            managerIds.add(mainLeadOwner.ManagerId);
+        }
         
         for (Lead__c lead : leadsToMerge) {
             User owner = userMap.get(lead.OwnerId);
-            if (owner != null && owner.ManagerId != null) managerIds.add(owner.ManagerId);
+            if (owner != null && owner.ManagerId != null) {
+                managerIds.add(owner.ManagerId);
+            } else {
+                // If any owner doesn't have a manager (or is a Queue), we can't have a unique common manager
+                managerIds.add(null);
+            }
         }
 
+        // If there is exactly ONE common manager and they report to someone (Grandparent Manager)
         if (managerIds.size() == 1 && !managerIds.contains(null)) {
-            return new List<Id>(managerIds)[0];
+            Id commonManagerId = new List<Id>(managerIds)[0];
+            
+            // We need to check if that common manager has a manager.
+            // Since we queried Manager.ManagerId for the OWNERS, it's available in the OWNER's record.
+            // All owners in this case have the same info because they share the same manager.
+            if (mainLeadOwner != null && mainLeadOwner.ManagerId == commonManagerId && mainLeadOwner.Manager.ManagerId != null) {
+                return mainLeadOwner.Manager.ManagerId;
+            }
         }
 
-        return '005C1000005Qn8fIAC';
+        // Otherwise (different managers, no manager, or top of hierarchy), send to Admin
+        return adminId;
     }
 }

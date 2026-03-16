@@ -6,6 +6,7 @@ import getInitData from '@salesforce/apex/LoanQuickActionController.getInitData'
 import createLoan from '@salesforce/apex/LoanQuickActionController.createLoan';
 
 const CURRENT_ADDRESS_FLAG = 'Permanent_address_same_as_Current__c';
+const CURRENT_ADDRESS_FLAG_LOWER = CURRENT_ADDRESS_FLAG.toLowerCase();
 const CURRENT_FIELDS = ['flat_no__c', 'street__c', 'land_mark__c', 'pincode__c'];
 const PERMANENT_FIELDS = ['permanent_flat_no__c', 'permanent_street__c', 'permanent_land_mark__c', 'permanent_pincode__c'];
 
@@ -13,8 +14,9 @@ const EXCLUDED_FIELDS = new Set([
     'miles_loan_code__c',
     'loan_status__c',
     'application_id__c',
-    'Redirection_URL__c',
-    'loan_id__c'
+    'redirection_url__c',
+    'loan_id__c',
+    'loan_provider__c'
 ]);
 
 const PROVIDERS = {
@@ -196,7 +198,6 @@ export default class LoanCreateFromLead extends LightningElement {
         this.step = 'select';
         this.errorMessage = '';
         this.noVisibleFields = false;
-        this.layoutSections = [];
         this.prefillApplied = false;
         this.formValues = {};
     }
@@ -346,6 +347,24 @@ export default class LoanCreateFromLead extends LightningElement {
         return 'Unexpected error.';
     }
 
+    isCurrentAddressField(apiName) {
+        return !!apiName && CURRENT_FIELDS.includes(apiName.toLowerCase());
+    }
+
+    isPermanentAddressField(apiName) {
+        return !!apiName && PERMANENT_FIELDS.includes(apiName.toLowerCase());
+    }
+
+    syncPermanentAddressFields() {
+        if (!this.isTruthy(this.formValues[CURRENT_ADDRESS_FLAG_LOWER])) return;
+
+        for (let i = 0; i < CURRENT_FIELDS.length; i += 1) {
+            const currentField = CURRENT_FIELDS[i];
+            const permanentField = PERMANENT_FIELDS[i];
+            this.formValues[permanentField] = this.formValues[currentField];
+        }
+    }
+
     buildLowercaseMap(obj) {
         const map = {};
         if (!obj) return map;
@@ -440,7 +459,7 @@ export default class LoanCreateFromLead extends LightningElement {
                         fieldApiName,
                         isMobileField: fieldApiName && fieldApiName.toLowerCase() === mobileApiLower,
                         disabled: this.isFieldDisabled(fieldApiName),
-                        prefillValue: this.resolvePrefillValue(fieldApiName)
+                        prefillValue: this.formValues[fieldApiName.toLowerCase()] ?? this.resolvePrefillValue(fieldApiName)
                     });
                 });
 
@@ -480,8 +499,9 @@ export default class LoanCreateFromLead extends LightningElement {
                     }
                     return {
                         ...col,
-                        prefillValue: this.resolvePrefillValue(col.fieldApiName),
+                        prefillValue: this.formValues[col.fieldApiName.toLowerCase()] ?? this.resolvePrefillValue(col.fieldApiName),
                         required: this.isFieldRequired(col.fieldApiName),
+                        disabled: this.isFieldDisabled(col.fieldApiName),
                         isMobileField: col.fieldApiName.toLowerCase() === mobileApiLower
                     };
                 });
@@ -508,7 +528,9 @@ export default class LoanCreateFromLead extends LightningElement {
 
     isFieldDisabled(apiName) {
         if (!apiName) return false;
-        if (apiName === 'Loan_Provider__c') return true;
+        if (this.isPermanentAddressField(apiName) && this.isTruthy(this.formValues[CURRENT_ADDRESS_FLAG_LOWER])) {
+            return true;
+        }
         if (apiName === 'program_name__c') return true;
         return this.candidateFieldApi && apiName === this.candidateFieldApi;
     }
@@ -518,6 +540,10 @@ export default class LoanCreateFromLead extends LightningElement {
         if (!apiName) return;
         const key = apiName.toLowerCase();
         this.formValues[key] = event.target.value;
+        if (key === CURRENT_ADDRESS_FLAG_LOWER || this.isCurrentAddressField(apiName)) {
+            this.syncPermanentAddressFields();
+        }
+        this.applyPrefillToLayout();
         this.updateRequiredFlags();
     }
 

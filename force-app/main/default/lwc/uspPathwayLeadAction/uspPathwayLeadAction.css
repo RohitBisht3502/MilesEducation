@@ -1,0 +1,38 @@
+.panel-shell {
+    margin: -1rem;
+    overflow: visible;
+}
+
+.panel-header {
+    background: #032d60;
+    color: #fff;
+    font-size: 1.25rem;
+    text-align: center;
+    padding: 1rem 1.5rem;
+    font-weight: 600;
+}
+
+.panel-body {
+    padding: 1.5rem;
+    background: #fff;
+    overflow: visible;
+}
+
+.selection-box {
+    border: 1px solid #d8dde6;
+    border-radius: 0.25rem;
+    padding: 1rem;
+}
+
+.selection-title {
+    margin-bottom: 1rem;
+    color: #3e3e3c;
+    font-weight: 600;
+}
+
+.panel-footer {
+    background: #032d60;
+    margin: 0 -1rem -1rem -1rem;
+    padding: 0.875rem 1rem;
+    text-align: right;
+}

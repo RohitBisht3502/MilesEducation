@@ -1,27 +1,36 @@
 <template>
     <lightning-quick-action-panel header="Enable Eligibility Check">
-        <div class="slds-var-p-around_medium">
-            <template if:true={isAlreadyInitiated}>
-                <p>
-                    Eligibility process for the candidate is already initiated.
-                </p>
+        <div class="slds-is-relative">
+            <template if:true={isProcessing}>
+                <lightning-spinner
+                    alternative-text="Processing"
+                    size="medium">
+                </lightning-spinner>s
             </template>
-            <template if:false={isAlreadyInitiated}>
-                <p>
-                    This will create the eligibility folder structure for this record
-                    and enable document-based eligibility checks.
-                </p>
-                <p class="slds-m-top_small">
-                    Do you want to proceed?
-                </p>
-            </template>
+            <div class="slds-var-p-around_medium">
+                <template if:true={isAlreadyInitiated}>
+                    <p>
+                        Eligibility process for the candidate is already initiated.
+                    </p>
+                </template>
+                <template if:false={isAlreadyInitiated}>
+                    <p>
+                        This will create the eligibility folder structure for this record
+                        and enable document-based eligibility checks.
+                    </p>
+                    <p class="slds-m-top_small">
+                        Do you want to proceed?
+                    </p>
+                </template>
+            </div>
         </div>
 
         <div slot="footer">
             <lightning-button
                 variant="neutral"
                 label="Cancel"
-                onclick={handleCancel}>
+                onclick={handleCancel}
+                disabled={isProcessing}>
             </lightning-button>
 
             <lightning-button

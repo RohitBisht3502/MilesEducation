@@ -9,12 +9,17 @@ import { refreshApex } from '@salesforce/apex';
 import getBusinessVerticals from '@salesforce/apex/RoundRobinMatrixController.getBusinessVerticals';
 import getCityStatuses from '@salesforce/apex/RoundRobinToggleOnOff.getCityStatuses';
 import updateCityStatuses from '@salesforce/apex/RoundRobinToggleOnOff.updateCityStatuses';
+import CLAIM_INFO from '@salesforce/label/c.Claim_Info';
 
 const DEFAULT_TYPE = 'CC - Pre Enrollment';
 const DEFAULT_VERTICAL = 'Accounting Vertical';
 const AUTO_BUCKETS = ['Bucket 1', 'Bucket 2'];
 
 export default class RoundRobinManagmentSystem extends LightningElement {
+  label = {
+    CLAIM_INFO
+  };
+
   @track cities = [];
   @track buckets = [];
   @track leadSources = [];
@@ -813,11 +818,28 @@ wiredCityStatuses(result) {
     this.rebuildTempDisplaySources();
   };
 
-  rebuildTempDisplaySources() {
-    let sourcesToShow = this.leadSources || [];
+  handleSelectAllSources = (e) => {
+    const isChecked = e.target.checked;
+    const sourcesToShow = this.getSourcesForModal();
+
+    this.tempSelectedSources = isChecked ? [...sourcesToShow] : [];
+    this.rebuildTempDisplaySources();
+  };
+
+  get areAllTempSourcesSelected() {
+    const sourcesToShow = this.getSourcesForModal();
+    return sourcesToShow.length > 0 && this.tempSelectedSources.length === sourcesToShow.length;
+  }
+
+  getSourcesForModal() {
     if (this.selectedBucket && this.bucketSourcesMap[this.selectedBucket]) {
-      sourcesToShow = this.bucketSourcesMap[this.selectedBucket];
+      return this.bucketSourcesMap[this.selectedBucket];
     }
+    return this.leadSources || [];
+  }
+
+  rebuildTempDisplaySources() {
+    const sourcesToShow = this.getSourcesForModal();
 
     const sel = new Set(this.tempSelectedSources || []);
     this.displayLeadSourcesTemp = (sourcesToShow || []).map((s) => ({

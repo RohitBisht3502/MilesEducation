@@ -1,0 +1,191 @@
+<template>
+    <lightning-quick-action-panel header="Eligibility Report">
+        <template if:true={isLoading}>
+            <div class="loading-wrap">
+                <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+            </div>
+        </template>
+
+        <template if:false={isLoading}>
+            <div class="panel-header">
+                <div class="path-header">
+                    <div>
+                        <!--<div class="path-label">Eligibility Email</div>-->
+                        <div class="path-steps">
+                            <span class={detailsStepClass}>1. Details</span>
+                            <span class={templateStepClass}>2. Template</span>
+                        </div>
+                    </div>
+                    <div class="path-meta">
+                        <span class="meta-pill">Eligibility Code: {eligibilityCodeDisplay}</span>
+                    </div>
+                    
+                </div>
+            </div>
+
+            <div class="panel-body">
+                <template if:true={isDetailsStep}>
+                    <template if:true={isEmailMissing}>
+                        <div class="warning-banner">
+                            Email address is missing on this record. Update it before sending.
+                        </div>
+                    </template>
+
+                    <div class="info-grid">
+                        <div class="info-card">
+                            <div class="info-label">{recordTypeLabel} Name</div>
+                            <div class="info-value">{recordNameDisplay}</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">UUID</div>
+                            <div class="info-value">{uuidDisplay}</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">Eligibility Status</div>
+                            <div class="info-value">{eligibilityStatusDisplay}</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">GP Status</div>
+                            <div class="info-value">{gpStatusDisplay}</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">Score</div>
+                            <div class="info-value">{scoreDisplay}</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">Email</div>
+                            <div class="info-value">{emailDisplay}</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">Owner</div>
+                            <div class="info-value">{ownerNameDisplay}</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">GP Owner</div>
+                            <div class="info-value">{gpOwnerNameDisplay}</div>
+                        </div>
+                    </div>
+
+                    <div class="summary-card">
+                        <div class="summary-header">
+                            <div class="summary-title">Files Summary</div>
+                            <div class="summary-total">Total Files: {totalFilesDisplay}</div>
+                        </div>
+                        <div class="summary-pills">
+                            <template if:true={hasFileCounts}>
+                                <template for:each={fileStatusCounts} for:item="stat">
+                                    <span key={stat.status} class={stat.className}>
+                                        {stat.status}: {stat.count}
+                                    </span>
+                                </template>
+                            </template>
+                            <template if:false={hasFileCounts}>
+                                <span class="empty-note">No eligibility files found.</span>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+
+                <template if:true={isTemplateStep}>
+                    <template if:true={isEmailMissing}>
+                        <div class="warning-banner">
+                            Email address is missing on this record. Update it before sending.
+                        </div>
+                    </template>
+
+                    <div class="template-grid">
+                        <div class="template-selector">
+                            <lightning-combobox
+                                label="Template"
+                                placeholder="Select a template"
+                                value={selectedTemplateId}
+                                options={templateOptions}
+                                onchange={handleTemplateChange}>
+                            </lightning-combobox>
+
+                            <div class="template-meta">
+                                <div class="meta-row">
+                                    <span class="meta-label">To:</span>
+                                    <span class="meta-value">{emailDisplay}</span>
+                                </div>
+                                <div class="meta-row">
+                                    <span class="meta-label">Template:</span>
+                                    <span class="meta-value">{selectedTemplateNameDisplay}</span>
+                                </div>
+                                <div class="meta-row">
+                                    <span class="meta-label">Owner:</span>
+                                    <span class="meta-value">{ownerNameDisplay}</span>
+                                </div>
+                            </div>
+                            <template if:true={hasTemplateSelected}>
+                                <div class="subject-editor">
+                                    <lightning-input
+                                        type="text"
+                                        label="Subject"
+                                        value={emailSubject}
+                                        onchange={handleSubjectChange}>
+                                    </lightning-input>
+                                </div>
+                            </template>
+                        </div>
+
+                        <div class="editor-card">
+                            <div class="editor-header">Email Content</div>
+                            <div class="editor-body">
+                                <template if:true={hasTemplateSelected}>
+                                    <lightning-input-rich-text
+                                        label="Body"
+                                        value={emailBody}
+                                        onchange={handleBodyChange}>
+                                    </lightning-input-rich-text>
+                                </template>
+                                <template if:false={hasTemplateSelected}>
+                                    <div class="preview-empty">
+                                        Select a template to edit the email content.
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </template>
+
+        <div slot="footer">
+            <template if:true={isDetailsStep}>
+                <lightning-button
+                    variant="neutral"
+                    label="Cancel"
+                    onclick={handleCancel}>
+                </lightning-button>
+                <lightning-button
+                    class="slds-m-left_small"
+                    variant="brand"
+                    label="Next"
+                    onclick={handleNext}
+                    disabled={isNextDisabled}>
+                </lightning-button>
+            </template>
+            <template if:true={isTemplateStep}>
+                <lightning-button
+                    variant="neutral"
+                    label="Back"
+                    onclick={handleBack}>
+                </lightning-button>
+                <lightning-button
+                    class="slds-m-left_small"
+                    variant="neutral"
+                    label="Cancel"
+                    onclick={handleCancel}>
+                </lightning-button>
+                <lightning-button
+                    class="slds-m-left_small"
+                    variant="brand"
+                    label="Send Email"
+                    onclick={handleSend}
+                    disabled={isSendDisabled}>
+                </lightning-button>
+            </template>
+        </div>
+    </lightning-quick-action-panel>
+</template>

@@ -88,13 +88,12 @@
                         </template>
                     </div>
 
-                    <!-- Merge Comments (Only needed for GM merge) -->
                     <template if:true={showComments}>
                         <div class="comments-section">
-                            <label class="field-label">Merge Comments</label>
+                            <label class="field-label">Merge Comments <span style="color: #ea4335;">*</span></label>
                             <lightning-textarea class="comment-input-lwc" label="Merge Comments" variant="label-hidden"
-                                placeholder="Enter comments (Required if you are the Manager merging these leads)"
-                                value={mergeComments} onchange={handleCommentChange}></lightning-textarea>
+                                placeholder="Enter comments" value={mergeComments}
+                                onchange={handleCommentChange}></lightning-textarea>
                         </div>
                     </template>
 

@@ -2,11 +2,12 @@ import { LightningElement, api, track, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import checkUserCredit from '@salesforce/apex/ViewPhoneNumberController.checkUserCredit';
 import getPhoneNumber from '@salesforce/apex/ViewPhoneNumberController.getPhoneNumber';
+import { CloseActionScreenEvent } from 'lightning/actions';
 
 export default class ViewPhoneNumberOnLead extends LightningElement {
     @api recordId;
     @api objectApiName = 'Lead__c'; // Default value
-    
+    @track email = '';
     @track creditBalance = 0;
     @track phoneNumber = '';
     @track isLoading = false;
@@ -33,11 +34,11 @@ export default class ViewPhoneNumberOnLead extends LightningElement {
             this.showCreditError = true;
         }
     }
-    
+
     get isButtonDisabled() {
         return this.isLoading || !this.hasCredit || this.wireLoading;
     }
-    
+
     handleViewPhone() {
         if (!this.hasCredit) {
             this.showError('Insufficient Credits', 'Please purchase more credits to view phone numbers');
@@ -54,7 +55,8 @@ export default class ViewPhoneNumberOnLead extends LightningElement {
             console.log('Phone result received:', result);
             
             // Set phone number
-            this.phoneNumber = result.phoneNumber;
+          this.phoneNumber = result.phoneNumber;
+this.email = result.email;
             
             // Update credit balance from server response
             this.creditBalance = Math.floor(result.newCreditBalance);
@@ -113,10 +115,53 @@ export default class ViewPhoneNumberOnLead extends LightningElement {
             document.body.removeChild(textArea);
         }
     }
+
     
-    handleClose() {
-        this.phoneNumber = '';
+    handleCopyEmail() {
+
+    if (!this.email) return;
+
+    const textArea = document.createElement('textarea');
+    textArea.value = this.email;
+
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    try {
+        const successful = document.execCommand('copy');
+
+        if (successful) {
+            this.showSuccess('Copied!', 'Email copied to clipboard');
+        } else {
+            this.showError('Copy Failed', 'Could not copy email');
+        }
+    } catch (err) {
+        this.showError('Copy Failed', 'Could not copy email');
     }
+
+    document.body.removeChild(textArea);
+}
+
+
+
+
+
+   handleClose() {
+    this.phoneNumber = '';
+    this.email = '';
+
+   
+     this.dispatchEvent(new CloseActionScreenEvent());
+
+  
+    setTimeout(() => {
+        window.location.reload();
+    }, 500);
+}
     
     // Select phone number text when clicked
     selectPhoneText(event) {
@@ -131,6 +176,20 @@ export default class ViewPhoneNumberOnLead extends LightningElement {
             }
         }
     }
+
+
+    selectEmailText(event) {
+    const emailElement = this.template.querySelector('.email-value');
+
+    if (emailElement) {
+        const range = document.createRange();
+        range.selectNodeContents(emailElement);
+
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+}
     
     // Helper to get error message from different error formats
     getErrorMessage(error) {

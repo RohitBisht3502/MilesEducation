@@ -22,6 +22,15 @@ public with sharing class LeadNewOverrideController {
         }
     }
 
+    public class PicklistOption {
+        @AuraEnabled public String label;
+        @AuraEnabled public String value;
+        public PicklistOption(String label, String value) {
+            this.label = label;
+            this.value = value;
+        }
+    }
+
     public class Result {
         @AuraEnabled public Boolean success;
         @AuraEnabled public String message;
@@ -70,15 +79,30 @@ public with sharing class LeadNewOverrideController {
         return options;
     }
 
+    @AuraEnabled(cacheable=true)
+    public static List<PicklistOption> getCityOptions() {
+        List<PicklistOption> options = new List<PicklistOption>();
+        for (Schema.PicklistEntry entry : Schema.SObjectType.Round_Robin_Pool__c.fields.City__c.getPicklistValues()) {
+            if (entry.isActive()) {
+                options.add(new PicklistOption(entry.getLabel(), entry.getValue()));
+            }
+        }
+        return options;
+    }
+
     @AuraEnabled
-    public static Result createLeadByCourse(String course, String firstName, String lastName, String phone, String email) {
+    public static Result createLeadByCourse(String course, String city, String firstName, String lastName, String countryCode, String phone, String email) {
         try {
             if (String.isBlank(course)) {
                 return errorResult('Course is required.');
             }
-            if (String.isBlank(lastName) || String.isBlank(phone) || String.isBlank(email)) {
-                return errorResult('Last Name, Phone, and Email are required.');
+            if (String.isBlank(city) || String.isBlank(lastName) || String.isBlank(phone) || String.isBlank(email)) {
+                return errorResult('City, Last Name, Phone, and Email are required.');
             }
+
+            String normalizedCountryCode = normalizeCountryCode(countryCode);
+            String phoneDigits = normalizePhoneDigits(phone, normalizedCountryCode);
+            String fullPhone = normalizedCountryCode + phoneDigits;
 
             Id recordTypeId = getRecordTypeIdForCourse(course);
             if (recordTypeId == null) {
@@ -86,12 +110,12 @@ public with sharing class LeadNewOverrideController {
             }
             String stage = getDefaultStageForCourse(course);
 
-            Lead__c existingLead = findExistingLeadByPhone(phone);
+            Lead__c existingLead = findExistingLeadByPhone(fullPhone);
             if (existingLead != null) {
                 return errorResult('Lead already exists with this phone number.');
             }
 
-            Phone_Number__c existingPhone = findExistingPhone(phone);
+            Phone_Number__c existingPhone = findExistingPhone(phoneDigits);
             if (existingPhone != null && existingPhone.Lead__c != null) {
                 return errorResult('Phone number already exists with another Lead.');
             }
@@ -111,7 +135,7 @@ public with sharing class LeadNewOverrideController {
             Lead candidate = null;
             Id candidateIdToUse = (candidateIdFromPhone != null ? candidateIdFromPhone : candidateIdFromEmail);
             if (candidateIdToUse != null) {
-                List<Lead> candidates = [SELECT Id FROM Lead WHERE Id = :candidateIdToUse LIMIT 1];
+                List<Lead> candidates = [SELECT Id, Phone, Email, City FROM Lead WHERE Id = :candidateIdToUse LIMIT 1];
                 if (!candidates.isEmpty()) candidate = candidates[0];
             }
 
@@ -120,17 +144,36 @@ public with sharing class LeadNewOverrideController {
                     FirstName = firstName,
                     LastName  = lastName,
                     Company   = 'Miles Education',
-                    Phone     = phone,
-                    Email     = email
+                    Phone     = fullPhone,
+                    Email     = email,
+                    City      = city
                 );
                 insert candidate;
+            } else {
+                Boolean candidateChanged = false;
+                if (candidate.Phone != fullPhone) {
+                    candidate.Phone = fullPhone;
+                    candidateChanged = true;
+                }
+                if (candidate.Email != email) {
+                    candidate.Email = email;
+                    candidateChanged = true;
+                }
+                if (candidate.City != city) {
+                    candidate.City = city;
+                    candidateChanged = true;
+                }
+                if (candidateChanged) {
+                    update candidate;
+                }
             }
 
             String fullName = buildFullName(firstName, lastName);
             Lead__c newLead = new Lead__c(
                 Name         = fullName,
-                Phone__c     = phone,
+                Phone__c     = fullPhone,
                 Email__c     = email,
+                City__c      = city,
                 Stage__c     = stage,
                 Course__c    = course,
                 Source__c    = 'Referral',
@@ -141,11 +184,12 @@ public with sharing class LeadNewOverrideController {
 
             if (existingPhone == null) {
                 Phone_Number__c phoneRec = new Phone_Number__c(
-                    Phone__c     = phone,
+                    Phone__c     = phoneDigits,
                     Lead__c      = newLead.Id,
                     Candidate__c = candidate.Id,
                     Is_Primary__c= true
                 );
+                setPhoneCountryCode(phoneRec, normalizedCountryCode);
                 insert phoneRec;
             } else {
                 Boolean phoneChanged = false;
@@ -159,6 +203,13 @@ public with sharing class LeadNewOverrideController {
                 }
                 if (existingPhone.Is_Primary__c != true) {
                     existingPhone.Is_Primary__c = true;
+                    phoneChanged = true;
+                }
+                if (String.valueOf(existingPhone.get('Phone__c')) != phoneDigits) {
+                    existingPhone.put('Phone__c', phoneDigits);
+                    phoneChanged = true;
+                }
+                if (setPhoneCountryCode(existingPhone, normalizedCountryCode)) {
                     phoneChanged = true;
                 }
                 if (phoneChanged) update existingPhone;
@@ -200,14 +251,18 @@ public with sharing class LeadNewOverrideController {
     }
 
     @AuraEnabled
-    public static Result createLead(Id recordTypeId, String firstName, String lastName, String phone, String email) {
+    public static Result createLead(Id recordTypeId, String firstName, String lastName, String city, String countryCode, String phone, String email) {
         try {
             if (recordTypeId == null) {
                 return errorResult('Record Type is required.');
             }
-            if (String.isBlank(lastName) || String.isBlank(phone) || String.isBlank(email)) {
-                return errorResult('Last Name, Phone, and Email are required.');
+            if (String.isBlank(city) || String.isBlank(lastName) || String.isBlank(phone) || String.isBlank(email)) {
+                return errorResult('City, Last Name, Phone, and Email are required.');
             }
+
+            String normalizedCountryCode = normalizeCountryCode(countryCode);
+            String phoneDigits = normalizePhoneDigits(phone, normalizedCountryCode);
+            String fullPhone = normalizedCountryCode + phoneDigits;
 
             RecordType rt = [
                 SELECT Id, Name
@@ -222,7 +277,7 @@ public with sharing class LeadNewOverrideController {
             }
             String stage = getDefaultStageForCourse(course);
 
-            Phone_Number__c existingPhone = findExistingPhone(phone);
+            Phone_Number__c existingPhone = findExistingPhone(phoneDigits);
             if (existingPhone != null && existingPhone.Lead__c != null) {
                 return errorResult('Phone number already exists with another Lead.');
             }
@@ -242,7 +297,7 @@ public with sharing class LeadNewOverrideController {
             Lead candidate = null;
             Id candidateIdToUse = (candidateIdFromPhone != null ? candidateIdFromPhone : candidateIdFromEmail);
             if (candidateIdToUse != null) {
-                List<Lead> candidates = [SELECT Id FROM Lead WHERE Id = :candidateIdToUse LIMIT 1];
+                List<Lead> candidates = [SELECT Id, Phone, Email, City FROM Lead WHERE Id = :candidateIdToUse LIMIT 1];
                 if (!candidates.isEmpty()) candidate = candidates[0];
             }
 
@@ -251,17 +306,36 @@ public with sharing class LeadNewOverrideController {
                     FirstName = firstName,
                     LastName  = lastName,
                     Company   = 'Miles Education',
-                    Phone     = phone,
-                    Email     = email
+                    Phone     = fullPhone,
+                    Email     = email,
+                    City      = city
                 );
                 insert candidate;
+            } else {
+                Boolean candidateChanged = false;
+                if (candidate.Phone != fullPhone) {
+                    candidate.Phone = fullPhone;
+                    candidateChanged = true;
+                }
+                if (candidate.Email != email) {
+                    candidate.Email = email;
+                    candidateChanged = true;
+                }
+                if (candidate.City != city) {
+                    candidate.City = city;
+                    candidateChanged = true;
+                }
+                if (candidateChanged) {
+                    update candidate;
+                }
             }
 
             String fullName = buildFullName(firstName, lastName);
             Lead__c newLead = new Lead__c(
                 Name         = fullName,
-                Phone__c     = phone,
+                Phone__c     = fullPhone,
                 Email__c     = email,
+                City__c      = city,
                 Stage__c     = stage,
                 Course__c    = course,
                 Source__c    = 'Referral',
@@ -272,11 +346,12 @@ public with sharing class LeadNewOverrideController {
 
             if (existingPhone == null) {
                 Phone_Number__c phoneRec = new Phone_Number__c(
-                    Phone__c     = phone,
+                    Phone__c     = phoneDigits,
                     Lead__c      = newLead.Id,
                     Candidate__c = candidate.Id,
                     Is_Primary__c= true
                 );
+                setPhoneCountryCode(phoneRec, normalizedCountryCode);
                 insert phoneRec;
             } else {
                 Boolean phoneChanged = false;
@@ -290,6 +365,13 @@ public with sharing class LeadNewOverrideController {
                 }
                 if (existingPhone.Is_Primary__c != true) {
                     existingPhone.Is_Primary__c = true;
+                    phoneChanged = true;
+                }
+                if (String.valueOf(existingPhone.get('Phone__c')) != phoneDigits) {
+                    existingPhone.put('Phone__c', phoneDigits);
+                    phoneChanged = true;
+                }
+                if (setPhoneCountryCode(existingPhone, normalizedCountryCode)) {
                     phoneChanged = true;
                 }
                 if (phoneChanged) update existingPhone;
@@ -348,6 +430,37 @@ public with sharing class LeadNewOverrideController {
             }
         }
         return name;
+    }
+
+    private static String normalizePhoneDigits(String phone, String countryCode) {
+        String digits = String.isBlank(phone) ? '' : phone.replaceAll('[^0-9]', '');
+        if (String.isBlank(digits)) {
+            throw new AuraHandledException('Phone must contain only digits.');
+        }
+        if (countryCode == '+91' && digits.length() != 10) {
+            throw new AuraHandledException('If country code is +91, phone must be exactly 10 digits.');
+        }
+        if (countryCode != '+91' && digits.length() > 13) {
+            throw new AuraHandledException('If other country code, phone can be maximum 13 digits.');
+        }
+        return digits;
+    }
+
+    private static String normalizeCountryCode(String countryCode) {
+        String code = String.isBlank(countryCode) ? '+91' : countryCode.trim();
+        if (code != '+91' && code != '+971') {
+            code = '+91';
+        }
+        return code;
+    }
+
+    private static Boolean setPhoneCountryCode(SObject phoneRecord, String countryCode) {
+        if (phoneRecord == null || String.isBlank(countryCode)) return false;
+        if (!Phone_Number__c.SObjectType.getDescribe().fields.getMap().containsKey('Country_Code__c')) return false;
+        String currentValue = String.valueOf(phoneRecord.get('Country_Code__c'));
+        if (currentValue == countryCode) return false;
+        phoneRecord.put('Country_Code__c', countryCode);
+        return true;
     }
 
     private static Phone_Number__c findExistingPhone(String rawPhone) {

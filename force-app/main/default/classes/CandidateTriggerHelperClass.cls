@@ -1,7 +1,3 @@
-/*
-    Author       : ROHIT SINGH BISHT
-    Description  : 
-*/
 public without sharing class CandidateTriggerHelperClass {
 
     public static void handleBeforeInsert(List<Lead> newLeads) {
@@ -94,6 +90,8 @@ public without sharing class CandidateTriggerHelperClass {
             }
         }
         
+        System.debug('Size of Lead to Update ::::: '+ leadsToUpdate.Size());
+        
         if (!leadsToUpdate.isEmpty()) {
             update leadsToUpdate;
         }
@@ -160,6 +158,36 @@ public without sharing class CandidateTriggerHelperClass {
         return candidateRunningNumber;
     }
     
+    public static void handleMilesUuidRecording(List<Lead> newLeads, Map<Id, Lead> oldMap) {
+
+    if (newLeads == null || newLeads.isEmpty()) return;
+
+    Set<String> uuidSet = new Set<String>();
+
+    for (Lead newLead : newLeads) {
+
+        Lead oldLead = oldMap.get(newLead.Id);
+
+        if (newLead.UUID__c != null) {
+
+            // Run when UUID is newly populated or changed
+            if (oldLead == null || newLead.UUID__c != oldLead.UUID__c) {
+                uuidSet.add(newLead.UUID__c);
+            }
+        }
+    }
+
+    if (uuidSet.isEmpty()) return;
+
+    for (String uuid : uuidSet) {
+        Callout_MfSfUntrackToTrackRecording.sendByMilesUuid(uuid);
+    }
+}
+
+
+
+
+
     // Method to get city code mapping from custom metadata
     private static Map<String, String> getCityCodeMap() {
         Map<String, String> cityCodeMap = new Map<String, String>();

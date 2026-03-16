@@ -57,6 +57,11 @@
                 <div class={leadTabClass} data-tab="lead" onclick={handleTabClick}>
                     Lead Information
                 </div>
+                <template if:true={showRelatedTab}>
+                    <div class={relatedTabClass} data-tab="related" onclick={handleTabClick}>
+                        Related Leads
+                    </div>
+                </template>
                 <div class={historyTabClass} data-tab="history" onclick={handleTabClick}>
                     Call History
                 </div>
@@ -182,8 +187,9 @@
                             <div class="feedback-grid">
                                 <!-- Row 1 -->
                                 <div class="row-2">
-                                    <lightning-combobox label="Call Status (L1)" value={l1Value} options={filteredL1Options}
-                                        onchange={handleL1Change} disabled={isFeedbackDisabled}>
+                                    <lightning-combobox label="Call Status (L1)" value={l1Value}
+                                        options={filteredL1Options} onchange={handleL1Change}
+                                        disabled={isFeedbackDisabled}>
                                     </lightning-combobox>
 
                                     <lightning-combobox label="Sub Status (L2)" value={l2Value} options={l2Options}
@@ -409,9 +415,82 @@
                 </div>
             </template>
 
+            <!-- ===== RELATED LEADS ===== -->
+            <!-- ===== RELATED LEADS TAB ===== -->
+            <template if:true={isRelatedTab}>
 
+                <!-- UNTRACKED CALL -->
+                <template if:true={isUntrackedCall}>
+                    <c-tag-lead-for-call-log record-id={recordId}></c-tag-lead-for-call-log>
+                </template>
 
+                <!-- TRACKED CALL -->
+                <template if:false={isUntrackedCall}>
 
+                    <!-- RELATED LEADS LIST -->
+                    <div class="section-card history-card">
+                        <div class="section-header">
+                            <lightning-icon icon-name="standard:lead" size="small"></lightning-icon>
+                            <span>Related Leads</span>
+                        </div>
+
+                        <template if:true={hasRelatedLeads}>
+                            <div class="call-history-list">
+
+                                <template for:each={relatedLeads} for:item="row">
+                                    <div key={row.id} class="call-history-item">
+
+                                        <div class="call-history-left">
+                                            <strong>{row.course}</strong>
+                                        </div>
+
+                                        <div class="call-history-right">
+                                            <lightning-combobox value={row.stage} options={row.stageOptions}
+                                                data-id={row.id} onchange={handleRelatedStageChange}>
+                                            </lightning-combobox>
+                                        </div>
+
+                                    </div>
+                                </template>
+
+                            </div>
+                        </template>
+
+                        <template if:false={hasRelatedLeads}>
+                            <div class="call-history-empty">
+                                No related leads found
+                            </div>
+                        </template>
+
+                    </div>
+
+                    <!-- CREATE NEW LEAD -->
+                    <div class="section-card history-card">
+                        <div class="section-header">
+                            <lightning-icon icon-name="utility:add" size="small"></lightning-icon>
+                            <span>Create New Lead</span>
+                        </div>
+
+                        <div class="feedback-grid two-column">
+
+                            <lightning-combobox label="Course" value={newLeadCourse} options={availableCourseOptions}
+                                onchange={handleNewLeadCourseChange}>
+                            </lightning-combobox>
+
+                            <lightning-input type="email" label="Email" value={newLeadEmail}
+                                onchange={handleNewLeadEmailChange} required>
+                            </lightning-input>
+
+                            <lightning-button class="create-lead-btn" variant="brand" label="Create Lead"
+                                onclick={handleCreateRelatedLead} disabled={disableCreateLead}>
+                            </lightning-button>
+
+                        </div>
+                    </div>
+
+                </template>
+
+            </template>
         </div>
 
 
@@ -427,7 +506,7 @@
 
             <template if:false={showFeedback}>
                 <lightning-button variant="brand" label={callButtonLabel} onclick={callApi}
-                    disabled={callButtonDisabled}>
+                    disabled={callButtonDisabled} class="call-runo-btn">
                 </lightning-button>
             </template>
 

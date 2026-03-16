@@ -3,7 +3,7 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 import allocateLeadNow from '@salesforce/apex/Webservice_RunoAllocationAPI.allocateLeadNow';
 import updateCallFeedback from '@salesforce/apex/Webservice_RunoAllocationAPI.updateCallFeedback';
-import getL1L2Values from '@salesforce/apex/Webservice_RunoAllocationAPI.getL1L2Values';
+
 import getCallHistory from '@salesforce/apex/Webservice_RunoAllocationAPI.getCallHistory';
 import getIdentity from '@salesforce/apex/RunoCallIdentityService.getIdentity';
 import getStageLevelValues from '@salesforce/apex/Webservice_RunoAllocationAPI.getStageLevelValues';
@@ -336,16 +336,14 @@ export default class RunoAllocationCallQ1 extends NavigationMixin(LightningEleme
             this.processDispositions(this.dispositions);
             return;
         }
+
         try {
-            // Fallback to fetch dispositions if not passed via props
             const data = await getDispositions();
+
             if (data && data.length > 0) {
                 this.processDispositions(data);
-            } else {
-                // Legacy fallback just in case
-                this.fullMap = await getL1L2Values();
-                this._allL1Options = Object.keys(this.fullMap).map(k => ({ label: k, value: k }));
             }
+
         } catch (e) {
             console.error('Picklist load failed:', e);
         }

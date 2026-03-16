@@ -14,22 +14,46 @@
         $A.enqueueAction(action);
     },
 
+    loadCities: function(component) {
+        var action = component.get("c.getCityOptions");
+        action.setCallback(this, function(resp) {
+            if (resp.getState() === "SUCCESS") {
+                component.set("v.cityOptions", resp.getReturnValue() || []);
+            } else {
+                component.set("v.errorMessage", this.extractError(resp));
+            }
+        });
+        $A.enqueueAction(action);
+    },
+
     createLeadByCourse: function(component) {
         component.set("v.errorMessage", "");
         var course = component.get("v.course");
+        var city = component.get("v.city");
         var lastName = component.get("v.lastName");
         var phone = component.get("v.phone");
+        var countryCode = component.get("v.countryCode");
         var email = component.get("v.email");
 
-        if (!course || !lastName || !phone || !email) {
-            component.set("v.errorMessage", "Course, Last Name, Phone, and Email are required.");
+        if (!course || !city || !lastName || !phone || !email) {
+            component.set("v.errorMessage", "Course, City, Last Name, Phone, and Email are required.");
             return;
         }
 
         var phoneValue = String(phone || "").trim();
-        var phoneRegex = /^[6-9]\d{9}$/;
+        var phoneRegex = /^\d+$/;
         if (!phoneRegex.test(phoneValue)) {
-            component.set("v.errorMessage", "Phone must be a valid 10-digit number starting with 6-9.");
+            component.set("v.errorMessage", "Phone must contain only digits.");
+            return;
+        }
+
+        if (countryCode === "+91" && phoneValue.length !== 10) {
+            component.set("v.errorMessage", "If country code is +91, phone must be exactly 10 digits.");
+            return;
+        }
+
+        if (countryCode !== "+91" && phoneValue.length > 13) {
+            component.set("v.errorMessage", "If other country code, phone can be maximum 13 digits.");
             return;
         }
 
@@ -37,16 +61,18 @@
         var action = component.get("c.createLeadByCourse");
         action.setParams({
             course: course,
+            city: city,
             firstName: component.get("v.firstName"),
             lastName: lastName,
+            countryCode: countryCode,
             phone: phoneValue,
             email: email
         });
         action.setCallback(this, function(resp) {
-            component.set("v.isLoading", false);
             if (resp.getState() === "SUCCESS") {
                 var result = resp.getReturnValue();
                 if (result && result.success && result.leadId) {
+                    component.set("v.isLoading", true);
                     var navEvt = $A.get("e.force:navigateToSObject");
                     if (navEvt) {
                         navEvt.setParams({ recordId: result.leadId });
@@ -57,9 +83,11 @@
                         closeEvt.fire();
                     }
                 } else {
+                    component.set("v.isLoading", false);
                     component.set("v.errorMessage", (result && result.message) ? result.message : "Failed to create Lead.");
                 }
             } else {
+                component.set("v.isLoading", false);
                 component.set("v.errorMessage", this.extractError(resp));
             }
         });

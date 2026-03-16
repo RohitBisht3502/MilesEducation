@@ -60,6 +60,7 @@ global without sharing class Webhook_LoanStatusInboundService {
             }
 
             String loanCode = payload.miles_loan_code.trim();
+            String loanStatus = payload.loan_status.trim();
             List<Loan__c> loans = [SELECT Id FROM Loan__c WHERE miles_loan_code__c = :loanCode LIMIT 1];
 
             if (loans.isEmpty()) {
@@ -71,7 +72,7 @@ global without sharing class Webhook_LoanStatusInboundService {
             }
 
             Loan__c loanToUpdate = loans[0];
-            loanToUpdate.put('loan_status__c', payload.loan_status.trim());
+            loanToUpdate.put('loan_status__c', loanStatus);
             update loanToUpdate;
 
             statusCode = 200;
@@ -79,14 +80,7 @@ global without sharing class Webhook_LoanStatusInboundService {
             out.message = 'Loan status updated successfully';
             out.loanId = loanToUpdate.Id;
 
-            IntegrationLogUtil.insertLog(
-                serviceName,
-                requestPayload,
-                truncate(JSON.serialize(out)),
-                out.message,
-                'Success',
-                statusCode
-            );
+            IntegrationLogUtil.insertLog(serviceName, requestPayload, truncate(JSON.serialize(out)), out.message, 'Success', statusCode);
         } catch (DmlException de) {
             statusCode = 500;
             out.message = 'DML error while updating loan: ' + de.getMessage();

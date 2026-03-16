@@ -40,7 +40,7 @@ public without sharing class EligibilityQuickActionController {
         if (recordId == null) {
             throw new AuraHandledException('Record Id is required.');
         }
-        String eligibility = 'Eligibility Criteria';
+        String eligibility = 'GP';
 
         Schema.SObjectType sobjectType = recordId.getSObjectType();
         if (sobjectType == Lead.SObjectType) {

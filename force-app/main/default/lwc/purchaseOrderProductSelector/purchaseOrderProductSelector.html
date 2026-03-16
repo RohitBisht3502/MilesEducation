@@ -278,7 +278,7 @@
                         onchange={handleDiscountValue}>
                     </lightning-input>
                     <lightning-input data-id="downPayment" type="number" label="Down Payment (₹)" value={downPayment}
-                        min={minimumDownPayment} max={finalPayable}
+                        min={effectiveMinimumDownPayment} max={finalPayable}
                         message-when-range-overflow="Down payment cannot exceed total payable."
                         message-when-range-underflow={downPaymentMinMessage} onchange={handleDownPaymentChange}>
                     </lightning-input>

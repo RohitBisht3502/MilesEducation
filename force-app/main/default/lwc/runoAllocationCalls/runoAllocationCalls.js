@@ -1160,48 +1160,50 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
 
 
     async loadCallHistory() {
-        if (!this.recordId) return;
+    if (!this.candidateId) return;
 
-        try {
-            const rows = await getCallHistory({
-                candidateId: this.candidateId
-            });
+    try {
+        const rows = await getCallHistory({
+            recordId: this.candidateId
+        });
 
-            const dateFmt = new Intl.DateTimeFormat('en-IN', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-            });
+        console.log('Call History rows:', rows);
 
-            const timeFmt = new Intl.DateTimeFormat('en-IN', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+        const dateFmt = new Intl.DateTimeFormat('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+        });
 
-            this.callHistory = (rows || []).map(r => {
-                const dt = r.startTime || r.createdDate;
-                const d = dt ? new Date(dt) : null;
+        const timeFmt = new Intl.DateTimeFormat('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
 
-                const totalSec = Number(r.durationSeconds || 0);
-                const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
-                const ss = String(totalSec % 60).padStart(2, '0');
+        this.callHistory = (rows || []).map(r => {
+            const dt = r.startTime || r.createdDate;
+            const d = dt ? new Date(dt) : null;
 
-                return {
-                    id: r.id,
-                    dateLabel: d ? dateFmt.format(d) : 'NA',
-                    timeLabel: d ? timeFmt.format(d) : '',
-                    durationLabel: `${mm}:${ss}`,
-                    status: r.status || 'NA',
-                    l1: r.l1 || '',
-                    l2: r.l2 || '',
-                    stage: r.stage || ''
-                };
-            });
+            const totalSec = Number(r.durationSeconds || 0);
+            const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+            const ss = String(totalSec % 60).padStart(2, '0');
 
-        } catch (e) {
-            console.error('Call history load failed:', e);
-        }
+            return {
+                id: r.id,
+                dateLabel: d ? dateFmt.format(d) : 'NA',
+                timeLabel: d ? timeFmt.format(d) : '',
+                durationLabel: `${mm}:${ss}`,
+                status: r.status || 'NA',
+                l1: r.l1 || '',
+                l2: r.l2 || '',
+                stage: r.stage || ''
+            };
+        });
+
+    } catch (e) {
+        console.error('Call history load failed:', e);
     }
+}
 
     get disablePauseBtnFinal() {
         return (

@@ -190,10 +190,11 @@ global without sharing class MilesWebService {
 
                 // Create Phone_Number__c (tag phone)
                 Phone_Number__c phoneRec = new Phone_Number__c(
-                    Name         = inputData.phone,
-                    Phone__c     = inputData.phone,
-                    Candidate__c = candidate.Id,
-                    Is_Primary__c = true
+                    Phone__c               = inputData.phone,
+                    Candidate__c           = candidate.Id,
+                    Is_Primary__c          = true,
+                    Created_Date__C        = 'true',
+                    By_Pass_Validation__c  = true
                 );
                 insert phoneRec;
 
@@ -397,7 +398,7 @@ global without sharing class MilesWebService {
             return null;
         }
 
-        List<Email__c> emailList = [SELECT Id, Candidate__c FROM Email__c WHERE Email__c = :email LIMIT 1 ];
+        List<Email__c> emailList = [SELECT Id, Candidate__c, Created_Date__c FROM Email__c WHERE Email__c = :email LIMIT 1 ];
 
         // Email exists
         if (!emailList.isEmpty()) {
@@ -405,6 +406,7 @@ global without sharing class MilesWebService {
 
             // Email exists -> only associate to candidate (do not touch Lead__c)
             if (existingEmail.Candidate__c == null) existingEmail.Candidate__c = candidateId;
+            existingEmail.Created_Date__c = 'true';
             // if (existingEmail.Enquiry__c == null)   existingEmail.Enquiry__c   = enquiryId;
             update existingEmail;
 
@@ -417,6 +419,7 @@ global without sharing class MilesWebService {
             Email__c         = email,
             Candidate__c     = candidateId,
             Student__c       = (studentAccountId != null ? studentAccountId : null),
+            Created_Date__c  = 'true',
             Is_Primary__c    = true
         );
         insert newEmail;

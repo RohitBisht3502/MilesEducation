@@ -3,12 +3,35 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { getRecord } from 'lightning/uiRecordApi';
 import getUploadUuid from '@salesforce/apex/Callout_AWSFileUploader.getUploadUuid';
 import getPresignedUrlForUpload from '@salesforce/apex/Callout_AWSFileUploader.getPresignedUrlForUpload';
-import uploadFileToS3 from '@salesforce/apex/Callout_AWSFileUploader.uploadFileToS3';
 import getPathOptions from '@salesforce/apex/EligibilityUploadPathService.getPathOptions';
 import handleNewQualification from '@salesforce/apex/EligibilityFileService.handleNewQualification';
 import handleMainFolderFilesJson from '@salesforce/apex/EligibilityFileService.handleMainFolderFilesJson';
 import { CloseActionScreenEvent } from 'lightning/actions';
 import { NavigationMixin } from 'lightning/navigation';
+
+const ALLOWED_MIME_TO_EXT = {
+  'application/pdf': 'pdf',
+  'application/msword': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'text/plain': 'txt'
+};
+
+const ALLOWED_EXTENSIONS = new Set(['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'txt']);
+
+const EXTENSION_TO_MIME = {
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  txt: 'text/plain'
+};
+
+const ALLOWED_EXTENSIONS_LABEL = 'pdf, doc, docx, jpg, jpeg, png, txt';
 
 export default class FileUploader extends NavigationMixin(LightningElement) {
   @api recordId;
@@ -17,6 +40,7 @@ export default class FileUploader extends NavigationMixin(LightningElement) {
 
   @track uploading = false;
   @track lastResultMessage = '';
+  @track errorMessage = '';
   @track qualificationTypeOptions = [];
   @track qualificationTitleOptions = [];
   @track categoryOptions = [];
@@ -66,14 +90,14 @@ export default class FileUploader extends NavigationMixin(LightningElement) {
   get folderPath() {
     if (!this.hasPathSelection) return '';
     if (this.isFlatTypeSelected) {
-      return this.joinPath(['eligibility_docs', this.flatTypeKey]);
+      return this.joinPath(['eligibility_docs', this.flatTypeKey]).toLowerCase();
     }
     return this.joinPath([
       'eligibility_docs',
       this.selectedQualificationType,
       this.selectedQualificationTitle,
       this.selectedCategory
-    ]);
+    ]).toLowerCase();
   }
 
   get isUploadDisabled() {
@@ -89,7 +113,37 @@ export default class FileUploader extends NavigationMixin(LightningElement) {
   }
 
   handleFileChange(e) {
-    this.files = Array.from(e.target.files || []);
+    const incoming = Array.from(e.target.files || []);
+    if (!incoming.length) return;
+    const invalid = [];
+    const validIncoming = [];
+    incoming.forEach((file) => {
+      const allowedExt = this.getAllowedExtension(file);
+      if (!allowedExt) {
+        invalid.push(file.name);
+      } else {
+        validIncoming.push(file);
+      }
+    });
+
+    if (invalid.length) {
+      this.toast(
+        'Error',
+        `Unsupported file type: ${invalid.join(', ')}. Allowed: ${ALLOWED_EXTENSIONS_LABEL}.`,
+        'error'
+      );
+    }
+
+    const merged = [...this.files, ...validIncoming];
+    const seen = new Set();
+    const unique = [];
+    merged.forEach((file) => {
+      const key = `${file.name}:${file.size}:${file.lastModified}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      unique.push(file);
+    });
+    this.files = unique;
     this.lastResultMessage = '';
   }
 
@@ -134,7 +188,9 @@ export default class FileUploader extends NavigationMixin(LightningElement) {
 
     this.uploading = true;
     this.lastResultMessage = '';
+    this.errorMessage = '';
     const successItems = [];
+    const errorMessages = [];
     let success = 0, failed = 0;
     const folderPath = this.folderPath;
     const isFlat = this.isFlatTypeSelected;
@@ -145,13 +201,16 @@ export default class FileUploader extends NavigationMixin(LightningElement) {
       return;
     }
 
+    const invalidUploads = [];
     for (const file of this.files) {
       try {
-        const extension =
-          this.getFileExtension(file.name) ||
-          this.getExtensionFromContentType(file.type) ||
-          'bin';
-        const contentType = this.buildContentType(extension);
+        const extension = this.getAllowedExtension(file);
+        if (!extension) {
+          invalidUploads.push(file.name);
+          failed += 1;
+          continue;
+        }
+        const contentType = this.resolveContentType(extension, file.type);
         const fileUuid = await getUploadUuid();
 
         const presignedUrl = await getPresignedUrlForUpload({
@@ -160,11 +219,12 @@ export default class FileUploader extends NavigationMixin(LightningElement) {
           fileUuid,
           folderPath
         });
+        console.log('preassinged urlllllll>', presignedUrl);
+        await this.putToS3(presignedUrl, file, contentType);
 
-        await this.putToS3(presignedUrl, file, contentType, fileUuid);
-
-        const fileName = `${fileUuid}.${extension}`;
-        const filePath = this.joinPath([this.uuid, folderPath, fileName]);
+        const storageFileName = `${fileUuid}.${extension}`;
+        const filePath = this.joinPath([this.uuid, folderPath, storageFileName]);
+        const fileName = file && file.name ? file.name : storageFileName;
         successItems.push({
           uuid: fileUuid,
           path: filePath,
@@ -175,9 +235,19 @@ export default class FileUploader extends NavigationMixin(LightningElement) {
         success += 1;
       } catch (e) {
         failed += 1;
+        const msg = (e && e.body && e.body.message) || e.message || 'S3 upload failed.';
+        errorMessages.push(`${file.name}: ${msg}`);
         // eslint-disable-next-line no-console
         console.error('Upload failed:', e);
       }
+    }
+
+    if (invalidUploads.length) {
+      this.toast(
+        'Error',
+        `Unsupported file type: ${invalidUploads.join(', ')}. Allowed: ${ALLOWED_EXTENSIONS_LABEL}.`,
+        'error'
+      );
     }
 
     let syncSucceeded = false;
@@ -219,53 +289,69 @@ export default class FileUploader extends NavigationMixin(LightningElement) {
         // eslint-disable-next-line no-console
         console.log('Upload sync result:', result);
         if (result && result._localError) {
-          // local validation already handled via toast
+          // local validation already handled
         } else if (!result || result.success !== true) {
-            const msg = result && result.message ? result.message : 'Files uploaded but failed to sync in Salesforce.';
-            //this.toast('Warning', msg, 'warning');
-          } else {
-            syncSucceeded = true;
-            this.toast('Success', 'Files uploaded and saved successfully.', 'success');
-            this.closeAndNavigate();
-          }
-        } catch (error) {
-          if (!syncSucceeded) {
-            const msg = this.getApexErrorMessage(error) || 'Files uploaded but failed to sync in Salesforce.';
-            this.toast('Warning', msg, 'warning');
-          }
+          const msg = result && result.message ? result.message : 'Files uploaded but failed to sync in Salesforce.';
+          errorMessages.push(`Salesforce Sync: ${msg}`);
+        } else {
+          syncSucceeded = true;
         }
+      } catch (error) {
+        if (!syncSucceeded) {
+          const msg = this.getApexErrorMessage(error) || 'Files uploaded but failed to sync in Salesforce.';
+          errorMessages.push(`Sync Error: ${msg}`);
+          this.toast('Warning', msg, 'warning');
+        }
+      }
     }
 
     this.uploading = false;
     this.lastResultMessage = `Uploaded: ${success} | Failed: ${failed}`;
-    this.toast(failed === 0 ? 'Success' : 'Partial Success', this.lastResultMessage, failed === 0 ? 'success' : 'warning');
+
+    if (errorMessages.length > 0) {
+      this.errorMessage = `Failure details: ${errorMessages.join('; ')}`;
+    }
+
+    // Modal Closing Strategy: Only close if 100% of files succeeded
+    if (failed === 0 && (syncSucceeded || successItems.length === 0)) {
+      this.toast('Success', 'All files uploaded and saved successfully.', 'success');
+      this.closeAndNavigate();
+    } else {
+      this.toast('Partial Success', this.lastResultMessage, 'warning');
+    }
   }
 
-  async putToS3(url, file, contentType, fileUuid) {
-    const base64Body = await this.readFileAsBase64(file);
-    if (!base64Body) throw new Error('File read failed (empty body).');
-    return uploadFileToS3({ presignedUrl: url, base64Body, contentType, fileUuid });
-  }
-
-  readFileAsBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error('Failed to read file.'));
-      reader.onload = () => {
-        const result = reader.result;
-        if (typeof result !== 'string') {
-          reject(new Error('Failed to read file.'));
-          return;
-        }
-        const parts = result.split(',');
-        resolve(parts.length > 1 ? parts[1] : '');
-      };
-      reader.readAsDataURL(file);
+  async putToS3(url, file, contentType) {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': contentType || 'application/octet-stream'
+      },
+      body: file
     });
+
+    if (!response.ok) {
+      let responseText = '';
+      try {
+        responseText = await response.text();
+      } catch (e) {
+        // best effort only, not all responses return a readable body
+      }
+      throw new Error(
+        `S3 upload failed. Status: ${response.status}${responseText ? ` | ${responseText}` : ''}`
+      );
+    }
+
+    return response.status;
   }
 
-  buildContentType(extension) {
-    if (extension) return `application/${extension}`;
+  resolveContentType(extension, mimeType) {
+    if (mimeType && ALLOWED_MIME_TO_EXT[mimeType.toLowerCase()]) {
+      return mimeType;
+    }
+    if (extension && EXTENSION_TO_MIME[extension]) {
+      return EXTENSION_TO_MIME[extension];
+    }
     return 'application/octet-stream';
   }
 
@@ -278,9 +364,26 @@ export default class FileUploader extends NavigationMixin(LightningElement) {
 
   getExtensionFromContentType(contentType) {
     if (!contentType || typeof contentType !== 'string') return '';
-    const parts = contentType.split('/');
+    const normalized = contentType.toLowerCase();
+    if (ALLOWED_MIME_TO_EXT[normalized]) {
+      return ALLOWED_MIME_TO_EXT[normalized];
+    }
+    const parts = normalized.split('/');
     if (parts.length < 2 || !parts[1]) return '';
     return parts[1].toLowerCase();
+  }
+
+  getAllowedExtension(file) {
+    if (!file) return '';
+    const mime = file.type ? file.type.toLowerCase() : '';
+    if (mime && ALLOWED_MIME_TO_EXT[mime]) {
+      return ALLOWED_MIME_TO_EXT[mime];
+    }
+    const ext = this.getFileExtension(file.name);
+    if (ext && ALLOWED_EXTENSIONS.has(ext)) {
+      return ext;
+    }
+    return '';
   }
 
   resolveLogicalType(categoryValue) {

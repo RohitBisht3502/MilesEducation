@@ -19,6 +19,7 @@ public without sharing class EligibilityEmailQuickActionController {
         @AuraEnabled public String candidateName;
         @AuraEnabled public String studentName;
         @AuraEnabled public String uuid;
+        @AuraEnabled public String eligibilityCode;
         @AuraEnabled public String eligibilityStatus;
         @AuraEnabled public String gpStatus;
         @AuraEnabled public Decimal score;
@@ -57,7 +58,8 @@ public without sharing class EligibilityEmailQuickActionController {
         if (ctx.candidateId != null) {
             cand = [
                 SELECT Id, Name, Email, Owner.Name, GP_User__c, GP_User__r.Name,
-                       GP_Lead_Status__c, CPA_Eligibility_Status__c, Credit_score__c, UUID__c
+                       GP_Lead_Status__c, CPA_Eligibility_Status__c, Credit_score__c, UUID__c,
+                       Eligibility_Code__c
                 FROM Lead
                 WHERE Id = :ctx.candidateId
                 LIMIT 1
@@ -69,7 +71,8 @@ public without sharing class EligibilityEmailQuickActionController {
         if (ctx.studentId != null) {
             stud = [
                 SELECT Id, Name, Email__c, Owner.Name, GP_User__c, GP_User__r.Name,
-                       GP_Lead_Status__c, CPA_Eligibility_Status__c, Credit_score__c, UUID__c
+                       GP_Lead_Status__c, CPA_Eligibility_Status__c, Credit_score__c, UUID__c,
+                       Eligibility_Code__c
                 FROM Account
                 WHERE Id = :ctx.studentId
                 LIMIT 1
@@ -85,6 +88,7 @@ public without sharing class EligibilityEmailQuickActionController {
             res.eligibilityStatus = cand != null ? cand.CPA_Eligibility_Status__c : null;
             res.gpStatus = cand != null ? cand.GP_Lead_Status__c : null;
             res.score = cand != null ? cand.Credit_score__c : null;
+            res.eligibilityCode = cand != null ? cand.Eligibility_Code__c : null;
         } else {
             res.recordName = stud != null ? stud.Name : null;
             res.email = stud != null ? stud.Email__c : null;
@@ -93,6 +97,7 @@ public without sharing class EligibilityEmailQuickActionController {
             res.eligibilityStatus = stud != null ? stud.CPA_Eligibility_Status__c : null;
             res.gpStatus = stud != null ? stud.GP_Lead_Status__c : null;
             res.score = stud != null ? stud.Credit_score__c : null;
+            res.eligibilityCode = stud != null ? stud.Eligibility_Code__c : null;
         }
 
         List<AggregateResult> aggregates = new List<AggregateResult>();

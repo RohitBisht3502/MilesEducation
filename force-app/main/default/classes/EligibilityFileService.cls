@@ -19,8 +19,8 @@ public without sharing class EligibilityFileService {
     }
 
     public class SimpleResponse {
-        public Boolean success;
-        public String message;
+        @AuraEnabled public Boolean success;
+        @AuraEnabled public String message;
     }
 
     @AuraEnabled

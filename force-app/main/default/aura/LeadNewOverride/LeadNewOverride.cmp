@@ -4,9 +4,12 @@
     access="global">
     <aura:attribute name="courseOptions" type="List" default="[]"/>
     <aura:attribute name="course" type="String" default=""/>
+    <aura:attribute name="cityOptions" type="List" default="[]"/>
+    <aura:attribute name="city" type="String" default=""/>
     <aura:attribute name="firstName" type="String" default=""/>
     <aura:attribute name="lastName" type="String" default=""/>
     <aura:attribute name="phone" type="String" default=""/>
+    <aura:attribute name="countryCode" type="String" default="+91"/>
     <aura:attribute name="email" type="String" default=""/>
     <aura:attribute name="isLoading" type="Boolean" default="false"/>
     <aura:attribute name="errorMessage" type="String" default=""/>
@@ -40,17 +43,23 @@
                 
                 <!-- Phone -->
                 <lightning:layoutItem size="3" smallDeviceSize="6" padding="around-small">
-                    <lightning:input
-                        name="phone"
-                        type="tel"
-                        label="Phone"
-                        required="true"
-                        value="{!v.phone}"
-                        minlength="10"
-                        maxlength="10"
-                        pattern="^[6-9]\\d{9}$"
-                        message-when-pattern-mismatch="Enter a valid 10-digit phone number starting with 6-9."
-                        onchange="{!c.handleInputChange}"/>
+                    <div class="slds-grid slds-gutters_x-small">
+                        <div class="slds-col slds-size_1-of-4">
+                            <lightning:select name="countryCode" label="Country Code" required="true" value="{!v.countryCode}" onchange="{!c.handleInputChange}">
+                                <option value="+91">+91</option>
+                                <option value="+971">+971</option>
+                            </lightning:select>
+                        </div>
+                        <div class="slds-col slds-size_3-of-4">
+                            <lightning:input
+                                name="phone"
+                                type="text"
+                                label="Phone Number"
+                                value="{!v.phone}"
+                                maxlength="15"
+                                onchange="{!c.handleInputChange}"/>
+                        </div>
+                    </div>
                 </lightning:layoutItem>
                 
                 <!-- Course -->
@@ -62,9 +71,19 @@
                         </aura:iteration>
                     </lightning:select>
                 </lightning:layoutItem>
+
+                <!-- City -->
+                <lightning:layoutItem size="3" smallDeviceSize="6" padding="around-small">
+                    <lightning:select name="city" label="City" value="{!v.city}" required="true" onchange="{!c.handleInputChange}">
+                        <option value="">--None--</option>
+                        <aura:iteration items="{!v.cityOptions}" var="opt">
+                            <option value="{!opt.value}">{!opt.label}</option>
+                        </aura:iteration>
+                    </lightning:select>
+                </lightning:layoutItem>
             </lightning:layout>
 
-            <div class="slds-m-top_medium">
+            <div class="slds-m-top_medium slds-text-align_right">
                 <lightning:button variant="brand" label="{!v.isLoading ? 'Saving...' : 'Save'}" onclick="{!c.handleCreate}" disabled="{!v.isLoading}"/>
                 <lightning:button class="slds-m-left_small" variant="neutral" label="Cancel" onclick="{!c.handleCancel}" disabled="{!v.isLoading}"/>
             </div>

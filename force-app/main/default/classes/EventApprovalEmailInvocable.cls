@@ -98,22 +98,9 @@ public without sharing class EventApprovalEmailInvocable {
         Map<Id, User> managerMap = managerIds.isEmpty()
             ? new Map<Id, User>()
             : new Map<Id, User>([
-                SELECT Id, Email, Name, ManagerId
-                FROM User
-                WHERE Id IN :managerIds
-            ]);
-
-        Set<Id> managerManagerIds = new Set<Id>();
-        for (User mgr : managerMap.values()) {
-            if (mgr.ManagerId != null) managerManagerIds.add(mgr.ManagerId);
-        }
-
-        Map<Id, User> managerManagerMap = managerManagerIds.isEmpty()
-            ? new Map<Id, User>()
-            : new Map<Id, User>([
                 SELECT Id, Email, Name
                 FROM User
-                WHERE Id IN :managerManagerIds
+                WHERE Id IN :managerIds
             ]);
 
         String currentUserName = UserInfo.getName();
@@ -207,6 +194,11 @@ public without sharing class EventApprovalEmailInvocable {
                             new PendingNotification(ev.OwnerId, ev.Id, ownerNotifTitle, ownerNotifBody)
                         );
                     }
+
+                    out.success = true;
+                    out.message = 'Prepared';
+                    results.add(out);
+                    continue;
                 }
 
 
@@ -227,15 +219,8 @@ public without sharing class EventApprovalEmailInvocable {
                 }
 
                 User manager = managerMap.get(ownerUser.ManagerId);
-                if (manager == null || manager.ManagerId == null) {
-                    out.success = false; out.message = 'Manager\'s manager not found for lead: ' + leadRec.Id;
-                    results.add(out); continue;
-                }
-
-                Id managerManagerId = manager.ManagerId;
-                User managerManager = managerManagerMap.get(managerManagerId);
-                if (managerManager == null || String.isBlank(managerManager.Email)) {
-                    out.success = false; out.message = 'Manager\'s manager user not found or email blank: ' + managerManagerId;
+                if (manager == null || String.isBlank(manager.Email)) {
+                    out.success = false; out.message = 'Lead owner manager user not found or email blank: ' + ownerUser.ManagerId;
                     results.add(out); continue;
                 }
 
@@ -261,7 +246,7 @@ public without sharing class EventApprovalEmailInvocable {
                 }
 
                 Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
-                mail.setToAddresses(new List<String>{ managerManager.Email });
+                mail.setToAddresses(new List<String>{ manager.Email });
                 mail.setSubject(subject);
 
                 if (!String.isBlank(htmlBody)) {
@@ -276,7 +261,7 @@ public without sharing class EventApprovalEmailInvocable {
                 String notifTitle = 'Gmeet Approval Request';
                 String notifBody = 'Gmeet ' + (ev.Subject == null ? '' : ev.Subject)
                     + ' for Lead ' + leadName + '  requires approval.';
-                pendingNotifs.add(new PendingNotification(managerManagerId, ev.Id, notifTitle, notifBody));
+                pendingNotifs.add(new PendingNotification(manager.Id, ev.Id, notifTitle, notifBody));
 
                 out.success = true;
                 out.message = 'Prepared';

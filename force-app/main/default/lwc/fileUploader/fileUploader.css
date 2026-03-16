@@ -100,9 +100,19 @@
 }
 
 .spinner-row,
-.result-row {
+.result-row,
+.error-row {
   display: flex;
   justify-content: center;
+}
+
+.error-row {
+  color: #ea001e;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  margin-top: 8px;
+  padding: 0 12px;
 }
 
 /* File pill container */

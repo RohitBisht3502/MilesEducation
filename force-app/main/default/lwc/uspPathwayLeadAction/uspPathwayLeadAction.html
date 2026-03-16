@@ -1,15 +1,35 @@
 <template>
-    <lightning-card title="Create US Pathway Lead">
-        <div class="slds-p-around_medium">
-            <p>This will create a new US Pathway Lead for this student.</p>
-            <div class="slds-m-top_medium">
-                <lightning-button
-                    variant="brand"
-                    label="Create US Pathway Lead"
-                    onclick={handleCreate}
-                    disabled={isLoading}>
-                </lightning-button>
+    <lightning-quick-action-panel>
+        <div class="panel-shell">
+            <div class="panel-header">{headerLabel}</div>
+
+            <div class="panel-body">
+                <div class="selection-box">
+                    <div class="selection-title">Which lead do you want to create?</div>
+                    <lightning-radio-group
+                        name="courseType"
+                        label="Course Type"
+                        options={courseTypeOptions}
+                        value={selectedCourseType}
+                        onchange={handleCourseTypeChange}
+                        type="radio">
+                    </lightning-radio-group>
+                </div>
             </div>
         </div>
-    </lightning-card>
+
+        <div slot="footer" class="panel-footer">
+            <lightning-button
+                label="Cancel"
+                onclick={handleCancel}
+                class="slds-m-right_small">
+            </lightning-button>
+            <lightning-button
+                variant="brand"
+                label="Create Lead"
+                onclick={handleCreate}
+                disabled={isCreateDisabled}>
+            </lightning-button>
+        </div>
+    </lightning-quick-action-panel>
 </template>

@@ -54,42 +54,7 @@ public without sharing class Callout_AWSFileUploader {
 
     @AuraEnabled(cacheable=false)
     public static String getUploadUuid() {
-        External_Service_Config__mdt cfg = loadConfig();
-        String endpoint = buildEndpoint(cfg.Endpoint_URL__c, '/getUUID');
-
-        HttpRequest req = new HttpRequest();
-        req.setEndpoint(endpoint);
-        req.setMethod('GET');
-        if (!String.isBlank(cfg.Api_Key__c) && !String.isBlank(cfg.Api_Key_Header__c)) {
-            req.setHeader(cfg.Api_Key_Header__c, cfg.Api_Key__c);
-        }
-
-        Http http = new Http();
-        HttpResponse res;
-        try {
-            res = http.send(req);
-        } catch (Exception e) {
-            IntegrationLogUtil.insertLog('AWS File Uploader - UUID', null, null, 'Callout error: ' + e.getMessage(), 'Failed', null);
-            throw new AuraHandledException('Callout failed: ' + e.getMessage());
-        }
-
-        Integer code = res.getStatusCode();
-        String body = res.getBody();
-
-        if (code != 200 || String.isBlank(body)) {
-            IntegrationLogUtil.insertLog('AWS File Uploader - UUID', null, body, 'Non-200 or empty body', 'Failed', code);
-            throw new AuraHandledException('UUID API returned error. Status: ' + code);
-        }
-
-        Map<String, Object> payload = unwrapBody(body);
-        String uuid = (payload == null) ? null : (String) payload.get('uuid');
-        if (String.isBlank(uuid)) {
-            IntegrationLogUtil.insertLog('AWS File Uploader - UUID', null, body, 'Missing uuid in response', 'Failed', code);
-            throw new AuraHandledException('Invalid UUID response.');
-        }
-
-        IntegrationLogUtil.insertLog('AWS File Uploader - UUID', null, (body != null && body.length() > 3000 ? body.substring(0, 3000) : body), 'Success', 'Success', 200);
-        return uuid;
+        return String.valueOf(UUID.randomUUID());
     }
 
     @AuraEnabled(cacheable=false)
@@ -147,53 +112,6 @@ public without sharing class Callout_AWSFileUploader {
 
         IntegrationLogUtil.insertLog('AWS File Uploader - Presign', null, (body != null && body.length() > 3000 ? body.substring(0, 3000) : body), 'Success', 'Success', 200);
         return url;
-    }
-
-    @AuraEnabled(cacheable=false)
-    public static Integer uploadFileToS3(
-        String presignedUrl,
-        String base64Body,
-        String contentType,
-        String fileUuid
-    ) {
-        if (String.isBlank(presignedUrl)) throw new AuraHandledException('presignedUrl is required.');
-        if (String.isBlank(base64Body)) throw new AuraHandledException('file body is required.');
-        if (String.isBlank(contentType)) contentType = 'application/octet-stream';
-
-        Blob body = EncodingUtil.base64Decode(base64Body);
-
-        HttpRequest req = new HttpRequest();
-        req.setEndpoint(presignedUrl);
-        req.setMethod('PUT');
-        req.setHeader('Content-Type', contentType);
-        req.setBodyAsBlob(body);
-
-        Http http = new Http();
-        HttpResponse res;
-        try {
-            res = http.send(req);
-        } catch (Exception e) {
-            IntegrationLogUtil.insertLog('AWS File Uploader - S3 PUT', fileUuid, null, 'Callout error: ' + e.getMessage(), 'Failed', null);
-            throw new AuraHandledException('S3 upload callout failed: ' + e.getMessage());
-        }
-
-        Integer code = res.getStatusCode();
-        String responseBody = res.getBody();
-
-        if (code < 200 || code >= 300) {
-            IntegrationLogUtil.insertLog(
-                'AWS File Uploader - S3 PUT',
-                fileUuid,
-                (responseBody != null && responseBody.length() > 3000 ? responseBody.substring(0, 3000) : responseBody),
-                'Non-2xx response',
-                'Failed',
-                code
-            );
-            throw new AuraHandledException('S3 upload failed. Status: ' + code);
-        }
-
-        IntegrationLogUtil.insertLog('AWS File Uploader - S3 PUT', fileUuid, null, 'Success', 'Success', code);
-        return code;
     }
 
     private static External_Service_Config__mdt loadConfig() {

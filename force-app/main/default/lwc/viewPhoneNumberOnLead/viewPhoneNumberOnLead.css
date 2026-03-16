@@ -1,12 +1,15 @@
 .phone-viewer-container {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     padding: 16px;
-    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+
+   background: #f9fafb;
+
     border-radius: 12px;
     position: relative;
     min-height: 200px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    border: 1px solid #e2e8f0;
+
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+    border: 1px solid #1e40af;
 }
 
 /* Credit Display */
@@ -15,12 +18,62 @@
     position: relative;
 }
 
+
+/* Remove close (X) icon from modal */
+.slds-modal__close,
+button.slds-button.slds-button_icon.slds-modal__close {
+    display: none !important;
+}
+.email-wrapper{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+}
+
+
+.phone-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+.phone-number-box,
+.email-box{
+    flex:1;
+}
+
+.right-copy{
+    min-width:120px;
+}
+.email-box{
+    padding:16px;
+    background:#f9fafb;
+    border:2px solid #e5e7eb;
+    border-radius:10px;
+    text-align:center;
+    cursor:pointer;
+}
+
+.email-value{
+    font-size:18px;
+    font-weight:600;
+    color:#111827;
+}
+.slds-modal__close {
+    display: none !important;
+}
+
+/* Optional: also hide modal header completely */
+.slds-modal__header {
+    display: none !important;
+}
+
 .credit-badge {
     display: inline-flex;
     align-items: center;
     gap: 8px;
     padding: 8px 16px;
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+   background: linear-gradient(135deg, #022F5B 0%, #0A3D7A 100%);
     color: white;
     border-radius: 20px;
     font-size: 14px;
@@ -155,9 +208,8 @@
     min-width: 140px;
 }
 
-/* View Button */
 .view-btn {
-    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+    background: linear-gradient(135deg, #022F5B 0%, #0A3D7A 100%);
     color: white;
     box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
 }
@@ -180,17 +232,18 @@
     box-shadow: none;
 }
 
-/* Copy Button */
 .copy-btn {
-    background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+    background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
     color: white;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    border: none;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    transition: all 0.3s ease;
 }
 
 .copy-btn:hover {
-    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%);
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
 }
 
 .copy-btn:active {
@@ -199,17 +252,16 @@
 
 /* Close Button */
 .close-btn {
-    background: white;
-    color: #374151;
-    border: 2px solid #e5e7eb;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+   background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
+    color: white;
+    border: none;
+    box-shadow: 0 6px 16px rgba(239,68,68,0.4);
 }
 
 .close-btn:hover {
-    background: #f9fafb;
-    border-color: #d1d5db;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+    box-shadow: 0 8px 20px rgba(79, 70, 229, 0.6);
 }
 
 .close-btn:active {
@@ -320,12 +372,12 @@
         width: 100%;
         min-width: auto;
     }
-    
+
     .action-section .view-btn {
         width: 100%;
         min-width: auto;
     }
-    
+
     .wire-loading {
         top: 4px;
         right: 4px;

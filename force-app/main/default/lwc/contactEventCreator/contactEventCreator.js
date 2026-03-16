@@ -236,10 +236,10 @@ export default class ContactEventCreator extends LightningElement {
                 this.contactEmail
             ]);
 
-            const managerManagerEmail = userInfo?.Manager?.Manager?.Email;
-            const managerManagerName = userInfo?.Manager?.Manager?.Name || 'Manager';
-            if (managerManagerEmail && !skipEmail.has(managerManagerEmail)) {
-                this.addParticipantWithData(managerManagerEmail, managerManagerName, false, false);
+            const managerEmail = userInfo?.Manager?.Email;
+            const managerName = userInfo?.Manager?.Name || 'Manager';
+            if (managerEmail && !skipEmail.has(managerEmail)) {
+                this.addParticipantWithData(managerEmail, managerName, false, false);
             }
         } catch (error) {
             console.error('Error loading user info:', error);

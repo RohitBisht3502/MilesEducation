@@ -3,6 +3,7 @@ import { CurrentPageReference } from 'lightning/navigation';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { CloseActionScreenEvent } from 'lightning/actions';
 import { NavigationMixin } from 'lightning/navigation';
+
 import getActiveProducts from '@salesforce/apex/PurchaseOrderService.getActiveProducts';
 import savePurchaseOrder from '@salesforce/apex/PurchaseOrderService.save';
 import checkAddressByRecordId from '@salesforce/apex/PurchaseOrderService.checkAddressByRecordId';
@@ -11,36 +12,39 @@ import getAddressByRecordId from '@salesforce/apex/PurchaseOrderService.getAddre
 import getMinimumDownPayment from '@salesforce/apex/PurchaseOrderService.getMinimumDownPayment';
 import getDiscountThreshold from '@salesforce/apex/PurchaseOrderService.getDiscountThreshold';
 import getLoansForLead from '@salesforce/apex/PurchaseOrderService.getLoansForLead';
+
 import MINIMUM_DOWNPAYMENT from '@salesforce/label/c.Minimum_Downpayment';
-import { refreshApex } from '@salesforce/apex';
 
 const MAX_DISCOUNT_PERCENT = 100;
+const DEFAULT_COUNTRY = 'India';
 
-export default class PurchaseOrderProductSelector extends NavigationMixin(LightningElement){
+export default class PurchaseOrderProductSelector extends NavigationMixin(LightningElement) {
     @track products = [];
     @track loans = [];
+    @track sameAsBilling = false;
+    @track addressData = {
+        billing: { country: DEFAULT_COUNTRY },
+        shipping: { country: DEFAULT_COUNTRY }
+    };
+    @track showAddressModal = false;
+    @track missingAddressType = '';
+
     selectedLoanId = null;
     searchKey = '';
     showCheckout = false;
     discountType = 'fixed';
-wiredProductsResult;
+    wiredProductsResult;
     discountValue = 0;
     downPayment = 0;
     selectedAddressType = 'billing';
     recordId;
-    @track sameAsBilling = false;
     minimumDownPayment = 0;
     discountThreshold = 0;
     approvalComments = '';
     shippingPhone = '';
-    @track addressData = { billing: {}, shipping: {} };
 
     hasBillingAddress = false;
     hasShippingAddress = false;
-
-    // Modal variables
-    @track showAddressModal = false;
-    @track missingAddressType = '';
 
     @wire(CurrentPageReference)
     getStateParameters(currentPageReference) {
@@ -68,25 +72,25 @@ wiredProductsResult;
     }
 
     @wire(getActiveProducts, { recordId: '$recordId' })
-wiredProducts(result) {
-    this.wiredProductsResult = result;
-    const { data, error } = result;
+    wiredProducts(result) {
+        this.wiredProductsResult = result;
+        const { data, error } = result;
 
-    if (data) {
-        this.products = data.map(p => ({
-            id: p.id,
-            name: p.name || '',
-            sku: p.productCode || '',
-            category: p.family || '',
-            price: Number(p.unitPrice) || 0,
-            type: p.type || '',
-            quantity: 1,
-            selected: false
-        }));
-    } else if (error) {
-        this.showToast('Error', error.body?.message || 'Failed to load products', 'error');
+        if (data) {
+            this.products = data.map((p) => ({
+                id: p.id,
+                name: p.name || '',
+                sku: p.productCode || '',
+                category: p.family || '',
+                price: Number(p.unitPrice) || 0,
+                type: p.type || '',
+                quantity: 1,
+                selected: false
+            }));
+        } else if (error) {
+            this.showToast('Error', error.body?.message || 'Failed to load products', 'error');
+        }
     }
-}
 
     get isBillingModal() {
         return this.missingAddressType === 'billing';
@@ -96,13 +100,12 @@ wiredProducts(result) {
         this.sameAsBilling = event.target.checked;
     }
 
-
     get currentAddressLabel() {
         return this.selectedAddressType === 'shipping' ? 'Shipping Address' : 'Billing Address';
     }
 
     get hasSelectedProducts() {
-        return this.products.some(p => p.selected);
+        return this.products.some((p) => p.selected);
     }
 
     get disableCreatePurchase() {
@@ -124,7 +127,8 @@ wiredProducts(result) {
     get filteredProducts() {
         if (!this.products.length) return [];
         if (!this.searchKey) return this.products;
-        return this.products.filter(p =>
+
+        return this.products.filter((p) =>
             (p.name || '').toLowerCase().includes(this.searchKey)
         );
     }
@@ -135,12 +139,12 @@ wiredProducts(result) {
 
     get selectedProducts() {
         return this.products
-            .filter(p => p.selected)
-            .map(p => ({ ...p, total: p.price }));
+            .filter((p) => p.selected)
+            .map((p) => ({ ...p, total: p.price }));
     }
 
     get hasStudyMaterial() {
-        return this.selectedProducts.some(p => p.type === 'Study Material');
+        return this.selectedProducts.some((p) => p.type === 'Study Material');
     }
 
     get cartCount() {
@@ -158,6 +162,10 @@ wiredProducts(result) {
         return 0;
     }
 
+    get effectiveMinimumDownPayment() {
+        return Math.max(0, Number(this.minimumDownPayment) || 0) + (Number(this.processingFee) || 0);
+    }
+
     get processingFeeMessage() {
         const fee = this.processingFee;
         if (!fee) return '';
@@ -169,7 +177,7 @@ wiredProducts(result) {
     }
 
     get formattedLoans() {
-        return this.loans.map(l => ({
+        return this.loans.map((l) => ({
             ...l,
             className: `loan-card${this.selectedLoanId === l.id ? ' selected' : ''}`,
             isSelected: this.selectedLoanId === l.id
@@ -186,7 +194,11 @@ wiredProducts(result) {
 
     get discountAmount() {
         if (this.subTotal <= 0) return 0;
-        if (this.discountType === 'percentage') return Math.round((this.subTotal * Math.min(this.discountValue, 100)) / 100);
+
+        if (this.discountType === 'percentage') {
+            return Math.round((this.subTotal * Math.min(this.discountValue, 100)) / 100);
+        }
+
         return Math.min(this.discountValue, this.subTotal);
     }
 
@@ -228,7 +240,8 @@ wiredProducts(result) {
     }
 
     get downPaymentMinMessage() {
-        if (this.minimumDownPayment > 0) {
+        if (this.effectiveMinimumDownPayment > 0) {
+            return `Minimum down payment should be Rs ${this.effectiveMinimumDownPayment}`;
             return `Minimum down payment should be ₹${this.minimumDownPayment}`;
         }
         return 'Down payment cannot be negative.';
@@ -236,20 +249,22 @@ wiredProducts(result) {
 
     validateAddressFields(address, sectionLabel) {
         const required = ['street', 'city', 'state', 'postal', 'country'];
+
         for (const key of required) {
             const value = address[key];
             if (!value || !String(value).trim()) {
-                const fieldLabel = key === 'postal'
-                    ? 'ZIP Code'
-                    : `${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+                const fieldLabel =
+                    key === 'postal'
+                        ? 'ZIP Code'
+                        : `${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+
                 this.showToast('Error', `${sectionLabel} ${fieldLabel} is mandatory.`, 'error');
                 return false;
             }
         }
+
         return true;
     }
-
-
 
     handleSearch(event) {
         this.searchKey = event.target.value?.toLowerCase() || '';
@@ -259,30 +274,59 @@ wiredProducts(result) {
         this.selectedAddressType = event.detail.value;
     }
 
+    normalizeAddress(address = {}) {
+        return {
+            street: address.street || '',
+            city: address.city || '',
+            state: address.state || '',
+            postal: address.postal || '',
+            country: address.country || DEFAULT_COUNTRY
+        };
+    }
+
+    ensureDefaultCountries() {
+        this.addressData = {
+            billing: {
+                ...this.addressData.billing,
+                country: this.addressData.billing?.country || DEFAULT_COUNTRY
+            },
+            shipping: {
+                ...this.addressData.shipping,
+                country: this.addressData.shipping?.country || DEFAULT_COUNTRY
+            }
+        };
+    }
+
     handleLoanSelect(event) {
         this.selectedLoanId = event.target.value;
+        this.syncDownPayment();
     }
 
     addToCart(event) {
         const id = event.currentTarget.dataset.id;
-        this.products = this.products.map(p => {
+
+        this.products = this.products.map((p) => {
             if (String(p.id) === id) {
                 return { ...p, selected: true };
             }
             return { ...p, selected: false, quantity: 1 };
         });
+
         this.syncDownPayment();
     }
 
     removeItem(event) {
         const id = event.currentTarget.dataset.id;
-        this.products = this.products.map(p => (String(p.id) === id ? { ...p, selected: false, quantity: 1 } : p));
+        this.products = this.products.map((p) =>
+            String(p.id) === id ? { ...p, selected: false, quantity: 1 } : p
+        );
         this.syncDownPayment();
     }
 
     handleDiscountType(event) {
         const newType = event.target.value;
         const oldType = this.discountType;
+
         if (oldType === newType) return;
 
         let newValue = this.discountValue;
@@ -291,8 +335,11 @@ wiredProducts(result) {
             if (oldType === 'percentage' && newType === 'fixed') {
                 newValue = Math.round((this.subTotal * Math.min(this.discountValue, 100)) / 100);
             }
+
             if (oldType === 'fixed' && newType === 'percentage') {
-                newValue = Math.round((Math.min(this.discountValue, this.subTotal) / this.subTotal) * 100);
+                newValue = Math.round(
+                    (Math.min(this.discountValue, this.subTotal) / this.subTotal) * 100
+                );
             }
         }
 
@@ -307,9 +354,11 @@ wiredProducts(result) {
         this.validateDiscount(event.target);
         this.syncDownPayment();
     }
+
     handleApprovalComments(event) {
         this.approvalComments = event.target.value || '';
     }
+
     handleDownPaymentChange(event) {
         const value = Number(event.target.value) || 0;
         this.validateDownPayment(event.target, value);
@@ -320,7 +369,6 @@ wiredProducts(result) {
         this.showCheckout = false;
     }
 
-    // ===== PROCEED TO CHECKOUT =====
     async proceedToCheckout() {
         if (!this.hasSelectedProducts) {
             this.showToast('Warning', 'Please select at least one product.', 'warning');
@@ -329,7 +377,7 @@ wiredProducts(result) {
 
         try {
             const loans = await getLoansForLead({ recordId: this.recordId });
-            this.loans = loans.map(l => ({
+            this.loans = loans.map((l) => ({
                 id: l.Id,
                 name: l.Name,
                 provider: l.Loan_Provider__c,
@@ -345,42 +393,36 @@ wiredProducts(result) {
 
             const hasStudyMaterial = this.hasStudyMaterial;
             this.selectedAddressType = 'shipping';
-            await this.loadAddresses();
 
-            // Billing missing
+            await this.loadAddresses();
+            this.ensureDefaultCountries();
+
             if (!this.hasBillingAddress) {
                 this.missingAddressType = 'billing';
                 this.showAddressModal = true;
                 this.sameAsBilling = false;
-
                 return;
             }
 
-            // Shipping missing (only for study material)
             if (hasStudyMaterial && !this.hasShippingAddress) {
                 this.missingAddressType = 'shipping';
                 this.showAddressModal = true;
-
                 return;
             }
 
             this.showCheckout = true;
             this.sameAsBilling = false;
-
-
         } catch (error) {
             this.showToast('Error', error.body?.message || error.message, 'error');
         }
     }
 
-    // ===== SAVE ADDRESS =====
     saveAddress() {
-
         const inputs = this.template.querySelectorAll('lightning-input[data-field]');
         const billing = {};
         const shipping = {};
 
-        inputs.forEach(i => {
+        inputs.forEach((i) => {
             const key = i.dataset.field;
 
             if (key.startsWith('billing_')) {
@@ -407,15 +449,17 @@ wiredProducts(result) {
 
         this.shippingPhone = shipping.phone;
 
-        // save billing first
+        const normalizedBilling = this.normalizeAddress(billing);
+        const normalizedShipping = this.sameAsBilling
+            ? { ...normalizedBilling }
+            : this.normalizeAddress(shipping);
+
         saveAddress({
             recordId: this.recordId,
             addressType: 'billing',
             address: billing
         })
             .then(async () => {
-
-                // auto copy if same as billing
                 if (this.sameAsBilling) {
                     shipping.street = billing.street;
                     shipping.city = billing.city;
@@ -424,11 +468,12 @@ wiredProducts(result) {
                     shipping.country = billing.country;
                 }
 
-                const shouldSaveShipping = this.missingAddressType === 'shipping'
-                    || this.missingAddressType === 'edit'
-                    || this.sameAsBilling;
+                const hasShippingInput = this.sameAsBilling || this.shouldShowShippingFields;
+                const shouldSaveShipping =
+                    this.missingAddressType === 'shipping' ||
+                    this.missingAddressType === 'edit' ||
+                    hasShippingInput;
 
-                // save shipping only if needed
                 if (shouldSaveShipping) {
                     await saveAddress({
                         recordId: this.recordId,
@@ -437,19 +482,26 @@ wiredProducts(result) {
                     });
                 }
 
+                this.addressData = {
+                    billing: normalizedBilling,
+                    shipping: normalizedShipping
+                };
+
                 this.showAddressModal = false;
                 this.sameAsBilling = false;
-              
-window.location.reload();
-  await this.loadAddresses();
-                this.proceedToCheckout();
+                this.hasBillingAddress = true;
 
+                if (shouldSaveShipping) {
+                    this.hasShippingAddress = true;
+                }
+
+                await this.loadAddresses();
+                this.proceedToCheckout();
             })
-            .catch(err => {
+            .catch((err) => {
                 this.showToast('Error', err.body?.message || err.message, 'error');
             });
     }
-
 
     confirmPurchase() {
         if (!this.hasSelectedProducts) {
@@ -472,7 +524,16 @@ window.location.reload();
             return;
         }
 
-        if (this.downPayment < Number(this.minimumDownPayment || 0)) {
+        if (this.downPayment < this.effectiveMinimumDownPayment) {
+            this.showToast(
+                'Error',
+                `Minimum down payment should be Rs ${this.effectiveMinimumDownPayment}`,
+                'error'
+            );
+            return;
+        }
+
+        if (this.downPayment < this.effectiveMinimumDownPayment) {
             this.showToast(
                 'Error',
                 `Minimum down payment should be ₹${this.minimumDownPayment || 0}`,
@@ -500,7 +561,7 @@ window.location.reload();
             addressType: 'shipping',
             approvalComments: this.approvalComments,
             loanId: this.selectedLoanId,
-            items: this.selectedProducts.map(p => ({
+            items: this.selectedProducts.map((p) => ({
                 productId: p.id,
                 unitPrice: p.price,
                 qty: 1,
@@ -520,7 +581,7 @@ window.location.reload();
                 this.dispatchEvent(new CloseActionScreenEvent());
                 this.resetComponent();
             })
-            .catch(error => {
+            .catch((error) => {
                 const msg = error.body?.message || error.message || 'Unexpected error';
                 this.showToast('Error', msg, 'error');
                 console.error('Purchase Order creation failed:', error);
@@ -529,7 +590,7 @@ window.location.reload();
 
     resetComponent() {
         this.showCheckout = false;
-        this.products = this.products.map(p => ({ ...p, selected: false, quantity: 1 }));
+        this.products = this.products.map((p) => ({ ...p, selected: false, quantity: 1 }));
         this.discountValue = 0;
         this.discountType = 'percentage';
         this.selectedAddressType = 'billing';
@@ -550,44 +611,39 @@ window.location.reload();
         this.showAddressModal = false;
     }
 
-   async openEditAddressModal() {
-    this.missingAddressType = 'edit';
-    this.sameAsBilling = false;
+    async openEditAddressModal() {
+        this.missingAddressType = 'edit';
+        this.sameAsBilling = false;
 
-    await this.loadAddresses();
-
-    this.showAddressModal = true;
-}
+        await this.loadAddresses();
+        this.ensureDefaultCountries();
+        this.showAddressModal = true;
+    }
 
     async loadAddresses() {
         if (!this.recordId) return;
+
         try {
             const res = await getAddressByRecordId({ recordId: this.recordId });
             const billing = res?.billing || {};
             const shipping = res?.shipping || {};
+
             this.addressData = {
-                billing: {
-                    street: billing.street || '',
-                    city: billing.city || '',
-                    state: billing.state || '',
-                    postal: billing.postal || '',
-                    country: billing.country || ''
-                },
-                shipping: {
-                    street: shipping.street || '',
-                    city: shipping.city || '',
-                    state: shipping.state || '',
-                    postal: shipping.postal || '',
-                    country: shipping.country || ''
-                }
+                billing: this.normalizeAddress(billing),
+                shipping: this.normalizeAddress(shipping)
             };
+            this.ensureDefaultCountries();
+
             this.shippingPhone = res?.phone || '';
         } catch (error) {
             this.showToast('Error', error.body?.message || error.message, 'error');
         }
     }
+
     validateDiscount(inputEl) {
-        const input = inputEl || this.template.querySelector('lightning-input[data-id="discount"]');
+        const input =
+            inputEl || this.template.querySelector('lightning-input[data-id="discount"]');
+
         if (!input) return true;
 
         const value = Number(this.discountValue) || 0;
@@ -607,12 +663,15 @@ window.location.reload();
         input.reportValidity();
         return !message;
     }
+
     validateDownPayment(inputEl, rawValue) {
-        const input = inputEl || this.template.querySelector('lightning-input[data-id="downPayment"]');
+        const input =
+            inputEl || this.template.querySelector('lightning-input[data-id="downPayment"]');
+
         if (!input) return true;
 
         const value = rawValue !== undefined ? rawValue : Number(this.downPayment) || 0;
-        const min = Math.max(0, Number(this.minimumDownPayment) || 0);
+        const min = this.effectiveMinimumDownPayment;
         let message = '';
 
         if (value < min) {
@@ -628,12 +687,16 @@ window.location.reload();
 
     getSelectedLoanTenureMonths() {
         if (!this.selectedLoanId || !this.loans || !this.loans.length) return null;
-        const loan = this.loans.find(l => l.id === this.selectedLoanId);
+
+        const loan = this.loans.find((l) => l.id === this.selectedLoanId);
         if (!loan || !loan.tenure) return null;
+
         const match = String(loan.tenure).match(/(\d+)/);
         if (!match) return null;
+
         return Number(match[1]) || null;
     }
+
     syncDownPayment() {
         const input = this.template.querySelector('lightning-input[data-id="downPayment"]');
         if (input) {

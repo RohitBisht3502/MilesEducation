@@ -32,6 +32,8 @@ public without sharing class CandidateTriggerFrameworkHandler extends BaseTrigge
         CandidateTriggerHelperClass.transferRecordsOnConversion(getNewLeads(), getOldLeadMap());
         CandidateTriggerHelperClass.syncGpUserToRelatedLeads(getNewLeads(), getOldLeadMap());
         // CandidateTriggerHelperClass.createBridgeCourseLeads(getNewLeads(), getOldLeadMap());
+
+        CandidateTriggerHelperClass.handleMilesUuidRecording(getNewLeads(), getOldLeadMap());
     }
 
     public override void beforeDelete() {

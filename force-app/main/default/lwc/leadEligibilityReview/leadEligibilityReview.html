@@ -419,14 +419,7 @@
                                                                             </div>
 
                                                                             <div class="row-right">
-                                                                                <lightning-button
-                                                                                    variant="brand-outline"
-                                                                                    label="View"
-                                                                                    class="file-link view-button"
-                                                                                    data-id={file.id}
-                                                                                    onclick={handleViewFile}
-                                                                                    disabled={file.isViewing}>
-                                                                                </lightning-button>
+                                                                                
                                                                                 <template if:true={file.isViewing}>
                                                                                     <lightning-spinner alternative-text="Loading" size="small" class="view-spinner"></lightning-spinner>
                                                                                 </template>
@@ -435,6 +428,15 @@
                                                                                     <span class="status-dot"></span>
                                                                                     {file.status}
                                                                                 </span>
+
+                                                                                <lightning-button
+                                                                                    variant="brand-outline"
+                                                                                    label="View"
+                                                                                    class="file-link view-button"
+                                                                                    data-id={file.id}
+                                                                                    onclick={handleViewFile}
+                                                                                    disabled={file.isViewing}>
+                                                                                </lightning-button>
 
                                                                                 <lightning-button-icon
                                                                                     icon-name="utility:edit"

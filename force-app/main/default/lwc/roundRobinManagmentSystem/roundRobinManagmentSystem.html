@@ -34,7 +34,7 @@
           title={sourceTriggerTitle}
         >
           <span class="ms-text">{selectedSourcesDisplay}</span>
-          <span class="ms-caret">▾</span>
+          <span class="ms-caret">v</span>
 
           <template if:true={selectedBucket}>
             <div class="bucket-hint">(From: {selectedBucket})</div>
@@ -64,9 +64,9 @@
         </select>
       </div>
 
-      <!-- Actions (✅ Removed New button) -->
+      <!-- Actions -->
       <div class="actions">
-        <button class="btn small" onclick={openRoundRobinModal}>
+        <button class="btn small" onclick={openRoundRobinModal} title={label.CLAIM_INFO}>
           ON/OFF
         </button>
         <button class="btn small" onclick={reload}>Apply Filter</button>
@@ -86,6 +86,14 @@
 
           <div class="modal-body">
             <div class="multiselect-options">
+              <label class="option-label">
+                <input
+                  type="checkbox"
+                  checked={areAllTempSourcesSelected}
+                  onchange={handleSelectAllSources}
+                />
+                <span>Select All</span>
+              </label>
               <template for:each={displayLeadSourcesTemp} for:item="s">
                 <label key={s.key} class="option-label">
                   <input
@@ -112,8 +120,8 @@
       <div class="modal-overlay" onclick={closeRoundRobinModal}>
         <div class="modal-content rr-modal" onclick={handleModalClick}>
           <div class="modal-header">
-            <h3>Round Robin Settings</h3>
-            <button class="modal-close" onclick={closeRoundRobinModal}>✕</button>
+            <h3>{label.CLAIM_INFO}</h3>
+            <button class="modal-close" onclick={closeRoundRobinModal}>X</button>
           </div>
 
           <div class="modal-body">
@@ -178,8 +186,8 @@
                       />
                     </td>
                     <!-- <td>
-                      <button class="seq-btn" data-index={index} onclick={moveSeqUp} title="Move Up">⬆</button>
-                      <button class="seq-btn" data-index={index} onclick={moveSeqDown} title="Move Down">⬇</button>
+                      <button class="seq-btn" data-index={index} onclick={moveSeqUp} title="Move Up">Up</button>
+                      <button class="seq-btn" data-index={index} onclick={moveSeqDown} title="Move Down">Down</button>
                     </td> -->
                   </tr>
                 </template>

@@ -94,7 +94,7 @@ export default class WebinarAttendedLeads extends LightningElement {
 
             if (webinars && webinars.length > 0) {
                 this.webinarOptions = webinars.map(w => ({
-                    label: w.name,
+                    label: w.webinarId ? `${w.name} (${w.webinarId})` : w.name,
                     value: w.webinarId
                 }));
             } else {

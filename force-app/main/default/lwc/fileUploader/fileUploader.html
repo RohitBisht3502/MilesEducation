@@ -58,7 +58,7 @@
           <input
             type="file"
             multiple
-            accept="*/*"
+            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
             onchange={handleFileChange}
             class="hidden-file-input"
           />
@@ -115,6 +115,14 @@
         <template if:true={lastResultMessage}>
           <div class="result-row">
             <lightning-formatted-text value={lastResultMessage}>
+            </lightning-formatted-text>
+          </div>
+        </template>
+
+        <!-- Error details -->
+        <template if:true={errorMessage}>
+          <div class="error-row">
+            <lightning-formatted-text value={errorMessage}>
             </lightning-formatted-text>
           </div>
         </template>

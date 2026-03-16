@@ -5,6 +5,7 @@
             <div class="credit-badge">
                 <lightning-icon icon-name="utility:preview" size="x-small" class="credit-icon"></lightning-icon>
                 <span class="credit-label">Available Credits:</span>
+
                 <span class="credit-value">{creditBalance}</span>
             </div>
         </div>
@@ -14,20 +15,43 @@
             <div class="phone-display-section">
                 <div class="phone-header">
                     <lightning-icon icon-name="utility:phone_portrait" size="small"></lightning-icon>
-                    <h3>Phone Number</h3>
+                    <h3>Phone Number & Mail</h3>
                 </div>
-                
+
                 <div class="phone-wrapper">
-                    <div class="phone-number-box" onclick={selectPhoneText}>
-                        <span class="phone-number">{phoneNumber}</span>
-                        <div class="phone-hint">Click to select</div>
+                    <div class="phone-row">
+
+                        <div class="phone-number-box" onclick={selectPhoneText}>
+                            <span class="phone-number">{phoneNumber}</span>
+                            <div class="phone-hint">Click to select</div>
+                        </div>
+
+                        <button class="copy-btn right-copy" onclick={handleCopy}>
+        <lightning-icon icon-name="utility:copy" size="x-small"></lightning-icon>
+        Copy
+    </button>
+
                     </div>
-                    
+
+                    <template if:true={email}>
+
+                        <div class="phone-row">
+
+                            <div class="email-box" onclick={selectEmailText}>
+                                <span class="email-value">{email}</span>
+                                <div class="phone-hint">Click to select</div>
+                            </div>
+
+                            <button class="copy-btn right-copy" onclick={handleCopyEmail}>
+        <lightning-icon icon-name="utility:copy" size="x-small"></lightning-icon>
+        Copy
+    </button>
+
+                        </div>
+
+                    </template>
                     <div class="button-container">
-                        <button class="copy-btn" onclick={handleCopy}>
-                            <lightning-icon icon-name="utility:copy" size="x-small"></lightning-icon>
-                            Copy
-                        </button>
+
                         <button class="close-btn" onclick={handleClose}>
                             Close
                         </button>
@@ -39,14 +63,14 @@
         <!-- Action Section (when no phone shown) -->
         <template if:false={phoneNumber}>
             <div class="action-section">
-                <button 
-                    class="view-btn" 
+                <button
+                    class="view-btn"
                     onclick={handleViewPhone}
                     disabled={isButtonDisabled}>
                     <lightning-icon icon-name="utility:phone" size="x-small"></lightning-icon>
                     View Phone Number
                 </button>
-                
+
                 <div if:true={showCreditError} class="error-container">
                     <div class="error-message">
                         <lightning-icon icon-name="utility:error" size="x-small"></lightning-icon>
@@ -63,7 +87,7 @@
                 <span>Processing...</span>
             </div>
         </template>
-        
+
         <!-- Wire Method Loading -->
         <template if:true={wireLoading}>
             <div class="wire-loading">

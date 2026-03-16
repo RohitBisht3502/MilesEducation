@@ -1,15 +1,12 @@
 import { LightningElement, api, track, wire } from 'lwc';
 import searchLeads from '@salesforce/apex/TagLeadController.searchLeads';
 import tagOrCreateLead from '@salesforce/apex/TagLeadController.tagOrCreateLead';
-import getL1L2Values from '@salesforce/apex/Webservice_RunoAllocationAPI.getL1L2Values';
 import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
 import { getObjectInfo } from 'lightning/uiObjectInfoApi';
 import { getPicklistValues } from 'lightning/uiObjectInfoApi';
 import LEAD_OBJECT from '@salesforce/schema/Lead__c';
 import CALL_LOG_OBJECT from '@salesforce/schema/Call_Log__c';
 import COURSE_FIELD from '@salesforce/schema/Lead__c.Course__c';
-import L1_FIELD from '@salesforce/schema/Call_Log__c.L1__c';
-import L2_FIELD from '@salesforce/schema/Call_Log__c.L2__c';
 import CUSTOMER_NAME_FIELD from '@salesforce/schema/Call_Log__c.Customer_Name__c';
 import PHONE_NUMBER_FIELD from '@salesforce/schema/Call_Log__c.Phone_Number__c';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
@@ -37,46 +34,27 @@ export default class TagLeadForCallLog extends LightningElement {
     viewState = 'search';
     hasAutoSearched = false;
     courseOptions = [];
-    l1Options = [];
-    l2Options = [];
-
-    fullL1L2Map = {};
-    createDependentL2Options = [];
-    isCreateL2Disabled = true;
 
     connectedCallback() {
-        this.loadDependentMap();
         this.setDefaultFollowUpDate();
     }
 
-   setDefaultFollowUpDate() {
-    const next = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    setDefaultFollowUpDate() {
+        const next = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    const yyyy = next.getFullYear();
-    const mm = String(next.getMonth() + 1).padStart(2, '0');
-    const dd = String(next.getDate()).padStart(2, '0');
-    const hh = String(next.getHours()).padStart(2, '0');
-    const mi = String(next.getMinutes()).padStart(2, '0');
+        const yyyy = next.getFullYear();
+        const mm = String(next.getMonth() + 1).padStart(2, '0');
+        const dd = String(next.getDate()).padStart(2, '0');
+        const hh = String(next.getHours()).padStart(2, '0');
+        const mi = String(next.getMinutes()).padStart(2, '0');
 
-    const defaultDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+        const defaultDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
 
-    this.formData.nextFollowUpDate = defaultDate;
-}
-
-
-    async loadDependentMap() {
-        try {
-            const mapData = await getL1L2Values();
-            this.fullL1L2Map = mapData;
-
-            this.l1Options = Object.keys(mapData).map(key => ({
-                label: key,
-                value: key
-            }));
-        } catch (error) {
-            console.error('Error loading L1/L2 dependency:', error);
-        }
+        this.formData.nextFollowUpDate = defaultDate;
     }
+
+
+
 
     @wire(getRecord, { recordId: '$recordId', fields: CALL_LOG_FIELDS })
     wiredCallLogHandler(result) {
@@ -84,12 +62,12 @@ export default class TagLeadForCallLog extends LightningElement {
         const { error, data } = result;
         if (data) {
             const phoneNumber = getFieldValue(data, PHONE_NUMBER_FIELD);
-            
+
             if (phoneNumber && !this.hasAutoSearched) {
                 this.searchKeyword = phoneNumber;
                 this.formData.phone = phoneNumber;
                 this.hasAutoSearched = true;
-                
+
                 this.runSearch(phoneNumber);
             }
         } else if (error) {
@@ -130,11 +108,13 @@ export default class TagLeadForCallLog extends LightningElement {
         if (!info) return null;
 
         const rtis = info.recordTypeInfos || {};
+
+        // Use the Master Record Type ID (ending in AAA) to fetch ALL picklist values
         const master = Object.keys(rtis)
             .map(id => rtis[id])
             .find(rti => rti?.master);
 
-        return master?.recordTypeId || info.defaultRecordTypeId;
+        return master?.recordTypeId || '012000000000000AAA';
     }
 
     get customerName() {
@@ -221,27 +201,7 @@ export default class TagLeadForCallLog extends LightningElement {
         this.formData.nextFollowUpDate = event.target.value;
     }
 
-    handleCreateL1Change(event) {
-        this.formData.l1 = event.target.value;
 
-        const l2List = this.fullL1L2Map[this.formData.l1] || [];
-
-        this.createDependentL2Options = l2List.map(value => ({
-            label: value,
-            value: value
-        }));
-
-        this.isCreateL2Disabled = this.createDependentL2Options.length === 0;
-        this.formData.l2 = '';
-    }
-
-    handleCreateL2Change(event) {
-        this.formData.l2 = event.target.value;
-    }
-
-    handleCreateFeedbackChange(event) {
-        this.formData.feedback = event.target.value;
-    }
 
     handleCreateNew() {
         this.viewState = 'create';
@@ -264,8 +224,6 @@ export default class TagLeadForCallLog extends LightningElement {
             l2: '',
             feedback: ''
         };
-        this.createDependentL2Options = [];
-        this.isCreateL2Disabled = true;
     }
 
     closeModal() {
@@ -293,10 +251,8 @@ export default class TagLeadForCallLog extends LightningElement {
     }
 
     get isFormValid() {
-        return this.formData.name.trim() && 
-               this.formData.course.trim() && 
-               this.formData.l1.trim() && 
-               this.formData.l2.trim();
+        return this.formData.name.trim() &&
+            this.formData.course.trim();
     }
 
     get submitButtonLabel() {
@@ -352,7 +308,8 @@ export default class TagLeadForCallLog extends LightningElement {
             l1: null,
             l2: null,
             feedback: null,
-            nextFollowUpDate: null
+            nextFollowUpDate: null,
+            recordTypeId: this.courseRecordTypeId
         })
             .then(() => {
                 this.dispatchEvent(new ShowToastEvent({
@@ -395,6 +352,7 @@ export default class TagLeadForCallLog extends LightningElement {
         }
 
         this.isLoading = true;
+        console.log('handleSubmit: Calling tagOrCreateLead with recordTypeId:', this.courseRecordTypeId);
 
         tagOrCreateLead({
             callLogId: this.recordId,
@@ -404,10 +362,11 @@ export default class TagLeadForCallLog extends LightningElement {
             email: this.formData.email,
             phone: this.phoneNumber,
             disableRR: true,
-            l1: this.formData.l1,
-            l2: this.formData.l2,
+            l1: this.formData.l1 || null,
+            l2: this.formData.l2 || null,
             feedback: this.formData.feedback || null,
-            nextFollowUpDate: this.formData.nextFollowUpDate || null
+            nextFollowUpDate: this.formData.nextFollowUpDate || null,
+            recordTypeId: this.courseRecordTypeId
         })
             .then(() => {
                 this.dispatchEvent(new ShowToastEvent({

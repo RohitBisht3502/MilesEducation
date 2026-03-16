@@ -354,13 +354,15 @@ public without sharing class PurchaseOrderService {
     private static void createLoanTransaction(Id purchaseOrderId, Id loanId) {
         if (purchaseOrderId == null || loanId == null) return;
 
-        Loan__c loan = [SELECT Amount_requested__c FROM Loan__c WHERE Id = :loanId LIMIT 1];
+        Loan__c loan = [SELECT Amount_requested__c, loan_status__c FROM Loan__c WHERE Id = :loanId LIMIT 1];
 
         Transcation__c txn = new Transcation__c();
         txn.Purchase_Orders__c = purchaseOrderId;
         txn.Loan__c = loanId;
         txn.Payment__c = loan != null ? loan.Amount_requested__c : null;
-        txn.Status__c = 'Received';
+        txn.Status__c = loan != null && loan.loan_status__c == 'Disbursed'
+            ? 'Received'
+            : STATUS_INITIATED;
         insert txn;
     }
 
@@ -519,7 +521,7 @@ public without sharing class PurchaseOrderService {
         return po;
     }
 
-    @AuraEnabled(cacheable=true)
+    @AuraEnabled
     public static AddressDetailsDTO getAddressByRecordId(Id recordId) {
         AddressDetailsDTO res = new AddressDetailsDTO();
         if (recordId == null) {
@@ -791,9 +793,10 @@ public without sharing class PurchaseOrderService {
         item.has_training       = hasTraining;
         item.has_study_material = hasStudyMaterial;
 
+        Decimal discountAmount = req.discount == null ? 0 : req.discount;
         item.actual_price = total;
-        item.agreed_fee   = total;
-        item.discount     = req.discount;
+        item.agreed_fee   = Math.max(0, total - discountAmount);
+        item.discount     = discountAmount;
         
         if (!String.isBlank(req.loanId)) {
             try {

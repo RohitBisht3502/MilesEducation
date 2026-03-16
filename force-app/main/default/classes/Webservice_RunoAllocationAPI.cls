@@ -39,53 +39,71 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         @AuraEnabled public String attendance;
     }
 
-    @AuraEnabled(cacheable=true)
-    public static List<CallHistoryDTO> getCallHistory(Id candidateId) {
-        if (candidateId == null) {
-            return new List<CallHistoryDTO>();
-        }
 
-        List<Call_Log__c> logs = [SELECT Id, Start_Time__c, CreatedDate, Duration_Seconds__c, Status__c, L1__c, L2__c, Stage__c FROM Call_Log__c WHERE Candidate__c = :candidateId ORDER BY Start_Time__c DESC NULLS LAST, CreatedDate DESC LIMIT 10];
 
-        List<CallHistoryDTO> res = new List<CallHistoryDTO>();
+@AuraEnabled(cacheable=true)
+public static List<CallHistoryDTO> getCallHistory(Id recordId) {
 
-        for (Call_Log__c cl : logs) {
-            CallHistoryDTO dto = new CallHistoryDTO();
-            dto.id = cl.Id;
-            dto.startTime = cl.Start_Time__c;
-            dto.createdDate = cl.CreatedDate;
-            dto.durationSeconds = cl.Duration_Seconds__c != null
-                ? Integer.valueOf(cl.Duration_Seconds__c)
-                : 0;
-            dto.status = cl.Status__c;
-            dto.l1 = cl.L1__c;
-            dto.l2 = cl.L2__c;
-            dto.stage = cl.Stage__c;
-            
-            res.add(dto);
-        }
-
-        return res;
+    if (recordId == null) {
+        return new List<CallHistoryDTO>();
     }
 
-    @AuraEnabled(cacheable=true)
-    public static List<EventDTO> getLeadEvents(Id recordId) {
-        if (recordId == null) return new List<EventDTO>();
+    List<Call_Log__c> logs = [
+        SELECT Id, Start_Time__c, CreatedDate, Duration_Seconds__c,
+               Status__c, L1__c, L2__c, Stage__c
+        FROM Call_Log__c
+        WHERE Candidate__c = :recordId
+           OR Lead__c = :recordId
+           OR Student__c = :recordId
+        ORDER BY Start_Time__c DESC NULLS LAST, CreatedDate DESC
+        LIMIT 10
+    ];
 
-        List<Event> events = [SELECT Id, Subject, Candidate_Attendance__c FROM Event WHERE WhatId = :recordId ORDER BY ActivityDateTime DESC LIMIT 20];
+    List<CallHistoryDTO> res = new List<CallHistoryDTO>();
 
-        List<EventDTO> res = new List<EventDTO>();
+    for (Call_Log__c cl : logs) {
+        CallHistoryDTO dto = new CallHistoryDTO();
+        dto.id = cl.Id;
+        dto.startTime = cl.Start_Time__c;
+        dto.createdDate = cl.CreatedDate;
+        dto.durationSeconds = cl.Duration_Seconds__c != null
+            ? Integer.valueOf(cl.Duration_Seconds__c)
+            : 0;
+        dto.status = cl.Status__c;
+        dto.l1 = cl.L1__c;
+        dto.l2 = cl.L2__c;
+        dto.stage = cl.Stage__c;
 
-        for (Event e : events) {
-            EventDTO dto = new EventDTO();
-            dto.id = e.Id;
-            dto.subject = e.Subject;
-            dto.attendance = e.Candidate_Attendance__c;
-            res.add(dto);
-        }
-
-        return res;
+        res.add(dto);
     }
+
+    return res;
+}
+    @AuraEnabled(cacheable=true)
+public static List<EventDTO> getLeadEvents(Id recordId) {
+    if (recordId == null) return new List<EventDTO>();
+
+    List<Event> events = [
+        SELECT Id, Subject, Candidate_Attendance__c
+        FROM Event
+        WHERE WhoId = :recordId
+           OR WhatId = :recordId
+        ORDER BY ActivityDateTime DESC
+        LIMIT 20
+    ];
+
+    List<EventDTO> res = new List<EventDTO>();
+
+    for (Event e : events) {
+        EventDTO dto = new EventDTO();
+        dto.id = e.Id;
+        dto.subject = e.Subject;
+        dto.attendance = e.Candidate_Attendance__c;
+        res.add(dto);
+    }
+
+    return res;
+}
 
     @AuraEnabled(cacheable=true)
     public static Id getLatestUntrackedCallLog(Id leadId) {
@@ -223,12 +241,13 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
 
     public static AllocationDTO buildAllocationPayload(String name, String phone, String email) {
         AllocationDTO payload = new AllocationDTO();
+        User currentUser = [SELECT Phone FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1];
         payload.customer = new CustomerDTO();
         payload.customer.name = name;
         payload.customer.phoneNumber = phone;
         payload.customer.email = email;
-        payload.processName = 'Default Process';
-        payload.assignedTo = '8123191110';
+        payload.processName = Label.Runo_Process;
+        payload.assignedTo = String.isBlank(currentUser.Phone) ? '8123191110' : currentUser.Phone;
         payload.priority = 3;
         payload.notes = 'Outbound call from Miles Force';
         payload.userFields = new List<Object>();
@@ -482,14 +501,22 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
             if (!logs.isEmpty()) logRecord = logs[0];
         }
 
-        if (logRecord == null &&
-            recordId != null &&
-            recordId.getSObjectType() == Lead__c.SObjectType) {
+       if (logRecord == null && recordId != null) {
 
-            List<Call_Log__c> logs = [SELECT Id, Phone_Number__c, Lead__c FROM Call_Log__c WHERE Lead__c = :recordId ORDER BY CreatedDate DESC LIMIT 1];
-            if (!logs.isEmpty()) logRecord = logs[0];
-        }
+    List<Call_Log__c> logs = [
+        SELECT Id, Phone_Number__c, Lead__c, Candidate__c, Student__c
+        FROM Call_Log__c
+        WHERE Lead__c = :recordId
+           OR Candidate__c = :recordId
+           OR Student__c = :recordId
+        ORDER BY CreatedDate DESC
+        LIMIT 1
+    ];
 
+    if (!logs.isEmpty()) {
+        logRecord = logs[0];
+    }
+}
         if (logRecord != null && String.isNotBlank(logRecord.Phone_Number__c)) {
             List<Call_Log__c> phoneLogs = [SELECT Id, Untracked__c FROM Call_Log__c WHERE Phone_Number__c = :logRecord.Phone_Number__c AND Untracked__c = true];
             for (Call_Log__c cl : phoneLogs) {

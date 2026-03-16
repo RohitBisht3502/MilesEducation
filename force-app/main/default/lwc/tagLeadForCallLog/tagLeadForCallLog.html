@@ -23,20 +23,11 @@
                     <lightning-icon icon-name="utility:search" size="x-small" class="title-icon"></lightning-icon>
                     Search Contact
                 </h2>
-                
+
                 <div class="search-box">
-                    <input 
-                        type="text"
-                        class="custom-input"
-                        placeholder="Search by name, phone or candidate ID"
-                        value={searchKeyword}
-                        oninput={handleSearchInput}
-                        onkeypress={handleSearchKeyPress}
-                    />
-                    <button 
-                        class="search-button"
-                        onclick={handleSearchClick}
-                        disabled={isLoading}>
+                    <input type="text" class="custom-input" placeholder="Search by name, phone or candidate ID"
+                        value={searchKeyword} oninput={handleSearchInput} onkeypress={handleSearchKeyPress} />
+                    <button class="search-button" onclick={handleSearchClick} disabled={isLoading}>
                         <lightning-icon icon-name="utility:search" size="x-small"></lightning-icon>
                         Search
                     </button>
@@ -59,18 +50,17 @@
 
                             <template for:each={cand.courses} for:item="lead">
                                 <div key={lead.id} class="lead-wrapper">
-                                    <div
-                                        data-id={lead.id}
-                                        class={lead.cssClass}
-                                        onclick={selectLead}>
+                                    <div data-id={lead.id} class={lead.cssClass} onclick={selectLead}>
                                         <div class="lead-info">
                                             <div class="lead-details-row">
                                                 <span class="lead-detail">
-                                                    <lightning-icon icon-name="utility:topic" size="xx-small"></lightning-icon>
+                                                    <lightning-icon icon-name="utility:topic"
+                                                        size="xx-small"></lightning-icon>
                                                     {lead.course}
                                                 </span>
                                                 <span class="lead-detail">
-                                                    <lightning-icon icon-name="utility:user" size="xx-small"></lightning-icon>
+                                                    <lightning-icon icon-name="utility:user"
+                                                        size="xx-small"></lightning-icon>
                                                     Owner: {lead.ownerName}
                                                 </span>
                                             </div>
@@ -80,10 +70,8 @@
                                     <template if:true={lead.showTagForm}>
                                         <div class="tag-form-section">
                                             <div class="tag-form-container">
-                                                <button 
-                                                    class="custom-button primary tag-button-inline"
-                                                    onclick={handleTagLead}
-                                                    disabled={isLoading}>
+                                                <button class="custom-button primary tag-button-inline"
+                                                    onclick={handleTagLead} disabled={isLoading}>
                                                     {tagButtonLabel}
                                                 </button>
                                             </div>
@@ -119,23 +107,15 @@
                                 <label class="form-label">
                                     Name <span class="required-asterisk">*</span>
                                 </label>
-                                <input 
-                                    type="text"
-                                    class="custom-input"
-                                    placeholder="Enter full name"
-                                    value={formData.name}
-                                    onchange={handleNameChange}
-                                />
+                                <input type="text" class="custom-input" placeholder="Enter full name"
+                                    value={formData.name} onchange={handleNameChange} />
                             </div>
 
                             <div class="form-field">
                                 <label class="form-label">
                                     Course <span class="required-asterisk">*</span>
                                 </label>
-                                <select 
-                                    class="custom-input"
-                                    value={formData.course}
-                                    onchange={handleCourseChange}>
+                                <select class="custom-input" onchange={handleCourseChange}>
                                     <option value="">-- Select Course --</option>
                                     <template for:each={courseOptions} for:item="option">
                                         <option key={option.value} value={option.value}>
@@ -149,13 +129,8 @@
                         <div class="form-row">
                             <div class="form-field">
                                 <label class="form-label">Email</label>
-                                <input 
-                                    type="email"
-                                    class="custom-input"
-                                    placeholder="Enter email address"
-                                    value={formData.email}
-                                    onchange={handleEmailChange}
-                                />
+                                <input type="email" class="custom-input" placeholder="Enter email address"
+                                    value={formData.email} onchange={handleEmailChange} />
                             </div>
                         </div>
                     </div>
@@ -165,24 +140,16 @@
 
         <div class="footer-actions">
             <template if:true={showNotFound}>
-                <button 
-                    class="custom-button primary"
-                    onclick={handleCreateNew}>
+                <button class="custom-button primary" onclick={handleCreateNew}>
                     Create New Lead
                 </button>
             </template>
 
             <template if:true={showCreateForm}>
-                <button 
-                    class="custom-button primary"
-                    onclick={handleSubmit}
-                    disabled={isLoading}>
+                <button class="custom-button primary" onclick={handleSubmit} disabled={isLoading}>
                     {submitButtonLabel}
                 </button>
-                <button 
-                    class="custom-button secondary"
-                    onclick={handleCancel}
-                    disabled={isLoading}>
+                <button class="custom-button secondary" onclick={handleCancel} disabled={isLoading}>
                     Cancel
                 </button>
             </template>

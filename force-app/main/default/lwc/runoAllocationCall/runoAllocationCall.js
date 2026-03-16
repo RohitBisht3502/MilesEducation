@@ -4,15 +4,21 @@ import allocateLeadNow from '@salesforce/apex/Webservice_RunoAllocationAPI.alloc
 import updateCallFeedback from '@salesforce/apex/Webservice_RunoAllocationAPI.updateCallFeedback';
 import getCallHistory from '@salesforce/apex/Webservice_RunoAllocationAPI.getCallHistory';
 import getIdentity from '@salesforce/apex/RunoCallIdentityService.getIdentity';
+import getRelatedLeads from '@salesforce/apex/RunoCallIdentityService.getRelatedLeads';
+import createRelatedLead from '@salesforce/apex/RunoCallIdentityService.createRelatedLead';
 import getStageLevelValues from '@salesforce/apex/Webservice_RunoAllocationAPI.getStageLevelValues';
+import updateRelatedLeadStages from '@salesforce/apex/RunoCallIdentityService.updateRelatedLeadStages';
 import { CurrentPageReference } from 'lightning/navigation';
 import { NavigationMixin } from 'lightning/navigation';
+// import { getPicklistValuesByRecordType }
+// from 'lightning/uiObjectInfoApi';
 import { CloseActionScreenEvent } from 'lightning/actions';
 import { subscribe, unsubscribe, onError } from 'lightning/empApi';
 import { getRecord } from 'lightning/uiRecordApi';
-import { getObjectInfo, getPicklistValuesByRecordType } from 'lightning/uiObjectInfoApi';
+import { getObjectInfo, getPicklistValues } from 'lightning/uiObjectInfoApi';
 import LEAD_OBJECT from '@salesforce/schema/Lead__c';
 import LEAD_RECORDTYPE_FIELD from '@salesforce/schema/Lead__c.RecordTypeId';
+import STAGE_FIELD from '@salesforce/schema/Lead__c.Stage__c';
 import getWebinarMembers from '@salesforce/apex/Webservice_RunoAllocationAPI.getWebinarMembers';
 import getLeadEvents from '@salesforce/apex/Webservice_RunoAllocationAPI.getLeadEvents';
 import getDispositions from '@salesforce/apex/CallDispositionConfigService.getDispositions';
@@ -21,6 +27,7 @@ import getDispositions from '@salesforce/apex/CallDispositionConfigService.getDi
 export default class RunoAllocationCall extends NavigationMixin(LightningElement) {
 
     @api recordId;
+    candidateId;
     isFeedbackDisabled = true;
     // UI / state
     loading = false;
@@ -32,7 +39,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     // Call popup overlay (Calling Runo...)
     showCallPopup = false;
     isStageDisabled = false;
-
+relatedLeadEdits = {};
     activeTab = 'lead';
     expectedPaymentDate;
     notifyMe = false;
@@ -55,6 +62,9 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     stageOptions = [];
     levelOptions = [];
     leadRecordTypeId = null;
+    recordTypeStageMap = {};
+    activeRelatedRecordTypeId = null;
+    pendingRelatedRecordTypeIds = [];
 
     // auto call start from lead url 
     autoCall = false;
@@ -64,7 +74,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     // Toast / error
     showPopup = false;
     errorText;
-
+// isRelatedTab = false;
     // identity info
     identity = {
         name: '',
@@ -96,6 +106,11 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     timerId = null;
     webinarHistory = [];
     webinarLoaded = false;
+    relatedLeads = [];
+    relatedLeadsLoaded = false;
+    newLeadCourse = '';
+    newLeadEmail = '';
+    isCreatingRelatedLead = false;
     // feedback
     showFeedback = false;
     savingFeedback = false;
@@ -128,6 +143,9 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
             if (data.level) {
                 this.courseValue = data.level;
             }
+            if (!this.candidateId && data.candidateId) {
+                this.candidateId = data.candidateId;
+            }
 
         } else if (error) {
             this.errorText = error?.body?.message || 'Failed to load identity';
@@ -145,6 +163,35 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     wiredLeadRecordType({ data }) {
         if (data) {
             this.leadRecordTypeId = data.fields.RecordTypeId?.value;
+        }
+    }
+
+    @wire(getPicklistValues, {
+        recordTypeId: '$activeRelatedRecordTypeId',
+        fieldApiName: STAGE_FIELD
+    })
+    wiredRelatedStagePicklist({ data, error }) {
+        if (data && this.activeRelatedRecordTypeId) {
+            const options = (data.values || []).map(v => ({
+                label: v.label,
+                value: v.value
+            }));
+
+            this.recordTypeStageMap = {
+                ...this.recordTypeStageMap,
+                [this.activeRelatedRecordTypeId]: options
+            };
+
+            this.relatedLeads = (this.relatedLeads || []).map(row => (
+                row.recordTypeId === this.activeRelatedRecordTypeId
+                    ? { ...row, stageOptions: options }
+                    : row
+            ));
+
+            this.loadNextRelatedStageOptions();
+        } else if (error && this.activeRelatedRecordTypeId) {
+            console.error('Related stage picklist load failed:', error);
+            this.loadNextRelatedStageOptions();
         }
     }
 
@@ -183,6 +230,10 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         return this.activeTab === 'history';
     }
 
+    get isRelatedTab() {
+        return this.activeTab === 'related';
+    }
+
     handleTabClick(event) {
         this.activeTab = event.target.dataset.tab;
         if (this.activeTab === 'webinar' && !this.webinarLoaded) {
@@ -190,6 +241,9 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         }
         if (this.activeTab === 'event' && !this.eventLoaded) {
             this.loadEventHistory();
+        }
+        if (this.activeTab === 'related' && !this.relatedLeadsLoaded) {
+            this.loadRelatedLeads();
         }
 
     }
@@ -201,6 +255,10 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
 
     get historyTabClass() {
         return `tab-item ${this.activeTab === 'history' ? 'active' : ''}`;
+    }
+
+    get relatedTabClass() {
+        return `tab-item ${this.activeTab === 'related' ? 'active' : ''}`;
     }
 
 
@@ -227,6 +285,36 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         return (this.eventHistory || []).length > 0;
     }
 
+    get showRelatedTab() {
+        return !!this.candidateId;
+    }
+
+    get hasRelatedLeads() {
+        return (this.relatedLeads || []).length > 0;
+    }
+
+    get availableCourseOptions() {
+        const existing = new Set(
+            (this.relatedLeads || [])
+                .map(r => (r.course || '').trim().toLowerCase())
+                .filter(v => v.length > 0)
+        );
+        return (this.levelOptions || []).filter(opt => {
+            const val = (opt.value || '').trim().toLowerCase();
+            return val && !existing.has(val);
+        });
+    }
+
+    get disableCreateLead() {
+        return (
+            !this.candidateId ||
+            !this.newLeadCourse ||
+            !this.newLeadEmail ||
+            this.availableCourseOptions.length === 0 ||
+            this.isCreatingRelatedLead
+        );
+    }
+
 
     handleViewMoreLead() {
         if (!this.recordId) return;
@@ -248,6 +336,14 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
 
     handleSpamChange(e) {
         this.isSpam = e.target.checked;
+    }
+
+    handleNewLeadEmailChange(event) {
+        this.newLeadEmail = event.target.value;
+    }
+
+    handleNewLeadCourseChange(event) {
+        this.newLeadCourse = event.detail.value;
     }
     handleExpectedDateChange(event) {
         this.expectedPaymentDate = event.target.value;
@@ -292,6 +388,70 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     }
 
 
+
+handleRelatedStageChange(event) {
+    const leadId = event.currentTarget?.dataset?.id;
+    const stage = event.detail.value;
+
+    this.relatedLeads = (this.relatedLeads || []).map(r => {
+        if (r.id === leadId) {
+            return { ...r, stage };
+        }
+        return r;
+    });
+
+    if (leadId) {
+        this.relatedLeadEdits = { 
+            ...this.relatedLeadEdits, 
+            [leadId]: stage 
+        };
+    }
+}
+
+    handleNewLeadCourseChange(event) {
+        this.newLeadCourse = event.detail.value;
+    }
+
+    async handleCreateRelatedLead() {
+        if (!this.candidateId || !this.newLeadCourse || !this.newLeadEmail || this.isCreatingRelatedLead) return;
+
+        try {
+            this.isCreatingRelatedLead = true;
+
+            await createRelatedLead({
+                candidateId: this.candidateId,
+                course: this.newLeadCourse,
+                email: this.newLeadEmail,
+                sourceRecordId: this.recordId
+            });
+
+            this.newLeadCourse = '';
+            this.newLeadEmail = '';
+
+            await this.loadRelatedLeads();
+
+
+ this.dispatchEvent(
+            new ShowToastEvent({
+                title: 'Success',
+                message: 'Related lead created successfully',
+                variant: 'success'
+            })
+        );
+        }
+        
+         catch (e) {
+            console.error('Create related lead failed:', e);
+            this.toast(
+                'Create Failed',
+                e?.body?.message || e?.message || 'Failed to create lead',
+                'error'
+            );
+        } finally {
+            this.isCreatingRelatedLead = false;
+        }
+    }
+
     // --------------- LIFECYCLE -------------
 
     connectedCallback() {
@@ -315,26 +475,143 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
 
 
 
-    async loadStageAndCourse() {
+   async loadStageAndCourse() {
+    try {
+        const data = await getStageLevelValues({ recordId: this.recordId });
+
+        if (data.stage) {
+            this.stageOptions = data.stage.map(v => ({
+                label: v,
+                value: v
+            }));
+        }
+
+        if (data.level) {
+            this.levelOptions = data.level.map(v => ({
+                label: v,
+                value: v
+            }));
+        }
+
+    } catch (e) {
+        console.error('Stage/Course load failed:', e);
+    }
+}
+async loadRelatedLeads() {
+
+    if (!this.candidateId) {
+        this.relatedLeads = [];
+        this.relatedLeadsLoaded = true;
+        return;
+    }
+
+    try {
+
+        const rows = await getRelatedLeads({
+            candidateId: this.candidateId
+        });
+
+        this.relatedLeads = (rows || []).map(r => ({
+            id: r.id,
+            recordTypeId: r.recordTypeId,
+            course: r.course || 'NA',
+            stage: r.stage || '',
+            stageOptions: this.recordTypeStageMap[r.recordTypeId] || []
+        }));
+
+        this.queueRelatedStageOptions();
+
+        this.relatedLeadsLoaded = true;
+
+    } catch (e) {
+        console.error('Related leads load failed:', e);
+        this.relatedLeads = [];
+        this.relatedLeadsLoaded = true;
+    }
+}
+
+queueRelatedStageOptions() {
+    const missingIds = [...new Set(
+        (this.relatedLeads || [])
+            .map(row => row.recordTypeId)
+            .filter(id => id && !this.recordTypeStageMap[id])
+    )];
+
+    this.pendingRelatedRecordTypeIds = missingIds;
+
+    if (!this.activeRelatedRecordTypeId) {
+        this.loadNextRelatedStageOptions();
+    }
+}
+
+loadNextRelatedStageOptions() {
+    if (this.pendingRelatedRecordTypeIds.length === 0) {
+        this.activeRelatedRecordTypeId = null;
+        return;
+    }
+
+    this.activeRelatedRecordTypeId = this.pendingRelatedRecordTypeIds[0];
+    this.pendingRelatedRecordTypeIds = this.pendingRelatedRecordTypeIds.slice(1);
+}
+
+
+// async loadStageOptionsForLeads() {
+
+//     for (let lead of this.relatedLeads) {
+
+//         if (!lead.recordTypeId) continue;
+
+//         if (this.recordTypeStageMap[lead.recordTypeId]) {
+//             lead.stageOptions = this.recordTypeStageMap[lead.recordTypeId];
+//             continue;
+//         }
+
+//         const result = await getPicklistValuesByRecordType({
+//             objectApiName: 'Lead__c',
+//             recordTypeId: lead.recordTypeId
+//         });
+
+//         const stageField = result.picklistFieldValues.Stage__c;
+
+//         const options = (stageField?.values || []).map(v => ({
+//             label: v.label,
+//             value: v.value
+//         }));
+
+//         this.recordTypeStageMap[lead.recordTypeId] = options;
+
+//         lead.stageOptions = options;
+//     }
+
+//     this.relatedLeads = [...this.relatedLeads];
+// }
+
+    async handleCreateRelatedLead() {
+        if (!this.candidateId || !this.newLeadCourse || !this.newLeadEmail || this.isCreatingRelatedLead) return;
+
         try {
-            const data = await getStageLevelValues({ recordId: this.recordId });
+            this.isCreatingRelatedLead = true;
 
-            if (data.stage) {
-                this.stageOptions = data.stage.map(v => ({
-                    label: v,
-                    value: v
-                }));
-            }
+            await createRelatedLead({
+                candidateId: this.candidateId,
+                course: this.newLeadCourse,
+                email: this.newLeadEmail,
+                sourceRecordId: this.recordId
+            });
 
-            if (data.level) {
-                this.courseOptions = data.level.map(v => ({
-                    label: v,
-                    value: v
-                }));
-            }
+            this.newLeadCourse = '';
+            this.newLeadEmail = '';
 
+            await this.loadRelatedLeads();
         } catch (e) {
-            console.error('Stage/Course load failed:', e);
+            console.error('Create related lead failed:', e);
+            this.toast(
+                'Create Failed',
+                e?.body?.message || e?.message || 'Failed to create lead',
+                'error'
+            );
+        } finally {
+            this.isCreatingRelatedLead = false;
         }
     }
 
@@ -438,16 +715,29 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
 
     async loadCallHistory() {
         if (!this.recordId) return;
+
         try {
-            const rows = await getCallHistory({ recordId: this.recordId });
-            const dateFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
-            const timeFmt = new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit' });
+           const rows = await getCallHistory({ recordId: this.recordId });
+
+            const dateFmt = new Intl.DateTimeFormat('en-US', {
+                month: 'short',
+                day: '2-digit',
+                year: 'numeric'
+            });
+
+            const timeFmt = new Intl.DateTimeFormat('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
             this.callHistory = (rows || []).map(r => {
                 const dt = r.startTime || r.createdDate;
                 const d = dt ? new Date(dt) : null;
+
                 const totalSec = Number(r.durationSeconds || 0);
                 const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
                 const ss = String(totalSec % 60).padStart(2, '0');
+
                 return {
                     id: r.id,
                     dateLabel: d ? dateFmt.format(d) : 'NA',
@@ -459,6 +749,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
                     stage: r.stage || ''
                 };
             });
+
         } catch (e) {
             console.error('Call history load failed:', e);
         }
@@ -573,48 +864,47 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
 
 
 
-    async loadCallHistory() {
-        if (!this.recordId) return;
+   async loadCallHistory() {
+    if (!this.recordId) return;
 
-        try {
-            const rows = await getCallHistory({ recordId: this.recordId });
+    try {
+      const rows = await getCallHistory({ recordId: this.recordId });
 
-            const dateFmt = new Intl.DateTimeFormat('en-US', {
-                month: 'short',
-                day: '2-digit',
-                year: 'numeric'
-            });
+        const dateFmt = new Intl.DateTimeFormat('en-US', {
+            month: 'short',
+            day: '2-digit',
+            year: 'numeric'
+        });
 
-            const timeFmt = new Intl.DateTimeFormat('en-US', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+        const timeFmt = new Intl.DateTimeFormat('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
 
-            this.callHistory = (rows || []).map(r => {
-                const dt = r.startTime || r.createdDate;
-                const d = dt ? new Date(dt) : null;
+        this.callHistory = (rows || []).map(r => {
+            const dt = r.startTime || r.createdDate;
+            const d = dt ? new Date(dt) : null;
 
-                const totalSec = Number(r.durationSeconds || 0);
-                const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
-                const ss = String(totalSec % 60).padStart(2, '0');
+            const totalSec = Number(r.durationSeconds || 0);
+            const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+            const ss = String(totalSec % 60).padStart(2, '0');
 
-                return {
-                    id: r.id,
-                    dateLabel: d ? dateFmt.format(d) : 'NA',
-                    timeLabel: d ? timeFmt.format(d) : '',
-                    durationLabel: `${mm}:${ss}`,
-                    status: r.status || 'NA',
-                    l1: r.l1 || '',
-                    l2: r.l2 || '',
-                    stage: r.stage || ''
-                };
-            });
+            return {
+                id: r.id,
+                dateLabel: d ? dateFmt.format(d) : 'NA',
+                timeLabel: d ? timeFmt.format(d) : '',
+                durationLabel: `${mm}:${ss}`,
+                status: r.status || 'NA',
+                l1: r.l1 || '',
+                l2: r.l2 || '',
+                stage: r.stage || ''
+            };
+        });
 
-        } catch (e) {
-            console.error('Call history load failed:', e);
-        }
+    } catch (e) {
+        console.error('Call history load failed:', e);
     }
-
+}
 
     // -------------- CALL API ---------------
 
@@ -875,12 +1165,27 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
                 })
             );
 
+     await this.loadCallHistory();
+            await this.loadUntrackedStatus();
+            const edits = Object.keys(this.relatedLeadEdits || {}).map(id => ({
+                id,
+                stage: this.relatedLeadEdits[id]
+            }));
+            if (edits.length > 0) {
+                try {
+                    await updateRelatedLeadStages({ updates: edits });
+                    await this.loadRelatedLeads();
+                } catch (e) {
+                    console.error('Related leads update failed:', e);
+                    this.toast('Related Update Failed', e?.body?.message || e?.message || 'Failed to update related leads', 'error');
+                }
+            }
+
+
+            // this.dispatchEvent(new CloseActionScreenEvent());
+
             this.dispatchEvent(new CloseActionScreenEvent());
 
-
-setTimeout(() => {
-    window.location.reload();
-}, 500);
 
             this.clearFeedbackTimers();
             // payload.courseId = this.courseValue;
@@ -893,6 +1198,10 @@ setTimeout(() => {
             this.showCallPopup = false;
             this.setElapsed(0);
 
+            //         setTimeout(() => {
+            //     window.location.reload();
+            // }, 500);
+
             // reset fields like good LWC
             this.feedback = '';
             this.l1Value = '';
@@ -902,6 +1211,8 @@ setTimeout(() => {
             sessionStorage.setItem('RUNO_REFRESH_ON_BACK', 'true');
 
             this.navigateAfterSave();
+
+
 
             // this.navigateAfterSave();
 
@@ -943,40 +1254,20 @@ setTimeout(() => {
     }
 
     navigateAfterSave() {
-        const state = this.pageRef?.state || {};
 
-        const recordIdFromUrl =
-            state.c__recordId ||
-            state.recordId ||
-            state.id ||
-            state.c__id;
-
-        // CASE 1: Opened from URL / Nav / Utility
-        if (recordIdFromUrl) {
-
-            this[NavigationMixin.Navigate]({
-                type: 'standard__objectPage',
-                attributes: {
-                    objectApiName: 'Lead__c',
-                    actionName: 'list'
-                },
-                state: {
-                    filterName: 'Recent'
-                }
-            });
-
-            // force refresh
-            setTimeout(() => {
-                window.location.reload();
-            }, 500);
+        if (!this.recordId) {
+            return;
         }
 
-        // CASE 2: Opened as Quick Action
-        else {
-            this.dispatchEvent(new CloseActionScreenEvent());
-        }
+        this[NavigationMixin.Navigate]({
+            type: 'standard__recordPage',
+            attributes: {
+                recordId: this.recordId,
+                objectApiName: 'Lead',
+                actionName: 'view'
+            }
+        });
     }
-
 
 
 

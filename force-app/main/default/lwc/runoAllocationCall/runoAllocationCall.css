@@ -4,6 +4,14 @@
 
     --slds-c-modal-footer-color-background: #1e3a5f;
     --slds-c-modal-footer-text-color: #ffffff;
+
+    --slds-c-modal-sizing-width: 90vw;
+    --slds-c-modal-sizing-max-width: 1300px;
+
+}
+.slds-modal__container {
+    max-width: 1500px !important;
+    width: 95vw !important;
 }
 
 .call-header {
@@ -11,6 +19,36 @@
   color: white;
   border-radius: 6px;
 }
+
+.create-lead-btn .slds-button {
+    background-color: #0176d3;
+    border-color: #0176d3;
+    color: #ffffff;
+    font-weight: 600;
+    padding: 6px 16px;
+    border-radius: 6px;
+}
+
+/* Hover effect */
+.create-lead-btn .slds-button:hover {
+    background-color: #025bb5;
+    border-color: #025bb5;
+}
+
+/* Active click */
+.create-lead-btn .slds-button:active {
+    background-color: #014486;
+    border-color: #014486;
+}
+
+/* Disabled look */
+.create-lead-btn .slds-button:disabled {
+    background-color: #b0c4df;
+    border-color: #b0c4df;
+    color: #ffffff;
+}
+
+
 
 .tab-bar {
     display: flex;
@@ -87,7 +125,8 @@
     font-weight: 600;
      margin-top: 10px;
 
-margin-left: 130px;
+margin-left: 100px;
+margin-right: 5px;
 }
 .view-more-link:hover {
     text-decoration: underline;
@@ -362,6 +401,35 @@ margin-left: 130px;
    
    
 }
+
+/* Call Runo Button Styling */
+
+.call-runo-btn {
+    --slds-c-button-brand-color-background: #1b96ff;
+    --slds-c-button-brand-color-border: #1b96ff;
+    --slds-c-button-brand-color-text: #ffffff;
+
+    --slds-c-button-brand-color-background-hover: #0b7dda;
+    --slds-c-button-brand-color-border-hover: #0b7dda;
+
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    transition: all 0.25s ease;
+}
+
+/* Hover effect */
+.call-runo-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(27,150,255,0.35);
+}
+
+/* Click animation */
+.call-runo-btn:active {
+    transform: scale(0.96);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+
+
 .custom-header {
     display: flex;
     justify-content: space-between;
