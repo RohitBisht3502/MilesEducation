@@ -292,14 +292,18 @@ public static List<EventDTO> getLeadEvents(Id recordId) {
         if (recordId != null) {
             SObjectType sType = recordId.getSObjectType();
 
-            if (sType == Lead__c.SObjectType) {
-                callLog.Lead__c = recordId;
+          
+if (sType == Lead__c.SObjectType) {
+    callLog.Lead__c = recordId;
+}
 
-                Id candidateId = Utility.candidateByPhone(phone);
-                if (candidateId != null) {
-                    callLog.Candidate__c = candidateId;
-                }
-            }
+else if (sType == Lead.SObjectType) {
+    callLog.Candidate__c = recordId;
+}
+
+else if (sType == Account.SObjectType) {
+    callLog.Student__c = recordId;
+}
         }
 
         insert callLog;

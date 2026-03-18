@@ -6,6 +6,8 @@
     <aura:attribute name="course" type="String" default=""/>
     <aura:attribute name="cityOptions" type="List" default="[]"/>
     <aura:attribute name="city" type="String" default=""/>
+    <aura:attribute name="sourceOptions" type="List" default="[]"/>
+    <aura:attribute name="source" type="String" default=""/>
     <aura:attribute name="firstName" type="String" default=""/>
     <aura:attribute name="lastName" type="String" default=""/>
     <aura:attribute name="phone" type="String" default=""/>
@@ -77,6 +79,15 @@
                     <lightning:select name="city" label="City" value="{!v.city}" required="true" onchange="{!c.handleInputChange}">
                         <option value="">--None--</option>
                         <aura:iteration items="{!v.cityOptions}" var="opt">
+                            <option value="{!opt.value}">{!opt.label}</option>
+                        </aura:iteration>
+                    </lightning:select>
+                </lightning:layoutItem>
+
+                <lightning:layoutItem size="3" smallDeviceSize="6" padding="around-small">
+                    <lightning:select name="source" label="Source" value="{!v.source}" required="true" onchange="{!c.handleInputChange}">
+                        <option value="">--None--</option>
+                        <aura:iteration items="{!v.sourceOptions}" var="opt">
                             <option value="{!opt.value}">{!opt.label}</option>
                         </aura:iteration>
                     </lightning:select>

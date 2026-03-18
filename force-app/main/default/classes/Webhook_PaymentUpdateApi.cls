@@ -50,7 +50,7 @@ global without sharing class Webhook_PaymentUpdateApi {
             return response;
         }
 
-        if (String.isBlank(paymentReq.transactionId)) {
+        if (!isSubvention(transactionType) && String.isBlank(paymentReq.transactionId)) {
             response.success = false;
             response.message = 'Transaction Id is required';
 
@@ -81,7 +81,8 @@ global without sharing class Webhook_PaymentUpdateApi {
                         Loan__c = resolvedLoanId,
                         Payment__c = paymentReq.paymentReceived,
                         Status__c = 'Received',
-                        Transcation_Id__c = paymentReq.transactionId
+                        Transcation_Id__c = paymentReq.transactionId,
+                        Transaction_Type__c = transactionType
                     );
                 } else {
                     Transcation__c txn = [
@@ -97,6 +98,7 @@ global without sharing class Webhook_PaymentUpdateApi {
                     txn.Payment__c = paymentReq.paymentReceived;
                     txn.Status__c = 'Received';
                     txn.Transcation_Id__c = paymentReq.transactionId;
+                    txn.Transaction_Type__c = transactionType;
                     update txn;
                 }
             } else {
@@ -119,6 +121,7 @@ global without sharing class Webhook_PaymentUpdateApi {
                 txn.Payment__c = paymentReq.paymentReceived;
                 txn.Status__c = 'Received';
                 txn.Transcation_Id__c = paymentReq.transactionId;
+                txn.Transaction_Type__c = transactionType;
                 update txn;
             }
 

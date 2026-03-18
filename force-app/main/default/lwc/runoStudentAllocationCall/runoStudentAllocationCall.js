@@ -321,7 +321,7 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
     }
 
     get isStageFinalDisabled() {
-        return this.isStageDisabled || this.isFeedbackDisabled;
+        return this.isStageDisabled ;
     }
 
     get isFollowUpFinalDisabled() {

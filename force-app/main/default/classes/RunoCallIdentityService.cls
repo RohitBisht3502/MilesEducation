@@ -68,21 +68,27 @@ public without sharing class RunoCallIdentityService {
             dto.canId = null;
             dto.candidateId = cl.Candidate__c;
             dto.studentId = cl.Student__c;
+            
             return dto;
         }
 
         if (sObjType == Lead.SObjectType) {
-            Lead c = [SELECT Id, Name, Email, Phone, City FROM Lead WHERE Id = :recordId LIMIT 1];
+            Lead c = [SELECT Id, Name, Email, Phone, City, ConvertedAccountId ,Owner.Name ,	City__c, 	Course__c, CreatedDate,Highest_Level__c FROM Lead WHERE Id = :recordId LIMIT 1];
 
             IdentityDTO dto = new IdentityDTO();
             dto.name = c.Name;
             dto.email = c.Email;
             dto.phone = c.Phone;
             dto.city = c.City;
-            dto.source = 'Candidate';
-            dto.stage = null;
+            dto.source = c.Course__c;
+            dto.stage = c.Highest_Level__c;
             dto.candidateId = c.Id;
             dto.studentId = c.ConvertedAccountId;
+            dto.leadOwner = c.Owner.Name;
+             dto.CreatedDate = c.CreatedDate;
+             dto.mhpTag = 'NA';
+             dto.city = c.City__c;
+               
             return dto;
         }
 

@@ -101,37 +101,89 @@
                         Create New Lead
                     </h2>
 
-                    <div class="form-container">
-                        <div class="form-row">
-                            <div class="form-field">
-                                <label class="form-label">
-                                    Name <span class="required-asterisk">*</span>
-                                </label>
-                                <input type="text" class="custom-input" placeholder="Enter full name"
-                                    value={formData.name} onchange={handleNameChange} />
-                            </div>
+                    <div class="form-container form-grid">
+                        <div class="form-field form-field-span-2">
+                            <label class="form-label">
+                                First Name
+                            </label>
+                            <input type="text" class="custom-input" placeholder="Enter full name"
+                                value={formData.firstName} onchange={handleNameChange} />
+                        </div>
 
-                            <div class="form-field">
-                                <label class="form-label">
-                                    Course <span class="required-asterisk">*</span>
-                                </label>
-                                <select class="custom-input" onchange={handleCourseChange}>
-                                    <option value="">-- Select Course --</option>
-                                    <template for:each={courseOptions} for:item="option">
-                                        <option key={option.value} value={option.value}>
-                                            {option.label}
-                                        </option>
-                                    </template>
-                                </select>
+                        <div class="form-field form-field-span-2">
+                            <label class="form-label">
+                                Last Name <span class="required-asterisk">*</span>
+                            </label>
+                            <input type="text" class="custom-input" placeholder="Enter last name"
+                                value={formData.lastName} onchange={handleLastNameChange} />
+                        </div>
+
+                        <div class="form-field form-field-span-2">
+                            <label class="form-label">
+                                Email <span class="required-asterisk">*</span>
+                            </label>
+                            <input type="email" class="custom-input" placeholder="Enter email address"
+                                value={formData.email} onchange={handleEmailChange} />
+                        </div>
+
+                        <div class="form-field form-field-span-2">
+                            <div class="phone-grid">
+                                <div class="form-field">
+                                    <label class="form-label">Country Code <span class="required-asterisk">*</span></label>
+                                    <select class="custom-input" onchange={handleCountryCodeChange}>
+                                        <option value="+91">+91</option>
+                                        <option value="+971">+971</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-field">
+                                    <label class="form-label">Phone Number <span class="required-asterisk">*</span></label>
+                                    <input type="text" class="custom-input" placeholder="Enter phone number"
+                                        value={formData.phone} onchange={handlePhoneChange} />
+                                </div>
                             </div>
                         </div>
 
-                        <div class="form-row">
-                            <div class="form-field">
-                                <label class="form-label">Email</label>
-                                <input type="email" class="custom-input" placeholder="Enter email address"
-                                    value={formData.email} onchange={handleEmailChange} />
-                            </div>
+                        <div class="form-field form-field-span-2">
+                            <label class="form-label">
+                                Course <span class="required-asterisk">*</span>
+                            </label>
+                            <select class="custom-input" onchange={handleCourseChange}>
+                                <option value="">-- Select Course --</option>
+                                <template for:each={courseOptions} for:item="option">
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <div class="form-field form-field-span-2">
+                            <label class="form-label">
+                                City <span class="required-asterisk">*</span>
+                            </label>
+                            <select class="custom-input" onchange={handleCityChange}>
+                                <option value="">-- Select City --</option>
+                                <template for:each={cityOptions} for:item="option">
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <div class="form-field form-field-span-2">
+                            <label class="form-label">
+                                Source <span class="required-asterisk">*</span>
+                            </label>
+                            <select class="custom-input" onchange={handleSourceChange}>
+                                <option value="">-- Select Source --</option>
+                                <template for:each={sourceOptions} for:item="option">
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                </template>
+                            </select>
                         </div>
                     </div>
                 </div>

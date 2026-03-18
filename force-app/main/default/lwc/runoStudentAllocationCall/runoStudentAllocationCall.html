@@ -129,7 +129,7 @@
                                         <small>Course:-</small>
                                         <strong>{identity.source}</strong>
                                     </div>
-                                </div> -->
+                                </div> --> 
 
                                 <!-- <div class="info-tile">
                                     <lightning-icon icon-name="utility:collection"></lightning-icon>
@@ -148,12 +148,12 @@
                                     </div>
                                 </div>
 
-                                <!-- <div class="info-tile">
+                                 <!-- <div class="info-tile">
                                     <lightning-icon icon-name="utility:check"></lightning-icon>
                                     <div>
                                         <small>MHP:-</small>
                                         <strong>{identity.mhpTag}</strong>
-                                    </div>
+                                    </div> 
                                 </div> -->
 
                                 <div class="info-tile">
@@ -213,7 +213,7 @@
                                     </div>
 
                                     <lightning-input type="date" label="Expected Date" value={expectedPaymentDate}
-                                        onchange={handleExpectedDateChange} disabled={isFeedbackDisabled}>
+                                        onchange={handleExpectedDateChange} >
                                     </lightning-input>
                                 </div>
 
@@ -221,14 +221,13 @@
                                 <div class="row-3-followup">
                                     <div class="follow-date">
                                         <lightning-input type="date" label="Next Follow Up - Date"
-                                            value={nextFollowUpDate} onchange={handleNextFollowUpDateChange}
-                                            disabled={isFollowUpFinalDisabled}>
+                                            value={nextFollowUpDate} onchange={handleNextFollowUpDateChange}>
                                         </lightning-input>
                                     </div>
 
                                     <div class="follow-time">
                                         <lightning-input type="time" label="Time" value={nextFollowUpDate}
-                                            onchange={handleNextFollowUpDateChange} disabled={isFollowUpFinalDisabled}>
+                                            onchange={handleNextFollowUpDateChange} >
                                         </lightning-input>
                                     </div>
 
@@ -242,15 +241,15 @@
                                 <!-- Row 4 -->
                                 <div class="checkbox-row">
                                     <lightning-input type="checkbox" label="Notify Me" checked={notifyMe}
-                                        onchange={handleNotifyChange} disabled={isFeedbackDisabled}>
+                                        onchange={handleNotifyChange} >
                                     </lightning-input>
 
                                     <lightning-input type="checkbox" label="DND" checked={isDnd}
-                                        onchange={handleDndChange} disabled={isFeedbackDisabled}>
+                                        onchange={handleDndChange} >
                                     </lightning-input>
 
                                     <lightning-input type="checkbox" label="Is Spam" checked={isSpam}
-                                        onchange={handleSpamChange} disabled={isFeedbackDisabled}>
+                                        onchange={handleSpamChange} >
                                     </lightning-input>
                                 </div>
 

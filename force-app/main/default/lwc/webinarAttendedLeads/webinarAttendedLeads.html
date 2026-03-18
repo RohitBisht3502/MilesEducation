@@ -34,7 +34,7 @@
                         <h1 class="webinar-selection-title">Select a Webinar</h1>
 
                         <div class="webinar-select-wrapper">
-                            <lightning-combobox name="webinar" label="" value={selectedWebinarId}
+                            <lightning-combobox name="webinar" label="" value={selectedWebinarApiId}
                                 placeholder="Choose a webinar..." options={webinarOptions}
                                 onchange={handleWebinarChange} class="webinar-combobox">
                             </lightning-combobox>
@@ -148,7 +148,19 @@
                                             <tr key={spoc.spocId} class="table-row">
                                                 <td class="table-cell">
                                                     <div class="spoc-info">
-                                                        <span class="spoc-avatar">{spoc.spocName}</span>
+                                                        <template if:true={spoc.isGroupRow}>
+                                                            <button
+                                                                type="button"
+                                                                class="gm-toggle-btn"
+                                                                data-gm-id={spoc.managerId}
+                                                                onclick={handleToggleGm}>
+                                                                <span class="gm-toggle-icon">{spoc.toggleIcon}</span>
+                                                                <span class="spoc-avatar gm-row-label">{spoc.spocName}</span>
+                                                            </button>
+                                                        </template>
+                                                        <template if:false={spoc.isGroupRow}>
+                                                            <span class="spoc-avatar spoc-child-label">{spoc.spocName}</span>
+                                                        </template>
                                                     </div>
                                                 </td>
                                                 <td class="table-cell">
@@ -178,10 +190,12 @@
                                                     <span class="attendance-rate-badge">{spoc.attendanceRate}%</span>
                                                 </td>
                                                 <td class="table-cell table-cell--actions">
-                                                    <button data-spoc-id={spoc.spocId} onclick={handleViewSpocData}
-                                                        class="action-btn action-btn--primary" title="View SPOC Data">
-                                                        View
-                                                    </button>
+                                                    <template if:true={spoc.canView}>
+                                                        <button data-spoc-id={spoc.spocId} onclick={handleViewSpocData}
+                                                            class="action-btn action-btn--primary" title="View SPOC Data">
+                                                            View
+                                                        </button>
+                                                    </template>
                                                 </td>
                                             </tr>
                                         </template>

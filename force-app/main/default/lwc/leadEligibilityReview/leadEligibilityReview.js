@@ -144,7 +144,12 @@ export default class LeadEligibilityReview extends LightningElement {
             this.editLeadStatus = data.leadStatus;
         } else if (error) {
             // eslint-disable-next-line no-console
-            console.error(error);
+            console.error('Error loading eligibility snapshot', error);
+            this.showToast(
+                'Error',
+                (error && error.body && error.body.message) || 'Unable to load eligibility snapshot.',
+                'error'
+            );
         }
     }
 

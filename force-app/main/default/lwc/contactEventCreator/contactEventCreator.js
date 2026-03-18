@@ -1,28 +1,19 @@
 import { LightningElement, api, wire, track } from 'lwc';
 import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
-import getEventPicklistValues
-from '@salesforce/apex/GoogleMeetService.getEventPicklistValues';
+import { getObjectInfo, getPicklistValuesByRecordType } from 'lightning/uiObjectInfoApi';
+import { CloseActionScreenEvent } from 'lightning/actions';
+
+import getEventPicklistValues from '@salesforce/apex/GoogleMeetService.getEventPicklistValues';
 import checkExistingMeetings from '@salesforce/apex/GoogleMeetService.checkExistingMeetings';
-
-
-// import { getObjectInfo, getPicklistValues } from 'lightning/uiObjectInfoApi';
-import EVENT_OBJECT from '@salesforce/schema/Event';
-// import MEETING_TYPE_FIELD from '@salesforce/schema/Event.Meeting_type__c';
-// import TYPE_OF_MEETING_FIELD from '@salesforce/schema/Event.Type_of_Meeting__c';
-
-import { getObjectInfo, getPicklistValuesByRecordType } 
-from 'lightning/uiObjectInfoApi';
-
-
 import createMeetingWithEvent from '@salesforce/apex/GoogleMeetService.createMeetingWithEvent';
 import getCurrentUserInfo from '@salesforce/apex/UserController.getCurrentUserInfo';
 import getAvailableUsers from '@salesforce/apex/UserController.getAvailableUsers';
-import { CloseActionScreenEvent } from 'lightning/actions';
+
+import EVENT_OBJECT from '@salesforce/schema/Event';
 
 const LEAD_EMAIL_FIELD = 'Lead__c.Email__c';
-const LEAD_NAME_FIELD  = 'Lead__c.Name';
-
+const LEAD_NAME_FIELD = 'Lead__c.Name';
 const ORG_MEETING_EMAIL = 'meetings@mileseducation.com';
 
 export default class ContactEventCreator extends LightningElement {
@@ -37,7 +28,7 @@ export default class ContactEventCreator extends LightningElement {
 
     // Meeting type / duration
     @track meetingType = '';
-    duration = '45'; // default 45 minutes
+    duration = '45';
 
     selectedUser = '';
     customEmail = '';
@@ -45,7 +36,6 @@ export default class ContactEventCreator extends LightningElement {
     @track otherTypeOfMeeting = '';
     @track typeOfMeetingOptions = [];
 
-    
     // Data
     @track participants = [];
     contactEmail = '';
@@ -55,7 +45,7 @@ export default class ContactEventCreator extends LightningElement {
     @track availableUsers = [];
     @track participantOptions = [];
 
-    // picklist options
+    // Picklist options
     @track meetingTypeOptions = [];
 
     // State
@@ -73,16 +63,12 @@ export default class ContactEventCreator extends LightningElement {
     })
     wiredPicklists({ data, error }) {
         if (data) {
-            /* Meeting Type */
             if (data.picklistFieldValues.Meeting_type__c) {
-                this.meetingTypeOptions =
-                    data.picklistFieldValues.Meeting_type__c.values;
+                this.meetingTypeOptions = data.picklistFieldValues.Meeting_type__c.values;
             }
 
-            /* Type of Meeting */
             if (data.picklistFieldValues.Type_of_Meeting__c) {
-                this.typeOfMeetingOptions =
-                    data.picklistFieldValues.Type_of_Meeting__c.values;
+                this.typeOfMeetingOptions = data.picklistFieldValues.Type_of_Meeting__c.values;
             }
         } else if (error) {
             console.error('Picklist load error', error);
@@ -93,67 +79,6 @@ export default class ContactEventCreator extends LightningElement {
         return this.objectInfo?.data?.defaultRecordTypeId;
     }
 
-
-
-
-//     @wire(getPicklistValues, {
-//     recordTypeId: '$recordTypeId',
-//     fieldApiName: TYPE_OF_MEETING_FIELD
-// })
-// wiredTypeOfMeeting({ data, error }) {
-//     if (data && data.values) {
-//         this.typeOfMeetingOptions = data.values.map(v => ({
-//             label: v.label,
-//             value: v.value
-//         }));
-
-//         if (!this.typeOfMeeting && data.defaultValue) {
-//             this.typeOfMeeting = data.defaultValue.value;
-//         }
-//     } else if (error) {
-//         console.error('Error loading Type of Meeting picklist', error);
-//     }
-// }
-
-
-    // ===== Event picklist wiring =====
-    // @wire(getObjectInfo, { objectApiName: EVENT_OBJECT })
-    // objectInfo;
-
-    // get recordTypeId() {
-    //     return this.objectInfo && this.objectInfo.data
-    //         ? this.objectInfo.data.defaultRecordTypeId
-    //         : null;
-    // }
-
-    // @wire(getPicklistValues, {
-    //     recordTypeId: '$recordTypeId',
-    //     fieldApiName: MEETING_TYPE_FIELD
-    // })
-    // wiredMeetingTypeValues({ data, error }) {
-    //     if (data && data.values && data.values.length) {
-    //         this.meetingTypeOptions = data.values.map(v => ({
-    //             label: v.label,
-    //             value: v.value
-    //         }));
-    //         if (!this.meetingType) {
-    //             const def = data.defaultValue && data.defaultValue.value
-    //                 ? data.defaultValue.value
-    //                 : null;
-    //             this.meetingType = def || this.meetingTypeOptions[0].value;
-    //         }
-    //     } else {
-    //         this.meetingTypeOptions = [
-    //             { label: 'Online', value: 'Online' },
-    //             { label: 'Offline', value: 'Offline' }
-    //         ];
-    //         if (!this.meetingType) {
-    //             this.meetingType = 'Online';
-    //         }
-    //     }
-    // }
-
-    // ===== derived getters =====
     get hasParticipants() {
         return this.participants.length > 0;
     }
@@ -169,13 +94,13 @@ export default class ContactEventCreator extends LightningElement {
     get durationOptions() {
         const isOffline = this.meetingType === 'Offline';
         const values = isOffline ? [30, 45, 60, 90] : [30, 45, 60];
+
         return values.map(v => ({
             label: `${v} minutes`,
             value: String(v)
         }));
     }
 
-    // ===== lifecycle =====
     connectedCallback() {
         this.loadCurrentUserInfo();
         this.loadAvailableUsers();
@@ -186,7 +111,7 @@ export default class ContactEventCreator extends LightningElement {
     wiredLead({ error, data }) {
         if (data) {
             const email = getFieldValue(data, LEAD_EMAIL_FIELD) || '';
-            const name  = getFieldValue(data, LEAD_NAME_FIELD) || '';
+            const name = getFieldValue(data, LEAD_NAME_FIELD) || '';
 
             this.contactEmail = email;
 
@@ -199,7 +124,6 @@ export default class ContactEventCreator extends LightningElement {
     }
 
     loadActivityPicklists() {
-        // Meeting Type (Event)
         getEventPicklistValues({ fieldApiName: 'Meeting_type__c' })
             .then(data => {
                 console.log('Meeting type options', data);
@@ -209,7 +133,6 @@ export default class ContactEventCreator extends LightningElement {
                 console.error('Meeting type error', error);
             });
 
-        // Type of Meeting (Event)
         getEventPicklistValues({ fieldApiName: 'Type_of_Meeting__c' })
             .then(data => {
                 console.log('Type of meeting options', data);
@@ -220,9 +143,6 @@ export default class ContactEventCreator extends LightningElement {
             });
     }
 
-
-
-    // ===== data loading =====
     async loadCurrentUserInfo() {
         try {
             const userInfo = await getCurrentUserInfo();
@@ -238,6 +158,7 @@ export default class ContactEventCreator extends LightningElement {
 
             const managerEmail = userInfo?.Manager?.Email;
             const managerName = userInfo?.Manager?.Name || 'Manager';
+
             if (managerEmail && !skipEmail.has(managerEmail)) {
                 this.addParticipantWithData(managerEmail, managerName, false, false);
             }
@@ -259,9 +180,10 @@ export default class ContactEventCreator extends LightningElement {
         const existingParticipantEmails = new Set(this.participants.map(p => p.email));
 
         this.participantOptions = this.availableUsers
-            .filter(user => 
-                user.Email !== this.currentUserEmail &&
-                !existingParticipantEmails.has(user.Email)
+            .filter(
+                user =>
+                    user.Email !== this.currentUserEmail &&
+                    !existingParticipantEmails.has(user.Email)
             )
             .map(user => ({
                 label: `${user.Name} (${user.Email})`,
@@ -270,7 +192,6 @@ export default class ContactEventCreator extends LightningElement {
             }));
     }
 
-    // ===== input handlers =====
     handleSubjectChange(event) {
         this.subject = event.target.value;
         this.clearError();
@@ -299,6 +220,7 @@ export default class ContactEventCreator extends LightningElement {
         if (!this.durationOptions.find(o => o.value === this.duration)) {
             this.duration = '45';
         }
+
         this.updateEndDateTimeFromDuration();
     }
 
@@ -323,6 +245,7 @@ export default class ContactEventCreator extends LightningElement {
             this.description = parts.join(' - ');
         }
     }
+
     handleUserSelection(event) {
         this.selectedUser = event.detail.value;
         this.clearError();
@@ -333,7 +256,6 @@ export default class ContactEventCreator extends LightningElement {
         this.clearError();
     }
 
-    // ===== participants =====
     addParticipantWithData(email, name = '', isCurrentUser = false, isLead = false) {
         if (!email) return;
 
@@ -359,13 +281,14 @@ export default class ContactEventCreator extends LightningElement {
 
     addSelectedUser() {
         if (!this.selectedUser) {
-            // this.error = 'Please select a user from the dropdown';
             this.showToast('Error', 'Please select a user from the dropdown', 'error');
             return;
         }
 
-        const selectedUserObj = this.availableUsers.find(user => user.Email === this.selectedUser);
-        
+        const selectedUserObj = this.availableUsers.find(
+            user => user.Email === this.selectedUser
+        );
+
         if (selectedUserObj) {
             this.addParticipantWithData(selectedUserObj.Email, selectedUserObj.Name, false);
             this.selectedUser = '';
@@ -375,23 +298,26 @@ export default class ContactEventCreator extends LightningElement {
 
     addCustomEmail() {
         if (!this.customEmail) {
-            // this.error = 'Please enter an email address';
             this.showToast('Error', 'Please enter an email address', 'error');
             return;
         }
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(this.customEmail)) {
-            // this.error = 'Please enter a valid email address';
             this.showToast('Error', 'Please enter a valid email address', 'error');
             return;
         }
 
-        const existingUser = this.availableUsers.find(user => user.Email === this.customEmail);
-        
+        const existingUser = this.availableUsers.find(
+            user => user.Email === this.customEmail
+        );
+
         if (existingUser) {
-            // this.error = 'This email belongs to an existing user. Please select them from the dropdown instead.';
-            this.showToast('Error', 'This email belongs to an existing user. Please select them from the dropdown instead.', 'error');
+            this.showToast(
+                'Error',
+                'This email belongs to an existing user. Please select them from the dropdown instead.',
+                'error'
+            );
             return;
         }
 
@@ -415,11 +341,12 @@ export default class ContactEventCreator extends LightningElement {
     }
 
     clearAllParticipants() {
-        this.participants = this.participants.filter(p => p.isCurrentUser || p.email === this.contactEmail);
+        this.participants = this.participants.filter(
+            p => p.isCurrentUser || p.email === this.contactEmail
+        );
         this.prepareParticipantOptions();
     }
 
-    // ===== time calc: start + duration => end =====
     updateEndDateTimeFromDuration() {
         if (!this.startDateTime || !this.duration) return;
 
@@ -442,36 +369,35 @@ export default class ContactEventCreator extends LightningElement {
         }
     }
 
-    // ===== main save =====
-    // ===== main save =====
     async createMeeting() {
         this.updateSubjectAndDescription();
+
         if (!this.validateForm()) {
             return;
         }
 
         this.isLoading = true;
-        // this.error = '';
         this.showSuccess = false;
 
         try {
-
-            // Convert string to Date objects
             const startDate = new Date(this.startDateTime);
             const endDate = new Date(this.endDateTime);
-            
-            // Check for duplicate meeting
+
             const hasDuplicate = await checkExistingMeetings({
-                startUtc: startDate,    // Pass as Date object
-                endUtc: endDate         // Pass as Date object
+                startUtc: startDate,
+                endUtc: endDate
             });
-            
+
             if (hasDuplicate) {
                 this.isLoading = false;
-                this.showToast('Error', 'A meeting already exists at this exact time. Please choose a different time slot.', 'error');
+                this.showToast(
+                    'Error',
+                    'A meeting already exists at this exact time. Please choose a different time slot.',
+                    'error'
+                );
                 return;
             }
-            
+
             const emailsSet = new Set();
 
             this.participants.forEach(p => {
@@ -480,7 +406,6 @@ export default class ContactEventCreator extends LightningElement {
                 }
             });
 
-            // always include org email
             emailsSet.add(ORG_MEETING_EMAIL);
 
             const attendeeEmails = Array.from(emailsSet);
@@ -489,17 +414,12 @@ export default class ContactEventCreator extends LightningElement {
                 .map(p => {
                     const name = (p.name || '').trim();
                     const email = (p.email || '').trim();
-                    if (name) {
-                        return `${name} - ${email}`;
-                    }
-                    return email;
+                    return name ? `${name} - ${email}` : email;
                 })
                 .join(', ');
 
-
-            // 🔹 Convert to proper ISO strings for Apex Datetime params
             const startIso = new Date(this.startDateTime).toISOString();
-            const endIso   = new Date(this.endDateTime).toISOString();
+            const endIso = new Date(this.endDateTime).toISOString();
 
             const result = await createMeetingWithEvent({
                 recordId: this.recordId,
@@ -522,10 +442,7 @@ export default class ContactEventCreator extends LightningElement {
             this.clearForm();
             this.dispatchEvent(new CloseActionScreenEvent());
             setTimeout(() => window.location.reload(), 800);
-
         } catch (error) {
-            // this.error = this.extractErrorMessage(error);
-            // this.showToast('Error', this.error, 'error');
             const errorMessage = this.extractErrorMessage(error);
             this.showToast('Error', errorMessage, 'error');
         } finally {
@@ -533,76 +450,71 @@ export default class ContactEventCreator extends LightningElement {
         }
     }
 
-
-    // ===== validation / utils =====
     validateForm() {
+        if (!this.contactEmail || this.contactEmail.trim() === '') {
+            this.showToast(
+                'Error',
+                'Lead email is required before scheduling a meeting. Please update Lead email first.',
+                'error'
+            );
+            return false;
+        }
 
-         if (!this.contactEmail || this.contactEmail.trim() === '') {
-        this.showToast(
-            'Error',
-            'Lead email is required before scheduling a meeting. Please update Lead email first.',
-            'error'
-        );
-        return false;
-    }
         if (!this.subject) {
-            // this.error = 'Please enter a meeting subject';
             this.showToast('Error', 'Please enter a meeting subject', 'error');
             return false;
         }
+
         if (!this.meetingType) {
-            // this.error = 'Please select a Meeting Type';
             this.showToast('Error', 'Please select a Meeting Type', 'error');
             return false;
         }
+
         if (!this.startDateTime) {
-            // this.error = 'Please select start date/time';
             this.showToast('Error', 'Please select start date/time', 'error');
             return false;
         }
+
         if (!this.endDateTime) {
-            // this.error = 'Please select end date/time';
             this.showToast('Error', 'Please select end date/time', 'error');
             return false;
         }
+
         if (!this.duration) {
-            // this.error = 'Please select meeting duration';
             this.showToast('Error', 'Please select meeting duration', 'error');
             return false;
         }
+
         if (this.participants.length === 0) {
-            // this.error = 'Please add at least one participant';
             this.showToast('Error', 'Please add at least one participant', 'error');
             return false;
         }
+
         if (!this.typeOfMeeting) {
-            // this.error = 'Please select Type of Meeting';
             this.showToast('Error', 'Please select Type of Meeting', 'error');
             return false;
         }
+
         if (this.showOtherTypeOfMeeting && !this.otherTypeOfMeeting?.trim()) {
             this.showToast('Error', 'Please enter Other Type of Meeting', 'error');
             return false;
         }
-
 
         const start = new Date(this.startDateTime);
         const end = new Date(this.endDateTime);
         const now = new Date();
 
         if (start < now) {
-            // this.error = 'Start date/time cannot be in the past';
             this.showToast('Error', 'Start date/time cannot be in the past', 'error');
             return false;
         }
+
         if (end < now) {
-            // this.error = 'End date/time cannot be in the past';
             this.showToast('Error', 'End date/time cannot be in the past', 'error');
             return false;
         }
 
         if (end <= start) {
-            // this.error = 'End date/time must be after start date/time';
             this.showToast('Error', 'End date/time must be after start date/time', 'error');
             return false;
         }
@@ -612,7 +524,7 @@ export default class ContactEventCreator extends LightningElement {
 
     extractErrorMessage(error) {
         let message = 'Unknown error occurred';
-        
+
         if (error.body) {
             if (error.body.message) {
                 message = error.body.message;
@@ -627,7 +539,7 @@ export default class ContactEventCreator extends LightningElement {
         } else if (error.message) {
             message = error.message;
         }
-        
+
         return message;
     }
 
@@ -641,7 +553,9 @@ export default class ContactEventCreator extends LightningElement {
         this.duration = '45';
         this.otherTypeOfMeeting = '';
 
-        this.participants = this.participants.filter(p => p.isCurrentUser || p.email === this.contactEmail);
+        this.participants = this.participants.filter(
+            p => p.isCurrentUser || p.email === this.contactEmail
+        );
         this.prepareParticipantOptions();
     }
 
@@ -666,9 +580,11 @@ export default class ContactEventCreator extends LightningElement {
 
     handleTypeOfMeetingChange(event) {
         this.typeOfMeeting = event.detail.value;
+
         if (!this.showOtherTypeOfMeeting) {
             this.otherTypeOfMeeting = '';
         }
+
         this.updateSubjectAndDescription();
         this.clearError();
     }
@@ -681,5 +597,4 @@ export default class ContactEventCreator extends LightningElement {
     get showOtherTypeOfMeeting() {
         return (this.typeOfMeeting || '').toLowerCase() === 'other';
     }
-
 }

@@ -1,10 +1,7 @@
 public without sharing class SobjectNavBarController {
 
-    private static final String ENQUIRY_OBJECT = 'Enquiry__c';
-    private static final String SOURCE_FIELD  = 'Coming_From__c';
-    private static final String LEAD_LOOKUP = 'Lead__c';
-    private static final String STUDENT_LOOKUP = 'Student__c';
-    private static final String CAND_LOOKUP   = 'Candidate__c';
+    private static final String SOURCE_CAIRA_WEBINAR = 'CAIRA Webinar';
+    private static final String SOURCE_ZOOM_WEBINAR = 'Zoom Webinar';
 
     @AuraEnabled(cacheable=true)
     public static NavDataWrapper getNavData(Id recordId) {
@@ -26,19 +23,26 @@ public without sharing class SobjectNavBarController {
             return res;
         }
 
-        String lookupField;
-        if (isCandidate) {
-            lookupField = CAND_LOOKUP;
-        } else if (isAccount) {
-            lookupField = STUDENT_LOOKUP;
-        } else {
-            lookupField = LEAD_LOOKUP;
-        }
-        System.debug(LoggingLevel.INFO, 'getNavData: recordId=' + recordId + ', sObjName=' + sObjName + ', lookupField=' + lookupField);
+        System.debug(LoggingLevel.INFO, 'getNavData: recordId=' + recordId + ', sObjName=' + sObjName);
 
-        if (hasField(ENQUIRY_OBJECT, lookupField)) {
-            res.enquiry = queryGroupedBySource(ENQUIRY_OBJECT, lookupField, recordId);
+        Map<String, SourceCountWrapper> sourceMap = new Map<String, SourceCountWrapper>();
+
+        if (isLead) {
+            mergeCounts(sourceMap, getEnquirySourcesByLead(recordId));
+            mergeCounts(sourceMap, getEventSources(recordId));
+            mergeCounts(sourceMap, getWebinarSourcesByLead(recordId));
+        } else if (isAccount) {
+            mergeCounts(sourceMap, getEnquirySourcesByStudent(recordId));
+            mergeCounts(sourceMap, getEventSources(recordId));
+            mergeCounts(sourceMap, getWebinarSourcesByStudent(recordId));
+        } else if (isCandidate) {
+            mergeCounts(sourceMap, getEnquirySourcesByCandidate(recordId));
+            mergeCounts(sourceMap, getEventSources(recordId));
+            mergeCounts(sourceMap, getWebinarSourcesByCandidate(recordId));
         }
+
+        res.enquiry = sourceMap.values();
+        res.enquiry.sort();
 
         Datetime latestDt;
         String latestSrc;
@@ -56,46 +60,127 @@ public without sharing class SobjectNavBarController {
         return res;
     }
 
-    private static List<SourceCountWrapper> queryGroupedBySource(String objectApiName, String lookupField, Id recordId) {
+    private static List<SourceCountWrapper> getEnquirySourcesByLead(Id recordId) {
         List<SourceCountWrapper> outList = new List<SourceCountWrapper>();
-
-        String q =
-            'SELECT ' + SOURCE_FIELD + ', ' +
-            'COUNT(Id), ' +
-            'MAX(LastModifiedDate) ' +
-            'FROM ' + objectApiName + ' ' +
-            'WHERE ' + lookupField + ' = :recId ' +
-            'AND ' + SOURCE_FIELD + ' != NULL ' +
-            'AND ' + SOURCE_FIELD + ' != \'\' ' +
-            'GROUP BY ' + SOURCE_FIELD + ' ' +
-            'ORDER BY MAX(LastModifiedDate) DESC';
-
-        Id recId = recordId;
-        System.debug(LoggingLevel.DEBUG, 'queryGroupedBySource: ' + q);
-
-        List<SObject> sobs = Database.query(q);
-        List<AggregateResult> ars = new List<AggregateResult>();
-        for (SObject s : sobs) ars.add((AggregateResult)s);
-
-        for (AggregateResult ar : ars) {
-            outList.add(new SourceCountWrapper(
-                (String) ar.get(SOURCE_FIELD),
-                (Integer) ar.get('expr0'),
-                (Datetime) ar.get('expr1')
-            ));
+        for (AggregateResult ar : [
+            SELECT Coming_From__c source, COUNT(Id) recordCount, MAX(LastModifiedDate) latestDt
+            FROM Enquiry__c
+            WHERE Lead__c = :recordId AND Coming_From__c != null AND Coming_From__c != ''
+            GROUP BY Coming_From__c
+            ORDER BY MAX(LastModifiedDate) DESC
+        ]) {
+            outList.add(new SourceCountWrapper((String) ar.get('source'), (Integer) ar.get('recordCount'), (Datetime) ar.get('latestDt')));
         }
-
-        System.debug(LoggingLevel.DEBUG, 'queryGroupedBySource: object=' + objectApiName + ', rows=' + outList.size());
         return outList;
     }
 
-    private static Boolean hasField(String objectApiName, String fieldApiName) {
-        Map<String, Schema.SObjectType> globalMap = Schema.getGlobalDescribe();
-        if (!globalMap.containsKey(objectApiName)) return false;
+    private static List<SourceCountWrapper> getEnquirySourcesByStudent(Id recordId) {
+        List<SourceCountWrapper> outList = new List<SourceCountWrapper>();
+        for (AggregateResult ar : [
+            SELECT Coming_From__c source, COUNT(Id) recordCount, MAX(LastModifiedDate) latestDt
+            FROM Enquiry__c
+            WHERE Student__c = :recordId AND Coming_From__c != null AND Coming_From__c != ''
+            GROUP BY Coming_From__c
+            ORDER BY MAX(LastModifiedDate) DESC
+        ]) {
+            outList.add(new SourceCountWrapper((String) ar.get('source'), (Integer) ar.get('recordCount'), (Datetime) ar.get('latestDt')));
+        }
+        return outList;
+    }
 
-        Map<String, Schema.SObjectField> fieldMap =
-            globalMap.get(objectApiName).getDescribe().fields.getMap();
-        return fieldMap.containsKey(fieldApiName);
+    private static List<SourceCountWrapper> getEnquirySourcesByCandidate(Id recordId) {
+        List<SourceCountWrapper> outList = new List<SourceCountWrapper>();
+        for (AggregateResult ar : [
+            SELECT Coming_From__c source, COUNT(Id) recordCount, MAX(LastModifiedDate) latestDt
+            FROM Enquiry__c
+            WHERE Candidate__c = :recordId AND Coming_From__c != null AND Coming_From__c != ''
+            GROUP BY Coming_From__c
+            ORDER BY MAX(LastModifiedDate) DESC
+        ]) {
+            outList.add(new SourceCountWrapper((String) ar.get('source'), (Integer) ar.get('recordCount'), (Datetime) ar.get('latestDt')));
+        }
+        return outList;
+    }
+
+    private static List<SourceCountWrapper> getEventSources(Id recordId) {
+        List<SourceCountWrapper> outList = new List<SourceCountWrapper>();
+        for (AggregateResult ar : [
+            SELECT Meeting_type__c source, COUNT(Id) recordCount, MAX(LastModifiedDate) latestDt
+            FROM Event
+            WHERE (WhoId = :recordId OR WhatId = :recordId) AND Meeting_type__c != null AND Meeting_type__c != '' AND Stage__c = 'Completed'
+            GROUP BY Meeting_type__c
+            ORDER BY MAX(LastModifiedDate) DESC
+        ]) {
+            outList.add(new SourceCountWrapper((String) ar.get('source'), (Integer) ar.get('recordCount'), (Datetime) ar.get('latestDt')));
+        }
+        return outList;
+    }
+
+    private static List<SourceCountWrapper> getWebinarSourcesByLead(Id recordId) {
+        List<SourceCountWrapper> outList = new List<SourceCountWrapper>();
+        for (AggregateResult ar : [
+            SELECT Webinar__r.Type_Of_Webinar__c webinarType, COUNT(Id) recordCount, MAX(LastModifiedDate) latestDt
+            FROM Webinar_Member__c
+            WHERE Lead__c = :recordId AND Webinar__c != null AND Attendance_Status__c = 'Present'
+            GROUP BY Webinar__r.Type_Of_Webinar__c
+            ORDER BY MAX(LastModifiedDate) DESC
+        ]) {
+            outList.add(new SourceCountWrapper(getWebinarSourceLabel((String) ar.get('webinarType')), (Integer) ar.get('recordCount'), (Datetime) ar.get('latestDt')));
+        }
+        return outList;
+    }
+
+    private static List<SourceCountWrapper> getWebinarSourcesByStudent(Id recordId) {
+        List<SourceCountWrapper> outList = new List<SourceCountWrapper>();
+        for (AggregateResult ar : [
+            SELECT Webinar__r.Type_Of_Webinar__c webinarType, COUNT(Id) recordCount, MAX(LastModifiedDate) latestDt
+            FROM Webinar_Member__c
+            WHERE Student__c = :recordId AND Webinar__c != null AND Attendance_Status__c = 'Present'
+            GROUP BY Webinar__r.Type_Of_Webinar__c
+            ORDER BY MAX(LastModifiedDate) DESC
+        ]) {
+            outList.add(new SourceCountWrapper(getWebinarSourceLabel((String) ar.get('webinarType')), (Integer) ar.get('recordCount'), (Datetime) ar.get('latestDt')));
+        }
+        return outList;
+    }
+
+    private static List<SourceCountWrapper> getWebinarSourcesByCandidate(Id recordId) {
+        List<SourceCountWrapper> outList = new List<SourceCountWrapper>();
+        for (AggregateResult ar : [
+            SELECT Webinar__r.Type_Of_Webinar__c webinarType, COUNT(Id) recordCount, MAX(LastModifiedDate) latestDt
+            FROM Webinar_Member__c
+            WHERE Candidate__c = :recordId AND Webinar__c != null AND Attendance_Status__c = 'Present'
+            GROUP BY Webinar__r.Type_Of_Webinar__c
+            ORDER BY MAX(LastModifiedDate) DESC
+        ]) {
+            outList.add(new SourceCountWrapper(getWebinarSourceLabel((String) ar.get('webinarType')), (Integer) ar.get('recordCount'), (Datetime) ar.get('latestDt')));
+        }
+        return outList;
+    }
+
+    private static void mergeCounts(Map<String, SourceCountWrapper> sourceMap, List<SourceCountWrapper> items) {
+        for (SourceCountWrapper item : items) {
+            if (item == null || String.isBlank(item.source)) {
+                continue;
+            }
+
+            if (!sourceMap.containsKey(item.source)) {
+                sourceMap.put(item.source, new SourceCountWrapper(item.source, item.count, item.lastModified));
+                continue;
+            }
+
+            SourceCountWrapper existing = sourceMap.get(item.source);
+            existing.count += item.count == null ? 0 : item.count;
+            if (item.lastModified != null && (existing.lastModified == null || item.lastModified > existing.lastModified)) {
+                existing.lastModified = item.lastModified;
+            }
+        }
+    }
+
+    private static String getWebinarSourceLabel(String webinarType) {
+        return webinarType != null && webinarType.trim().equalsIgnoreCase('CAIRA')
+            ? SOURCE_CAIRA_WEBINAR
+            : SOURCE_ZOOM_WEBINAR;
     }
 
     public class NavDataWrapper {
@@ -103,7 +188,7 @@ public without sharing class SobjectNavBarController {
         @AuraEnabled public String latestSource;
     }
 
-    public class SourceCountWrapper {
+    public class SourceCountWrapper implements Comparable {
         @AuraEnabled public String source;
         @AuraEnabled public Integer count;
         @AuraEnabled public Datetime lastModified;
@@ -112,6 +197,15 @@ public without sharing class SobjectNavBarController {
             this.source = source;
             this.count = count;
             this.lastModified = lastModified;
+        }
+
+        public Integer compareTo(Object obj) {
+            SourceCountWrapper other = (SourceCountWrapper) obj;
+            if (other == null) return -1;
+            if (this.lastModified == other.lastModified) return 0;
+            if (this.lastModified == null) return 1;
+            if (other.lastModified == null) return -1;
+            return this.lastModified > other.lastModified ? -1 : 1;
         }
     }
 }

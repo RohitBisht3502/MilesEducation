@@ -2,6 +2,7 @@
     doInit: function(component, event, helper) {
         helper.loadCourses(component);
         helper.loadCities(component);
+        helper.loadSources(component);
     },
 
     handleInputChange: function(component, event, helper) {
@@ -9,6 +10,7 @@
         var value = event.getSource().get("v.value");
         if (name === "course") component.set("v.course", value);
         if (name === "city") component.set("v.city", value);
+        if (name === "source") component.set("v.source", value);
         if (name === "firstName") component.set("v.firstName", value);
         if (name === "lastName") component.set("v.lastName", value);
         if (name === "phone") component.set("v.phone", value);

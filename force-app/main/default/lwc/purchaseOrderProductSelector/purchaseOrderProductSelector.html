@@ -62,7 +62,7 @@
                 <h2 class="section-title">
                     Cart Items <span class="badge">{cartCount}</span>
                 </h2>
-                <div class="subtotal">Subtotal: ₹{subTotal}</div>
+                <div class="subtotal">Rs {subTotal}</div>
             </div>
 
             <div class="table-wrapper">
@@ -232,7 +232,7 @@
                                     <div class="loan-info">
                                         <div class="loan-name">{loan.name} - {loan.provider}</div>
                                         <div class="loan-meta">
-                                            <span>App ID: {loan.appId}</span>
+                                            <span>Miles Loan ID: {loan.milesLoanCode}</span>
                                             <span class="status-badge">{loan.status}</span>
                                         </div>
                                     </div>
@@ -274,16 +274,16 @@
                         </label>
                     </div>
 
-                    <lightning-input data-id="discount" type="number" label={discountLabel} value={discountValue}
+                    <lightning-input data-id="discount" type="number" label={discountLabelText} value={discountValue}
                         onchange={handleDiscountValue}>
                     </lightning-input>
-                    <lightning-input data-id="downPayment" type="number" label="Down Payment (₹)" value={downPayment}
+                    <lightning-input data-id="downPayment" type="number" label="Down Payment (Rs)" value={downPayment}
                         min={effectiveMinimumDownPayment} max={finalPayable}
                         message-when-range-overflow="Down payment cannot exceed total payable."
-                        message-when-range-underflow={downPaymentMinMessage} onchange={handleDownPaymentChange}>
+                        message-when-range-underflow={downPaymentMinMessageText} onchange={handleDownPaymentChange}>
                     </lightning-input>
-                    <template if:true={processingFeeMessage}>
-                        <div class="approval-note">{processingFeeMessage} Total down payment: ₹{totalDownPayment}</div>
+                    <template if:true={hasProcessingFee}>
+                        <div class="approval-note">{processingFeeMessageText} Total down payment: Rs {totalDownPayment}</div>
                     </template>
                     <div class="approval-note">
                         {approvalHint}
@@ -300,17 +300,17 @@
 
                     <div class="price-row">
                         <span>Subtotal</span>
-                        <span>₹{subTotal}</span>
+                        <span>Rs {subTotal}</span>
                     </div>
 
                     <div class="price-row">
                         <span>Discount</span>
-                        <span>- ₹{discountAmount}</span>
+                        <span>- Rs {discountAmount}</span>
                     </div>
 
                     <div class="price-row total">
                         <span>Total Payable</span>
-                        <span>₹{finalPayable}</span>
+                        <span>Rs {finalPayable}</span>
                     </div>
 
                     <lightning-button class="confirm-btn" variant="brand" label={confirmButtonLabel}

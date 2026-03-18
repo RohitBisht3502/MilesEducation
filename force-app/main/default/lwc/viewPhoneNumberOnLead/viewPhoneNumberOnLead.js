@@ -1,12 +1,12 @@
 import { LightningElement, api, track, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import { refreshApex } from '@salesforce/apex';
 import checkUserCredit from '@salesforce/apex/ViewPhoneNumberController.checkUserCredit';
 import getPhoneNumber from '@salesforce/apex/ViewPhoneNumberController.getPhoneNumber';
-import { CloseActionScreenEvent } from 'lightning/actions';
 
 export default class ViewPhoneNumberOnLead extends LightningElement {
     @api recordId;
-    @api objectApiName = 'Lead__c'; // Default value
+    @api objectApiName = 'Lead__c';
     @track email = '';
     @track creditBalance = 0;
     @track phoneNumber = '';
@@ -14,12 +14,14 @@ export default class ViewPhoneNumberOnLead extends LightningElement {
     @track hasCredit = true;
     @track showCreditError = false;
     @track wireLoading = false;
-    
-    // Wire method for instant credit data loading
+    wiredCreditResult;
+
     @wire(checkUserCredit)
-    wiredCreditData({ error, data }) {
+    wiredCreditData(result) {
+        this.wiredCreditResult = result;
+        const { error, data } = result;
         this.wireLoading = true;
-        
+
         if (data) {
             console.log('Wire data received:', data);
             this.creditBalance = Math.floor(data.creditBalance);
@@ -44,64 +46,63 @@ export default class ViewPhoneNumberOnLead extends LightningElement {
             this.showError('Insufficient Credits', 'Please purchase more credits to view phone numbers');
             return;
         }
-        
+
         this.isLoading = true;
-        
+
         getPhoneNumber({
             recordId: this.recordId,
             objectApiName: this.objectApiName
         })
-        .then(result => {
-            console.log('Phone result received:', result);
-            
-            // Set phone number
-          this.phoneNumber = result.phoneNumber;
-this.email = result.email;
-            
-            // Update credit balance from server response
-            this.creditBalance = Math.floor(result.newCreditBalance);
-            this.hasCredit = this.creditBalance > 0;
-            this.showCreditError = !this.hasCredit;
-            
-            this.showSuccess('Success', 'Phone number retrieved successfully.');
-            this.isLoading = false;
-        })
-        .catch(error => {
-            console.error('Error getting phone:', error);
-            console.error('Error details:', JSON.stringify(error, null, 2));
-            
-            // Extract error message
-            let errorMessage = this.getErrorMessage(error);
-            
-            // Check for specific errors
-            if (errorMessage.includes('Logging_Id__c')) {
-                errorMessage = 'Activity log creation failed. Please check field permissions.';
-            }
-            
-            this.showError('Error', errorMessage);
-            this.isLoading = false;
-        });
+            .then(result => {
+                console.log('Phone result received:', result);
+
+                this.phoneNumber = result.phoneNumber;
+                this.email = result.email;
+
+                this.creditBalance = Math.floor(result.newCreditBalance);
+                this.hasCredit = this.creditBalance > 0;
+                this.showCreditError = !this.hasCredit;
+
+                this.showSuccess('Success', 'Phone number retrieved successfully.');
+                Promise.resolve(refreshApex(this.wiredCreditResult))
+                    .finally(() => {
+                        this.isLoading = false;
+                    });
+            })
+            .catch(error => {
+                console.error('Error getting phone:', error);
+                console.error('Error details:', JSON.stringify(error, null, 2));
+
+                let errorMessage = this.getErrorMessage(error);
+
+                if (errorMessage.includes('Logging_Id__c')) {
+                    errorMessage = 'Activity log creation failed. Please check field permissions.';
+                }
+
+                this.showError('Error', errorMessage);
+                this.isLoading = false;
+            });
     }
-    
+
     handleCopy() {
-        if (!this.phoneNumber) return;
-        
-        // Create temporary textarea for copying
+        if (!this.phoneNumber) {
+            return;
+        }
+
         const textArea = document.createElement('textarea');
         textArea.value = this.phoneNumber;
-        
-        // Make it invisible
+
         textArea.style.position = 'fixed';
         textArea.style.left = '-999999px';
         textArea.style.top = '-999999px';
-        
+
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
-        
+
         try {
-            // Try to copy
             const successful = document.execCommand('copy');
+
             if (successful) {
                 this.showSuccess('Copied!', 'Phone number copied to clipboard');
             } else {
@@ -111,65 +112,57 @@ this.email = result.email;
             console.error('Copy error:', err);
             this.showError('Copy Failed', 'Could not copy to clipboard');
         } finally {
-            // Clean up
             document.body.removeChild(textArea);
         }
     }
 
-    
     handleCopyEmail() {
+        if (!this.email) {
+            return;
+        }
 
-    if (!this.email) return;
+        const textArea = document.createElement('textarea');
+        textArea.value = this.email;
 
-    const textArea = document.createElement('textarea');
-    textArea.value = this.email;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
 
-    textArea.style.position = 'fixed';
-    textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
 
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
+        try {
+            const successful = document.execCommand('copy');
 
-    try {
-        const successful = document.execCommand('copy');
-
-        if (successful) {
-            this.showSuccess('Copied!', 'Email copied to clipboard');
-        } else {
+            if (successful) {
+                this.showSuccess('Copied!', 'Email copied to clipboard');
+            } else {
+                this.showError('Copy Failed', 'Could not copy email');
+            }
+        } catch (err) {
             this.showError('Copy Failed', 'Could not copy email');
         }
-    } catch (err) {
-        this.showError('Copy Failed', 'Could not copy email');
+
+        document.body.removeChild(textArea);
     }
 
-    document.body.removeChild(textArea);
-}
+    handleClose() {
+        this.phoneNumber = '';
+        this.email = '';
 
+        setTimeout(() => {
+            window.location.reload(true);
+        }, 500);
+    }
 
-
-
-
-   handleClose() {
-    this.phoneNumber = '';
-    this.email = '';
-
-   
-     this.dispatchEvent(new CloseActionScreenEvent());
-
-  
-    setTimeout(() => {
-        window.location.reload();
-    }, 500);
-}
-    
-    // Select phone number text when clicked
     selectPhoneText(event) {
         if (event.target.classList.contains('phone-number-box')) {
             const phoneElement = this.template.querySelector('.phone-number');
+
             if (phoneElement) {
                 const range = document.createRange();
                 range.selectNodeContents(phoneElement);
+
                 const selection = window.getSelection();
                 selection.removeAllRanges();
                 selection.addRange(range);
@@ -177,54 +170,60 @@ this.email = result.email;
         }
     }
 
-
     selectEmailText(event) {
-    const emailElement = this.template.querySelector('.email-value');
+        const emailElement = this.template.querySelector('.email-value');
 
-    if (emailElement) {
-        const range = document.createRange();
-        range.selectNodeContents(emailElement);
+        if (emailElement) {
+            const range = document.createRange();
+            range.selectNodeContents(emailElement);
 
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
     }
-}
-    
-    // Helper to get error message from different error formats
+
     getErrorMessage(error) {
         if (error && error.body) {
             if (error.body.message) {
                 return error.body.message;
             }
+
             if (typeof error.body === 'string') {
                 return error.body;
             }
         }
+
         if (error && error.message) {
             return error.message;
         }
+
         if (typeof error === 'string') {
             return error;
         }
+
         return 'An unexpected error occurred';
     }
-    
+
     showSuccess(title, message) {
-        this.dispatchEvent(new ShowToastEvent({
-            title: title, 
-            message: message, 
-            variant: 'success', 
-            mode: 'dismissable'
-        }));
+        this.dispatchEvent(
+            new ShowToastEvent({
+                title: title,
+                message: message,
+                variant: 'success',
+                mode: 'dismissable'
+            })
+        );
     }
-    
+
     showError(title, message) {
-        this.dispatchEvent(new ShowToastEvent({
-            title: title, 
-            message: message, 
-            variant: 'error', 
-            mode: 'sticky'
-        }));
+        this.dispatchEvent(
+            new ShowToastEvent({
+                title: title,
+                message: message,
+                variant: 'error',
+                mode: 'sticky'
+            })
+        );
     }
 }

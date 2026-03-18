@@ -1,5 +1,5 @@
 /*
-    Author       : Codex
+    Author       : Rohit Singh Bisht
     Description  : Aura controller for Lead__c New override.
 */
 public with sharing class LeadNewOverrideController {
@@ -90,8 +90,19 @@ public with sharing class LeadNewOverrideController {
         return options;
     }
 
+    @AuraEnabled(cacheable=true)
+    public static List<PicklistOption> getSourceOptions() {
+        List<PicklistOption> options = new List<PicklistOption>();
+        for (Schema.PicklistEntry entry : Schema.SObjectType.Lead__c.fields.Source__c.getPicklistValues()) {
+            if (entry.isActive()) {
+                options.add(new PicklistOption(entry.getLabel(), entry.getValue()));
+            }
+        }
+        return options;
+    }
+
     @AuraEnabled
-    public static Result createLeadByCourse(String course, String city, String firstName, String lastName, String countryCode, String phone, String email) {
+    public static Result createLeadByCourse(String course, String city, String firstName, String lastName, String countryCode, String phone, String email, String source) {
         try {
             if (String.isBlank(course)) {
                 return errorResult('Course is required.');
@@ -146,7 +157,8 @@ public with sharing class LeadNewOverrideController {
                     Company   = 'Miles Education',
                     Phone     = fullPhone,
                     Email     = email,
-                    City      = city
+                    City      = city,
+                    Is_Created_Manually__c = true
                 );
                 insert candidate;
             } else {
@@ -163,6 +175,10 @@ public with sharing class LeadNewOverrideController {
                     candidate.City = city;
                     candidateChanged = true;
                 }
+                if (candidate.Is_Created_Manually__c != true) {
+                    candidate.Is_Created_Manually__c = true;
+                    candidateChanged = true;
+                }
                 if (candidateChanged) {
                     update candidate;
                 }
@@ -176,9 +192,10 @@ public with sharing class LeadNewOverrideController {
                 City__c      = city,
                 Stage__c     = stage,
                 Course__c    = course,
-                Source__c    = 'Referral',
+                Source__c    = source,
                 RecordTypeId = recordTypeId,
-                Candidate__c = candidate.Id
+                Candidate__c = candidate.Id,
+                Is_Created_Manually__c = true
             );
             insert newLead;
 
@@ -297,7 +314,7 @@ public with sharing class LeadNewOverrideController {
             Lead candidate = null;
             Id candidateIdToUse = (candidateIdFromPhone != null ? candidateIdFromPhone : candidateIdFromEmail);
             if (candidateIdToUse != null) {
-                List<Lead> candidates = [SELECT Id, Phone, Email, City FROM Lead WHERE Id = :candidateIdToUse LIMIT 1];
+                List<Lead> candidates = [SELECT Id, Phone, Email, City, Is_Created_Manually__c FROM Lead WHERE Id = :candidateIdToUse LIMIT 1];
                 if (!candidates.isEmpty()) candidate = candidates[0];
             }
 
@@ -308,7 +325,8 @@ public with sharing class LeadNewOverrideController {
                     Company   = 'Miles Education',
                     Phone     = fullPhone,
                     Email     = email,
-                    City      = city
+                    City      = city,
+                    Is_Created_Manually__c = true
                 );
                 insert candidate;
             } else {
@@ -323,6 +341,10 @@ public with sharing class LeadNewOverrideController {
                 }
                 if (candidate.City != city) {
                     candidate.City = city;
+                    candidateChanged = true;
+                }
+                if (candidate.Is_Created_Manually__c != true) {
+                    candidate.Is_Created_Manually__c = true;
                     candidateChanged = true;
                 }
                 if (candidateChanged) {
@@ -340,7 +362,8 @@ public with sharing class LeadNewOverrideController {
                 Course__c    = course,
                 Source__c    = 'Referral',
                 RecordTypeId = rt.Id,
-                Candidate__c = candidate.Id
+                Candidate__c = candidate.Id,
+                Is_Created_Manually__c = true
             );
             insert newLead;
 
@@ -410,6 +433,14 @@ public with sharing class LeadNewOverrideController {
         } catch (Exception e) {
             return errorResult(e.getMessage());
         }
+    }
+
+    @AuraEnabled
+    public static void sendLeadToMiles(Id leadId) {
+        if (leadId == null) {
+            throw new AuraHandledException('Lead Id is required.');
+        }
+        Callout_MilesWebService.sendLeadToMiles(leadId);
     }
 
     private static Result errorResult(String message) {

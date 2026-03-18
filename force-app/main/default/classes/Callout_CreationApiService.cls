@@ -52,6 +52,7 @@ public with sharing class Callout_CreationApiService {
             );
 
             if (loan.Permanent_address_same_as_Current__c == true) {
+                putCurrentAddress(body, loan);
                 putPermanentAddress(body, loan);
             } else {
                 putCurrentAddress(body, loan);

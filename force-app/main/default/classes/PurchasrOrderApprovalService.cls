@@ -209,13 +209,13 @@ public without sharing class PurchasrOrderApprovalService {
 
     private static Id getLeadOwnersManagerManager(Id leadId) {
         Lead__c leadRec = [SELECT OwnerId FROM Lead__c WHERE Id = :leadId LIMIT 1];
-        User ownerUser = [SELECT ManagerId, Manager.ManagerId FROM User WHERE Id = :leadRec.OwnerId LIMIT 1];
+        User ownerUser = [SELECT ManagerId FROM User WHERE Id = :leadRec.OwnerId LIMIT 1];
         if (leadId == null) return null;
 
 
 
-        if (ownerUser.Manager != null && ownerUser.Manager.ManagerId != null) {
-            return ownerUser.Manager.ManagerId;
+        if (ownerUser.ManagerId != null) {
+            return ownerUser.ManagerId;
         }
 
         return null;

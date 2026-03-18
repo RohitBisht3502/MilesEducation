@@ -62,6 +62,13 @@ public without sharing class EligibilityReviewController {
         @AuraEnabled public String cpaEligibilityStatus;
     }
 
+    private static Boolean hasSnapshotValues(EligibilitySnapshot snap) {
+        return snap != null
+            && (String.isNotBlank(snap.leadStatus)
+                || snap.creditScore != null
+                || String.isNotBlank(snap.cpaEligibilityStatus));
+    }
+
     private class FileInput {
         public Id fileId;
         public String status;
@@ -234,28 +241,33 @@ public without sharing class EligibilityReviewController {
 
         EligibilityRecordResolver.Context ctx = EligibilityRecordResolver.resolveByRecordId(leadId);
         if (ctx.studentId != null) {
-            Account a = [
+            List<Account> accounts = [
                 SELECT GP_Lead_Status__c, Credit_score__c, CPA_Eligibility_Status__c
                 FROM Account
                 WHERE Id = :ctx.studentId
                 LIMIT 1
             ];
-            snap.leadStatus = a.GP_Lead_Status__c;
-            snap.creditScore = a.Credit_score__c;
-            snap.cpaEligibilityStatus = a.CPA_Eligibility_Status__c;
-            return snap;
+            if (!accounts.isEmpty()) {
+                Account a = accounts[0];
+                snap.leadStatus = a.GP_Lead_Status__c;
+                snap.creditScore = a.Credit_score__c;
+                snap.cpaEligibilityStatus = a.CPA_Eligibility_Status__c;
+            }
         }
 
-        if (ctx.candidateId != null) {
-            Lead l = [
+        if (!hasSnapshotValues(snap) && ctx.candidateId != null) {
+            List<Lead> leads = [
                 SELECT GP_Lead_Status__c, Credit_score__c, CPA_Eligibility_Status__c
                 FROM Lead
                 WHERE Id = :ctx.candidateId
                 LIMIT 1
             ];
-            snap.leadStatus = l.GP_Lead_Status__c;
-            snap.creditScore = l.Credit_score__c;
-            snap.cpaEligibilityStatus = l.CPA_Eligibility_Status__c;
+            if (!leads.isEmpty()) {
+                Lead l = leads[0];
+                snap.leadStatus = l.GP_Lead_Status__c;
+                snap.creditScore = l.Credit_score__c;
+                snap.cpaEligibilityStatus = l.CPA_Eligibility_Status__c;
+            }
         }
         return snap;
     }

@@ -36,7 +36,7 @@ public without sharing class Webservice_GMeetRegistrationsService {
 
         Map<Id, Lead__c> leadMap = new Map<Id, Lead__c>();
         if (!leadIds.isEmpty()) {
-            for (Lead__c ld : [SELECT Id, Candidate__c FROM Lead__c WHERE Id IN :leadIds]) {
+            for (Lead__c ld : [SELECT Id, Candidate__c, Candidate__r.UUID__c FROM Lead__c WHERE Id IN :leadIds]) {
                 leadMap.put(ld.Id, ld);
             }
         }
@@ -56,10 +56,12 @@ public without sharing class Webservice_GMeetRegistrationsService {
             String endTimeStr   = ev.EndDateTime.format('yyyy-MM-dd\'T\'HH:mm:ssZ');
 
             Id sfIdToSend = ev.Id;
+            String milesUuid;
             if (ev.WhatId != null && ev.WhatId.getSObjectType() == Lead__c.SObjectType) {
                 Lead__c ld = leadMap.get(ev.WhatId);
                 if (ld != null && ld.Candidate__c != null) {
                     sfIdToSend = ld.Candidate__c;
+                    milesUuid = ld.Candidate__r != null ? ld.Candidate__r.UUID__c : null;
                 }
             }
 
@@ -67,6 +69,7 @@ public without sharing class Webservice_GMeetRegistrationsService {
                 'event_id'        => ev.Event_Id__c,
                 'conference_id'   => ev.ConferenceId__c,
                 'sf_id'           => sfIdToSend,
+                'miles_uuid'      => milesUuid,
                 'meeting_type'    => ev.Meeting_type__c,
                 'start_time'      => startTimeStr,
                 'end_time'        => endTimeStr

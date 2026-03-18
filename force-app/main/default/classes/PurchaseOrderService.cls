@@ -233,28 +233,25 @@ public without sharing class PurchaseOrderService {
             Callout_PurchaseOrderService.CalloutResult calloutRes;
             if (!requiresApproval) {
                 // api callout to miles
-              calloutRes = callExternalPurchaseService(req, lead, candidate);
+             // calloutRes = callExternalPurchaseService(req, lead, candidate);
             }
 
             Purchase_Order__c po    = createPurchaseOrder(req, context, lead, candidate, student);
-            // po.Purchase_Order_Id__c = '41';
-            if (calloutRes != null) {
-                po.Purchase_Order_Id__c = String.valueOf(calloutRes.purchaseId);
-                po.Response_Payload__c  = calloutRes.responseBody;
-            }
-            if (requiresApproval) {
-                po.Approval_Status__c = STATUS_PENDING;
-            }
+            po.Purchase_Order_Id__c = '41';
+            // if (calloutRes != null) {
+            //     po.Purchase_Order_Id__c = String.valueOf(calloutRes.purchaseId);
+            //     po.Response_Payload__c  = calloutRes.responseBody;
+            // }
+            // if (requiresApproval) {
+            //     po.Approval_Status__c = STATUS_PENDING;
+            // }
             insert po;
 
-            createLineItems(po.Id, req.items);
+            createLineItems(po.Id, req.items, req.processingFee, req.loanId);
             updateCairaLevelIfNeeded(context, lead, req.items);
             createTransaction(po.Id, req.downPayment, req.leadId);
             if (!String.isBlank(req.loanId)) {
                 createLoanTransaction(po.Id, req.loanId);
-            }
-            if (req.processingFee != null && req.processingFee > 0 && !String.isBlank(req.loanId)) {
-                createProcessingFeeTransaction(po.Id, req.loanId, req.processingFee);
             }
             if (requiresApproval) {
                 String course = context != null ? context.course : null;
@@ -363,17 +360,6 @@ public without sharing class PurchaseOrderService {
         txn.Status__c = loan != null && loan.loan_status__c == 'Disbursed'
             ? 'Received'
             : STATUS_INITIATED;
-        insert txn;
-    }
-
-    private static void createProcessingFeeTransaction(Id purchaseOrderId, Id loanId, Decimal feeAmount) {
-        if (purchaseOrderId == null || loanId == null || feeAmount == null || feeAmount <= 0) return;
-
-        Transcation__c txn = new Transcation__c();
-        txn.Purchase_Orders__c = purchaseOrderId;
-        txn.Loan__c = loanId;
-        txn.Payment__c = feeAmount;
-        txn.Status__c = 'Received';
         insert txn;
     }
 
@@ -616,7 +602,12 @@ public without sharing class PurchaseOrderService {
         }
     }
 
-    private static void createLineItems(Id purchaseOrderId, List<LineItemRequest> items) {
+    private static void createLineItems(
+        Id purchaseOrderId,
+        List<LineItemRequest> items,
+        Decimal processingFee,
+        String loanId
+    ) {
         List<Purchase_Order_Line_Item__c> lines = new List<Purchase_Order_Line_Item__c>();
 
         for (LineItemRequest li : items) {
@@ -626,6 +617,14 @@ public without sharing class PurchaseOrderService {
             row.Quantity__c = li.qty;
             row.Unit_Price__c = li.unitPrice;
             lines.add(row);
+        }
+
+        if (!String.isBlank(loanId) && processingFee != null && processingFee > 0) {
+            Purchase_Order_Line_Item__c feeRow = new Purchase_Order_Line_Item__c();
+            feeRow.Purchase_Order__c = purchaseOrderId;
+            feeRow.Quantity__c = 1;
+            feeRow.Unit_Price__c = processingFee;
+            lines.add(feeRow);
         }
 
         if (!lines.isEmpty()) {
@@ -668,7 +667,7 @@ public without sharing class PurchaseOrderService {
     @AuraEnabled(cacheable=true)
     public static List<Loan__c> getLoansForLead(Id recordId) {
         if (recordId == null) return new List<Loan__c>();
-        return [SELECT Id, Name, Loan_Provider__c, loan_status__c, application_id__c, Loan_Id__c, Tenure__c FROM Loan__c WHERE Lead__c = :recordId AND loan_status__c IN ('Approved')];
+        return [SELECT Id, Name, Loan_Provider__c, loan_status__c, miles_loan_code__c, Loan_Id__c, Tenure__c, Processing_Fee__c FROM Loan__c WHERE Lead__c = :recordId AND loan_status__c IN ('Approved')];
     }
 
     @AuraEnabled
@@ -795,7 +794,7 @@ public without sharing class PurchaseOrderService {
 
         Decimal discountAmount = req.discount == null ? 0 : req.discount;
         item.actual_price = total;
-        item.agreed_fee   = Math.max(0, total - discountAmount);
+        item.agreed_fee   = Math.max(0, total - discountAmount) + (req.processingFee == null ? 0 : req.processingFee);
         item.discount     = discountAmount;
         
         if (!String.isBlank(req.loanId)) {

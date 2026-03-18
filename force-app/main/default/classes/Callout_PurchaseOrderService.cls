@@ -45,6 +45,7 @@ public without sharing class Callout_PurchaseOrderService {
         public Boolean status;
         public String path;
         public Integer statusCode;
+        public String message;
         public Result result;
     }
 
@@ -154,6 +155,16 @@ public without sharing class Callout_PurchaseOrderService {
         System.debug('Create Enrolment API Response Body: ' + resBody);
 
         if (sc < 200 || sc >= 300 || String.isBlank(resBody)) {
+            String apiMessage;
+            if (!String.isBlank(resBody)) {
+                try {
+                    ApiResponse errorResp = (ApiResponse) JSON.deserialize(resBody, ApiResponse.class);
+                    apiMessage = errorResp != null ? errorResp.message : null;
+                } catch (Exception ex) {
+                    apiMessage = null;
+                }
+            }
+
             IntegrationLogUtil.insertLog(
                 'Create Enrolment API',
                 null,
@@ -162,7 +173,10 @@ public without sharing class Callout_PurchaseOrderService {
                 'Failed',
                 sc
             );
-            throw new AuraHandledException('External API failed (HTTP ' + sc + '): ' + (resBody == null ? '' : resBody));
+            throw new AuraHandledException(
+                'External API failed (HTTP ' + sc + '): ' +
+                (String.isNotBlank(apiMessage) ? apiMessage : (resBody == null ? '' : resBody))
+            );
         }
 
         ApiResponse resp;

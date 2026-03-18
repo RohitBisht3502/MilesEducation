@@ -1,6 +1,8 @@
 import { LightningElement, api, track, wire } from 'lwc';
 import searchLeads from '@salesforce/apex/TagLeadController.searchLeads';
 import tagOrCreateLead from '@salesforce/apex/TagLeadController.tagOrCreateLead';
+import getCityOptions from '@salesforce/apex/LeadNewOverrideController.getCityOptions';
+import getSourceOptions from '@salesforce/apex/LeadNewOverrideController.getSourceOptions';
 import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
 import { getObjectInfo } from 'lightning/uiObjectInfoApi';
 import { getPicklistValues } from 'lightning/uiObjectInfoApi';
@@ -19,10 +21,14 @@ export default class TagLeadForCallLog extends LightningElement {
 
     @track leads = [];
     @track formData = {
-        name: '',
+        firstName: '',
+        lastName: '',
         course: '',
+        city: '',
+        source: '',
         email: '',
         phone: '',
+        countryCode: '+91',
         nextFollowUpDate: '',
         l1: '',
         l2: '',
@@ -34,6 +40,8 @@ export default class TagLeadForCallLog extends LightningElement {
     viewState = 'search';
     hasAutoSearched = false;
     courseOptions = [];
+    cityOptions = [];
+    sourceOptions = [];
 
     connectedCallback() {
         this.setDefaultFollowUpDate();
@@ -186,15 +194,35 @@ export default class TagLeadForCallLog extends LightningElement {
     }
 
     handleNameChange(event) {
-        this.formData.name = event.target.value;
+        this.formData.firstName = event.target.value;
+    }
+
+    handleLastNameChange(event) {
+        this.formData.lastName = event.target.value;
     }
 
     handleCourseChange(event) {
         this.formData.course = event.target.value;
     }
 
+    handleCityChange(event) {
+        this.formData.city = event.target.value;
+    }
+
+    handleSourceChange(event) {
+        this.formData.source = event.target.value;
+    }
+
     handleEmailChange(event) {
         this.formData.email = event.target.value;
+    }
+
+    handlePhoneChange(event) {
+        this.formData.phone = event.target.value;
+    }
+
+    handleCountryCodeChange(event) {
+        this.formData.countryCode = event.target.value;
     }
 
     handleCreateFollowUpDateChange(event) {
@@ -215,10 +243,14 @@ export default class TagLeadForCallLog extends LightningElement {
         this.selectedLeadId = null;
         this.setDefaultFollowUpDate();
         this.formData = {
-            name: '',
+            firstName: '',
+            lastName: '',
             course: '',
+            city: '',
+            source: '',
             email: '',
             phone: this.phoneNumber,
+            countryCode: '+91',
             nextFollowUpDate: this.formData.nextFollowUpDate,
             l1: '',
             l2: '',
@@ -251,8 +283,12 @@ export default class TagLeadForCallLog extends LightningElement {
     }
 
     get isFormValid() {
-        return this.formData.name.trim() &&
-            this.formData.course.trim();
+        return this.formData.lastName.trim() &&
+            this.formData.course.trim() &&
+            this.formData.city.trim() &&
+            this.formData.source.trim() &&
+            this.formData.email.trim() &&
+            this.formData.phone.trim();
     }
 
     get submitButtonLabel() {
@@ -304,6 +340,11 @@ export default class TagLeadForCallLog extends LightningElement {
             course: null,
             email: null,
             phone: null,
+            city: null,
+            source: null,
+            firstName: null,
+            lastName: null,
+            countryCode: null,
             disableRR: true,
             l1: null,
             l2: null,
@@ -357,10 +398,15 @@ export default class TagLeadForCallLog extends LightningElement {
         tagOrCreateLead({
             callLogId: this.recordId,
             leadId: null,
-            name: this.formData.name,
+            name: [this.formData.firstName, this.formData.lastName].filter(Boolean).join(' '),
             course: this.formData.course,
             email: this.formData.email,
-            phone: this.phoneNumber,
+            phone: this.formData.phone,
+            city: this.formData.city,
+            source: this.formData.source,
+            firstName: this.formData.firstName,
+            lastName: this.formData.lastName,
+            countryCode: this.formData.countryCode,
             disableRR: true,
             l1: this.formData.l1 || null,
             l2: this.formData.l2 || null,
@@ -387,5 +433,29 @@ export default class TagLeadForCallLog extends LightningElement {
             .finally(() => {
                 this.isLoading = false;
             });
+    }
+
+    @wire(getCityOptions)
+    wiredCities({ data, error }) {
+        if (data) {
+            this.cityOptions = data.map(option => ({
+                label: option.label,
+                value: option.value
+            }));
+        } else if (error) {
+            console.error('Error loading city options:', error);
+        }
+    }
+
+    @wire(getSourceOptions)
+    wiredSources({ data, error }) {
+        if (data) {
+            this.sourceOptions = data.map(option => ({
+                label: option.label,
+                value: option.value
+            }));
+        } else if (error) {
+            console.error('Error loading source options:', error);
+        }
     }
 }

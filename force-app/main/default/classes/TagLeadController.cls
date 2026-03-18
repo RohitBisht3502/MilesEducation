@@ -48,6 +48,11 @@ public without sharing class TagLeadController {
         String course, 
         String email, 
         String phone, 
+        String city,
+        String source,
+        String firstName,
+        String lastName,
+        String countryCode,
         Boolean disableRR, 
         String l1, 
         String l2, 
@@ -85,73 +90,50 @@ public without sharing class TagLeadController {
                 update customLeadRecord;
             }
             
-            createPhoneNumberRecordIfNotExists(callLog.Phone_Number__c, customLeadRecord.Candidate__c);
-            
         } else {
-            Lead standardLead = new Lead();
-            standardLead.LastName = name;
-            standardLead.Email = email;
-            standardLead.Phone = phone;
-            standardLead.Company = 'N/A';
-            insert standardLead;
-            
-            customLeadRecord = new Lead__c();
-            customLeadRecord.Name = name;
-            
-            // Determine Record Type based on Course Name
-            Id finalRecordTypeId = null;
-            if (String.isNotBlank(course)) {
-                String trimmedCourse = course.trim();
-                Schema.DescribeSObjectResult dsr = Lead__c.SObjectType.getDescribe();
-                
-                // Try to find Record Type that matches the Course Label
-                Schema.RecordTypeInfo matchRti = dsr.getRecordTypeInfosByName().get(trimmedCourse);
-                if (matchRti != null && matchRti.isAvailable() && !matchRti.isMaster()) {
-                    finalRecordTypeId = matchRti.getRecordTypeId();
-                }
+            LeadNewOverrideController.Result createResult = LeadNewOverrideController.createLeadByCourse(
+                course,
+                city,
+                firstName,
+                lastName,
+                countryCode,
+                phone,
+                email,
+                source
+            );
+
+            if (createResult == null || createResult.success != true || createResult.leadId == null) {
+                throw new AuraHandledException(
+                    createResult != null && String.isNotBlank(createResult.message)
+                        ? createResult.message
+                        : 'Failed to create Lead.'
+                );
             }
 
-            // Fallback: If no course-specific record type, use passed ID or find default
-            if (finalRecordTypeId == null) {
-                finalRecordTypeId = recordTypeId;
-                if (finalRecordTypeId == null || String.valueOf(finalRecordTypeId).endsWith('AAA')) {
-                    Schema.DescribeSObjectResult dsr = Lead__c.SObjectType.getDescribe();
-                    for (Schema.RecordTypeInfo rti : dsr.getRecordTypeInfos()) {
-                        if (rti.isAvailable() && !rti.isMaster() && rti.isDefaultRecordTypeMapping()) {
-                            finalRecordTypeId = rti.getRecordTypeId();
-                            break;
-                        }
-                    }
-                    if (finalRecordTypeId == null || String.valueOf(finalRecordTypeId).endsWith('AAA')) {
-                        for (Schema.RecordTypeInfo rti : dsr.getRecordTypeInfos()) {
-                            if (rti.isAvailable() && !rti.isMaster()) {
-                                finalRecordTypeId = rti.getRecordTypeId();
-                                break;
-                            }
-                        }
-                    }
-                }
+            customLeadRecord = [
+                SELECT Id, Candidate__c, Next_Follow_Up_Date__c, Disable_Round_Robin__c
+                FROM Lead__c
+                WHERE Id = :createResult.leadId
+                LIMIT 1
+            ];
+
+            Boolean leadChanged = false;
+            if (customLeadRecord.Disable_Round_Robin__c != disableRR) {
+                customLeadRecord.Disable_Round_Robin__c = disableRR;
+                leadChanged = true;
             }
-            customLeadRecord.RecordTypeId = finalRecordTypeId;
-            
-            customLeadRecord.Course__c = String.isNotBlank(course) ? course.trim() : null;
-            customLeadRecord.Stage__c = 'M3';
-            customLeadRecord.Email__c = email;
-            customLeadRecord.Phone__c = phone;
-            customLeadRecord.Candidate__c = standardLead.Id;
-            customLeadRecord.Disable_Round_Robin__c = disableRR;
-            
             if (String.isNotBlank(nextFollowUpDate)) {
                 customLeadRecord.Next_Follow_Up_Date__c = parseUiDateTime(nextFollowUpDate);
+                leadChanged = true;
             }
-            
-            try {
-                insert customLeadRecord;
-            } catch (DmlException e) {
-                throw new AuraHandledException('Error creating Custom Lead: ' + e.getDmlMessage(0) + ' (Value passed: ' + course + ')');
+            if (leadChanged) {
+                update customLeadRecord;
             }
+
+            LeadNewOverrideController.sendLeadToMiles(customLeadRecord.Id);
             
             callLog.Lead__c = customLeadRecord.Id;
+            callLog.Candidate__c = customLeadRecord.Candidate__c;
             callLog.L1__c = l1;
             callLog.L2__c = l2;
             callLog.Feedback__c = feedback;
@@ -163,26 +145,6 @@ public without sharing class TagLeadController {
                 update callLog;
             }
             
-            createPhoneNumberRecordIfNotExists(callLog.Phone_Number__c, customLeadRecord.Candidate__c);
-        }
-    }
-    
-    private static void createPhoneNumberRecordIfNotExists(String phoneNumber, Id standardLeadId) {
-        if (String.isNotBlank(phoneNumber) && standardLeadId != null) {
-            List<Phone_Number__c> existingPhones = [
-                SELECT Id 
-                FROM Phone_Number__c 
-                WHERE Name = :phoneNumber 
-                AND Candidate__c = :standardLeadId 
-                LIMIT 1
-            ];
-            
-            if (existingPhones.isEmpty()) {
-                Phone_Number__c phoneRec = new Phone_Number__c();
-                phoneRec.Name = phoneNumber;
-                phoneRec.Candidate__c = standardLeadId;
-                insert phoneRec;
-            }
         }
     }
 

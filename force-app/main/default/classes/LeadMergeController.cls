@@ -1,29 +1,5 @@
 public without sharing class LeadMergeController {
 
-    // @AuraEnabled(cacheable=true)
-    // public static List<Lead__c> searchLeads1(String searchKey, Id currentLeadId, List<Id> selectedLeadIds) {
-    //     if (String.isBlank(searchKey)) return new List<Lead__c>();
-
-    //     String key = '%' + searchKey + '%';
-
-    //     // Exclude the current lead and already selected leads from search results
-    //     Set<Id> excludeIds = new Set<Id>{currentLeadId};
-    //     if (selectedLeadIds != null && !selectedLeadIds.isEmpty()) {
-    //         excludeIds.addAll(selectedLeadIds);
-    //     }
-
-    //     return [
-    //         SELECT Id, Name, Phone__c, Email__c, OwnerId, Owner.Name
-    //         FROM Lead__c
-    //         WHERE (Phone__c LIKE :key
-    //            OR Name LIKE :key
-    //            OR Email__c LIKE :key)
-    //         AND Id NOT IN :excludeIds
-    //         LIMIT 50
-    //     ];
-    // }
-
-
     @AuraEnabled
     public static List<LeadWrapper> searchLeads(String searchKey, Id currentLeadId, List<Id> selectedLeadIds) {
 
@@ -36,32 +12,22 @@ public without sharing class LeadMergeController {
         if (currentLeadId != null) excludeIds.add(currentLeadId);
         if (selectedLeadIds != null) excludeIds.addAll(selectedLeadIds);
 
-        List<Lead__c> results = [
-            SELECT Id, Name, Email__c, Phone__c, Course__c, Owner.Name, OwnerId, Lead__c, Status__c
-            FROM Lead__c
-            WHERE (Name LIKE :key OR Phone__c LIKE :key OR Email__c LIKE :key)
+        // Phone search logic
+        Set<Id> candidateIdsFromPhone = new Set<Id>();
+        if (searchKey.length() >= 3) {
+            for (Phone_Number__c pn : [SELECT Candidate__c FROM Phone_Number__c WHERE Phone__c LIKE :key AND Candidate__c != null LIMIT 50]) {
+                candidateIdsFromPhone.add(pn.Candidate__c);
+            }
+        }
+
+        List<Lead> results = [
+            SELECT Id, Name, Email, Course__c, Owner.Name, OwnerId, Candidate__c, Merged_Status__c, Candidate_ID__c
+            FROM Lead
+            WHERE (Name LIKE :key OR Email LIKE :key OR Id IN :candidateIdsFromPhone OR Candidate_ID__c LIKE :key)
             AND Id NOT IN :excludeIds
             AND (Is_Merged__c = false OR Is_Merged__c = null)
             LIMIT 10
         ];
-
-        if (results.isEmpty()) {
-            List<Lead> standardLeads = [
-                SELECT Id, Candidate_ID__c FROM Lead WHERE Candidate_ID__c LIKE :key LIMIT 10
-            ];
-            if (!standardLeads.isEmpty()) {
-                Set<Id> stdLeadIds = new Set<Id>();
-                for (Lead ld : standardLeads) stdLeadIds.add(ld.Id);
-                results = [
-                    SELECT Id, Name, Email__c, Phone__c, Course__c, Owner.Name, OwnerId, Lead__c, Status__c
-                    FROM Lead__c
-                    WHERE Candidate__c IN :stdLeadIds
-                    AND Id NOT IN :excludeIds
-                    AND (Is_Merged__c = false OR Is_Merged__c = null)
-                    LIMIT 10
-                ];
-            }
-        }
 
         if (results.isEmpty()) return new List<LeadWrapper>();
 
@@ -70,11 +36,11 @@ public without sharing class LeadMergeController {
         Set<Id> parentIds = new Set<Id>();
         Set<Id> ownerIds = new Set<Id>();
         
-        for (Lead__c l : results) {
+        for (Lead l : results) {
             leadIds.add(l.Id);
             ownerIds.add(l.OwnerId);
-            if (l.Lead__c != null) {
-                parentIds.add(l.Lead__c);
+            if (l.Candidate__c != null) {
+                parentIds.add(l.Candidate__c);
             }
         }
 
@@ -105,22 +71,22 @@ public without sharing class LeadMergeController {
         // 2. QUERY PARENT STATUS (Explicitly)
         Map<Id, String> parentStatusMap = new Map<Id, String>();
         if (!parentIds.isEmpty()) {
-            for (Lead__c parent : [SELECT Id, Status__c FROM Lead__c WHERE Id IN :parentIds]) {
-                parentStatusMap.put(parent.Id, parent.Status__c);
+            for (Lead parent : [SELECT Id, Merged_Status__c FROM Lead WHERE Id IN :parentIds]) {
+                parentStatusMap.put(parent.Id, parent.Merged_Status__c);
             }
         }
 
         List<LeadWrapper> wrappers = new List<LeadWrapper>();
-        for (Lead__c l : results) {
+        for (Lead l : results) {
             LeadWrapper lw = new LeadWrapper();
             lw.lead = l;
             lw.ownerManagerId = ownerManagerMap.get(l.OwnerId); // May be null if owner is Queue
             
             Boolean selfLocked = lockedIds.contains(l.Id);
-            Boolean selfPending = l.Status__c == 'Pending';
+            Boolean selfPending = l.Merged_Status__c == 'Pending';
             
-            Boolean parentLocked = (l.Lead__c != null && lockedIds.contains(l.Lead__c));
-            Boolean parentPending = (l.Lead__c != null && parentStatusMap.containsKey(l.Lead__c) && parentStatusMap.get(l.Lead__c) == 'Pending');
+            Boolean parentLocked = (l.Candidate__c != null && lockedIds.contains(l.Candidate__c));
+            Boolean parentPending = (l.Candidate__c != null && parentStatusMap.containsKey(l.Candidate__c) && parentStatusMap.get(l.Candidate__c) == 'Pending');
             
             lw.isUnderApproval = selfLocked || selfPending || parentLocked || parentPending;
             wrappers.add(lw);
@@ -133,11 +99,11 @@ public without sharing class LeadMergeController {
     public static LeadWrapper getLeadDetails(Id leadId) {
         if (leadId == null) return null;
         
-        List<Lead__c> leads = [SELECT Id, Name, Email__c, Phone__c, Course__c, Owner.Name, OwnerId, Lead__c, Status__c 
-                     FROM Lead__c WHERE Id = :leadId];
+        List<Lead> leads = [SELECT Id, Name, Email, Course__c, Owner.Name, OwnerId, Candidate__c, Merged_Status__c 
+                     FROM Lead WHERE Id = :leadId];
         
         if (leads.isEmpty()) return null;
-        Lead__c l = leads[0];
+        Lead l = leads[0];
 
         LeadWrapper lw = new LeadWrapper();
         lw.lead = l;
@@ -154,7 +120,7 @@ public without sharing class LeadMergeController {
     }
 
     public class LeadWrapper {
-        @AuraEnabled public Lead__c lead;
+        @AuraEnabled public Lead lead;
         @AuraEnabled public Boolean isUnderApproval;
         @AuraEnabled public String ownerManagerId;
     }
@@ -176,12 +142,12 @@ public without sharing class LeadMergeController {
         idsToCheck.addAll(leadIdsToMerge);
 
         // Fetch leads to check for parents
-        List<Lead__c> leadsToCheck = [SELECT Id, Name, Lead__c, Status__c, Course__c FROM Lead__c WHERE Id IN :leadIdsToMerge];
+        List<Lead> leadsToCheck = [SELECT Id, Name, Candidate__c, Merged_Status__c, Course__c FROM Lead WHERE Id IN :leadIdsToMerge];
         Set<Id> parentIds = new Set<Id>();
-        for (Lead__c l : leadsToCheck) {
-            if (l.Lead__c != null) {
-                parentIds.add(l.Lead__c);
-                idsToCheck.add(l.Lead__c);
+        for (Lead l : leadsToCheck) {
+            if (l.Candidate__c != null) {
+                parentIds.add(l.Candidate__c);
+                idsToCheck.add(l.Candidate__c);
             }
         }
 
@@ -199,8 +165,8 @@ public without sharing class LeadMergeController {
         // Check Parent Statuses explicitly
         Map<Id, String> parentStatusMap = new Map<Id, String>();
         if (!parentIds.isEmpty()) {
-            for (Lead__c parent : [SELECT Id, Status__c FROM Lead__c WHERE Id IN :parentIds]) {
-                parentStatusMap.put(parent.Id, parent.Status__c);
+            for (Lead parent : [SELECT Id, Merged_Status__c FROM Lead WHERE Id IN :parentIds]) {
+                parentStatusMap.put(parent.Id, parent.Merged_Status__c);
             }
         }
 
@@ -208,26 +174,26 @@ public without sharing class LeadMergeController {
         if (lockedIds.contains(mainLeadId)) {
              throw new AuraHandledException('The current lead is in an approval process.');
         }
-        Lead__c currentLead = [SELECT Id, Status__c, OwnerId, Course__c FROM Lead__c WHERE Id = :mainLeadId];
-        if (currentLead.Status__c == 'Pending') {
+        Lead currentLead = [SELECT Id, Merged_Status__c, OwnerId, Course__c FROM Lead WHERE Id = :mainLeadId];
+        if (currentLead.Merged_Status__c == 'Pending') {
              throw new AuraHandledException('The current lead status is Pending.');
         }
 
         // B. Check Selected Leads
-        for (Lead__c l : leadsToCheck) {
+        for (Lead l : leadsToCheck) {
             if (lockedIds.contains(l.Id)) {
                  throw new AuraHandledException('Lead ' + l.Name + ' is in an approval process.');
             }
-            if (l.Status__c == 'Pending') {
+            if (l.Merged_Status__c == 'Pending') {
                  throw new AuraHandledException('Lead ' + l.Name + ' status is Pending.');
             }
 
             // C. Check Parents
-            if (l.Lead__c != null) {
-                if (lockedIds.contains(l.Lead__c)) {
+            if (l.Candidate__c != null) {
+                if (lockedIds.contains(l.Candidate__c)) {
                      throw new AuraHandledException('Lead ' + l.Name + ' is part of a pending merge (Parent locked).');
                 }
-                if (parentStatusMap.containsKey(l.Lead__c) && parentStatusMap.get(l.Lead__c) == 'Pending') {
+                if (parentStatusMap.containsKey(l.Candidate__c) && parentStatusMap.get(l.Candidate__c) == 'Pending') {
                      throw new AuraHandledException('Lead ' + l.Name + ' is part of a pending merge (Parent Pending).');
                 }
             }
@@ -244,8 +210,8 @@ public without sharing class LeadMergeController {
 
         // Collect Owners of all leads (Main + Merged)
         Set<Id> ownerIds = new Set<Id>{currentLead.OwnerId};
-        List<Lead__c> leadsToMerge = [SELECT Id, OwnerId FROM Lead__c WHERE Id IN :leadIdsToMerge];
-        for (Lead__c l : leadsToMerge) {
+        List<Lead> leadsToMerge = [SELECT Id, OwnerId FROM Lead WHERE Id IN :leadIdsToMerge];
+        for (Lead l : leadsToMerge) {
             ownerIds.add(l.OwnerId);
         }
         
@@ -289,21 +255,21 @@ public without sharing class LeadMergeController {
         // -------------------------
         // EXECUTE MERGE
         // -------------------------
-        Lead__c mainLead = currentLead; 
+        Lead mainLead = currentLead; 
 
         // Always require and store comment on Main Lead for audit
         if (String.isBlank(mergeComments)) {
             throw new AuraHandledException('Comment is required for this merge.');
         }
-        mainLead.put('Lead_Merge_Comments__c', mergeComments);
+        mainLead.put('Merge_Comments__c', mergeComments);
 
-        for (Lead__c lead : leadsToMerge) {
-            lead.Lead__c = mainLeadId;
+        for (Lead lead : leadsToMerge) {
+            lead.Candidate__c = mainLeadId;
         }
         update leadsToMerge;
 
         if (requiresApproval) {
-            mainLead.Status__c = 'Pending';
+            mainLead.Merged_Status__c = 'Pending';
             update mainLead;
 
             // Approval Routing Logic (SPOC or Different GM)
@@ -333,13 +299,13 @@ public without sharing class LeadMergeController {
 
         } else {
             // Direct Merge (Admin or Same GM)
-            mainLead.Status__c = 'Approved';
+            mainLead.Merged_Status__c = 'Approved';
             update mainLead; 
             return 'Leads merged successfully (No Approval Required).';
         }
     }
 
-    private static Id determineApprover(Lead__c mainLead, List<Lead__c> leadsToMerge, Map<Id, User> userMap) {
+    private static Id determineApprover(Lead mainLead, List<Lead> leadsToMerge, Map<Id, User> userMap) {
         User mainLeadOwner = userMap.get(mainLead.OwnerId);
         Id adminId = '005C1000005Qn8fIAC';
 
@@ -349,7 +315,7 @@ public without sharing class LeadMergeController {
             managerIds.add(mainLeadOwner.ManagerId);
         }
         
-        for (Lead__c lead : leadsToMerge) {
+        for (Lead lead : leadsToMerge) {
             User owner = userMap.get(lead.OwnerId);
             if (owner != null && owner.ManagerId != null) {
                 managerIds.add(owner.ManagerId);

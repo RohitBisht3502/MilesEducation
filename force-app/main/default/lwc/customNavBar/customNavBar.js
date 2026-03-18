@@ -4,6 +4,7 @@ import ROADMAP_IMG from '@salesforce/resourceUrl/Roadmap';
 import GMEET_IMG from '@salesforce/resourceUrl/Gmeet';
 import OFFICE_VISIT_IMG from '@salesforce/resourceUrl/OfficeVisitLight';
 import MILES_ONE_IMG from '@salesforce/resourceUrl/MILES_ONE_IMG';
+import CAIRA_WEBINAR_IMG from '@salesforce/resourceUrl/CAIRAwebinar';
 
 const BLINK_DURATION = 5000;
 
@@ -35,9 +36,18 @@ export default class CustomNavBar extends LightningElement {
                     let label = this.formatSourceLabel(source);
                     let iconUrl = null;
 
-                    if (normalized === 'zoom webinar') {
+                    if (normalized === 'caira webinar') {
+                        iconUrl = CAIRA_WEBINAR_IMG;
+                        label = 'CAIRA Webinar';
+                    } else if (normalized === 'zoom webinar') {
                         iconUrl = ROADMAP_IMG;
                         label = 'Zoom Webinar';
+                    } else if (normalized === 'online') {
+                        iconUrl = GMEET_IMG;
+                        label = 'Gmeet Online';
+                    } else if (normalized === 'offline') {
+                        iconUrl = OFFICE_VISIT_IMG;
+                        label = 'Gmeet Visit';
                     } else if (normalized === 'gmeet online') {
                         iconUrl = GMEET_IMG;
                         label = 'Gmeet Online';

@@ -26,17 +26,30 @@
         $A.enqueueAction(action);
     },
 
+    loadSources: function(component) {
+        var action = component.get("c.getSourceOptions");
+        action.setCallback(this, function(resp) {
+            if (resp.getState() === "SUCCESS") {
+                component.set("v.sourceOptions", resp.getReturnValue() || []);
+            } else {
+                component.set("v.errorMessage", this.extractError(resp));
+            }
+        });
+        $A.enqueueAction(action);
+    },
+
     createLeadByCourse: function(component) {
         component.set("v.errorMessage", "");
         var course = component.get("v.course");
         var city = component.get("v.city");
+        var source = component.get("v.source");
         var lastName = component.get("v.lastName");
         var phone = component.get("v.phone");
         var countryCode = component.get("v.countryCode");
         var email = component.get("v.email");
 
-        if (!course || !city || !lastName || !phone || !email) {
-            component.set("v.errorMessage", "Course, City, Last Name, Phone, and Email are required.");
+        if (!course || !city || !source || !lastName || !phone || !email) {
+            component.set("v.errorMessage", "Course, City, Source, Last Name, Phone, and Email are required.");
             return;
         }
 
@@ -66,22 +79,14 @@
             lastName: lastName,
             countryCode: countryCode,
             phone: phoneValue,
-            email: email
+            email: email,
+            source: source
         });
         action.setCallback(this, function(resp) {
             if (resp.getState() === "SUCCESS") {
                 var result = resp.getReturnValue();
                 if (result && result.success && result.leadId) {
-                    component.set("v.isLoading", true);
-                    var navEvt = $A.get("e.force:navigateToSObject");
-                    if (navEvt) {
-                        navEvt.setParams({ recordId: result.leadId });
-                        navEvt.fire();
-                    }
-                    var closeEvt = $A.get("e.force:closeQuickAction");
-                    if (closeEvt) {
-                        closeEvt.fire();
-                    }
+                    this.sendLeadToMiles(component, result.leadId);
                 } else {
                     component.set("v.isLoading", false);
                     component.set("v.errorMessage", (result && result.message) ? result.message : "Failed to create Lead.");
@@ -89,6 +94,26 @@
             } else {
                 component.set("v.isLoading", false);
                 component.set("v.errorMessage", this.extractError(resp));
+            }
+        });
+        $A.enqueueAction(action);
+    },
+
+    sendLeadToMiles: function(component, leadId) {
+        var action = component.get("c.sendLeadToMiles");
+        action.setParams({
+            leadId: leadId
+        });
+        action.setCallback(this, function() {
+            component.set("v.isLoading", true);
+            var navEvt = $A.get("e.force:navigateToSObject");
+            if (navEvt) {
+                navEvt.setParams({ recordId: leadId });
+                navEvt.fire();
+            }
+            var closeEvt = $A.get("e.force:closeQuickAction");
+            if (closeEvt) {
+                closeEvt.fire();
             }
         });
         $A.enqueueAction(action);

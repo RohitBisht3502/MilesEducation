@@ -1,0 +1,161 @@
+<template>
+    <lightning-card>
+        <div class="container slds-is-relative">
+            <template if:true={isLoading}>
+                <lightning-spinner alternative-text="Loading workday" size="medium"></lightning-spinner>
+            </template>
+
+            <div class="hero">
+                <div class="hero-layout">
+                    <div class="hero-left">
+                        <div class="hero-title-wrap">
+                            <h2 class="hero-title">{employeeName}</h2>
+                            <p class="hero-subtitle">{teamLabel}</p>
+                        </div>
+                    </div>
+
+                    <div class="hero-center">
+                        <div class="live-timer-wrap">
+                            <div class="live-timer-label">Live Timer</div>
+                            <div class="live-timer-value">{liveTimerLabel}</div>
+                        </div>
+
+                        <p class="hero-message">{motivationalLine}</p>
+
+                        <div class="action-row">
+                            <template if:true={canStartDay}>
+                                <lightning-button
+                                    variant="brand"
+                                    label="Start Day"
+                                    class="action-btn action-btn-start"
+                                    onclick={handleStartDay}
+                                    disabled={actionsDisabled}>
+                                </lightning-button>
+                            </template>
+
+                            <template if:true={canStartBreak}>
+                                <lightning-button
+                                    variant="neutral"
+                                    label="Start Break"
+                                    class="action-btn action-btn-break"
+                                    onclick={handleStartBreak}
+                                    disabled={actionsDisabled}>
+                                </lightning-button>
+                            </template>
+
+                            <template if:true={canEndBreak}>
+                                <lightning-button
+                                    variant="brand"
+                                    label="End Break"
+                                    class="action-btn action-btn-end-break"
+                                    onclick={handleEndBreak}
+                                    disabled={actionsDisabled}>
+                                </lightning-button>
+                            </template>
+
+                            <template if:true={canEndDay}>
+                                <lightning-button
+                                    variant="destructive"
+                                    label="End Day"
+                                    class="action-btn action-btn-end-day"
+                                    onclick={handleEndDay}
+                                    disabled={actionsDisabled}>
+                                </lightning-button>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="hero-right">
+                        <span class={statePillClass}>{stateLabel}</span>
+                    </div>
+                </div>
+            </div>
+
+            <template if:true={today}>
+                <div class="summary-grid">
+                    <article class="summary-card">
+                        <div class="summary-label">Start Time</div>
+                        <div class="summary-value">
+                            <template if:true={today.startTime}>
+                                <lightning-formatted-date-time
+                                    value={today.startTime}
+                                    year="numeric"
+                                    month="short"
+                                    day="2-digit"
+                                    hour="2-digit"
+                                    minute="2-digit">
+                                </lightning-formatted-date-time>
+                            </template>
+                            <template if:false={today.startTime}>-</template>
+                        </div>
+                    </article>
+
+                    <article class="summary-card">
+                        <div class="summary-label">End Time</div>
+                        <div class="summary-value">
+                            <template if:true={today.endTime}>
+                                <lightning-formatted-date-time
+                                    value={today.endTime}
+                                    year="numeric"
+                                    month="short"
+                                    day="2-digit"
+                                    hour="2-digit"
+                                    minute="2-digit">
+                                </lightning-formatted-date-time>
+                            </template>
+                            <template if:false={today.endTime}>-</template>
+                        </div>
+                    </article>
+
+                    <article class="summary-card">
+                        <div class="summary-label">Total Break (min)</div>
+                        <div class="summary-value">{today.totalBreakLabel}</div>
+                    </article>
+
+                    <article class="summary-card">
+                        <div class="summary-label">Gross Hours</div>
+                        <div class="summary-value">{today.grossHoursLabel}</div>
+                    </article>
+
+                    <article class="summary-card">
+                        <div class="summary-label">Net Hours</div>
+                        <div class="summary-value">{today.netHoursLabel}</div>
+                    </article>
+                </div>
+
+                <section class="panel">
+                    <h3 class="panel-title">Today&apos;s Breaks</h3>
+                    <template if:true={hasTodayBreaks}>
+                        <template for:each={todayBreaks} for:item="breakItem">
+                            <div key={breakItem.id} class={breakItem.rowClass}>
+                                <div class="break-index">Break {breakItem.sequenceNumber}</div>
+                                <div class="break-window">
+                                    <lightning-formatted-date-time
+                                        value={breakItem.breakStart}
+                                        hour="2-digit"
+                                        minute="2-digit">
+                                    </lightning-formatted-date-time>
+                                    <span class="divider">to</span>
+                                    <template if:true={breakItem.breakEnd}>
+                                        <lightning-formatted-date-time
+                                            value={breakItem.breakEnd}
+                                            hour="2-digit"
+                                            minute="2-digit">
+                                        </lightning-formatted-date-time>
+                                    </template>
+                                    <template if:false={breakItem.breakEnd}>
+                                        <span>Running</span>
+                                    </template>
+                                </div>
+                                <div class="break-duration">{breakItem.durationLabel} min</div>
+                            </div>
+                        </template>
+                    </template>
+                    <template if:false={hasTodayBreaks}>
+                        <p class="empty-note">No break records for today.</p>
+                    </template>
+                </section>
+            </template>
+        </div>
+    </lightning-card>
+</template>

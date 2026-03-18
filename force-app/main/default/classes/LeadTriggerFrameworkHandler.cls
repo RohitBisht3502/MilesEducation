@@ -46,32 +46,29 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         LeadPostEnrollmentRoundRobinHandler.handleBeforeUpdate(newLeads, oldMapLead);
     }
 
-    public override void afterInsert() {
-        List<Lead__c> newLeads = getNewLeads();
+   public override void afterInsert() {
+    List<Lead__c> newLeads = getNewLeads();
 
-        // removed this because data lake will send city as well 
-        // LeadTriggerHelperClass.handleAfterInsert(newLeads);
-        LeadTriggerHelperClass.handleAfterInsert1(newLeads);
+    LeadTriggerHelperClass.handleAfterInsert1(newLeads);
+    LeadTriggerHelperClass.afterInsertAutoRegisterWebinar(newLeads);
 
-        // LeadTriggerHelperClass.registerLeadForUpcomingWebinars(getNewLeads());
-        LeadTriggerHelperClass.afterInsertAutoRegisterWebinar(newLeads);
+    LeadStageTaskHandlerService.checkAndCreateNewTaskForInsert(newLeads);
 
-        // LeadTriggerHandler.createLeadActivityLogs(newLeads, null, true);
+    LeadTriggerHelperClass.updateHighestLevelOnCandidateWhenStageChanges(newLeads, null);
 
-        // Gp tool tasks updates
-        LeadStageTaskHandlerService.checkAndCreateNewTaskForInsert(newLeads);
+    LeadSyncOwnerChange.syncOnOwnerChange(new Map<Id, Lead__c>(), (Map<Id, Lead__c>)newMap);
+    LeadRelatedSyncService.syncOnOwnerChange(new Map<Id, Lead__c>(), (Map<Id, Lead__c>)newMap);
 
-        // Update highest level on candidate
-        LeadTriggerHelperClass.updateHighestLevelOnCandidateWhenStageChanges(newLeads, null);
+    /* ---- MILES API CALLOUT ---- */
 
-        // sync owner to ()
-        LeadSyncOwnerChange.syncOnOwnerChange(new Map<Id, Lead__c>(), (Map<Id, Lead__c>)newMap);
-        LeadRelatedSyncService.syncOnOwnerChange(new Map<Id, Lead__c>(), (Map<Id, Lead__c>)newMap);
+    // for(Lead__c ld : newLeads){
 
-        // M.Com Bridge Course Tasks
-        // LeadTriggerHelperClass.createMComTasks(newLeads, null);
-    }
+    //     if(ld.Phone__c != null && ld.Is_Created_Manually__c != true){
+    //         Callout_MilesWebService.sendLeadToMiles(ld.Id);
+    //     }
 
+    // }
+}
     public override void afterUpdate() {
         List<Lead__c> newLeads = getNewLeads();
         Map<Id, Lead__c> oldMapLead = getOldLeadMap();

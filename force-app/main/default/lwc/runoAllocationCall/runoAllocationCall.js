@@ -24,9 +24,13 @@ import getLeadEvents from '@salesforce/apex/Webservice_RunoAllocationAPI.getLead
 import getDispositions from '@salesforce/apex/CallDispositionConfigService.getDispositions';
 
 
+
+
 export default class RunoAllocationCall extends NavigationMixin(LightningElement) {
 
     @api recordId;
+
+    objectApiName;
     candidateId;
     isFeedbackDisabled = true;
     // UI / state
@@ -39,7 +43,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     // Call popup overlay (Calling Runo...)
     showCallPopup = false;
     isStageDisabled = false;
-relatedLeadEdits = {};
+    relatedLeadEdits = {};
     activeTab = 'lead';
     expectedPaymentDate;
     notifyMe = false;
@@ -74,7 +78,7 @@ relatedLeadEdits = {};
     // Toast / error
     showPopup = false;
     errorText;
-// isRelatedTab = false;
+    // isRelatedTab = false;
     // identity info
     identity = {
         name: '',
@@ -195,8 +199,6 @@ relatedLeadEdits = {};
         }
     }
 
-
-
     // -------------- PAGE REFERENCE (URL SAFE) --------------
 
     @wire(CurrentPageReference)
@@ -233,6 +235,12 @@ relatedLeadEdits = {};
     get isRelatedTab() {
         return this.activeTab === 'related';
     }
+   get showExtendedLeadFields() {
+    if (!this.recordId) return false;
+
+    // Lead__c custom object prefix usually starts with 'a0'
+    return this.recordId.startsWith('a0');
+}
 
     handleTabClick(event) {
         this.activeTab = event.target.dataset.tab;
@@ -389,24 +397,24 @@ relatedLeadEdits = {};
 
 
 
-handleRelatedStageChange(event) {
-    const leadId = event.currentTarget?.dataset?.id;
-    const stage = event.detail.value;
+    handleRelatedStageChange(event) {
+        const leadId = event.currentTarget?.dataset?.id;
+        const stage = event.detail.value;
 
-    this.relatedLeads = (this.relatedLeads || []).map(r => {
-        if (r.id === leadId) {
-            return { ...r, stage };
+        this.relatedLeads = (this.relatedLeads || []).map(r => {
+            if (r.id === leadId) {
+                return { ...r, stage };
+            }
+            return r;
+        });
+
+        if (leadId) {
+            this.relatedLeadEdits = {
+                ...this.relatedLeadEdits,
+                [leadId]: stage
+            };
         }
-        return r;
-    });
-
-    if (leadId) {
-        this.relatedLeadEdits = { 
-            ...this.relatedLeadEdits, 
-            [leadId]: stage 
-        };
     }
-}
 
     handleNewLeadCourseChange(event) {
         this.newLeadCourse = event.detail.value;
@@ -431,16 +439,16 @@ handleRelatedStageChange(event) {
             await this.loadRelatedLeads();
 
 
- this.dispatchEvent(
-            new ShowToastEvent({
-                title: 'Success',
-                message: 'Related lead created successfully',
-                variant: 'success'
-            })
-        );
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title: 'Success',
+                    message: 'Related lead created successfully',
+                    variant: 'success'
+                })
+            );
         }
-        
-         catch (e) {
+
+        catch (e) {
             console.error('Create related lead failed:', e);
             this.toast(
                 'Create Failed',
@@ -475,116 +483,116 @@ handleRelatedStageChange(event) {
 
 
 
-   async loadStageAndCourse() {
-    try {
-        const data = await getStageLevelValues({ recordId: this.recordId });
+    async loadStageAndCourse() {
+        try {
+            const data = await getStageLevelValues({ recordId: this.recordId });
 
-        if (data.stage) {
-            this.stageOptions = data.stage.map(v => ({
-                label: v,
-                value: v
-            }));
+            if (data.stage) {
+                this.stageOptions = data.stage.map(v => ({
+                    label: v,
+                    value: v
+                }));
+            }
+
+            if (data.level) {
+                this.levelOptions = data.level.map(v => ({
+                    label: v,
+                    value: v
+                }));
+            }
+
+        } catch (e) {
+            console.error('Stage/Course load failed:', e);
+        }
+    }
+    async loadRelatedLeads() {
+
+        if (!this.candidateId) {
+            this.relatedLeads = [];
+            this.relatedLeadsLoaded = true;
+            return;
         }
 
-        if (data.level) {
-            this.levelOptions = data.level.map(v => ({
-                label: v,
-                value: v
+        try {
+
+            const rows = await getRelatedLeads({
+                candidateId: this.candidateId
+            });
+
+            this.relatedLeads = (rows || []).map(r => ({
+                id: r.id,
+                recordTypeId: r.recordTypeId,
+                course: r.course || 'NA',
+                stage: r.stage || '',
+                stageOptions: this.recordTypeStageMap[r.recordTypeId] || []
             }));
+
+            this.queueRelatedStageOptions();
+
+            this.relatedLeadsLoaded = true;
+
+        } catch (e) {
+            console.error('Related leads load failed:', e);
+            this.relatedLeads = [];
+            this.relatedLeadsLoaded = true;
+        }
+    }
+
+    queueRelatedStageOptions() {
+        const missingIds = [...new Set(
+            (this.relatedLeads || [])
+                .map(row => row.recordTypeId)
+                .filter(id => id && !this.recordTypeStageMap[id])
+        )];
+
+        this.pendingRelatedRecordTypeIds = missingIds;
+
+        if (!this.activeRelatedRecordTypeId) {
+            this.loadNextRelatedStageOptions();
+        }
+    }
+
+    loadNextRelatedStageOptions() {
+        if (this.pendingRelatedRecordTypeIds.length === 0) {
+            this.activeRelatedRecordTypeId = null;
+            return;
         }
 
-    } catch (e) {
-        console.error('Stage/Course load failed:', e);
-    }
-}
-async loadRelatedLeads() {
-
-    if (!this.candidateId) {
-        this.relatedLeads = [];
-        this.relatedLeadsLoaded = true;
-        return;
+        this.activeRelatedRecordTypeId = this.pendingRelatedRecordTypeIds[0];
+        this.pendingRelatedRecordTypeIds = this.pendingRelatedRecordTypeIds.slice(1);
     }
 
-    try {
 
-        const rows = await getRelatedLeads({
-            candidateId: this.candidateId
-        });
+    // async loadStageOptionsForLeads() {
 
-        this.relatedLeads = (rows || []).map(r => ({
-            id: r.id,
-            recordTypeId: r.recordTypeId,
-            course: r.course || 'NA',
-            stage: r.stage || '',
-            stageOptions: this.recordTypeStageMap[r.recordTypeId] || []
-        }));
+    //     for (let lead of this.relatedLeads) {
 
-        this.queueRelatedStageOptions();
+    //         if (!lead.recordTypeId) continue;
 
-        this.relatedLeadsLoaded = true;
+    //         if (this.recordTypeStageMap[lead.recordTypeId]) {
+    //             lead.stageOptions = this.recordTypeStageMap[lead.recordTypeId];
+    //             continue;
+    //         }
 
-    } catch (e) {
-        console.error('Related leads load failed:', e);
-        this.relatedLeads = [];
-        this.relatedLeadsLoaded = true;
-    }
-}
+    //         const result = await getPicklistValuesByRecordType({
+    //             objectApiName: 'Lead__c',
+    //             recordTypeId: lead.recordTypeId
+    //         });
 
-queueRelatedStageOptions() {
-    const missingIds = [...new Set(
-        (this.relatedLeads || [])
-            .map(row => row.recordTypeId)
-            .filter(id => id && !this.recordTypeStageMap[id])
-    )];
+    //         const stageField = result.picklistFieldValues.Stage__c;
 
-    this.pendingRelatedRecordTypeIds = missingIds;
+    //         const options = (stageField?.values || []).map(v => ({
+    //             label: v.label,
+    //             value: v.value
+    //         }));
 
-    if (!this.activeRelatedRecordTypeId) {
-        this.loadNextRelatedStageOptions();
-    }
-}
+    //         this.recordTypeStageMap[lead.recordTypeId] = options;
 
-loadNextRelatedStageOptions() {
-    if (this.pendingRelatedRecordTypeIds.length === 0) {
-        this.activeRelatedRecordTypeId = null;
-        return;
-    }
+    //         lead.stageOptions = options;
+    //     }
 
-    this.activeRelatedRecordTypeId = this.pendingRelatedRecordTypeIds[0];
-    this.pendingRelatedRecordTypeIds = this.pendingRelatedRecordTypeIds.slice(1);
-}
-
-
-// async loadStageOptionsForLeads() {
-
-//     for (let lead of this.relatedLeads) {
-
-//         if (!lead.recordTypeId) continue;
-
-//         if (this.recordTypeStageMap[lead.recordTypeId]) {
-//             lead.stageOptions = this.recordTypeStageMap[lead.recordTypeId];
-//             continue;
-//         }
-
-//         const result = await getPicklistValuesByRecordType({
-//             objectApiName: 'Lead__c',
-//             recordTypeId: lead.recordTypeId
-//         });
-
-//         const stageField = result.picklistFieldValues.Stage__c;
-
-//         const options = (stageField?.values || []).map(v => ({
-//             label: v.label,
-//             value: v.value
-//         }));
-
-//         this.recordTypeStageMap[lead.recordTypeId] = options;
-
-//         lead.stageOptions = options;
-//     }
-
-//     this.relatedLeads = [...this.relatedLeads];
-// }
+    //     this.relatedLeads = [...this.relatedLeads];
+    // }
 
     async handleCreateRelatedLead() {
         if (!this.candidateId || !this.newLeadCourse || !this.newLeadEmail || this.isCreatingRelatedLead) return;
@@ -717,7 +725,7 @@ loadNextRelatedStageOptions() {
         if (!this.recordId) return;
 
         try {
-           const rows = await getCallHistory({ recordId: this.recordId });
+            const rows = await getCallHistory({ recordId: this.recordId });
 
             const dateFmt = new Intl.DateTimeFormat('en-US', {
                 month: 'short',
@@ -864,47 +872,47 @@ loadNextRelatedStageOptions() {
 
 
 
-   async loadCallHistory() {
-    if (!this.recordId) return;
+    async loadCallHistory() {
+        if (!this.recordId) return;
 
-    try {
-      const rows = await getCallHistory({ recordId: this.recordId });
+        try {
+            const rows = await getCallHistory({ recordId: this.recordId });
 
-        const dateFmt = new Intl.DateTimeFormat('en-US', {
-            month: 'short',
-            day: '2-digit',
-            year: 'numeric'
-        });
+            const dateFmt = new Intl.DateTimeFormat('en-US', {
+                month: 'short',
+                day: '2-digit',
+                year: 'numeric'
+            });
 
-        const timeFmt = new Intl.DateTimeFormat('en-US', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+            const timeFmt = new Intl.DateTimeFormat('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
 
-        this.callHistory = (rows || []).map(r => {
-            const dt = r.startTime || r.createdDate;
-            const d = dt ? new Date(dt) : null;
+            this.callHistory = (rows || []).map(r => {
+                const dt = r.startTime || r.createdDate;
+                const d = dt ? new Date(dt) : null;
 
-            const totalSec = Number(r.durationSeconds || 0);
-            const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
-            const ss = String(totalSec % 60).padStart(2, '0');
+                const totalSec = Number(r.durationSeconds || 0);
+                const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+                const ss = String(totalSec % 60).padStart(2, '0');
 
-            return {
-                id: r.id,
-                dateLabel: d ? dateFmt.format(d) : 'NA',
-                timeLabel: d ? timeFmt.format(d) : '',
-                durationLabel: `${mm}:${ss}`,
-                status: r.status || 'NA',
-                l1: r.l1 || '',
-                l2: r.l2 || '',
-                stage: r.stage || ''
-            };
-        });
+                return {
+                    id: r.id,
+                    dateLabel: d ? dateFmt.format(d) : 'NA',
+                    timeLabel: d ? timeFmt.format(d) : '',
+                    durationLabel: `${mm}:${ss}`,
+                    status: r.status || 'NA',
+                    l1: r.l1 || '',
+                    l2: r.l2 || '',
+                    stage: r.stage || ''
+                };
+            });
 
-    } catch (e) {
-        console.error('Call history load failed:', e);
+        } catch (e) {
+            console.error('Call history load failed:', e);
+        }
     }
-}
 
     // -------------- CALL API ---------------
 
@@ -1035,7 +1043,7 @@ loadNextRelatedStageOptions() {
     }
 
     get isStageFinalDisabled() {
-        return this.isStageDisabled || this.isFeedbackDisabled;
+        return this.isStageDisabled   || this.isFeedbackDisabled;
     }
     get isFollowUpFinalDisabled() {
         return this.autoSetFollowUp || this.isFeedbackDisabled;
@@ -1165,8 +1173,8 @@ loadNextRelatedStageOptions() {
                 })
             );
 
-     await this.loadCallHistory();
-            await this.loadUntrackedStatus();
+            await this.loadCallHistory();
+            // await this.loadUntrackedStatus();
             const edits = Object.keys(this.relatedLeadEdits || {}).map(id => ({
                 id,
                 stage: this.relatedLeadEdits[id]

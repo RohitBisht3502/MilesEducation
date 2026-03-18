@@ -1,92 +1,74 @@
-/**
- * @File Name          : webinarAttendedLeads.js
- * @Description        : Fixed LWC for Webinar Dashboard - Live sync marks absent, live GM metrics with attendance rate
- * @Author             : Dheeraj Kumar
- * @Last Modified On   : Nov 27, 2025
- * @Fixed Issues       : 1. Emails not in live sync are marked as Absent (frontend only)
- *                       2. All metrics update live after sync
- *                       3. GM SPOC table includes live Attendance Rate column
- **/
-
 import { LightningElement, wire, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
-import getActiveWebinarAttendees from '@salesforce/apex/WebinarController.getActiveWebinarAttendees';
-import getActiveWebinarAttendeesForUser from '@salesforce/apex/WebinarController.getActiveWebinarAttendeesForUser';
-import getManagedUsers from '@salesforce/apex/WebinarController.getManagedUsers';
-import syncLiveWebinarAttendees from '@salesforce/apex/WebinarController.syncLiveWebinarAttendees';
+import getMembersByWebinar from '@salesforce/apex/WebinarDashboard.getMembersByWebinar';
+import getSpocOptions from '@salesforce/apex/WebinarDashboard.getSpocOptions';
+import syncLiveWebinarAttendees from '@salesforce/apex/WebinarDashboard.syncLiveWebinarAttendees';
 import getWebinarsByNameOnly from '@salesforce/apex/WebinarController.getWebinarsByNameOnly';
 
-// Constants
 const STATUS = {
     ALL: 'All',
     PRESENT: 'Present',
     ABSENT: 'Absent',
-     SCHEDULED: 'Scheduled'
+    SCHEDULED: 'Scheduled'
 };
 
 const STATUS_OPTIONS = [
-    { label: 'All', value: STATUS.ALL },
+    { label: 'All',     value: STATUS.ALL     },
     { label: 'Present', value: STATUS.PRESENT },
-    { label: 'Absent', value: STATUS.ABSENT }
+    { label: 'Absent',  value: STATUS.ABSENT  }
 ];
 
 const TOAST_VARIANT = {
     SUCCESS: 'success',
-    ERROR: 'error',
+    ERROR:   'error',
     WARNING: 'warning',
-    INFO: 'info'
+    INFO:    'info'
 };
 
 const STATUS_BADGE_MAP = {
-    [STATUS.PRESENT]: 'status-badge status-badge--success',
-    [STATUS.ABSENT]: 'status-badge status-badge--error',
-   [STATUS.SCHEDULED]: 'status-badge status-badge--info'
-
+    [STATUS.PRESENT]:   'status-badge status-badge--success',
+    [STATUS.ABSENT]:    'status-badge status-badge--error',
+    [STATUS.SCHEDULED]: 'status-badge status-badge--info'
 };
 
 export default class WebinarAttendedLeads extends LightningElement {
-    // Tracked Properties
-    @track webinarData = [];
-    @track filteredData = [];
-    @track searchTerm = '';
-    @track statusFilter = STATUS.ALL;
-    @track statusFilterForSpoc = null; // New: Filter for SPOC quick view
-    @track selectedSpocId = null;
-    @track managedUsers = [];
-    @track spocSummaryData = [];
-    @track isLoading = false;
-    @track isSyncing = false;
-    @track isGM = false;
-    @track selectedWebinarId = null;
+    @track webinarData         = [];
+    @track filteredData        = [];
+    @track searchTerm          = '';
+    @track statusFilter        = STATUS.ALL;
+    @track statusFilterForSpoc = null;
+    @track selectedSpocId      = null;
+    @track managedUsers        = [];
+    @track spocSummaryGroups   = [];
+    @track spocSummaryData     = [];
+    @track expandedGmIds       = [];
+    @track isLoading           = false;
+    @track isSyncing           = false;
+    @track isGM                = false;
+    @track selectedWebinarId   = null;
+    @track selectedWebinarApiId = null;
     @track selectedWebinarName = null;
-    @track activeWebinarId = null;
-    @track liveAttendeeEmails = new Set();
-    @track allWebinarData = [];
-    @track webinarOptions = [];
+    @track activeWebinarId     = null;
+    @track liveAttendeeEmails  = new Set();
+    @track allWebinarData      = [];
+    @track webinarOptions      = [];
     @track showWebinarSelection = true;
-    @track hasLiveSyncOccurred = false;
-    @track showCallModal = false;
-    @track selectedLeadForCall = null;
+    @track hasLiveSyncOccurred  = false;
+    @track showCallModal        = false;
+    @track selectedLeadForCall  = null;
     @track metrics = {
         totalRegistrations: 0,
-        attended: 0,
-        attendanceRate: 0,
-        pendingFollowups: 0
+        attended:           0,
+        attendanceRate:     0,
+        pendingFollowups:   0
     };
 
-    // Static Properties
     statusOptions = STATUS_OPTIONS;
 
-    // -------------------------
-    // LIFECYCLE HOOKS
-    // -------------------------
     connectedCallback() {
         this.loadWebinars();
     }
 
-    // -------------------------
-    // LOAD WEBINARS
-    // -------------------------
     async loadWebinars() {
         this.isLoading = true;
         try {
@@ -95,18 +77,13 @@ export default class WebinarAttendedLeads extends LightningElement {
             if (webinars && webinars.length > 0) {
                 this.webinarOptions = webinars.map(w => ({
                     label: w.webinarId ? `${w.name} (${w.webinarId})` : w.name,
-                    value: w.webinarId
+                    value: w.id,
+                    webinarId: w.webinarId
                 }));
             } else {
                 this.showToast('Info', 'No active webinars found', TOAST_VARIANT.INFO);
             }
 
-            // Check if user is GM
-            const users = await getManagedUsers();
-            if (users && users.length > 0) {
-                this.isGM = true;
-                this.managedUsers = users;
-            }
         } catch (error) {
             this.handleError(error);
         } finally {
@@ -114,35 +91,37 @@ export default class WebinarAttendedLeads extends LightningElement {
         }
     }
 
-    // -------------------------
-    // WEBINAR SELECTION HANDLER
-    // -------------------------
     handleWebinarChange(event) {
-        this.selectedWebinarId = event.detail.value;
-        this.selectedWebinarName = this.webinarOptions.find(w => w.value === this.selectedWebinarId)?.label;
-        this.activeWebinarId = this.selectedWebinarId;
-        this.showWebinarSelection = false;
+        this.selectedWebinarApiId = event.detail.value;
+        const selectedWebinar = this.webinarOptions.find(w => w.value === this.selectedWebinarApiId);
 
-        // Sync live data immediately after webinar selection
+        this.selectedWebinarId   = selectedWebinar?.webinarId || null;
+        this.selectedWebinarName = selectedWebinar?.label;
+        this.activeWebinarId     = this.selectedWebinarId;
+        this.showWebinarSelection = false;
         this.syncAndLoadData();
     }
 
     async syncAndLoadData() {
-        if (!this.selectedWebinarId) {
-            return;
-        }
+        if (!this.selectedWebinarApiId) return;
 
         this.isLoading = true;
         try {
-            // First, sync live attendees to get live emails
             await this.handleSyncLiveAttendees();
+            const users = await getSpocOptions({ webinarId: this.selectedWebinarApiId });
+            this.managedUsers = (users || []).map(user => ({
+                Id: user.id,
+                Name: user.name,
+                ManagerId: user.managerId,
+                ManagerName: user.managerName
+            }));
+            this.isGM = this.managedUsers.length > 0;
 
-            // Then load the data with webinarId filter
             if (this.isGM) {
                 await this.loadAllSpocsData();
                 this.filteredData = [];
             } else {
-                const data = await getActiveWebinarAttendees({ webinarId: this.selectedWebinarId });
+                const data = await getMembersByWebinar({ webinarId: this.selectedWebinarApiId });
                 this.processWebinarData(data);
             }
         } catch (error) {
@@ -154,35 +133,14 @@ export default class WebinarAttendedLeads extends LightningElement {
 
     async loadAllSpocsData() {
         try {
-            // Fetch data for current user (GM) with webinarId filter
-            const currentUserData = await getActiveWebinarAttendees({ webinarId: this.selectedWebinarId });
-            let allData = [...currentUserData];
+            const allData = await getMembersByWebinar({ webinarId: this.selectedWebinarApiId });
+            this.allWebinarData = this.removeDuplicates(allData || []);
 
-            // Fetch data for each managed user with webinarId filter
-            for (const user of this.managedUsers) {
-                try {
-                    const userData = await getActiveWebinarAttendeesForUser({
-                        userId: user.Id,
-                        webinarId: this.selectedWebinarId
-                    });
-                    allData = [...allData, ...userData];
-                } catch (error) {
-                    console.log(`Error fetching data for user ${user.Name}:`, error);
-                }
-            }
-
-            // Store all data for GM metrics
-            this.allWebinarData = this.removeDuplicates(allData);
-
-            // Extract active webinar ID
             if (this.allWebinarData.length > 0 && this.allWebinarData[0].webinarId) {
                 this.activeWebinarId = this.allWebinarData[0].webinarId;
             }
 
-            // Apply live attendee status BEFORE calculating metrics
             this.applyLiveAttendeeStatus();
-
-            // Calculate metrics and build summary AFTER applying live status
             this.calculateGMMetrics();
             this.buildSpocSummary();
         } catch (error) {
@@ -194,7 +152,9 @@ export default class WebinarAttendedLeads extends LightningElement {
         const uniqueDataMap = new Map();
 
         data.forEach(item => {
-            const emailKey = item.email ? item.email.toLowerCase().trim() : `no-email-${item.webinarMemberId}`;
+            const emailKey = item.email
+                ? item.email.toLowerCase().trim()
+                : `no-email-${item.webinarMemberId}`;
 
             if (!uniqueDataMap.has(emailKey)) {
                 uniqueDataMap.set(emailKey, item);
@@ -210,52 +170,116 @@ export default class WebinarAttendedLeads extends LightningElement {
     }
 
     buildSpocSummary() {
-        const spocMap = new Map();
+        const gmMap = new Map();
 
-        // Add current user (GM)
-        const currentUserId = this.managedUsers.length > 0 ? this.managedUsers[0].ManagerId : null;
-        const gmData = this.allWebinarData.filter(item => item.spocId === currentUserId);
-
-        if (gmData.length > 0 && currentUserId) {
-            const present = gmData.filter(item => item.status === STATUS.PRESENT).length;
-            const absent = gmData.filter(item => item.status === STATUS.ABSENT).length;
-            const total = gmData.length;
-            const attendanceRate = this.calculatePercentage(present, total);
-
-            spocMap.set(currentUserId, {
-                spocId: currentUserId,
-                spocName: gmData[0].spocName || 'GM (Self)',
-                totalRegistrations: total,
-                present: present,
-                absent: absent,
-                attendanceRate: attendanceRate
-            });
-        }
-
-        // Add managed users
         this.managedUsers.forEach(user => {
-            const userData = this.allWebinarData.filter(item => item.spocId === user.Id);
-            const present = userData.filter(item => item.status === STATUS.PRESENT).length;
-            const absent = userData.filter(item => item.status === STATUS.ABSENT).length;
-            const total = userData.length;
-            const attendanceRate = this.calculatePercentage(present, total);
+            const gmId = user.ManagerId || 'no-gm';
+            const gmName = user.ManagerName || 'GM';
 
-            spocMap.set(user.Id, {
-                spocId: user.Id,
-                spocName: user.Name,
-                totalRegistrations: total,
-                present: present,
-                absent: absent,
-                attendanceRate: attendanceRate
-            });
+            if (!gmMap.has(gmId)) {
+                gmMap.set(gmId, {
+                    gmId,
+                    gmName,
+                    spocs: []
+                });
+            }
+
+            gmMap.get(gmId).spocs.push(user);
         });
 
-        this.spocSummaryData = Array.from(spocMap.values());
+        this.spocSummaryGroups = Array.from(gmMap.values()).map(group => {
+            const gmSpocIds = group.spocs.map(user => user.Id);
+            const gmData = this.allWebinarData.filter(item => gmSpocIds.includes(item.spocId));
+            const gmPresent = gmData.filter(item => item.status === STATUS.PRESENT).length;
+            const gmAbsent = gmData.filter(item => item.status === STATUS.ABSENT).length;
+            const gmTotal = gmData.length;
+
+            return {
+                gmId: group.gmId,
+                gmName: group.gmName,
+                totalRegistrations: gmTotal,
+                present: gmPresent,
+                absent: gmAbsent,
+                attendanceRate: this.calculatePercentage(gmPresent, gmTotal),
+                spocs: group.spocs.map(user => {
+                    const userData = this.allWebinarData.filter(item => item.spocId === user.Id);
+                    const present = userData.filter(item => item.status === STATUS.PRESENT).length;
+                    const absent = userData.filter(item => item.status === STATUS.ABSENT).length;
+                    const total = userData.length;
+
+                    return {
+                        spocId: user.Id,
+                        managerId: user.ManagerId,
+                        spocName: user.Name,
+                        totalRegistrations: total,
+                        present,
+                        absent,
+                        attendanceRate: this.calculatePercentage(present, total),
+                        isGroupRow: false,
+                        canView: true
+                    };
+                })
+            };
+        });
+
+        const validExpandedIds = new Set(this.spocSummaryGroups.map(group => group.gmId));
+        this.expandedGmIds = this.expandedGmIds.filter(gmId => validExpandedIds.has(gmId));
+        if (!this.expandedGmIds.length && this.spocSummaryGroups.length === 1) {
+            this.expandedGmIds = [this.spocSummaryGroups[0].gmId];
+        }
+        this.refreshSpocSummaryRows();
     }
 
-    // -------------------------
-    // LIVE SYNC HANDLER
-    // -------------------------
+    refreshSpocSummaryRows() {
+        const expandedIds = new Set(this.expandedGmIds);
+        const summaryRows = [];
+
+        this.spocSummaryGroups.forEach(group => {
+            const isExpanded = expandedIds.has(group.gmId);
+            summaryRows.push({
+                spocId: `gm-${group.gmId}`,
+                managerId: group.gmId,
+                spocName: group.gmName,
+                totalRegistrations: group.totalRegistrations,
+                present: group.present,
+                absent: group.absent,
+                attendanceRate: group.attendanceRate,
+                isGroupRow: true,
+                canView: false,
+                isExpanded,
+                toggleIcon: isExpanded ? '-' : '+'
+            });
+
+            if (isExpanded) {
+                group.spocs.forEach(spoc => {
+                    summaryRows.push({
+                        ...spoc,
+                        spocName: spoc.spocName
+                    });
+                });
+            }
+        });
+
+        this.spocSummaryData = summaryRows;
+    }
+
+    handleToggleGm(event) {
+        const gmId = event.currentTarget.dataset.gmId;
+        if (!gmId) {
+            return;
+        }
+
+        const expandedIds = new Set(this.expandedGmIds);
+        if (expandedIds.has(gmId)) {
+            expandedIds.delete(gmId);
+        } else {
+            expandedIds.add(gmId);
+        }
+
+        this.expandedGmIds = Array.from(expandedIds);
+        this.refreshSpocSummaryRows();
+    }
+
     async handleSyncLiveAttendees() {
         if (!this.activeWebinarId) {
             this.showToast('Error', 'No active webinar found', TOAST_VARIANT.ERROR);
@@ -266,55 +290,50 @@ export default class WebinarAttendedLeads extends LightningElement {
         try {
             const result = await syncLiveWebinarAttendees({ webinarId: this.activeWebinarId });
 
-            // Store live attendee emails from the API response
             if (result && result.liveEmails && Array.isArray(result.liveEmails)) {
-                this.liveAttendeeEmails = new Set(
+                this.liveAttendeeEmails  = new Set(
                     result.liveEmails.map(email => email.toLowerCase().trim())
                 );
                 this.hasLiveSyncOccurred = true;
             }
 
-            // Apply live status to allWebinarData for GM
             if (this.isGM) {
                 this.applyLiveAttendeeStatus();
                 this.calculateGMMetrics();
                 this.buildSpocSummary();
             }
 
-            // Reload current view with updated live status
             if (this.selectedSpocId) {
                 const data = this.allWebinarData.filter(item => item.spocId === this.selectedSpocId);
                 this.processWebinarData(data);
             } else if (!this.isGM) {
-    // For non-GM users — SAFE status handling (keeps Scheduled)
+                const data = this.webinarData.map(item => {
+                    const emailLower    = item.email ? item.email.toLowerCase().trim() : '';
+                    const isLiveAttendee = this.liveAttendeeEmails.has(emailLower);
+                    const normalizedStatus = this.normalizeAttendanceStatus(item.status);
 
-    const data = this.webinarData.map(item => {
-        const emailLower = item.email ? item.email.toLowerCase().trim() : '';
-        const isLiveAttendee = this.liveAttendeeEmails.has(emailLower);
+                    let finalStatus;
+                    if (isLiveAttendee) {
+                        finalStatus = STATUS.PRESENT;
+                    } else if (normalizedStatus) {
+                        finalStatus = normalizedStatus;
+                    } else if (this.hasLiveSyncOccurred) {
+                        finalStatus = isLiveAttendee ? STATUS.PRESENT : STATUS.ABSENT;
+                    } else {
+                        finalStatus = STATUS.SCHEDULED;
+                    }
 
-        let finalStatus;
+                    return {
+                        ...item,
+                        status:          finalStatus,
+                        statusBadgeClass: this.getStatusBadgeClass(finalStatus),
+                        showCallButton:  true
+                    };
+                });
 
-        if (item.status) {
-            finalStatus = item.status;   // Present/Absent from DB
-        } 
-        else if (this.hasLiveSyncOccurred) {
-            finalStatus = isLiveAttendee ? STATUS.PRESENT : STATUS.ABSENT;
-        } 
-        else {
-            finalStatus = STATUS.SCHEDULED;   
-        }
-
-        return {
-            ...item,
-            status: finalStatus,
-            statusBadgeClass: this.getStatusBadgeClass(finalStatus),
-            showCallButton: true
-        };
-    });
-
-    this.webinarData = data;
-    this.applyFilters();
-}
+                this.webinarData = data;
+                this.applyFilters();
+            }
 
             this.showToast(
                 'Success',
@@ -329,81 +348,76 @@ export default class WebinarAttendedLeads extends LightningElement {
     }
 
     handleBackToWebinarSelection() {
-        this.showWebinarSelection = true;
-        this.selectedWebinarId = null;
-        this.selectedWebinarName = null;
-        this.activeWebinarId = null;
-        this.selectedSpocId = null;
-        this.statusFilterForSpoc = null;
-        this.webinarData = [];
-        this.filteredData = [];
-        this.allWebinarData = [];
-        this.spocSummaryData = [];
-        this.liveAttendeeEmails = new Set();
-        this.hasLiveSyncOccurred = false;
+        this.showWebinarSelection  = true;
+        this.selectedWebinarId     = null;
+        this.selectedWebinarApiId  = null;
+        this.selectedWebinarName   = null;
+        this.activeWebinarId       = null;
+        this.selectedSpocId        = null;
+        this.statusFilterForSpoc   = null;
+        this.webinarData           = [];
+        this.filteredData          = [];
+        this.allWebinarData        = [];
+        this.spocSummaryData       = [];
+        this.spocSummaryGroups     = [];
+        this.expandedGmIds         = [];
+        this.liveAttendeeEmails    = new Set();
+        this.hasLiveSyncOccurred   = false;
         this.metrics = {
             totalRegistrations: 0,
-            attended: 0,
-            attendanceRate: 0,
-            pendingFollowups: 0
+            attended:           0,
+            attendanceRate:     0,
+            pendingFollowups:   0
         };
     }
 
-    // -------------------------
-    // APPLY LIVE ATTENDEE STATUS
-    // -------------------------
-applyLiveAttendeeStatus() {
-    if (!this.allWebinarData.length || !this.hasLiveSyncOccurred) return;
+    applyLiveAttendeeStatus() {
+        if (!this.allWebinarData.length || !this.hasLiveSyncOccurred) return;
 
-    this.allWebinarData = this.allWebinarData.map(item => {
-        const emailLower = item.email ? item.email.toLowerCase().trim() : '';
-        const isLiveAttendee = this.liveAttendeeEmails.has(emailLower);
+        this.allWebinarData = this.allWebinarData.map(item => {
+            const emailLower     = item.email ? item.email.toLowerCase().trim() : '';
+            const isLiveAttendee = this.liveAttendeeEmails.has(emailLower);
+            const normalizedStatus = this.normalizeAttendanceStatus(item.status);
 
-        let finalStatus;
+            let finalStatus;
+            if (isLiveAttendee) {
+                finalStatus = STATUS.PRESENT;
+            } else if (normalizedStatus) {
+                finalStatus = normalizedStatus;
+            } else {
+                finalStatus = isLiveAttendee ? STATUS.PRESENT : STATUS.SCHEDULED;
+            }
 
-        if (item.status) {
-            finalStatus = item.status;   // from DB only
-        } else {
-            finalStatus = isLiveAttendee 
-                ? STATUS.PRESENT 
-                : STATUS.SCHEDULED;   
-        }
-        if (webinarEnded) {
-   finalStatus = STATUS.ABSENT;
-}
+            return {
+                ...item,
+                status:           finalStatus,
+                statusBadgeClass: this.getStatusBadgeClass(finalStatus),
+                showCallButton:   true
+            };
+        });
+    }
 
-
-        return {
-            ...item,
-            status: finalStatus,
-            statusBadgeClass: this.getStatusBadgeClass(finalStatus),
-            showCallButton: true
-        };
-    });
-}
-
-
-    // -------------------------
-    // SPOC TABLE HANDLERS
-    // -------------------------
     async handleViewSpocData(event) {
-        const spocId = event.currentTarget ? event.currentTarget.dataset.spocId : event;
-        this.selectedSpocId = spocId;
-        this.statusFilterForSpoc = null; // Reset status filter when clicking View
-        this.isLoading = true;
+        const spocId             = event.currentTarget ? event.currentTarget.dataset.spocId : event;
+        this.selectedSpocId      = spocId;
+        this.statusFilterForSpoc = null;
+        this.isLoading           = true;
 
         try {
             let data;
             if (this.isGM) {
-                // Filter from already loaded data (already has live status applied)
-                data = this.allWebinarData.filter(item => item.spocId === spocId);
+                if (String(spocId).startsWith('gm-')) {
+                    const managerId = String(spocId).replace('gm-', '');
+                    const spocIds = this.managedUsers
+                        .filter(user => user.ManagerId === managerId)
+                        .map(user => user.Id);
+                    data = this.allWebinarData.filter(item => spocIds.includes(item.spocId));
+                } else {
+                    data = this.allWebinarData.filter(item => item.spocId === spocId);
+                }
             } else {
-                data = await getActiveWebinarAttendeesForUser({
-                    userId: spocId,
-                    webinarId: this.selectedWebinarId
-                });
+                data = [];
             }
-
             this.processWebinarData(data);
         } catch (error) {
             this.handleError(error);
@@ -412,31 +426,36 @@ applyLiveAttendeeStatus() {
         }
     }
 
-    // NEW: Handle quick view by clicking on numbers in SPOC table
     handleSpocQuickView(event) {
-        const spocId = event.currentTarget.dataset.spocId;
+        const spocId     = event.currentTarget.dataset.spocId;
         const filterType = event.currentTarget.dataset.filterType;
 
         this.selectedSpocId = spocId;
-        this.isLoading = true;
+        this.isLoading      = true;
 
         try {
-            // Filter data for this SPOC
-            const data = this.allWebinarData.filter(item => item.spocId === spocId);
-
-            // Set the status filter based on which number was clicked
-            if (filterType === 'present') {
-                this.statusFilterForSpoc = STATUS.PRESENT;
-                this.statusFilter = STATUS.PRESENT; // Sync with main filter
-            } else if (filterType === 'absent') {
-                this.statusFilterForSpoc = STATUS.ABSENT;
-                this.statusFilter = STATUS.ABSENT; // Sync with main filter
-            } else if (filterType === 'total') {
-                this.statusFilterForSpoc = STATUS.ALL;
-                this.statusFilter = STATUS.ALL; // Sync with main filter
+            let data;
+            if (String(spocId).startsWith('gm-')) {
+                const managerId = String(spocId).replace('gm-', '');
+                const spocIds = this.managedUsers
+                    .filter(user => user.ManagerId === managerId)
+                    .map(user => user.Id);
+                data = this.allWebinarData.filter(item => spocIds.includes(item.spocId));
+            } else {
+                data = this.allWebinarData.filter(item => item.spocId === spocId);
             }
 
-            // Process the data (filtering will happen in processWebinarData)
+            if (filterType === 'present') {
+                this.statusFilterForSpoc = STATUS.PRESENT;
+                this.statusFilter        = STATUS.PRESENT;
+            } else if (filterType === 'absent') {
+                this.statusFilterForSpoc = STATUS.ABSENT;
+                this.statusFilter        = STATUS.ABSENT;
+            } else if (filterType === 'total') {
+                this.statusFilterForSpoc = STATUS.ALL;
+                this.statusFilter        = STATUS.ALL;
+            }
+
             this.processWebinarData(data);
         } catch (error) {
             this.handleError(error);
@@ -445,9 +464,6 @@ applyLiveAttendeeStatus() {
         }
     }
 
-    // -------------------------
-    // EVENT HANDLERS
-    // -------------------------
     handleSearchChange(event) {
         this.searchTerm = event.target.value.toLowerCase();
         this.applyFilters();
@@ -456,38 +472,31 @@ applyLiveAttendeeStatus() {
     handleStatusFilter(event) {
         const newStatus = event.currentTarget.dataset.value;
         if (this.isValidStatus(newStatus) && newStatus !== this.statusFilter) {
-            this.statusFilter = newStatus;
-            this.statusFilterForSpoc = null; // Clear SPOC filter when manually changing filter
+            this.statusFilter        = newStatus;
+            this.statusFilterForSpoc = null;
             this.applyFilters();
         }
     }
 
     handleCall(event) {
-        const leadId = event.currentTarget.dataset.leadid;
-        const leadName = event.currentTarget.dataset.leadname;
+        const leadId    = event.currentTarget.dataset.leadid;
+        const leadName  = event.currentTarget.dataset.leadname;
         const leadEmail = event.currentTarget.dataset.email;
         const leadPhone = event.currentTarget.dataset.phone;
 
-        this.selectedLeadForCall = {
-            leadId,
-            leadName,
-            leadEmail,
-            leadPhone
-        };
-
-        this.showCallModal = true;
+        this.selectedLeadForCall = { leadId, leadName, leadEmail, leadPhone };
+        this.showCallModal       = true;
     }
 
     handleCloseCallModal() {
-        this.showCallModal = false;
+        this.showCallModal       = false;
         this.selectedLeadForCall = null;
     }
 
     handleFeedbackSaved() {
-        this.showCallModal = false;
+        this.showCallModal       = false;
         this.selectedLeadForCall = null;
 
-        // Reload data after feedback is saved
         if (this.isGM) {
             this.loadAllSpocsData();
         } else {
@@ -497,21 +506,15 @@ applyLiveAttendeeStatus() {
         this.showToast('Success', 'Call feedback saved and data refreshed', 'success');
     }
 
-    // -------------------------
-    // DATA PROCESSING
-    // -------------------------
     processWebinarData(data) {
         try {
             const uniqueData = this.removeDuplicates(data);
 
-            // Extract active webinar ID
             if (uniqueData.length > 0 && uniqueData[0].webinarId) {
                 this.activeWebinarId = uniqueData[0].webinarId;
             }
 
             this.webinarData = uniqueData.map(item => this.enrichWebinarItem(item));
-
-            // Apply the current status filter
             this.applyFilters();
 
             if (!this.isGM) {
@@ -523,34 +526,33 @@ applyLiveAttendeeStatus() {
         }
     }
 
-   enrichWebinarItem(item) {
-    const emailLower = item.email ? item.email.toLowerCase().trim() : '';
-    const isLiveAttendee = this.liveAttendeeEmails.has(emailLower);
+    enrichWebinarItem(item) {
+        const emailLower     = item.email ? item.email.toLowerCase().trim() : '';
+        const isLiveAttendee = this.liveAttendeeEmails.has(emailLower);
+        const normalizedStatus = this.normalizeAttendanceStatus(item.status);
 
-    let finalStatus;
-
-    // If attendance not marked yet
-    if (!item.status) {
-        if (this.hasLiveSyncOccurred) {
-            finalStatus = isLiveAttendee ? STATUS.PRESENT : STATUS.ABSENT;
+        let finalStatus;
+        if (isLiveAttendee) {
+            finalStatus = STATUS.PRESENT;
+        } else if (!normalizedStatus) {
+            finalStatus = this.hasLiveSyncOccurred
+                ? (isLiveAttendee ? STATUS.PRESENT : STATUS.ABSENT)
+                : STATUS.SCHEDULED;
         } else {
-            finalStatus = STATUS.SCHEDULED;   // ✅ THIS IS YOUR REQUIREMENT
+            finalStatus = normalizedStatus;
         }
-    } else {
-        finalStatus = item.status; // Present or Absent from DB
-    }
 
-    return {
-        ...item,
-        studentInitials: this.generateInitials(item.leadName),
-        formattedDate: this.formatDate(item.createdDate),
-        status: finalStatus,
-        statusBadgeClass: this.getStatusBadgeClass(finalStatus),
-        spocName: item.spocName || 'Not Assigned',
-        spocId: item.spocId,
-        showCallButton: true
-    };
-}
+        return {
+            ...item,
+            studentInitials:  this.generateInitials(item.leadName),
+            formattedDate:    this.formatDate(item.createdDate),
+            status:           finalStatus,
+            statusBadgeClass: this.getStatusBadgeClass(finalStatus),
+            spocName:         item.spocName || 'Not Assigned',
+            spocId:           item.spocId,
+            showCallButton:   true
+        };
+    }
 
     handleError(error) {
         this.logError('Error fetching webinar data', error);
@@ -562,14 +564,11 @@ applyLiveAttendeeStatus() {
 
     resetData() {
         if (!this.isGM) {
-            this.webinarData = [];
+            this.webinarData  = [];
             this.filteredData = [];
         }
     }
 
-    // -------------------------
-    // FILTERING
-    // -------------------------
     applyFilters() {
         this.filteredData = this.webinarData.filter(item =>
             this.matchesSearchCriteria(item) &&
@@ -582,9 +581,7 @@ applyLiveAttendeeStatus() {
     }
 
     matchesSearchCriteria(item) {
-        if (!this.searchTerm) {
-            return true;
-        }
+        if (!this.searchTerm) return true;
 
         const searchableFields = [
             item.studentName,
@@ -602,33 +599,30 @@ applyLiveAttendeeStatus() {
         return this.statusFilter === STATUS.ALL || item.status === this.statusFilter;
     }
 
-    // -------------------------
-    // METRICS CALCULATION
-    // -------------------------
     calculateMetrics() {
         const dataToUse = this.filteredData;
-        const total = dataToUse.length;
-        const attended = this.countByStatus(dataToUse, STATUS.PRESENT);
-        const absent = this.countByStatus(dataToUse, STATUS.ABSENT);
+        const total     = dataToUse.length;
+        const attended  = this.countByStatus(dataToUse, STATUS.PRESENT);
+        const absent    = this.countByStatus(dataToUse, STATUS.ABSENT);
 
         this.metrics = {
             totalRegistrations: total,
-            attended,
-            attendanceRate: this.calculatePercentage(attended, total),
-            pendingFollowups: absent
+            attended:           attended,
+            attendanceRate:     this.calculatePercentage(attended, total),
+            pendingFollowups:   absent
         };
     }
 
     calculateGMMetrics() {
-        const total = this.allWebinarData.length;
+        const total    = this.allWebinarData.length;
         const attended = this.countByStatus(this.allWebinarData, STATUS.PRESENT);
-        const absent = this.countByStatus(this.allWebinarData, STATUS.ABSENT);
+        const absent   = this.countByStatus(this.allWebinarData, STATUS.ABSENT);
 
         this.metrics = {
             totalRegistrations: total,
-            attended,
-            attendanceRate: this.calculatePercentage(attended, total),
-            pendingFollowups: absent
+            attended:           attended,
+            attendanceRate:     this.calculatePercentage(attended, total),
+            pendingFollowups:   absent
         };
     }
 
@@ -637,20 +631,15 @@ applyLiveAttendeeStatus() {
     }
 
     calculatePercentage(numerator, denominator) {
-        if (denominator === 0) {
-            return 0;
-        }
+        if (denominator === 0) return 0;
         return ((numerator / denominator) * 100).toFixed(1);
     }
 
-    // -------------------------
-    // UI HELPERS
-    // -------------------------
     get computedStatusOptions() {
         return this.statusOptions.map(status => ({
             ...status,
             buttonClass: this.buildStatusButtonClass(status.value),
-            isActive: status.value === this.statusFilter,
+            isActive:    status.value === this.statusFilter,
             ariaPressed: String(status.value === this.statusFilter)
         }));
     }
@@ -684,7 +673,7 @@ applyLiveAttendeeStatus() {
     }
 
     buildStatusButtonClass(statusValue) {
-        const baseClass = 'status-filter-btn';
+        const baseClass   = 'status-filter-btn';
         const activeClass = 'status-filter-btn--active';
         return statusValue === this.statusFilter
             ? `${baseClass} ${activeClass}`
@@ -695,13 +684,13 @@ applyLiveAttendeeStatus() {
         return STATUS_BADGE_MAP[status] || 'status-badge status-badge--default';
     }
 
-    // -------------------------
-    // UTILITIES
-    // -------------------------
+    normalizeAttendanceStatus(status) {
+        if (!status) return status;
+        return status === 'Registered' ? STATUS.ABSENT : status;
+    }
+
     generateInitials(name) {
-        if (!name) {
-            return '';
-        }
+        if (!name) return '';
         return name
             .trim()
             .split(/\s+/)
@@ -713,18 +702,14 @@ applyLiveAttendeeStatus() {
     }
 
     formatDate(dateString) {
-        if (!dateString) {
-            return '';
-        }
+        if (!dateString) return '';
         try {
             const date = new Date(dateString);
-            if (isNaN(date.getTime())) {
-                return '';
-            }
+            if (isNaN(date.getTime())) return '';
             return new Intl.DateTimeFormat('en-IN', {
-                year: 'numeric',
+                year:  'numeric',
                 month: 'short',
-                day: 'numeric'
+                day:   'numeric'
             }).format(date);
         } catch (error) {
             this.logError('Date formatting error', error);
@@ -733,12 +718,8 @@ applyLiveAttendeeStatus() {
     }
 
     extractErrorMessage(error) {
-        if (error?.body?.message) {
-            return error.body.message;
-        }
-        if (error?.message) {
-            return error.message;
-        }
+        if (error?.body?.message) return error.body.message;
+        if (error?.message)      return error.message;
         return 'An unexpected error occurred. Please try again.';
     }
 
@@ -751,11 +732,7 @@ applyLiveAttendeeStatus() {
     }
 
     showToast(title, message, variant) {
-        const event = new ShowToastEvent({
-            title,
-            message,
-            variant
-        });
+        const event = new ShowToastEvent({ title, message, variant });
         this.dispatchEvent(event);
     }
 

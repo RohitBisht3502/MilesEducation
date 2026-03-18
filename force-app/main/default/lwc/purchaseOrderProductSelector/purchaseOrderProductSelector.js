@@ -156,10 +156,9 @@ export default class PurchaseOrderProductSelector extends NavigationMixin(Lightn
     }
 
     get processingFee() {
-        const tenureMonths = this.getSelectedLoanTenureMonths();
-        if (tenureMonths === 6) return 2500;
-        if (tenureMonths === 12) return 5000;
-        return 0;
+        if (!this.selectedLoanId || !this.loans || !this.loans.length) return 0;
+        const loan = this.loans.find((l) => l.id === this.selectedLoanId);
+        return Number(loan?.processingFee) || 0;
     }
 
     get effectiveMinimumDownPayment() {
@@ -173,7 +172,28 @@ export default class PurchaseOrderProductSelector extends NavigationMixin(Lightn
     }
 
     get totalDownPayment() {
-        return (Number(this.downPayment) || 0) + (Number(this.processingFee) || 0);
+        return (Number(this.minimumDownPayment) || 0) + (Number(this.processingFee) || 0);
+    }
+
+    get hasProcessingFee() {
+        return this.processingFee > 0;
+    }
+
+    get processingFeeMessageText() {
+        const fee = this.processingFee;
+        if (!fee) return '';
+        return `Processing fee Rs ${fee} applied.`;
+    }
+
+    get discountLabelText() {
+        return this.discountType === 'percentage' ? 'Discount (%)' : 'Discount Amount (Rs)';
+    }
+
+    get downPaymentMinMessageText() {
+        if (this.effectiveMinimumDownPayment > 0) {
+            return `Minimum down payment should be Rs ${this.effectiveMinimumDownPayment}`;
+        }
+        return 'Down payment cannot be negative.';
     }
 
     get formattedLoans() {
@@ -224,7 +244,7 @@ export default class PurchaseOrderProductSelector extends NavigationMixin(Lightn
     }
 
     get finalPayable() {
-        return Math.max(0, this.subTotal - this.discountAmount);
+        return Math.max(0, this.subTotal - this.discountAmount) + (Number(this.processingFee) || 0);
     }
 
     get showShippingSection() {
@@ -382,8 +402,9 @@ export default class PurchaseOrderProductSelector extends NavigationMixin(Lightn
                 name: l.Name,
                 provider: l.Loan_Provider__c,
                 status: l.loan_status__c,
-                appId: l.application_id__c,
-                tenure: l.Tenure__c
+                milesLoanCode: l.miles_loan_code__c,
+                tenure: l.Tenure__c,
+                processingFee: l.Processing_Fee__c
             }));
 
             const addressStatus = await checkAddressByRecordId({ recordId: this.recordId });
@@ -702,5 +723,48 @@ export default class PurchaseOrderProductSelector extends NavigationMixin(Lightn
         if (input) {
             this.validateDownPayment(input);
         }
+    }
+
+    validateDiscount(inputEl) {
+        const input =
+            inputEl || this.template.querySelector('lightning-input[data-id="discount"]');
+
+        if (!input) return true;
+
+        const value = Number(this.discountValue) || 0;
+        let message = '';
+
+        if (this.discountType === 'percentage') {
+            if (value < 0 || value > MAX_DISCOUNT_PERCENT) {
+                message = `Discount must be between 0% and ${MAX_DISCOUNT_PERCENT}%`;
+            }
+        } else if (value < 0 || value > this.subTotal) {
+            message = `Discount must be between Rs 0 and Rs ${this.subTotal}`;
+        }
+
+        input.setCustomValidity(message);
+        input.reportValidity();
+        return !message;
+    }
+
+    validateDownPayment(inputEl, rawValue) {
+        const input =
+            inputEl || this.template.querySelector('lightning-input[data-id="downPayment"]');
+
+        if (!input) return true;
+
+        const value = rawValue !== undefined ? rawValue : Number(this.downPayment) || 0;
+        const min = this.effectiveMinimumDownPayment;
+        let message = '';
+
+        if (value < min) {
+            message = `Minimum down payment should be Rs ${min}`;
+        } else if (value > this.finalPayable) {
+            message = 'Down payment cannot exceed total payable.';
+        }
+
+        input.setCustomValidity(message);
+        input.reportValidity();
+        return !message;
     }
 }
