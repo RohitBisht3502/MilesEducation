@@ -1,10 +1,15 @@
 public with sharing class WorkdayManagementScheduler {
-    public static final String MONTHLY_JOB_NAME = 'Workday Monthly Attendance Seeder';
+    public static final String DAILY_SEEDER_JOB_NAME = 'Workday Daily Attendance Seeder 12:05AM';
+    public static final String LEGACY_MONTHLY_JOB_NAME = 'Workday Monthly Attendance Seeder';
     public static final String AUTO_CLOSE_JOB_NAME = 'Workday Daily Auto Close 11PM';
 
     @AuraEnabled
     public static void scheduleDefaultJobs() {
-        Set<String> targetNames = new Set<String>{ MONTHLY_JOB_NAME, AUTO_CLOSE_JOB_NAME };
+        Set<String> targetNames = new Set<String>{
+            DAILY_SEEDER_JOB_NAME,
+            LEGACY_MONTHLY_JOB_NAME,
+            AUTO_CLOSE_JOB_NAME
+        };
         for (CronTrigger triggerRow : [
             SELECT Id, CronJobDetail.Name
             FROM CronTrigger
@@ -13,10 +18,10 @@ public with sharing class WorkdayManagementScheduler {
             System.abortJob(triggerRow.Id);
         }
 
-        // 1st day of month, 12:15 AM
+        // Daily at 12:05 AM
         System.schedule(
-            MONTHLY_JOB_NAME,
-            '0 15 0 1 * ? *',
+            DAILY_SEEDER_JOB_NAME,
+            '0 5 0 * * ? *',
             new AttendanceMonthlySeederBatch()
         );
 

@@ -155,8 +155,9 @@
     <externalSharingModel>Private</externalSharingModel>
     <label>Queue Priority Matrix</label>
     <nameField>
+        <displayFormat>Queue - {0000}</displayFormat>
         <label>Queue Priority Matrix Name</label>
-        <type>Text</type>
+        <type>AutoNumber</type>
     </nameField>
     <pluralLabel>Queue Priority Matrix</pluralLabel>
     <searchLayouts></searchLayouts>

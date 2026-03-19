@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RecordType xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Course</fullName>
+    <active>true</active>
+    <label>Course</label>
+    <picklistValues>
+        <picklist>Bucket__c</picklist>
+        <values>
+            <fullName>Accounting Vertical</fullName>
+            <default>true</default>
+        </values>
+        <values>
+            <fullName>NA</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Course_Values__c</picklist>
+        <values>
+            <fullName>CAIRA</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>CMA</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>CPA</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>MCOM</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>US Pathway</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Source_Values__c</picklist>
+        <values>
+            <fullName>Advertisement</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Blog Marketing</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>CA-DB</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Email Marketing</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Facebook</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Facebook Ads</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Google Ads</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>IVR</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Incoming Call</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Instagram</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>LMS</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Linkedin InMails</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Live Chat</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Live Chat on Website</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>MF</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Manual Upload</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Miles One App</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Naukri</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Newsletter Marketing</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Organic</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Placement Drive</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Pre-Enrolled Leads</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Purchased Data</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Quora</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Referral</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Referral - Manual</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>SMS Marketing</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Social</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>SuperBot</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Times Jobs</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>TimesInternet</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Voice SMS</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Webinar Attended</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Website</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>WhatsApp BOT on Website</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Whatsapp Marketing</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Youtube</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Zoom Webinar</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>website-contact_us</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Value_Type__c</picklist>
+        <values>
+            <fullName>Course</fullName>
+            <default>true</default>
+        </values>
+    </picklistValues>
+</RecordType>

@@ -48,9 +48,7 @@
 
 
 
-      <div class="view-more-wrap">
-        <a onclick={handleViewMoreLead} class="view-more-link">View More</a>
-      </div>
+      <div class="tab-item more-details-link" onclick={handleViewMoreLead}>More Details</div>
 
       <template if:true={showTagLeadUI}>
         <c-tag-lead-for-call-log lead-id={recordId} phone-number={identity.phone}>
@@ -218,8 +216,8 @@
                       </template>
                     </div>
 
-                    <lightning-input type="date" label="Expected Date" value={expectedDate}
-                      onchange={handleExpectedDateChange}  disabled={disableUntilApi}>
+                    <lightning-input type="date" label="Expected Date" value={expectedDate} min={todayIsoDate}
+                      onchange={handleExpectedDateChange}  disabled={isConnectedOnlyFieldsDisabled}>
                     </lightning-input>
                   </div>
 
@@ -233,7 +231,7 @@
                       </lightning-input>
 
                       <lightning-input type="time" label="Time" value={nextFollowUpTimeOnly}
-                        onchange={handleNextFollowUpTimeChange}   disabled={disableFollowUpDateTime}>>
+                        onchange={handleNextFollowUpTimeChange}   disabled={disableFollowUpDateTime}>
                       </lightning-input>
 
                       <div class="auto-checkbox">
@@ -246,13 +244,13 @@
 
                   <!-- Row 4 -->
                   <div class="checkbox-box">
-                    <lightning-input type="checkbox" label="Notify Me" checked={notifyMe} onchange={handleNotifyChange}   disabled={disableUntilApi}>
+                    <lightning-input type="checkbox" label="Notify Me" checked={notifyMe} onchange={handleNotifyChange}   disabled={isConnectedOnlyFieldsDisabled}>
                     </lightning-input>
 
-                    <lightning-input type="checkbox" label="DND" checked={isDnd} onchange={handleDndChange} disabled={disableUntilApi}>
+                    <lightning-input type="checkbox" label="DND" checked={isDnd} onchange={handleDndChange} disabled={isConnectedOnlyFieldsDisabled}>
                     </lightning-input>
 
-                    <lightning-input type="checkbox" label="Is Spam" checked={isSpam} onchange={handleSpamChange}   disabled={disableUntilApi}>
+                    <lightning-input type="checkbox" label="Is Spam" checked={isSpam} onchange={handleSpamChange}   disabled={isConnectedOnlyFieldsDisabled}>
                     </lightning-input>
                   </div>
 

@@ -37,6 +37,12 @@ public with sharing class LeadNewOverrideController {
         @AuraEnabled public Id leadId;
     }
 
+    private static void applyDefaultCandidateAddress(Lead candidate) {
+        if (candidate == null) return;
+        candidate.Country = 'India';
+        candidate.Shipping_Country__c = 'India';
+    }
+
     @AuraEnabled(cacheable=true)
     public static List<RecordTypeOption> getLeadRecordTypes() {
         List<RecordTypeOption> out = new List<RecordTypeOption>();
@@ -146,7 +152,7 @@ public with sharing class LeadNewOverrideController {
             Lead candidate = null;
             Id candidateIdToUse = (candidateIdFromPhone != null ? candidateIdFromPhone : candidateIdFromEmail);
             if (candidateIdToUse != null) {
-                List<Lead> candidates = [SELECT Id, Phone, Email, City FROM Lead WHERE Id = :candidateIdToUse LIMIT 1];
+                List<Lead> candidates = [SELECT Id, Phone, Email, City, City__c FROM Lead WHERE Id = :candidateIdToUse LIMIT 1];
                 if (!candidates.isEmpty()) candidate = candidates[0];
             }
 
@@ -158,8 +164,10 @@ public with sharing class LeadNewOverrideController {
                     Phone     = fullPhone,
                     Email     = email,
                     City      = city,
+                    City__c   = city,
                     Is_Created_Manually__c = true
                 );
+                applyDefaultCandidateAddress(candidate);
                 insert candidate;
             } else {
                 Boolean candidateChanged = false;
@@ -173,6 +181,10 @@ public with sharing class LeadNewOverrideController {
                 }
                 if (candidate.City != city) {
                     candidate.City = city;
+                    candidateChanged = true;
+                }
+                if ((String)candidate.get('City__c') != city) {
+                    candidate.put('City__c', city);
                     candidateChanged = true;
                 }
                 if (candidate.Is_Created_Manually__c != true) {
@@ -314,7 +326,7 @@ public with sharing class LeadNewOverrideController {
             Lead candidate = null;
             Id candidateIdToUse = (candidateIdFromPhone != null ? candidateIdFromPhone : candidateIdFromEmail);
             if (candidateIdToUse != null) {
-                List<Lead> candidates = [SELECT Id, Phone, Email, City, Is_Created_Manually__c FROM Lead WHERE Id = :candidateIdToUse LIMIT 1];
+                List<Lead> candidates = [SELECT Id, Phone, Email, City, City__c, Is_Created_Manually__c FROM Lead WHERE Id = :candidateIdToUse LIMIT 1];
                 if (!candidates.isEmpty()) candidate = candidates[0];
             }
 
@@ -326,8 +338,10 @@ public with sharing class LeadNewOverrideController {
                     Phone     = fullPhone,
                     Email     = email,
                     City      = city,
+                    City__c   = city,
                     Is_Created_Manually__c = true
                 );
+                applyDefaultCandidateAddress(candidate);
                 insert candidate;
             } else {
                 Boolean candidateChanged = false;
@@ -341,6 +355,10 @@ public with sharing class LeadNewOverrideController {
                 }
                 if (candidate.City != city) {
                     candidate.City = city;
+                    candidateChanged = true;
+                }
+                if ((String)candidate.get('City__c') != city) {
+                    candidate.put('City__c', city);
                     candidateChanged = true;
                 }
                 if (candidate.Is_Created_Manually__c != true) {

@@ -414,8 +414,37 @@ else if (sType == Account.SObjectType) {
             throw new AuraHandledException('Stage is required when L1 is Connected.');
         }
 
+if (String.isBlank(request.l2)) {
+    throw new AuraHandledException('L2 selection is required before saving feedback.');
+}
+       
         logRecord.Feedback__c = request.feedback;
-        logRecord.Next_Follow_Up_Date__c = request.nextFollowUpDate;
+       
+       
+  Datetime parsedDate;
+
+if (!String.isBlank(request.nextFollowUpDate)) {
+    try {
+        String cleanDate = request.nextFollowUpDate;
+
+        //  REMOVE milliseconds if present
+        if (cleanDate.contains('.')) {
+            cleanDate = cleanDate.split('\\.')[0];
+        }
+
+        //  IMPORTANT FIX → replace T with space
+        cleanDate = cleanDate.replace('T', ' ');
+
+        System.debug('FINAL CLEAN DATE: ' + cleanDate);
+
+        parsedDate = Datetime.valueOf(cleanDate);
+
+    } catch (Exception e) {
+        throw new AuraHandledException('Invalid date format: ' + request.nextFollowUpDate);
+    }
+}
+
+logRecord.Next_Follow_Up_Date__c = parsedDate;
         logRecord.L1__c = request.l1;
         logRecord.L2__c = request.l2;
         logRecord.Notify_Me__c = request.notifyMe;
@@ -443,7 +472,7 @@ else if (sType == Account.SObjectType) {
 
         Lead__c leadUpdate = new Lead__c(
             Id = leadIdToUpdate,
-            Next_Follow_Up_Date__c = request.nextFollowUpDate,
+          Next_Follow_Up_Date__c = parsedDate,
             Notify_Me__c = request.notifyMe,
             Expected_payment_date__c = request.expectedPaymentDate
         );
@@ -588,7 +617,7 @@ else if (sType == Account.SObjectType) {
         public String recordId;
         public String callId;
         public String feedback;
-        public Datetime nextFollowUpDate;
+      public String nextFollowUpDate;
         public String l1;
         public String l2;
         public String stage;

@@ -54,6 +54,8 @@
     display: flex;
     gap: 8px;
     margin-bottom: 12px;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 
@@ -74,6 +76,16 @@
     grid-template-columns: 1fr 1fr auto;
     gap: 16px;
     align-items: end;
+    overflow: visible !important;
+}
+
+.follow-date,
+.follow-time,
+.follow-auto,
+.content-row,
+.left-panel,
+.right-panel {
+    overflow: visible !important;
 }
 
 .checkbox-row {
@@ -119,16 +131,14 @@
 
 
 
-.view-more-link {
+.more-details-link {
+    margin-left: auto;
     color: #1b96ff;
-    cursor: pointer;
     font-weight: 600;
-     margin-top: 10px;
-
-margin-left: 100px;
-margin-right: 5px;
+    white-space: nowrap;
 }
-.view-more-link:hover {
+
+.more-details-link:hover {
     text-decoration: underline;
 }
 

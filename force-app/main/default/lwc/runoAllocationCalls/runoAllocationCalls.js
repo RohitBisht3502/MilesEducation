@@ -752,6 +752,8 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
             this.isStageDisabled = false;
         }
 
+        this.resetConnectedOnlyFieldsIfNeeded();
+
         this.updateCommentVisibility();
     }
 
@@ -806,6 +808,59 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
 
     handleExpectedDateChange(e) {
         this.expectedDate = e.target.value;
+    }
+
+    get todayIsoDate() {
+        return new Date().toLocaleDateString('en-CA');
+    }
+
+    get isConnectedOnlyFieldsDisabled() {
+        return this.disableUntilApi || this.l1Value !== 'Connected';
+    }
+
+    resetConnectedOnlyFieldsIfNeeded() {
+        if (this.l1Value === 'Connected') {
+            return;
+        }
+
+        this.expectedDate = null;
+        this.notifyMe = false;
+        this.isDnd = false;
+        this.isSpam = false;
+    }
+
+    isPastExpectedPaymentDate() {
+        return !!this.expectedDate && this.expectedDate < this.todayIsoDate;
+    }
+
+    getNormalizedProgramName() {
+        return String(this.levelValue || this.identity?.level || '')
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, '');
+    }
+
+    isExpectedPaymentDateRequired() {
+        const stage = String(this.stageValue || '').trim().toUpperCase();
+        const program = this.getNormalizedProgramName();
+
+        if (!stage || !program) {
+            return false;
+        }
+
+        if (program.includes('USP')) {
+            return stage === 'U6';
+        }
+
+        if (
+            program.includes('CPA') ||
+            program.includes('CMA') ||
+            program.includes('CAIRA')
+        ) {
+            return stage === 'M6';
+        }
+
+        return false;
     }
 
     close() {
@@ -1027,8 +1082,17 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
             this.toast('Required', 'l2 is required.', 'warning');
             return false;
         }
+        if (this.isExpectedPaymentDateRequired() && !this.expectedDate) {
+            this.toast('Required', 'Expected Payment Date is mandatory for this stage.', 'warning');
+            return false;
+        }
+        if (this.isPastExpectedPaymentDate()) {
+            this.toast('Required', 'Expected Payment Date cannot be in the past.', 'warning');
+            return false;
+        }
         if (this.l1Value === 'Not-Connected') {
             this.stageValue = null;
+            this.resetConnectedOnlyFieldsIfNeeded();
         }
 
         this.savingFeedback = true;
@@ -1046,6 +1110,7 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
                 l1: this.l1Value,
                 l2: this.l2Value,
                 level: this.levelValue,
+                expectedPaymentDate: this.expectedDate,
                 notifyMe: this.notifyMe,
                 isDnd: this.isDnd,
                 isSpam: this.isSpam

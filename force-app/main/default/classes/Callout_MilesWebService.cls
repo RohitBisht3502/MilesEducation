@@ -37,7 +37,7 @@ public with sharing class Callout_MilesWebService implements Database.AllowsCall
     }
 
     public class MilesResult {
-        public String uuid;
+        public String miles_uuid;
     }
 
     @future(callout=true)
@@ -45,15 +45,15 @@ public with sharing class Callout_MilesWebService implements Database.AllowsCall
         System.debug('leadId: ' + leadId);
 
         try {
-            Lead__c ld = [SELECT Id, Name, Phone__c, Email__c, City__c, Course__c, Lead__c FROM Lead__c WHERE Id = :leadId LIMIT 1];
+            Lead__c customLead = [SELECT Id, Name, Phone__c, Email__c, City__c, Course__c, Candidate__c FROM Lead__c WHERE Id = :leadId LIMIT 1];
 
             MilesRequestWrapper reqBody = new MilesRequestWrapper();
-            reqBody.first_name = ld.Name;
-            reqBody.last_name = ld.Name;
+            reqBody.first_name = customLead.Name;
+            reqBody.last_name = customLead.Name;
             reqBody.country_code = '+91';
-            reqBody.phone = ld.Phone__c;
-            reqBody.email = ld.Email__c;
-            reqBody.city = ld.City__c;
+            reqBody.phone = customLead.Phone__c;
+            reqBody.email = customLead.Email__c;
+            reqBody.city = customLead.City__c;
             reqBody.course_id = 1;
             reqBody.coming_from = 'Salesforce';
             reqBody.campaign_id = 1;
@@ -101,17 +101,17 @@ public with sharing class Callout_MilesWebService implements Database.AllowsCall
 
                     if (!String.isBlank(uuid)) {
                         System.debug('UUID FROM API: ' + uuid);
-                        System.debug('Candidate Lead Id: ' + ld.Lead__c);
+                        System.debug('Candidate Id: ' + customLead.Candidate__c);
 
-                        if (ld.Lead__c != null) {
-                            Lead stdLead = new Lead();
-                            stdLead.Id = ld.Lead__c;
-                            stdLead.UUID__c = uuid;
-                            update stdLead;
+                        if (customLead.Candidate__c != null) {
+                            Lead candidate = new Lead();
+                            candidate.Id = customLead.Candidate__c;
+                            candidate.UUID__c = uuid;
+                            update candidate;
 
                             System.debug('UUID UPDATED IN LEAD');
                         } else {
-                            System.debug('Lead Lookup is NULL');
+                            System.debug('Candidate Lookup is NULL');
                         }
                     }
                 }

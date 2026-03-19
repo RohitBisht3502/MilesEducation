@@ -57,7 +57,7 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
     LeadTriggerHelperClass.updateHighestLevelOnCandidateWhenStageChanges(newLeads, null);
 
     LeadSyncOwnerChange.syncOnOwnerChange(new Map<Id, Lead__c>(), (Map<Id, Lead__c>)newMap);
-    LeadRelatedSyncService.syncOnOwnerChange(new Map<Id, Lead__c>(), (Map<Id, Lead__c>)newMap);
+    // LeadRelatedSyncService.syncOnOwnerChange(new Map<Id, Lead__c>(), (Map<Id, Lead__c>)newMap);
 
     /* ---- MILES API CALLOUT ---- */
 
@@ -75,7 +75,7 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
 
         LeadStageService.validateStageTransitions(newLeads, oldMapLead);
 
-        // LeadTriggerHandler.createLeadActivityLogs(newLeads, oldMapLead, false);
+        LeadActivityLogHandler.createLeadActivityLogs(newLeads, oldMapLead, false);
 
         LeadTriggerHelperClass.afterUpdateMergeLead((List<Lead__c>)newList, (Map<Id, Lead__c>)oldMap);
 
@@ -83,7 +83,7 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         LeadTriggerHelperClass.afterUpdateAutoRegisterWebinar((Map<Id, Lead__c>)newMap, oldMapLead);
 
         // 3. Create activity logs for Merged Leads (AFTER merge logic completes)
-        LeadTriggerHandler.createMergeLeadActivityLogs(newLeads, oldMapLead);
+        LeadActivityLogHandler.createMergeLeadActivityLogs(newLeads, oldMapLead);
 
         // sync city on candidate
         LeadTriggerHelperClass.syncParentCityOnChildCityChange(newLeads, oldMapLead);
@@ -98,10 +98,7 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         // LeadSyncOwnerChange.syncOnOwnerChange(oldMapLead, (Map<Id, Lead__c>)newMap);
 
         // sync owner to related records
-        LeadRelatedSyncService.syncOnOwnerChange(oldMapLead, (Map<Id, Lead__c>)newMap);
-
-        // log owner change activity
-        // LeadTriggerHandler.createOwnerChangeActivityLogs(newLeads, oldMapLead);
+        // LeadRelatedSyncService.syncOnOwnerChange(oldMapLead, (Map<Id, Lead__c>)newMap);
 
         // M.Com Bridge Course Tasks (Status changes)
         LeadTriggerHelperClass.createMComTasks(newLeads, oldMapLead);

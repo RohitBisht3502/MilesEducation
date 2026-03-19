@@ -5,6 +5,42 @@
     Description        : Service class to sync Lead owner changes to related records.
 */
 public without sharing class LeadRelatedSyncService {
+
+    public static void syncRelatedLeadsOnCandidateOwnerChange(List<Lead> newLeads, Map<Id, Lead> oldLeadsMap) {
+        if (newLeads == null || newLeads.isEmpty() || oldLeadsMap == null) {
+            return;
+        }
+
+        Map<Id, Id> candidateToOwner = new Map<Id, Id>();
+
+        for (Lead newLead : newLeads) {
+            Lead oldLead = oldLeadsMap.get(newLead.Id);
+            if (oldLead != null && newLead.OwnerId != oldLead.OwnerId && newLead.OwnerId != null) {
+                candidateToOwner.put(newLead.Id, newLead.OwnerId);
+            }
+        }
+
+        if (candidateToOwner.isEmpty()) {
+            return;
+        }
+
+        List<Lead__c> leadsToUpdate = new List<Lead__c>();
+        for (Lead__c relatedLead : [
+            SELECT Id, Candidate__c, OwnerId
+            FROM Lead__c
+            WHERE Candidate__c IN :candidateToOwner.keySet()
+        ]) {
+            Id targetOwnerId = candidateToOwner.get(relatedLead.Candidate__c);
+            if (targetOwnerId != null && relatedLead.OwnerId != targetOwnerId) {
+                relatedLead.OwnerId = targetOwnerId;
+                leadsToUpdate.add(relatedLead);
+            }
+        }
+
+        if (!leadsToUpdate.isEmpty()) {
+            update leadsToUpdate;
+        }
+    }
     
     public static void syncOnOwnerChange(Map<Id, Lead__c> oldMap, Map<Id, Lead__c> newMap) {
 

@@ -25,30 +25,7 @@
             </div>
         </template>
 
-        <!-- <template if:true={showCallPopup}>
-            <div class="call-overlay">
-                <div class="popup-inner wave-container">
-
-                    <div class="popup-call-icon pulse-icon">
-                        <lightning-icon icon-name="utility:call" size="large"></lightning-icon>
-                    </div>
-
-                    <div class="popup-text">Calling Runo...</div>
-
-                    <div class="wave-loader">
-                        <span></span><span></span><span></span><span></span>
-                    </div>
-
-                    <template if:true={canEndCall}>
-                        <lightning-button variant="destructive" label="End Call" onclick={handleEndCall}>
-                        </lightning-button>
-                    </template>
-
-                </div>
-            </div>
-        </template> -->
-
-
+       
         <!-- ===== BODY ===== -->
         <div class="body-wrapper">
 
@@ -73,11 +50,8 @@
                 <div class={eventTabClass} data-tab="event" onclick={handleTabClick}>
                     Event History
                 </div>
-                <div>
-                    <a onclick={handleViewMoreLead} class="view-more-link">
-                        View More
-                    </a>
-
+                <div class="tab-item more-details-link" onclick={handleViewMoreLead}>
+                    More Details
                 </div>
 
             </div>
@@ -223,7 +197,8 @@
                                     </div>
 
                                     <lightning-input type="date" label="Expected Date" value={expectedPaymentDate}
-                                        onchange={handleExpectedDateChange}>
+                                        onchange={handleExpectedDateChange} min={todayIsoDate}
+                                        disabled={isConnectedOnlyFieldsDisabled}>
                                     </lightning-input>
                                 </div>
 
@@ -236,8 +211,8 @@
                                     </div>
 
                                     <div class="follow-time">
-                                        <lightning-input type="time" label="Time" value={nextFollowUpDate}
-                                            onchange={handleNextFollowUpDateChange}>
+                                        <lightning-input type="time" label="Time" value={nextFollowUpTime} 
+                                            onchange={handleNextFollowUpTimeChange}>
                                         </lightning-input>
                                     </div>
 
@@ -251,15 +226,15 @@
                                 <!-- Row 4 -->
                                 <div class="checkbox-row">
                                     <lightning-input type="checkbox" label="Notify Me" checked={notifyMe}
-                                        onchange={handleNotifyChange}>
+                                        onchange={handleNotifyChange} disabled={isConnectedOnlyFieldsDisabled}>
                                     </lightning-input>
 
                                     <lightning-input type="checkbox" label="DND" checked={isDnd}
-                                        onchange={handleDndChange}>
+                                        onchange={handleDndChange} disabled={isConnectedOnlyFieldsDisabled}>
                                     </lightning-input>
 
                                     <lightning-input type="checkbox" label="Is Spam" checked={isSpam}
-                                        onchange={handleSpamChange}>
+                                        onchange={handleSpamChange} disabled={isConnectedOnlyFieldsDisabled}>
                                     </lightning-input>
                                 </div>
 
@@ -276,16 +251,6 @@
             </div>
 
 
-
-
-
-
-
-
-
-
-
-
             <!-- CALL HISTORY -->
             <template if:true={isHistoryTab}>
                 <div class="section-card history-card">
@@ -294,15 +259,6 @@
                         <lightning-icon icon-name="utility:call" size="small"></lightning-icon>
                         <span>Call History</span>
                     </div>
-
-
-
-
-
-
-
-
-
 
 
 
@@ -456,7 +412,7 @@
 
                                         <div class="call-history-right">
                                             <lightning-combobox value={row.stage} options={row.stageOptions}
-                                                data-id={row.id} onchange={handleRelatedStageChange}>
+                                                data-id={row.id} onchange={handleRelatedStageChange}   disabled={isRelatedStageDisabled}>
                                             </lightning-combobox>
                                         </div>
 
@@ -484,11 +440,11 @@
                         <div class="feedback-grid two-column">
 
                             <lightning-combobox label="Course" value={newLeadCourse} options={availableCourseOptions}
-                                onchange={handleNewLeadCourseChange}>
+                                onchange={handleNewLeadCourseChange} disabled={isRelatedStageDisabled}>
                             </lightning-combobox>
 
                             <lightning-input type="email" label="Email" value={newLeadEmail}
-                                onchange={handleNewLeadEmailChange} required>
+                                onchange={handleNewLeadEmailChange} >
                             </lightning-input>
 
                             <lightning-button class="create-lead-btn" variant="brand" label="Create Lead"

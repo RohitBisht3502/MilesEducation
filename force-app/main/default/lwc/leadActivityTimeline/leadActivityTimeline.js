@@ -39,12 +39,17 @@ export default class LeadActivityTimeline extends LightningElement {
             this.activities = (data.logs || []).map((log) => {
                 const isCall = log.activityType === 'Call';
                 const isLevelChange = log.activityType === 'Level Change';
+                const isOwnerChange = log.activityType === 'Owner Change';
                 const isMergeLead = log.activityType === 'Lead Merge';
                 const isViewedPhoneNumber = log.activityType === 'View Phone Number';
                 const isGmeet = (log.activityType || '').toLowerCase() === 'gmeet';
+                const isPurchase = log.activityType === 'Enrolment Form';
+                const isLoan = log.activityType === 'Payment' &&
+                    (log.loanStatus || log.loanAmount || log.loanProvider || log.milesLoanCode);
+                const isTransaction = log.activityType === 'Payment' && !isLoan;
                 const isCreated = log.name?.includes('Created') || false;
                 const isUpdated = log.name?.includes('Updated') || false;
-                const isOther = !isCall && !isLevelChange && !isMergeLead && !isViewedPhoneNumber && !isGmeet;
+                const isOther = !isCall && !isLevelChange && !isOwnerChange && !isMergeLead && !isViewedPhoneNumber && !isGmeet && !isPurchase && !isTransaction && !isLoan;
 
                 const formattedChangedDateTime = log.changedDateTime
                     ? new Date(log.changedDateTime).toLocaleString()
@@ -72,9 +77,13 @@ export default class LeadActivityTimeline extends LightningElement {
                     ...log,
                     isCall,
                     isLevelChange,
+                    isOwnerChange,
                     isMergeLead,
                     isViewedPhoneNumber,
                     isGmeet,
+                    isPurchase,
+                    isLoan,
+                    isTransaction,
                     isCreated,
                     isUpdated,
                     isOther,

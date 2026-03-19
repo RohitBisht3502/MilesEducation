@@ -7,12 +7,10 @@ public without sharing class LeadMergeController {
 
         String key = '%' + searchKey + '%';
 
-        // Exclude current lead + selected leads
         Set<Id> excludeIds = new Set<Id>();
         if (currentLeadId != null) excludeIds.add(currentLeadId);
         if (selectedLeadIds != null) excludeIds.addAll(selectedLeadIds);
 
-        // Phone search logic
         Set<Id> candidateIdsFromPhone = new Set<Id>();
         if (searchKey.length() >= 3) {
             for (Phone_Number__c pn : [SELECT Candidate__c FROM Phone_Number__c WHERE Phone__c LIKE :key AND Candidate__c != null LIMIT 50]) {
@@ -21,7 +19,7 @@ public without sharing class LeadMergeController {
         }
 
         List<Lead> results = [
-            SELECT Id, Name, Email, Course__c, Owner.Name, OwnerId, Candidate__c, Merged_Status__c, Candidate_ID__c
+            SELECT Id, Name, Email, Course__c, Owner.Name, OwnerId, Candidate__c, Candidate_ID__c
             FROM Lead
             WHERE (Name LIKE :key OR Email LIKE :key OR Id IN :candidateIdsFromPhone OR Candidate_ID__c LIKE :key)
             AND Id NOT IN :excludeIds
@@ -31,20 +29,25 @@ public without sharing class LeadMergeController {
 
         if (results.isEmpty()) return new List<LeadWrapper>();
 
-        // COLLECT IDs & Owners
         Set<Id> leadIds = new Set<Id>();
-        Set<Id> parentIds = new Set<Id>();
         Set<Id> ownerIds = new Set<Id>();
-        
         for (Lead l : results) {
             leadIds.add(l.Id);
             ownerIds.add(l.OwnerId);
-            if (l.Candidate__c != null) {
-                parentIds.add(l.Candidate__c);
-            }
         }
 
-        // Fetch Manager Ids for Owners
+        Set<Id> pendingLeadIds = new Set<Id>();
+        for (Approval_Process__c ap : [
+            SELECT Source_Candidate__c, Target_Candidate__c 
+            FROM Approval_Process__c 
+            WHERE Merge_Status__c = 'Pending' 
+            AND Record_Type__c = 'Lead Merged Request'
+            AND (Source_Candidate__c IN :leadIds OR Target_Candidate__c IN :leadIds)
+        ]) {
+            if (ap.Source_Candidate__c != null) pendingLeadIds.add(ap.Source_Candidate__c);
+            if (ap.Target_Candidate__c != null) pendingLeadIds.add(ap.Target_Candidate__c);
+        }
+
         Map<Id, Id> ownerManagerMap = new Map<Id, Id>();
         if (!ownerIds.isEmpty()) {
             for(User u : [SELECT Id, ManagerId FROM User WHERE Id IN :ownerIds]) {
@@ -52,43 +55,12 @@ public without sharing class LeadMergeController {
             }
         }
 
-        // 1. QUERY PENDING PROCESSES (For both Leads and Parents)
-        Set<Id> allIdsToCheck = new Set<Id>(leadIds);
-        allIdsToCheck.addAll(parentIds);
-        
-        Set<Id> lockedIds = new Set<Id>();
-        if (!allIdsToCheck.isEmpty()) {
-            for (ProcessInstance pi : [
-                SELECT TargetObjectId 
-                FROM ProcessInstance 
-                WHERE Status = 'Pending' 
-                AND TargetObjectId IN :allIdsToCheck
-            ]) {
-                lockedIds.add(pi.TargetObjectId);
-            }
-        }
-
-        // 2. QUERY PARENT STATUS (Explicitly)
-        Map<Id, String> parentStatusMap = new Map<Id, String>();
-        if (!parentIds.isEmpty()) {
-            for (Lead parent : [SELECT Id, Merged_Status__c FROM Lead WHERE Id IN :parentIds]) {
-                parentStatusMap.put(parent.Id, parent.Merged_Status__c);
-            }
-        }
-
         List<LeadWrapper> wrappers = new List<LeadWrapper>();
         for (Lead l : results) {
             LeadWrapper lw = new LeadWrapper();
             lw.lead = l;
-            lw.ownerManagerId = ownerManagerMap.get(l.OwnerId); // May be null if owner is Queue
-            
-            Boolean selfLocked = lockedIds.contains(l.Id);
-            Boolean selfPending = l.Merged_Status__c == 'Pending';
-            
-            Boolean parentLocked = (l.Candidate__c != null && lockedIds.contains(l.Candidate__c));
-            Boolean parentPending = (l.Candidate__c != null && parentStatusMap.containsKey(l.Candidate__c) && parentStatusMap.get(l.Candidate__c) == 'Pending');
-            
-            lw.isUnderApproval = selfLocked || selfPending || parentLocked || parentPending;
+            lw.ownerManagerId = ownerManagerMap.get(l.OwnerId);
+            lw.isUnderApproval = pendingLeadIds.contains(l.Id);
             wrappers.add(lw);
         }
 
@@ -99,17 +71,25 @@ public without sharing class LeadMergeController {
     public static LeadWrapper getLeadDetails(Id leadId) {
         if (leadId == null) return null;
         
-        List<Lead> leads = [SELECT Id, Name, Email, Course__c, Owner.Name, OwnerId, Candidate__c, Merged_Status__c 
+        List<Lead> leads = [SELECT Id, Name, Email, Course__c, Owner.Name, OwnerId, Candidate__c
                      FROM Lead WHERE Id = :leadId];
         
         if (leads.isEmpty()) return null;
         Lead l = leads[0];
 
+        Boolean isPending = ![
+            SELECT Id FROM Approval_Process__c 
+            WHERE Merge_Status__c = 'Pending' 
+            AND Record_Type__c = 'Lead Merged Request'
+            AND (Source_Candidate__c = :leadId OR Target_Candidate__c = :leadId)
+            LIMIT 1
+        ].isEmpty();
+
         LeadWrapper lw = new LeadWrapper();
         lw.lead = l;
+        lw.isUnderApproval = isPending;
         
-        // Handle Owner being a User or Queue
-        if (String.valueOf(l.OwnerId).startsWith('005')) { // 005 is User prefix
+        if (String.valueOf(l.OwnerId).startsWith('005')) {
              List<User> users = [SELECT Id, ManagerId FROM User WHERE Id = :l.OwnerId LIMIT 1];
              if (!users.isEmpty()) {
                  lw.ownerManagerId = users[0].ManagerId;
@@ -125,219 +105,264 @@ public without sharing class LeadMergeController {
         @AuraEnabled public String ownerManagerId;
     }
 
-     // ===== APEX CONTROLLER METHOD =====
-
     @AuraEnabled
-    public static String submitMergeForApproval(Id mainLeadId, List<Id> leadIdsToMerge, String mergeComments) {
+    public static String submitMergeForApproval(Id mainLeadId, Id sourceLeadId, List<Id> leadIdsToMerge, String mergeComments) {
         
-        if (leadIdsToMerge == null || leadIdsToMerge.isEmpty()) {
-            throw new AuraHandledException('No leads selected to merge');
+        // Handle both parameter styles to avoid deployment/cache sync issues
+        Id finalSourceId = sourceLeadId;
+        if (finalSourceId == null && leadIdsToMerge != null && !leadIdsToMerge.isEmpty()) {
+            finalSourceId = leadIdsToMerge[0];
+        }
+
+        if (finalSourceId == null) {
+            throw new AuraHandledException('No lead selected to merge');
         }
 
         // -------------------------
         // VALIDATION
         // -------------------------
-        Set<Id> idsToCheck = new Set<Id>();
-        idsToCheck.add(mainLeadId);
-        idsToCheck.addAll(leadIdsToMerge);
+        Set<Id> allIdsToCheck = new Set<Id>{mainLeadId, finalSourceId};
 
-        // Fetch leads to check for parents
-        List<Lead> leadsToCheck = [SELECT Id, Name, Candidate__c, Merged_Status__c, Course__c FROM Lead WHERE Id IN :leadIdsToMerge];
-        Set<Id> parentIds = new Set<Id>();
-        for (Lead l : leadsToCheck) {
-            if (l.Candidate__c != null) {
-                parentIds.add(l.Candidate__c);
-                idsToCheck.add(l.Candidate__c);
-            }
+        List<Approval_Process__c> pendingRequests = [
+            SELECT Source_Candidate__c, Target_Candidate__c, Source_Candidate__r.Name
+            FROM Approval_Process__c 
+            WHERE Merge_Status__c = 'Pending' 
+            AND Record_Type__c = 'Lead Merged Request'
+            AND (Source_Candidate__c IN :allIdsToCheck OR Target_Candidate__c IN :allIdsToCheck)
+        ];
+
+        if (!pendingRequests.isEmpty()) {
+            throw new AuraHandledException('One of the involves leads is already part of a pending merge request.');
         }
 
-        // Check ProcessInstances
-        Set<Id> lockedIds = new Set<Id>();
-        for (ProcessInstance pi : [
-            SELECT TargetObjectId 
-            FROM ProcessInstance 
-            WHERE Status = 'Pending' 
-            AND TargetObjectId IN :idsToCheck
-        ]) {
-            lockedIds.add(pi.TargetObjectId);
-        }
-
-        // Check Parent Statuses explicitly
-        Map<Id, String> parentStatusMap = new Map<Id, String>();
-        if (!parentIds.isEmpty()) {
-            for (Lead parent : [SELECT Id, Merged_Status__c FROM Lead WHERE Id IN :parentIds]) {
-                parentStatusMap.put(parent.Id, parent.Merged_Status__c);
-            }
-        }
-
-        // A. Check Main Lead
-        if (lockedIds.contains(mainLeadId)) {
-             throw new AuraHandledException('The current lead is in an approval process.');
-        }
-        Lead currentLead = [SELECT Id, Merged_Status__c, OwnerId, Course__c FROM Lead WHERE Id = :mainLeadId];
-        if (currentLead.Merged_Status__c == 'Pending') {
-             throw new AuraHandledException('The current lead status is Pending.');
-        }
-
-        // B. Check Selected Leads
-        for (Lead l : leadsToCheck) {
-            if (lockedIds.contains(l.Id)) {
-                 throw new AuraHandledException('Lead ' + l.Name + ' is in an approval process.');
-            }
-            if (l.Merged_Status__c == 'Pending') {
-                 throw new AuraHandledException('Lead ' + l.Name + ' status is Pending.');
-            }
-
-            // C. Check Parents
-            if (l.Candidate__c != null) {
-                if (lockedIds.contains(l.Candidate__c)) {
-                     throw new AuraHandledException('Lead ' + l.Name + ' is part of a pending merge (Parent locked).');
-                }
-                if (parentStatusMap.containsKey(l.Candidate__c) && parentStatusMap.get(l.Candidate__c) == 'Pending') {
-                     throw new AuraHandledException('Lead ' + l.Name + ' is part of a pending merge (Parent Pending).');
-                }
-            }
-        }
+        Lead sourceLead = [SELECT Id, Name, OwnerId FROM Lead WHERE Id = :finalSourceId];
+        Lead mainLead = [SELECT Id, Name, OwnerId FROM Lead WHERE Id = :mainLeadId];
 
         // -------------------------
         // DETERMINE SCENARIO
         // -------------------------
-        // Roles: Admin vs GM vs SPOC
-        // Admin: Profile = 'System Administrator' (or similar check)
-        // GM: Current User is Manager of Lead Owners
-        
         Id currentUserId = UserInfo.getUserId();
+        Set<Id> ownerIds = new Set<Id>{mainLead.OwnerId, sourceLead.OwnerId};
+        Map<Id, User> ownerMap = new Map<Id, User>([SELECT Id, ManagerId FROM User WHERE Id IN :ownerIds]);
 
-        // Collect Owners of all leads (Main + Merged)
-        Set<Id> ownerIds = new Set<Id>{currentLead.OwnerId};
-        List<Lead> leadsToMerge = [SELECT Id, OwnerId FROM Lead WHERE Id IN :leadIdsToMerge];
-        for (Lead l : leadsToMerge) {
-            ownerIds.add(l.OwnerId);
-        }
-        
-        // Fetch Owner Details (ManagerId and Manager's ManagerId)
-        Map<Id, User> ownerMap = new Map<Id, User>([SELECT Id, ManagerId, Manager.ManagerId FROM User WHERE Id IN :ownerIds]);
-
-        // Scenario Logic
-        // 1. Admin: Merge directly, no approval.
-        // 2. GM (Same Manager): If current user is manager of ALL lead owners -> Merge directly (Require Comment).
-        // 3. Different GM / Other: Approval to Admin.
-
-        Boolean requiresApproval = true;
         Boolean isSameGM = true;
-
-        // Check if Current User is Manager of ALL owners
         for (Id ownerId : ownerIds) {
             User u = ownerMap.get(ownerId);
-            
-            // If owner is a Queue, u will be null.
-            if (u == null) {
-                isSameGM = false;
-                break;
-            }
-            
-            // Strict Check: Current User MUST be the Manager.
-            // Even if owner is self, managerId must be current user (impossible) -> implies Self is not GM.
-            if (u.ManagerId != currentUserId) {
+            if (u == null || u.ManagerId != currentUserId) {
                 isSameGM = false;
                 break;
             }
         }
 
-        if (isSameGM) {
-            // Case 2: Same GM (Current User is everyone's manager)
-            requiresApproval = false; 
-        } else {
-            // Case 1: Different GM -> Send to Admin
-            requiresApproval = true;
-        }
-        
         // -------------------------
-        // EXECUTE MERGE
+        // EXECUTE APPROVAL PROCESS CREATION
         // -------------------------
-        Lead mainLead = currentLead; 
+        Id approverId = determineApprover(mainLead, sourceLead, ownerMap);
 
-        // Always require and store comment on Main Lead for audit
         if (String.isBlank(mergeComments)) {
             throw new AuraHandledException('Comment is required for this merge.');
         }
-        mainLead.put('Merge_Comments__c', mergeComments);
 
-        for (Lead lead : leadsToMerge) {
-            lead.Candidate__c = mainLeadId;
-        }
-        update leadsToMerge;
+        Id recordTypeId = Schema.SObjectType.Approval_Process__c.getRecordTypeInfosByDeveloperName().get('Lead_Merged_Request').getRecordTypeId();
 
-        if (requiresApproval) {
-            mainLead.Merged_Status__c = 'Pending';
+        Approval_Process__c ap = new Approval_Process__c();
+        ap.Source_Candidate__c = finalSourceId;
+        ap.Target_Candidate__c = mainLeadId;
+        ap.Comments__c = mergeComments;
+        ap.Requestor__c = currentUserId;
+        ap.Approver__c = approverId;
+        ap.Merge_Status__c = isSameGM ? 'Approved' : 'Pending';
+        ap.RecordTypeId = recordTypeId;
+        ap.Record_Type__c = 'Lead Merged Request';
+        insert ap;
+
+        if (isSameGM) {
+            sourceLead.Candidate__c = mainLeadId;
+            sourceLead.Is_Merged__c = true;
+            update sourceLead;
+
+            mainLead.Merge_Comments__c = mergeComments;
             update mainLead;
 
-            // Approval Routing Logic (SPOC or Different GM)
-            // Use existing logic to determine approver (Common Manager or Admin)
-            Id approverId = determineApprover(mainLead, leadsToMerge, ownerMap);
+            // Notify Requestor of successful direct merge
+            sendNotifications(ap.Id, currentUserId, 'Lead_Merge_Approved');
 
-            if (approverId == null) {
-                 throw new AuraHandledException('No valid approver found.');
-            }
-            
-            Approval.ProcessSubmitRequest req = new Approval.ProcessSubmitRequest();
-            req.setObjectId(mainLeadId);
-            req.setProcessDefinitionNameOrId('Lead_merge');
-            req.setComments(mergeComments); // Pass user comment to Approval Process
-            req.setNextApproverIds(new Id[]{ approverId });  
-
-            try {
-                Approval.ProcessResult result = Approval.process(req);
-                if (result.isSuccess()) {
-                    return 'Merge request submitted for approval.';
-                } else {
-                    throw new AuraHandledException('Error submitting approval.');
-                }
-            } catch (Exception e) {
-                throw new AuraHandledException('Error: ' + e.getMessage());
-            }
-
+            return 'Leads merged successfully (Directly Approved).';
         } else {
-            // Direct Merge (Admin or Same GM)
-            mainLead.Merged_Status__c = 'Approved';
-            update mainLead; 
-            return 'Leads merged successfully (No Approval Required).';
+            // Push & Email Notification to Approver
+            sendNotifications(ap.Id, approverId, 'Lead_Merge_Approval_Request');
+            return 'Approval request submitted and pending manager review.';
         }
     }
 
-    private static Id determineApprover(Lead mainLead, List<Lead> leadsToMerge, Map<Id, User> userMap) {
-        User mainLeadOwner = userMap.get(mainLead.OwnerId);
+    @AuraEnabled(cacheable=true)
+    public static ComparisonWrapper getComparisonDetails(Id approvalId) {
+        if (approvalId == null) return null;
+
+        Approval_Process__c ap = [SELECT Source_Candidate__c, Target_Candidate__c FROM Approval_Process__c WHERE Id = :approvalId LIMIT 1];
+        
+        Set<Id> leadIds = new Set<Id>();
+        if (ap.Source_Candidate__c != null) leadIds.add(ap.Source_Candidate__c);
+        if (ap.Target_Candidate__c != null) leadIds.add(ap.Target_Candidate__c);
+
+        if (leadIds.isEmpty()) return null;
+
+        Map<Id, Lead> leadMap = new Map<Id, Lead>([
+            SELECT Id, Name, Email, Course__c, LeadSource, Status, Owner.Name
+            FROM Lead WHERE Id IN :leadIds
+        ]);
+
+        Map<Id, List<Lead__c>> customLeadsByCandidate = new Map<Id, List<Lead__c>>();
+        for (Lead__c cl : [
+            SELECT Id, Name, Stage__c, Status__c, Course__c, Candidate__c
+            FROM Lead__c WHERE Candidate__c IN :leadIds
+            ORDER BY CreatedDate DESC
+        ]) {
+            if (!customLeadsByCandidate.containsKey(cl.Candidate__c)) {
+                customLeadsByCandidate.put(cl.Candidate__c, new List<Lead__c>());
+            }
+            customLeadsByCandidate.get(cl.Candidate__c).add(cl);
+        }
+
+        ComparisonWrapper cw = new ComparisonWrapper();
+        cw.source = new SingleLeadData(
+            leadMap.get(ap.Source_Candidate__c), 
+            customLeadsByCandidate.containsKey(ap.Source_Candidate__c) ? customLeadsByCandidate.get(ap.Source_Candidate__c) : new List<Lead__c>()
+        );
+        cw.target = new SingleLeadData(
+            leadMap.get(ap.Target_Candidate__c), 
+            customLeadsByCandidate.containsKey(ap.Target_Candidate__c) ? customLeadsByCandidate.get(ap.Target_Candidate__c) : new List<Lead__c>()
+        );
+        return cw;
+    }
+
+    public class ComparisonWrapper {
+        @AuraEnabled public SingleLeadData source;
+        @AuraEnabled public SingleLeadData target;
+    }
+
+    public class SingleLeadData {
+        @AuraEnabled public Lead standardLead;
+        @AuraEnabled public List<Lead__c> customLeads;
+
+        public SingleLeadData(Lead std, List<Lead__c> cstList) {
+            this.standardLead = std;
+            this.customLeads = cstList;
+        }
+    }
+
+    private static Id determineApprover(Lead mainLead, Lead sourceLead, Map<Id, User> userMap) {
         Id adminId = '005C1000005Qn8fIAC';
 
-        // Collect unique manager IDs from all owners (Main + Merged)
         Set<Id> managerIds = new Set<Id>();
-        if (mainLeadOwner != null && mainLeadOwner.ManagerId != null) {
-            managerIds.add(mainLeadOwner.ManagerId);
-        }
-        
-        for (Lead lead : leadsToMerge) {
-            User owner = userMap.get(lead.OwnerId);
-            if (owner != null && owner.ManagerId != null) {
-                managerIds.add(owner.ManagerId);
-            } else {
-                // If any owner doesn't have a manager (or is a Queue), we can't have a unique common manager
-                managerIds.add(null);
-            }
-        }
+        User mOwner = userMap.get(mainLead.OwnerId);
+        User sOwner = userMap.get(sourceLead.OwnerId);
 
-        // If there is exactly ONE common manager and they report to someone (Grandparent Manager)
+        if (mOwner != null && mOwner.ManagerId != null) managerIds.add(mOwner.ManagerId);
+        else managerIds.add(null);
+        
+        if (sOwner != null && sOwner.ManagerId != null) managerIds.add(sOwner.ManagerId);
+        else managerIds.add(null);
+
         if (managerIds.size() == 1 && !managerIds.contains(null)) {
             Id commonManagerId = new List<Id>(managerIds)[0];
-            
-            // We need to check if that common manager has a manager.
-            // Since we queried Manager.ManagerId for the OWNERS, it's available in the OWNER's record.
-            // All owners in this case have the same info because they share the same manager.
-            if (mainLeadOwner != null && mainLeadOwner.ManagerId == commonManagerId && mainLeadOwner.Manager.ManagerId != null) {
-                return mainLeadOwner.Manager.ManagerId;
-            }
+            User commonManager = [SELECT ManagerId FROM User WHERE Id = :commonManagerId LIMIT 1];
+            if (commonManager.ManagerId != null) return commonManager.ManagerId;
         }
 
-        // Otherwise (different managers, no manager, or top of hierarchy), send to Admin
         return adminId;
+    }
+
+    @AuraEnabled
+    public static void processApprovalResult(Id approvalId, String status, String managerComments) {
+        if (String.isBlank(managerComments)) {
+            throw new AuraHandledException('Comments are mandatory for finalizing the approval.');
+        }
+
+        Approval_Process__c ap = [SELECT Id, Source_Candidate__c, Target_Candidate__c, Merge_Status__c, Comments__c, Approval_Comments__c, Requestor__c FROM Approval_Process__c WHERE Id = :approvalId];
+        ap.Merge_Status__c = status; 
+        ap.Approval_Comments__c = managerComments;
+        update ap;
+
+        if (status == 'Approved' && ap.Source_Candidate__c != null && ap.Target_Candidate__c != null) {
+            Lead source = new Lead(
+                Id = ap.Source_Candidate__c,
+                Candidate__c = ap.Target_Candidate__c,
+                Is_Merged__c = true
+            );
+            update source;
+
+            Lead target = new Lead(
+                Id = ap.Target_Candidate__c,
+                Merge_Comments__c = managerComments
+            );
+            update target;
+        }
+
+        // Notify Requestor
+        String templateName = (status == 'Approved') ? 'Lead_Merge_Approved' : 'Lead_Merge_Rejected';
+        sendNotifications(ap.Id, ap.Requestor__c, templateName);
+    }
+
+    private static void sendNotifications(Id processId, Id targetUserId, String templateDeveloperName) {
+        if (targetUserId == null || processId == null) return;
+        
+        try {
+            // Get recipient details and record details to find a dummy "Who" (Lead) to bypass Salesforce restriction.
+            // Salesforce does not allow WhatId when TargetObjectId is a User.
+            User recipient = [SELECT Email FROM User WHERE Id = :targetUserId LIMIT 1];
+            Approval_Process__c ap = [SELECT Source_Candidate__c, Target_Candidate__c FROM Approval_Process__c WHERE Id = :processId LIMIT 1];
+            
+            // 1. Send Email
+            List<EmailTemplate> templates = [SELECT Id FROM EmailTemplate WHERE DeveloperName = :templateDeveloperName LIMIT 1];
+            if (!templates.isEmpty()) {
+                Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
+                mail.setTemplateId(templates[0].Id);
+                
+                // CRITICAL WORKAROUND: To use merge fields (!Approval_Process__c.X) when sending to a User,
+                // we must use a Lead/Contact/Account as TargetObjectId and redirect to the User email.
+                Id dummyWhoId = (ap.Source_Candidate__c != null) ? ap.Source_Candidate__c : ap.Target_Candidate__c;
+                
+                mail.setTargetObjectId(dummyWhoId); 
+                mail.setWhatId(processId);
+                mail.setTreatTargetObjectAsRecipient(false); // DO NOT send to the lead email
+                mail.setToAddresses(new String[] { recipient.Email }); // Send to the actual user
+                mail.setSaveAsActivity(false);
+                
+                Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
+            }
+
+            // 2. Send Custom Notification (Push)
+            List<CustomNotificationType> types = [SELECT Id FROM CustomNotificationType WHERE DeveloperName = 'Lead_Merge_Status_Notification' LIMIT 1];
+            if (!types.isEmpty()) {
+                Messaging.CustomNotification notification = new Messaging.CustomNotification();
+                notification.setNotificationTypeId(types[0].Id);
+                notification.setTargetId(processId);
+                
+                String title = 'Lead Merge Update';
+                String body = 'A lead merge request has been updated.';
+                
+                if (templateDeveloperName == 'Lead_Merge_Approval_Request') {
+                    title = 'Merge Request Pending';
+                    body = recipient.Email + ', a new lead merge request requires your approval.';
+                } else if (templateDeveloperName == 'Lead_Merge_Approved') {
+                    title = 'Merge Request Approved';
+                    body = 'Your lead merge request has been approved and finalized.';
+                } else if (templateDeveloperName == 'Lead_Merge_Rejected') {
+                    title = 'Merge Request Rejected';
+                    body = 'Your lead merge request has been rejected.';
+                }
+                
+                notification.setTitle(title);
+                notification.setBody(body);
+                notification.send(new Set<String>{String.valueOf(targetUserId)});
+            }
+        } catch (Exception e) {
+            // Log for visibility but only throw if it's a critical configuration error
+            System.debug('Notification Logic failed: ' + e.getMessage());
+            if (e.getMessage().contains('INVALID_ID_FIELD')) {
+                throw new AuraHandledException('Email Configuration Error: ' + e.getMessage());
+            }
+        }
     }
 }

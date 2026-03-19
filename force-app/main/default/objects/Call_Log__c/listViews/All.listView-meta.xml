@@ -11,5 +11,9 @@
     <columns>L2__c</columns>
     <columns>Untracked__c</columns>
     <filterScope>Everything</filterScope>
+    <filters>
+        <field>Candidate__c</field>
+        <operation>equals</operation>
+    </filters>
     <label>All</label>
 </ListView>

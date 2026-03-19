@@ -137,12 +137,16 @@ public without sharing class CandidateTriggerHelperClass {
         }
 
         Set<String> uuidSet = new Set<String>();
+        Map<String, Id> phoneToCandidateId = new Map<String, Id>();
 
         for (Lead newLead : newLeads) {
             Lead oldLead = oldMap.get(newLead.Id);
 
             if (newLead.UUID__c != null && (oldLead == null || newLead.UUID__c != oldLead.UUID__c)) {
                 uuidSet.add(newLead.UUID__c);
+                if (String.isNotBlank(newLead.Phone)) {
+                    phoneToCandidateId.put(newLead.Phone, newLead.Id);
+                }
             }
         }
 
@@ -152,6 +156,28 @@ public without sharing class CandidateTriggerHelperClass {
 
         for (String uuid : uuidSet) {
             Callout_MfSfUntrackToTrackRecording.sendByMilesUuid(uuid);
+        }
+
+        if (phoneToCandidateId.isEmpty()) {
+            return;
+        }
+
+        List<Call_Log__c> logsToUpdate = new List<Call_Log__c>();
+        for (Call_Log__c logRec : [
+            SELECT Id, Phone_Number__c, Candidate__c
+            FROM Call_Log__c
+            WHERE Phone_Number__c IN :phoneToCandidateId.keySet()
+        ]) {
+            Id candidateId = phoneToCandidateId.get(logRec.Phone_Number__c);
+            if (candidateId != null && logRec.Candidate__c != candidateId) {
+                logRec.Candidate__c = candidateId;
+                logRec.Untracked__c = false;
+                logsToUpdate.add(logRec);
+            }
+        }
+
+        if (!logsToUpdate.isEmpty()) {
+            update logsToUpdate;
         }
     }
 

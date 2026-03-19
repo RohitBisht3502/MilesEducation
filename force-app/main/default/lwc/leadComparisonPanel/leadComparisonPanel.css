@@ -1,0 +1,120 @@
+.comparison-container {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #dddbda;
+    background: transparent;
+}
+
+.header-icon {
+    background: #f3f3f3;
+    padding: 8px;
+    border-radius: 4px;
+    margin-right: 12px;
+}
+
+.grid-container {
+    display: flex;
+    gap: 1.5rem;
+    padding: 1.25rem;
+}
+
+.column {
+    flex: 1;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 1rem;
+    transition: all 0.2s;
+}
+
+.column-header {
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: center;
+}
+
+.badge {
+    padding: 4px 12px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.source-badge {
+    background: #f3f3f3;
+    color: #444;
+    border: 1px solid #dddbda;
+}
+
+.target-badge {
+    background: #f3f3f3;
+    color: #444;
+    border: 1px solid #dddbda;
+}
+
+.lead-info-section {
+    margin-bottom: 1rem;
+}
+
+.section-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px dashed #cbd5e1;
+    padding-bottom: 4px;
+}
+
+.field-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    font-size: 13px;
+}
+
+.label {
+    color: #64748b;
+    font-weight: 500;
+}
+
+.value {
+    color: #1e293b;
+    font-weight: 600;
+    text-align: right;
+}
+
+.status-pill {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.stage-pill {
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #ffedd5;
+}
+
+.master-stage {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #dbeafe;
+}
+
+.custom-section {
+    background: #f9fafb;
+    padding: 8px;
+    border-radius: 6px;
+    margin-top: 1rem;
+}

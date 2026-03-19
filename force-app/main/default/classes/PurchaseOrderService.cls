@@ -39,10 +39,15 @@ public without sharing class PurchaseOrderService {
         public Id productId;
         public Decimal unitPrice;
         public Decimal qty;
+        public String learningType;
         public SimpleLineItem(Id productId, Decimal unitPrice, Decimal qty) {
+            this(productId, unitPrice, qty, null);
+        }
+        public SimpleLineItem(Id productId, Decimal unitPrice, Decimal qty, String learningType) {
             this.productId = productId;
             this.unitPrice = unitPrice;
             this.qty = qty;
+            this.learningType = learningType;
         }
     }
 
@@ -52,12 +57,17 @@ public without sharing class PurchaseOrderService {
         public String sku;
         public Decimal unitPrice;
         public Decimal qty;
+        public String learningType;
         public ExpandedProduct(Id productId, String name, String sku, Decimal unitPrice, Decimal qty) {
+            this(productId, name, sku, unitPrice, qty, null);
+        }
+        public ExpandedProduct(Id productId, String name, String sku, Decimal unitPrice, Decimal qty, String learningType) {
             this.productId = productId;
             this.name = name;
             this.sku = sku;
             this.unitPrice = unitPrice;
             this.qty = qty;
+            this.learningType = learningType;
         }
     }
 
@@ -233,25 +243,25 @@ public without sharing class PurchaseOrderService {
             Callout_PurchaseOrderService.CalloutResult calloutRes;
             if (!requiresApproval) {
                 // api callout to miles
-             // calloutRes = callExternalPurchaseService(req, lead, candidate);
+             calloutRes = callExternalPurchaseService(req, lead, candidate, student);
             }
 
             Purchase_Order__c po    = createPurchaseOrder(req, context, lead, candidate, student);
-            po.Purchase_Order_Id__c = '41';
-            // if (calloutRes != null) {
-            //     po.Purchase_Order_Id__c = String.valueOf(calloutRes.purchaseId);
-            //     po.Response_Payload__c  = calloutRes.responseBody;
-            // }
-            // if (requiresApproval) {
-            //     po.Approval_Status__c = STATUS_PENDING;
-            // }
+           // po.Purchase_Order_Id__c = '41';
+            if (calloutRes != null) {
+                po.Purchase_Order_Id__c = String.valueOf(calloutRes.purchaseId);
+                po.Response_Payload__c  = calloutRes.responseBody;
+            }
+            if (requiresApproval) {
+                po.Approval_Status__c = STATUS_PENDING;
+            }
             insert po;
 
             createLineItems(po.Id, req.items, req.processingFee, req.loanId);
             updateCairaLevelIfNeeded(context, lead, req.items);
             createTransaction(po.Id, req.downPayment, req.leadId);
             if (!String.isBlank(req.loanId)) {
-                createLoanTransaction(po.Id, req.loanId);
+                createLoanTransaction(po.Id, req.loanId, req.discount);
             }
             if (requiresApproval) {
                 String course = context != null ? context.course : null;
@@ -348,15 +358,18 @@ public without sharing class PurchaseOrderService {
         insert txn;
     }
 
-    private static void createLoanTransaction(Id purchaseOrderId, Id loanId) {
+    private static void createLoanTransaction(Id purchaseOrderId, Id loanId, Decimal discountAmount) {
         if (purchaseOrderId == null || loanId == null) return;
 
         Loan__c loan = [SELECT Amount_requested__c, loan_status__c FROM Loan__c WHERE Id = :loanId LIMIT 1];
+        Decimal adjustedLoanAmount = loan != null
+            ? Math.max(0, (loan.Amount_requested__c == null ? 0 : loan.Amount_requested__c) - (discountAmount == null ? 0 : discountAmount))
+            : null;
 
         Transcation__c txn = new Transcation__c();
         txn.Purchase_Orders__c = purchaseOrderId;
         txn.Loan__c = loanId;
-        txn.Payment__c = loan != null ? loan.Amount_requested__c : null;
+        txn.Payment__c = adjustedLoanAmount;
         txn.Status__c = loan != null && loan.loan_status__c == 'Disbursed'
             ? 'Received'
             : STATUS_INITIATED;
@@ -441,7 +454,7 @@ public without sharing class PurchaseOrderService {
         if (items == null) return false;
 
         for (LineItemRequest li : items) {
-            if (li != null && li.learningType == LEARNING_TYPE_STUDY) {
+            if (li != null && isLearningType(li.learningType, LEARNING_TYPE_STUDY)) {
                 return true;
             }
         }
@@ -667,7 +680,7 @@ public without sharing class PurchaseOrderService {
     @AuraEnabled(cacheable=true)
     public static List<Loan__c> getLoansForLead(Id recordId) {
         if (recordId == null) return new List<Loan__c>();
-        return [SELECT Id, Name, Loan_Provider__c, loan_status__c, miles_loan_code__c, Loan_Id__c, Tenure__c, Processing_Fee__c FROM Loan__c WHERE Lead__c = :recordId AND loan_status__c IN ('Approved')];
+        return [SELECT Id, Name, Loan_Provider__c, loan_status__c, miles_loan_code__c, Loan_Id__c, Tenure__c, Processing_Fee__c, Amount_requested__c FROM Loan__c WHERE Lead__c = :recordId AND loan_status__c IN ('Approved')];
     }
 
     @AuraEnabled
@@ -721,12 +734,12 @@ public without sharing class PurchaseOrderService {
         return !String.isBlank(street) && !String.isBlank(city);
     }
 
-    private static Callout_PurchaseOrderService.CalloutResult callExternalPurchaseService( PurchaseOrderRequest req, Lead__c lead, Lead candidate ) {
+    private static Callout_PurchaseOrderService.CalloutResult callExternalPurchaseService( PurchaseOrderRequest req, Lead__c lead, Lead candidate, Account student ) {
 
         List<SimpleLineItem> baseItems = new List<SimpleLineItem>();
         for (LineItemRequest li : req.items) {
             if (li != null && li.productId != null) {
-                baseItems.add(new SimpleLineItem(li.productId, li.unitPrice, li.qty));
+                baseItems.add(new SimpleLineItem(li.productId, li.unitPrice, li.qty, li.learningType));
             }
         }
         List<ExpandedProduct> expandedItems = expandBundleItems(baseItems);
@@ -737,14 +750,18 @@ public without sharing class PurchaseOrderService {
         extReq.sf_id        = String.valueOf(candidate.Id);
         extReq.sf_lead_id   = String.valueOf(req.leadId);
         extReq.uuid         = candidate.UUID__c;
+        Decimal processingFeeAmount = req.processingFee == null ? 0 : req.processingFee;
+        Boolean hasLoanProcessingFee = !String.isBlank(req.loanId) && processingFeeAmount > 0;
         extReq.down_payment = req.downPayment;
         //extReq.created_by   = UserInfo.getName();
         extReq.created_by   = CREATED_BY_DEFAULT;
+        extReq.billing_address = buildBillingAddressPayload(candidate, student);
+        extReq.shipping_address = buildShippingAddressPayload(candidate, student, req.phoneNumber);
 
         Callout_PurchaseOrderService.RequestItem item = new Callout_PurchaseOrderService.RequestItem();
         item.program = (lead != null ? String.valueOf(lead.Course__c) : null);
-        Boolean hasTraining = false;
-        Boolean hasStudyMaterial = false;
+        Boolean hasTraining = true;
+        Boolean hasStudyMaterial = true;
 
         item.skus = new List<String>();
         item.enrolment_line_items = new List<Callout_PurchaseOrderService.EnrolmentLineItem>();
@@ -755,8 +772,8 @@ public without sharing class PurchaseOrderService {
             if (li == null) continue;
 
             if (!String.isBlank(li.learningType)) {
-                if (li.learningType == LEARNING_TYPE_TRAINING) hasTraining = true;
-                if (li.learningType == LEARNING_TYPE_STUDY) hasStudyMaterial = true;
+                if (isLearningType(li.learningType, LEARNING_TYPE_TRAINING)) hasTraining = true;
+                if (isLearningType(li.learningType, LEARNING_TYPE_STUDY)) hasStudyMaterial = true;
             }
         }
 
@@ -769,6 +786,9 @@ public without sharing class PurchaseOrderService {
             }
         }
 
+        Decimal discountAmount = req.discount == null ? 0 : req.discount;
+        Decimal remainingTrainingDiscount = discountAmount;
+
         for (ExpandedProduct ep : enrolmentItems) {
             if (ep == null) continue;
             Callout_PurchaseOrderService.EnrolmentLineItem eli =
@@ -780,21 +800,37 @@ public without sharing class PurchaseOrderService {
                 (ep.unitPrice != null ? ep.unitPrice : 0) *
                 (ep.qty != null ? ep.qty : 0);
 
+            Decimal lineDiscount = 0;
+            if (isTrainingDiscountItemName(eli.item_name) && remainingTrainingDiscount > 0) {
+                lineDiscount = Math.min(lineAmount, remainingTrainingDiscount);
+                remainingTrainingDiscount -= lineDiscount;
+            }
+
             eli.price          = lineAmount;
             eli.price_with_gst = lineAmount;
-            eli.discound       = 0;
-            eli.final_price    = lineAmount;
+            eli.discound       = lineDiscount;
+            eli.final_price    = Math.max(0, lineAmount - lineDiscount);
 
             item.enrolment_line_items.add(eli);
             total += lineAmount;
         }
 
+        if (hasLoanProcessingFee) {
+            Callout_PurchaseOrderService.EnrolmentLineItem feeLine =
+                new Callout_PurchaseOrderService.EnrolmentLineItem();
+            feeLine.item_name = 'Processing Fee';
+            feeLine.price = processingFeeAmount;
+            feeLine.price_with_gst = processingFeeAmount;
+            feeLine.discound = 0;
+            feeLine.final_price = processingFeeAmount;
+            item.enrolment_line_items.add(feeLine);
+        }
+
         item.has_training       = hasTraining;
         item.has_study_material = hasStudyMaterial;
 
-        Decimal discountAmount = req.discount == null ? 0 : req.discount;
         item.actual_price = total;
-        item.agreed_fee   = Math.max(0, total - discountAmount) + (req.processingFee == null ? 0 : req.processingFee);
+        item.agreed_fee   = Math.max(0, total - discountAmount) + processingFeeAmount;
         item.discount     = discountAmount;
         
         if (!String.isBlank(req.loanId)) {
@@ -880,7 +916,11 @@ public without sharing class PurchaseOrderService {
         }
         if (seedIds.isEmpty()) return result;
 
-        Map<Id, Product2> prodMap = new Map<Id, Product2>([SELECT Id, Name, ProductCode, Is_Bundle__c FROM Product2 WHERE Id IN :seedIds]);
+        Map<Id, Product2> prodMap = new Map<Id, Product2>([
+            SELECT Id, Name, ProductCode, Is_Bundle__c, Type__c
+            FROM Product2
+            WHERE Id IN :seedIds
+        ]);
         Map<Id, List<Product_Option__c>> optionsByBundle = new Map<Id, List<Product_Option__c>>();
 
         List<Product_Option__c> options = [SELECT Id, Bundle_Product__c, Product__c, Qty__c, Unit_Price__c FROM Product_Option__c WHERE Bundle_Product__c IN :seedIds];
@@ -895,7 +935,11 @@ public without sharing class PurchaseOrderService {
         }
 
         if (!childIds.isEmpty()) {
-            for (Product2 p : [SELECT Id, Name, ProductCode, Is_Bundle__c FROM Product2 WHERE Id IN :childIds]) {
+            for (Product2 p : [
+                SELECT Id, Name, ProductCode, Is_Bundle__c, Type__c
+                FROM Product2
+                WHERE Id IN :childIds
+            ]) {
                 prodMap.put(p.Id, p);
             }
         }
@@ -914,7 +958,8 @@ public without sharing class PurchaseOrderService {
                         child.Name,
                         child.ProductCode,
                         opt.Unit_Price__c,
-                        effectiveQty
+                        effectiveQty,
+                        String.isNotBlank(child.Type__c) ? child.Type__c : p.Type__c
                     ));
                 }
             } else {
@@ -923,7 +968,8 @@ public without sharing class PurchaseOrderService {
                     p != null ? p.Name : null,
                     p != null ? p.ProductCode : null,
                     li.unitPrice,
-                    li.qty
+                    li.qty,
+                    p != null ? p.Type__c : null
                 ));
             }
         }
@@ -1039,7 +1085,8 @@ public without sharing class PurchaseOrderService {
             prod.Name,
             prod.ProductCode,
             unitPrice,
-            qty
+            qty,
+            null
         ));
         path.remove(productId);
     }
@@ -1157,6 +1204,64 @@ public without sharing class PurchaseOrderService {
 
         if (rows.isEmpty() || rows[0].Discount__c == null) return null;
         return rows[0].Discount__c;
+    }
+
+    private static Callout_PurchaseOrderService.AddressPayload buildBillingAddressPayload(
+        Lead candidate,
+        Account student
+    ) {
+        Callout_PurchaseOrderService.AddressPayload payload = new Callout_PurchaseOrderService.AddressPayload();
+        if (student != null) {
+            payload.address_line_1 = student.BillingStreet;
+            payload.address_line_2 = '';
+            payload.city = student.BillingCity;
+            payload.state = student.BillingState;
+            payload.pincode = student.BillingPostalCode;
+            payload.phone_number = null;
+        } else if (candidate != null) {
+            payload.address_line_1 = candidate.Street;
+            payload.address_line_2 = '';
+            payload.city = candidate.City;
+            payload.state = candidate.State;
+            payload.pincode = candidate.PostalCode;
+            payload.phone_number = null;
+        }
+        return payload;
+    }
+
+    private static Callout_PurchaseOrderService.AddressPayload buildShippingAddressPayload(
+        Lead candidate,
+        Account student,
+        String phoneNumber
+    ) {
+        Callout_PurchaseOrderService.AddressPayload payload = new Callout_PurchaseOrderService.AddressPayload();
+        if (student != null) {
+            payload.address_line_1 = student.ShippingStreet;
+            payload.address_line_2 = '';
+            payload.city = student.ShippingCity;
+            payload.state = student.ShippingState;
+            payload.pincode = student.ShippingPostalCode;
+        } else if (candidate != null) {
+            payload.address_line_1 = candidate.Shipping_Street__c;
+            payload.address_line_2 = '';
+            payload.city = candidate.Shipping_City__c;
+            payload.state = candidate.Shipping_State__c;
+            payload.pincode = candidate.Shipping_Postal_Code__c;
+        }
+        payload.phone_number = phoneNumber;
+        return payload;
+    }
+
+    private static Boolean isLearningType(String actualType, String expectedType) {
+        return String.isNotBlank(actualType) &&
+            String.isNotBlank(expectedType) &&
+            actualType.trim().equalsIgnoreCase(expectedType.trim());
+    }
+
+    private static Boolean isTrainingDiscountItemName(String itemName) {
+        if (String.isBlank(itemName)) return false;
+        String normalizedName = itemName.trim().toLowerCase();
+        return normalizedName == 'cpa training' || normalizedName == 'cma training';
     }
 
 }

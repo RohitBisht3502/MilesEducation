@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RecordType xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Lead_Merge</fullName>
+    <active>true</active>
+    <label>Lead Merge</label>
+    <picklistValues>
+        <picklist>Activity_Type__c</picklist>
+        <values>
+            <fullName>Call</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Email</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Enrolment Form</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Gmeet</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>LMS</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Lead Downgraded</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Lead Merge</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Level Change</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Meeting</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Owner Change</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Payment</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>View Phone Number</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Webinar</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>EF_Status__c</picklist>
+        <values>
+            <fullName>Accepted</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>L1__c</picklist>
+        <values>
+            <fullName>Connected</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Not-Connected</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>L2__c</picklist>
+        <values>
+            <fullName>Attended And Disconnected</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Busy</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Discussed</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Google Meet Cancelled</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Google Meet Completed</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Google Meet Rescheduled</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Invalid Number</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Language Barrier</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Not Eligible</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Not Interested %28DND%29</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Not Lifting</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Not Reachable</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Postponed</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Request Call Back</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Switched Off</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Visit Booked By Mistake</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Visit Cancelled</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Visit Completed</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Visit Confirmed</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Visit Rescheduled</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Voice Mail</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Wrong Number</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Loan_status__c</picklist>
+        <values>
+            <fullName>Approved</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Transcation_Status__c</picklist>
+        <values>
+            <fullName>Initiated</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Received</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+</RecordType>

@@ -33,6 +33,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     objectApiName;
     candidateId;
     isFeedbackDisabled = true;
+    isL1Locked = false;
     // UI / state
     loading = false;
     disableCancel = false;
@@ -120,7 +121,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     savingFeedback = false;
     feedback = '';
     nextFollowUpDate = null;
-
+nextFollowUpTime = null;
     lastCallId = null;
 
     // manual end call if no response in 30s
@@ -317,7 +318,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         return (
             !this.candidateId ||
             !this.newLeadCourse ||
-            !this.newLeadEmail ||
+      
             this.availableCourseOptions.length === 0 ||
             this.isCreatingRelatedLead
         );
@@ -355,6 +356,59 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     }
     handleExpectedDateChange(event) {
         this.expectedPaymentDate = event.target.value;
+    }
+
+    get todayIsoDate() {
+        return new Date().toLocaleDateString('en-CA');
+    }
+
+    get isConnectedOnlyFieldsDisabled() {
+        return this.isFeedbackDisabled || this.l1Value !== 'Connected';
+    }
+
+    resetConnectedOnlyFieldsIfNeeded() {
+        if (this.l1Value === 'Connected') {
+            return;
+        }
+
+        this.expectedPaymentDate = null;
+        this.notifyMe = false;
+        this.isDnd = false;
+        this.isSpam = false;
+    }
+
+    isPastExpectedPaymentDate() {
+        return !!this.expectedPaymentDate && this.expectedPaymentDate < this.todayIsoDate;
+    }
+
+    getNormalizedProgramName() {
+        return String(this.levelValue || this.courseValue || this.identity?.level || '')
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, '');
+    }
+
+    isExpectedPaymentDateRequired() {
+        const stage = String(this.stageValue || '').trim().toUpperCase();
+        const program = this.getNormalizedProgramName();
+
+        if (!stage || !program) {
+            return false;
+        }
+
+        if (program.includes('USP')) {
+            return stage === 'U6';
+        }
+
+        if (
+            program.includes('CPA') ||
+            program.includes('CMA') ||
+            program.includes('CAIRA')
+        ) {
+            return stage === 'M6';
+        }
+
+        return false;
     }
 
 
@@ -429,12 +483,12 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
             await createRelatedLead({
                 candidateId: this.candidateId,
                 course: this.newLeadCourse,
-                email: this.newLeadEmail,
+              
                 sourceRecordId: this.recordId
             });
 
             this.newLeadCourse = '';
-            this.newLeadEmail = '';
+            // this.newLeadEmail = '';
 
             await this.loadRelatedLeads();
 
@@ -563,6 +617,10 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     }
 
 
+get isRelatedStageDisabled() {
+    return !this.isApiResponseReceived;
+}
+
     // async loadStageOptionsForLeads() {
 
     //     for (let lead of this.relatedLeads) {
@@ -595,7 +653,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     // }
 
     async handleCreateRelatedLead() {
-        if (!this.candidateId || !this.newLeadCourse || !this.newLeadEmail || this.isCreatingRelatedLead) return;
+        if (!this.candidateId || !this.newLeadCourse || this.isCreatingRelatedLead) return;
 
         try {
             this.isCreatingRelatedLead = true;
@@ -804,23 +862,30 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     }
 
     handleL1Change(e) {
-        this.l1Value = e.target.value;
-        this.userChangedStage = false;
 
-        const l2List = this.l1L2Map[this.l1Value] || [];
-
-        this.l2Options = l2List.map(v => ({
-            label: v,
-            value: v
-        }));
-
-        this.isL2Disabled = this.l2Options.length === 0;
-        this.l2Value = '';
-
-        this.isStageDisabled = this.l1Value === 'Not-Connected';
-
-        this.updateCommentVisibility();
+   
+    if (this.isL1Locked) {
+        return;
     }
+
+    this.l1Value = e.target.value;
+    this.userChangedStage = false;
+
+    const l2List = this.l1L2Map[this.l1Value] || [];
+
+    this.l2Options = l2List.map(v => ({
+        label: v,
+        value: v
+    }));
+
+    this.isL2Disabled = this.l2Options.length === 0;
+    this.l2Value = '';
+
+    this.isStageDisabled = this.l1Value === 'Not-Connected';
+    this.resetConnectedOnlyFieldsIfNeeded();
+
+    this.updateCommentVisibility();
+}
 
     handleL2Change(e) {
         this.l2Value = e.target.value;
@@ -853,12 +918,19 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         }
     }
 
-    //  only allow manual date change when autoSetFollowUp is false
-    handleNextFollowUpDateChange(e) {
-        if (!this.autoSetFollowUp) {
-            this.nextFollowUpDate = e.target.value;
-        }
-    }
+handleNextFollowUpDateChange(e) {
+    this.nextFollowUpDate = e.target.value;
+    this.autoSetFollowUp = false;
+}
+
+
+
+   handleNextFollowUpTimeChange(e) {
+    this.nextFollowUpTime = e.target.value;
+    this.autoSetFollowUp = false;
+}
+
+    
 
     close() {
         this.dispatchEvent(new CloseActionScreenEvent());
@@ -928,6 +1000,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         this.showCallPopup = true;
 
         this.l1Value = 'Not-Connected';
+        this.resetConnectedOnlyFieldsIfNeeded();
         this.l2Value = '';
 
         // Load L2 options immediately
@@ -1050,31 +1123,32 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     }
 
 
-    get filteredL1Options() {
+get filteredL1Options() {
 
-        if (!this.isApiResponseReceived) {
-            return this.l1Options;
-        }
-
-        if (this.l1Value === 'Connected') {
-            return this.l1Options.filter(opt => opt.value === 'Connected');
-        }
-
+    // before API response → normal
+    if (!this.isApiResponseReceived) {
         return this.l1Options;
     }
 
-    //  helper to set nextFollowUpDate = now + 24h in ISO format
-    setAutoDate24() {
-        const next = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-        const yyyy = next.getFullYear();
-        const mm = String(next.getMonth() + 1).padStart(2, '0');
-        const dd = String(next.getDate()).padStart(2, '0');
-        const hh = String(next.getHours()).padStart(2, '0');
-        const mi = String(next.getMinutes()).padStart(2, '0');
-
-        this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+    if (this.isL1Locked) {
+        return this.l1Options.filter(opt => opt.value === this.l1Value);
     }
+
+    return this.l1Options;
+}
+
+    //  helper to set nextFollowUpDate = now + 24h in ISO format
+setAutoDate24() {
+    const next = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const yyyy = next.getFullYear();
+    const mm = String(next.getMonth() + 1).padStart(2, '0');
+    const dd = String(next.getDate()).padStart(2, '0');
+
+   
+    this.nextFollowUpDate = `${yyyy}-${mm}-${dd}`;
+    this.nextFollowUpTime = `10:00`;
+}
     applyAutoStageLogic() {
         // Do nothing if user already selected stage.
         if (this.userChangedStage) {
@@ -1133,18 +1207,64 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
             );
             return;
         }
+if (!this.l2Value)  {
+    this.dispatchEvent(
+        new ShowToastEvent({
+            title: 'Error',
+            message: 'Please select L2 before saving feedback.',
+            variant: 'error'
+        })
+    );
+    return; 
+}
+
+if (this.isExpectedPaymentDateRequired() && !this.expectedPaymentDate) {
+    this.dispatchEvent(
+        new ShowToastEvent({
+            title: 'Required',
+            message: 'Expected Payment Date is mandatory for this stage.',
+            variant: 'error'
+        })
+    );
+    return;
+}
+
+if (this.isPastExpectedPaymentDate()) {
+    this.dispatchEvent(
+        new ShowToastEvent({
+            title: 'Required',
+            message: 'Expected Payment Date cannot be in the past.',
+            variant: 'error'
+        })
+    );
+    return;
+}
+
         if (this.l1Value === 'Not-Connected') {
             this.stageValue = null;
+            this.resetConnectedOnlyFieldsIfNeeded();
         }
 
         this.savingFeedback = true;
 
         try {
+
+let combinedDateTime = this.nextFollowUpDate
+    ? this.nextFollowUpDate + 'T' + (this.nextFollowUpTime || '10:00') + ':00'
+    : null;
+
+// FORCE CLEAN (THIS FIXES YOUR ERROR)
+if (combinedDateTime) {
+    combinedDateTime = combinedDateTime.split('.')[0];
+}
+
+console.log('FINAL DATETIME:', combinedDateTime);
+
             const payload = {
                 recordId: this.recordId,
                 callId: this.lastCallId,
                 feedback: this.feedback?.trim(),
-                nextFollowUpDate: this.nextFollowUpDate,
+                  nextFollowUpDate: combinedDateTime ? String(combinedDateTime) : null,
                 l1: this.l1Value,
                 l2: this.l2Value,
                 //    level: this.courseValue,
@@ -1360,18 +1480,22 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
         //  FINAL CORRECT LOGIC
         if (status === 'Completed' && !Number.isNaN(duration) && duration > 0) {
 
-            this.l1Value = 'Connected';
+    this.l1Value = 'Connected';
+    this.isL1Locked = true; 
 
-            totalSec = Math.floor(duration);
-            const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
-            const ss = String(totalSec % 60).padStart(2, '0');
-            this.elapsedLabel = `${mm}:${ss}`;
+    totalSec = Math.floor(duration);
+    const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+    const ss = String(totalSec % 60).padStart(2, '0');
+    this.elapsedLabel = `${mm}:${ss}`;
 
-        } else {
+} else {
 
-            this.l1Value = 'Not-Connected';
-            this.elapsedLabel = '00:00';
-        }
+    this.l1Value = 'Not-Connected';
+    this.isL1Locked = true; 
+    this.resetConnectedOnlyFieldsIfNeeded();
+
+    this.elapsedLabel = '00:00';
+}
         const l2List = this.l1L2Map[this.l1Value] || [];
 
         this.l2Options = l2List.map(v => ({

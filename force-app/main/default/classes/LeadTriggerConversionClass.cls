@@ -224,11 +224,69 @@ public class LeadTriggerConversionClass {
                 update foldersToUpdate;
             }
         }
+
+        insertLeadConversionActivityLogs(candidateToAccount);
+        transferActivityLogsOnCandidateConversion(candidateToAccount);
         
         syncAccountAddressesFromCandidate(candidateToAccount);
         transferRecordsOnCandidateConversion(candidateToAccount);
         
         System.debug('=== END ===');
+    }
+
+    private static void insertLeadConversionActivityLogs(Map<Id, Id> candidateToAccount) {
+        if (candidateToAccount == null || candidateToAccount.isEmpty()) {
+            return;
+        }
+
+        List<Activity_Log__c> logsToInsert = new List<Activity_Log__c>();
+        Datetime changedOn = System.now();
+
+        for (Id candidateId : candidateToAccount.keySet()) {
+            Id studentId = candidateToAccount.get(candidateId);
+            if (candidateId == null || studentId == null) {
+                continue;
+            }
+
+            Activity_Log__c log = new Activity_Log__c();
+            log.Name = 'Lead Converted to Student';
+            log.Activity_Type__c = 'Lead Conversion';
+            log.Candidate__c = candidateId;
+            log.Student__c = studentId;
+            log.Logging_Id__c = candidateId;
+            log.Changed_Date_Time__c = changedOn;
+            log.Action_Performed_By__c = UserInfo.getUserId();
+            log.Created_By__c = UserInfo.getName();
+            log.Description__c = 'Candidate converted to Student.';
+            logsToInsert.add(log);
+        }
+
+        if (!logsToInsert.isEmpty()) {
+            insert logsToInsert;
+        }
+    }
+
+    private static void transferActivityLogsOnCandidateConversion(Map<Id, Id> candidateToAccount) {
+        if (candidateToAccount == null || candidateToAccount.isEmpty()) {
+            return;
+        }
+
+        List<Activity_Log__c> logsToUpdate = new List<Activity_Log__c>();
+        for (Activity_Log__c logRec : [
+            SELECT Id, Candidate__c, Student__c
+            FROM Activity_Log__c
+            WHERE Candidate__c IN :candidateToAccount.keySet()
+        ]) {
+            Id studentId = candidateToAccount.get(logRec.Candidate__c);
+            if (studentId != null && logRec.Student__c != studentId) {
+                logRec.Student__c = studentId;
+                logsToUpdate.add(logRec);
+            }
+        }
+
+        if (!logsToUpdate.isEmpty()) {
+            update logsToUpdate;
+        }
     }
     
     private static void transferRecordsOnCandidateConversion(Map<Id, Id> candidateToAccount) {

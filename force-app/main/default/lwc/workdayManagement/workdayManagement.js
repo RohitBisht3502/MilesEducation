@@ -6,12 +6,16 @@ import startBreak from '@salesforce/apex/WorkdayManagementService.startBreak';
 import endBreak from '@salesforce/apex/WorkdayManagementService.endBreak';
 import endDay from '@salesforce/apex/WorkdayManagementService.endDay';
 
+const MISSING_ATTENDANCE_MESSAGE =
+    'We do not have the attendance record for you. Please contact admin to proceed.';
+
 export default class WorkdayManagement extends LightningElement {
     @track dashboard;
     @track isLoading = false;
     @track liveTimerLabel = '00:00:00';
 
     timerIntervalId;
+    hasShownMissingAttendanceToast = false;
 
     connectedCallback() {
         this.startLiveTimer();
@@ -69,8 +73,12 @@ export default class WorkdayManagement extends LightningElement {
         return this.state === 'ACTIVE';
     }
 
+    get hasTodayAttendance() {
+        return !!this.dashboard?.today;
+    }
+
     get actionsDisabled() {
-        return this.isLoading || !this.dashboard?.employeeActive;
+        return this.isLoading || !this.dashboard?.employeeActive || !this.hasTodayAttendance;
     }
 
     get statePillClass() {
@@ -98,6 +106,7 @@ export default class WorkdayManagement extends LightningElement {
         loadDashboard()
             .then(response => {
                 this.dashboard = this.decorateResponse(response);
+                this.handleMissingAttendanceRecord();
                 this.updateLiveTimer();
             })
             .catch(error => {
@@ -134,6 +143,21 @@ export default class WorkdayManagement extends LightningElement {
         }));
 
         return normalized;
+    }
+
+    handleMissingAttendanceRecord() {
+        const isAttendanceMissing = this.dashboard?.employeeActive && !this.hasTodayAttendance;
+        if (!isAttendanceMissing) {
+            this.hasShownMissingAttendanceToast = false;
+            return;
+        }
+
+        if (this.hasShownMissingAttendanceToast) {
+            return;
+        }
+
+        this.hasShownMissingAttendanceToast = true;
+        this.showToast('Error', MISSING_ATTENDANCE_MESSAGE, 'error');
     }
 
     formatMinutes(value) {

@@ -1,0 +1,113 @@
+<template>
+    <div class="comparison-container slds-card">
+        <header class="header slds-p-around_medium">
+            <div class="header-icon">
+                <lightning-icon icon-name="standard:merge" size="small"></lightning-icon>
+            </div>
+            <div class="header-text">
+                <h2 class="slds-text-heading_small slds-truncate">Lead Comparison</h2>
+                <p class="slds-text-color_weak slds-text-body_small">Compare attributes of both candidates side-by-side</p>
+            </div>
+        </header>
+
+        <template if:true={isLoading}>
+            <div class="slds-p-around_large slds-align_absolute-center">
+                <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+            </div>
+        </template>
+
+        <template if:true={comparisonData}>
+            <div class="grid-container">
+                <!-- SOURCE COLUMN -->
+                <div class="column source-column">
+                    <div class="column-header">
+                        <span class="badge source-badge">SOURCE (To be Merged)</span>
+                    </div>
+                    
+                    <div class="lead-info-section">
+                        <div class="section-title">Candidate</div>
+                        <div class="field-row">
+                            <span class="label">Name</span>
+                            <span class="value">{comparisonData.source.standardLead.Name}</span>
+                        </div>
+                        <div class="field-row">
+                            <span class="label">Email</span>
+                            <span class="value">{comparisonData.source.standardLead.Email}</span>
+                        </div>
+                    </div>
+
+                    <template if:true={comparisonData.source.customLeads.length}>
+                        <div class="section-title slds-m-top_small">Leads ({comparisonData.source.customLeads.length})</div>
+                    </template>
+
+                    <template for:each={comparisonData.source.customLeads} for:item="cl">
+                        <div key={cl.Id} class="lead-info-section custom-section">
+                            <div class="field-row">
+                                <span class="label">Course</span>
+                                <span class="value">{cl.Course__c}</span>
+                            </div>
+                            <div class="field-row">
+                                <span class="label">Stage</span>
+                                <span class="value">
+                                    <span class="status-pill stage-pill">{cl.Stage__c}</span>
+                                </span>
+                            </div>
+                            <div class="field-row">
+                                <span class="label">City</span>
+                                <span class="value">{cl.City__c}</span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- TARGET COLUMN -->
+                <div class="column target-column">
+                    <div class="column-header">
+                        <span class="badge target-badge">TARGET (Master Record)</span>
+                    </div>
+
+                    <div class="lead-info-section">
+                        <div class="section-title">Candidate</div>
+                        <div class="field-row">
+                            <span class="label">Name</span>
+                            <span class="value">{comparisonData.target.standardLead.Name}</span>
+                        </div>
+                        <div class="field-row">
+                            <span class="label">Email</span>
+                            <span class="value">{comparisonData.target.standardLead.Email}</span>
+                        </div>
+                    </div>
+
+                    <template if:true={comparisonData.target.customLeads.length}>
+                        <div class="section-title slds-m-top_small">Leads ({comparisonData.target.customLeads.length})</div>
+                    </template>
+
+                    <template for:each={comparisonData.target.customLeads} for:item="cl">
+                        <div key={cl.Id} class="lead-info-section custom-section">
+                            <div class="field-row">
+                                <span class="label">Course</span>
+                                <span class="value">{cl.Course__c}</span>
+                            </div>
+                            <div class="field-row">
+                                <span class="label">Stage</span>
+                                <span class="value">
+                                    <span class="status-pill stage-pill master-stage">{cl.Stage__c}</span>
+                                </span>
+                            </div>
+                            <div class="field-row">
+                                <span class="label">City</span>
+                                <span class="value">{cl.City__c}</span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <template if:true={error}>
+            <div class="slds-p-around_medium slds-text-color_error">
+                {error}
+            </div>
+        </template>
+    </div>
+</template>

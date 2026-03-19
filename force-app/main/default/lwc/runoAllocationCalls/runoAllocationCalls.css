@@ -228,6 +228,8 @@
     border-bottom: 1px solid #e0e0e0;
     padding-bottom: 6px;
     margin-bottom: 16px;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 
@@ -277,14 +279,13 @@
 
 
 
-.view-more-link {
-  cursor: pointer;
+.more-details-link {
+  margin-left: auto;
   color: #2064bc;
-  font-weight: 600;
-  margin-top: 10px;
-  margin-left: 180px;
+  white-space: nowrap;
 }
-.view-more-link:hover {
+
+.more-details-link:hover {
   text-decoration: underline;
 }
 

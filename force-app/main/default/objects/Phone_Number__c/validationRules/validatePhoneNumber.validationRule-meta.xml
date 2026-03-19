@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>validatePhoneNumber</fullName>
+    <active>true</active>
+    <description>If Country Code is &apos;+91&apos; then user can enter exactly 10 digit, otherwise user can enter maximum upto13 digit.</description>
+    <errorConditionFormula>IF(
+    By_Pass_Validation__c,
+    false,
+    IF(
+        ISPICKVAL(Country_Code__c, &quot;+91&quot;),
+        LEN(Phone__c) &lt;&gt; 10,
+        LEN(Phone__c) &gt; 13
+    )
+)</errorConditionFormula>
+    <errorMessage>If country code is +91,  phone must be exactly 10 digits.
+If other country code,  phone can be maximum 13 digits.</errorMessage>
+</ValidationRule>

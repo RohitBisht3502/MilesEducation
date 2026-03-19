@@ -88,12 +88,12 @@
 .btn-primary {
     height: 44px;
     padding: 0 24px;
-    background: #1967d2;
+    background: #0176d3; /* SLDS Brand Blue */
     color: #ffffff;
     border: none;
-    border-radius: 8px;
+    border-radius: 4px; /* More classic radius */
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 400;
     cursor: pointer;
     transition: all 0.2s ease;
     font-family: inherit;
@@ -117,12 +117,12 @@
     gap: 8px;
     height: 44px;
     padding: 0 28px;
-    background: #1e8e3e;
+    background: #2e844a; /* SLDS Success Green */
     color: #ffffff;
     border: none;
-    border-radius: 8px;
+    border-radius: 4px;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 400;
     cursor: pointer;
     transition: all 0.2s ease;
     font-family: inherit;

@@ -18,16 +18,14 @@ public with sharing class AttendanceMonthlySeederBatch implements Database.Batch
             employeeIds.add(employee.Id);
         }
 
-        Date monthStart = Date.today().toStartOfMonth();
-        Date monthEnd = monthStart.addMonths(1).addDays(-1);
+        Date attendanceDate = Date.today();
 
         Set<String> existingKeys = new Set<String>();
         for (Attendance__c existingAttendance : [
             SELECT Unique_Key__c
             FROM Attendance__c
             WHERE Employee__c IN :employeeIds
-            AND Attendance_Date__c >= :monthStart
-            AND Attendance_Date__c <= :monthEnd
+            AND Attendance_Date__c = :attendanceDate
         ]) {
             if (String.isNotBlank(existingAttendance.Unique_Key__c)) {
                 existingKeys.add(existingAttendance.Unique_Key__c);
@@ -36,30 +34,25 @@ public with sharing class AttendanceMonthlySeederBatch implements Database.Batch
 
         List<Attendance__c> recordsToInsert = new List<Attendance__c>();
         for (Employee__c employee : employees) {
-            Date cursorDate = monthStart;
-            while (cursorDate <= monthEnd) {
-                String keyValue = WorkdayManagementUtil.buildAttendanceKey(employee.Id, cursorDate);
-                if (existingKeys.contains(keyValue)) {
-                    cursorDate = cursorDate.addDays(1);
-                    continue;
-                }
-
-                Boolean isWorking = WorkdayManagementUtil.isWorkingDay(employee, cursorDate);
-                Attendance__c record = new Attendance__c();
-                record.Employee__c = employee.Id;
-                record.Attendance_Date__c = cursorDate;
-                record.Unique_Key__c = keyValue;
-                record.Day_Status__c = isWorking
-                    ? WorkdayManagementUtil.DAY_STATUS_PLANNED
-                    : WorkdayManagementUtil.DAY_STATUS_LEAVE;
-                record.Is_Week_Off__c = !isWorking;
-                record.Total_Break_Minutes__c = 0;
-                record.Gross_Work_Minutes__c = 0;
-                record.Net_Work_Minutes__c = 0;
-                recordsToInsert.add(record);
-                existingKeys.add(keyValue);
-                cursorDate = cursorDate.addDays(1);
+            String keyValue = WorkdayManagementUtil.buildAttendanceKey(employee.Id, attendanceDate);
+            if (existingKeys.contains(keyValue)) {
+                continue;
             }
+
+            Boolean isWorking = WorkdayManagementUtil.isWorkingDay(employee, attendanceDate);
+            Attendance__c record = new Attendance__c();
+            record.Employee__c = employee.Id;
+            record.Attendance_Date__c = attendanceDate;
+            record.Unique_Key__c = keyValue;
+            record.Day_Status__c = isWorking
+                ? WorkdayManagementUtil.DAY_STATUS_PLANNED
+                : WorkdayManagementUtil.DAY_STATUS_LEAVE;
+            record.Is_Week_Off__c = !isWorking;
+            record.Total_Break_Minutes__c = 0;
+            record.Gross_Work_Minutes__c = 0;
+            record.Net_Work_Minutes__c = 0;
+            recordsToInsert.add(record);
+            existingKeys.add(keyValue);
         }
 
         if (!recordsToInsert.isEmpty()) {

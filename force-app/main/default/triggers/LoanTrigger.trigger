@@ -1,4 +1,4 @@
-trigger LoanTrigger on Loan__c (before insert, after insert) {
+trigger LoanTrigger on Loan__c (before insert, after insert, after update) {
     LoanTriggerFrameworkHandler handler = new LoanTriggerFrameworkHandler(
         (List<Loan__c>) Trigger.new,
         (Trigger.isUpdate || Trigger.isDelete || Trigger.isUndelete)
@@ -18,5 +18,6 @@ trigger LoanTrigger on Loan__c (before insert, after insert) {
 
     if (Trigger.isAfter) {
         if (Trigger.isInsert) handler.afterInsert();
+        if (Trigger.isUpdate) handler.afterUpdate();
     }
 }

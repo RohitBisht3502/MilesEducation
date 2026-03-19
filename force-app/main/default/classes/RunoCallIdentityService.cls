@@ -193,13 +193,16 @@ public without sharing class RunoCallIdentityService {
         newLead.Candidate__c = candidateId;
         newLead.Course__c = course;
 
-        if (!String.isBlank(candidate.Email)) {
-            newLead.Email__c = candidate.Email;
-        } else if (sourceLead != null && !String.isBlank(sourceLead.Email__c)) {
-            newLead.Email__c = sourceLead.Email__c;
-        } else {
-            throw new AuraHandledException('Candidate does not have an email.');
-        }
+       // Set Email (optional now)
+if (!String.isBlank(candidate.Email)) {
+    newLead.Email__c = candidate.Email;
+} 
+else if (sourceLead != null && !String.isBlank(sourceLead.Email__c)) {
+    newLead.Email__c = sourceLead.Email__c;
+} 
+else {
+    newLead.Email__c = null; // ✅ allow null email
+}
 
         if (sourceLead != null) {
             newLead.Name = sourceLead.Name;

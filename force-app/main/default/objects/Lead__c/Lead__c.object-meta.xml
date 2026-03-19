@@ -158,13 +158,13 @@
     <enableSharing>true</enableSharing>
     <enableStreamingApi>true</enableStreamingApi>
     <externalSharingModel>Private</externalSharingModel>
-    <label>Program</label>
+    <label>Lead</label>
     <nameField>
         <label>Lead Name</label>
         <trackHistory>false</trackHistory>
         <type>Text</type>
     </nameField>
-    <pluralLabel>Programs</pluralLabel>
+    <pluralLabel>Leads</pluralLabel>
     <recordTypeTrackHistory>false</recordTypeTrackHistory>
     <searchLayouts>
         <excludedStandardButtons>ChangeOwner</excludedStandardButtons>

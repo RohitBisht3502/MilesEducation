@@ -252,6 +252,7 @@
                                             <th scope="col" class="table-header-cell">Email</th>
                                             <th scope="col" class="table-header-cell">Phone</th>
                                             <th scope="col" class="table-header-cell">Status</th>
+                                            <th scope="col" class="table-header-cell">Duration</th>
                                             <th scope="col" class="table-header-cell">Registration Date</th>
                                             <th scope="col" class="table-header-cell table-header-cell--actions">Actions
                                             </th>
@@ -296,6 +297,9 @@
                                                     <span class={item.statusBadgeClass}>
                                                         {item.status}
                                                     </span>
+                                                </td>
+                                                <td class="table-cell">
+                                                    <span class="date-text">{item.formattedDuration}</span>
                                                 </td>
                                                 <td class="table-cell">
                                                     <span class="date-text">{item.formattedDate}</span>

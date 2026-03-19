@@ -23,8 +23,8 @@ public class WebinarController {
     @AuraEnabled(cacheable=true)
     public static List<WebinarDTO> getWebinarsByNameOrId(String searchKey) {
         List<WebinarDTO> out = new List<WebinarDTO>();
-        Datetime nowDt = System.now();
-        String key = String.isBlank(searchKey) ? null : '%' + String.escapeSingleQuotes(searchKey.trim()) + '%';
+        String trimmedSearchKey = String.isBlank(searchKey) ? null : searchKey.trim();
+        String key = String.isBlank(trimmedSearchKey) ? null : '%' + trimmedSearchKey + '%';
 
         List<Webinar__c> webinars;
         if (String.isBlank(key)) {
@@ -45,8 +45,11 @@ public class WebinarController {
                 WHERE IsActive__c = TRUE
                     AND Status__c IN ('Created', 'Started')
                     AND Start_Date_Time__c != null
-                    AND Start_Date_Time__c >= :nowDt
-                    AND (Name LIKE :key OR Webinar_Id__c LIKE :key)
+                    AND (
+                        Name LIKE :key
+                        OR Webinar_Id__c LIKE :key
+                        OR Webinar_Id__c = :trimmedSearchKey
+                    )
                 ORDER BY Start_Date_Time__c DESC, Name ASC
                 LIMIT 200
             ];

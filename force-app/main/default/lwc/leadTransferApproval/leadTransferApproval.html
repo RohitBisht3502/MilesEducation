@@ -1,0 +1,43 @@
+<template>
+
+    <!-- MODAL HEADER -->
+    <lightning-modal-header label="Lead Transfer Request"></lightning-modal-header>
+
+    <!-- MODAL BODY -->
+    <lightning-modal-body>
+        <div class="slds-p-around_medium">
+
+            <lightning-textarea 
+                label=" Comments"
+                value={comments}
+                onchange={handleCommentChange}
+                required>
+            </lightning-textarea>
+
+        </div>
+
+        <template if:true={isSameOwner}>
+    <div class="slds-text-color_error slds-m-bottom_small">
+        You cannot send request for your own lead.
+    </div>
+</template>
+    </lightning-modal-body>
+
+    <!-- MODAL FOOTER -->
+    <lightning-modal-footer>
+<div class="footer">
+        <lightning-button 
+            label="Cancel"
+            onclick={handleCancel}>
+        </lightning-button>
+
+        <lightning-button 
+            label="send"
+            variant="brand"
+            onclick={handleSubmit}
+            disabled={isSubmitDisabled}>
+        </lightning-button>
+</div>
+    </lightning-modal-footer>
+
+</template>

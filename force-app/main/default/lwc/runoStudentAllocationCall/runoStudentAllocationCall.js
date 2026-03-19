@@ -109,6 +109,7 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
     savingFeedback = false;
     feedback = '';
     nextFollowUpDate = null;
+    nextFollowUpTime = null;
 
     lastCallId = null;
 
@@ -223,19 +224,18 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
             return val && !existing.has(val);
         });
     }
+    get isRelatedStageDisabled() {
+        return !this.isApiResponseReceived;
+    }
+
+
 
     get disableCreateLead() {
-        const emailValid = this.newLeadEmail && this.newLeadEmail.includes('@');
-
         return (
-            !this.identity?.canId ||
             !this.newLeadCourse ||
-            !emailValid ||
-            this.availableCourseOptions.length === 0 ||
             this.isCreatingRelatedLead
         );
     }
-
     get isLeadTab() {
         return this.activeTab === 'lead';
     }
@@ -321,7 +321,7 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
     }
 
     get isStageFinalDisabled() {
-        return this.isStageDisabled ;
+        return this.isStageDisabled || this.isFeedbackDisabled;
     }
 
     get isFollowUpFinalDisabled() {
@@ -381,6 +381,7 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
 
     handleNewLeadCourseChange(event) {
         this.newLeadCourse = event.detail.value;
+        console.log('Selected Course:', this.newLeadCourse);
     }
 
     handleNewLeadEmailChange(event) {
@@ -416,6 +417,59 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
         this.expectedPaymentDate = event.target.value;
     }
 
+    get todayIsoDate() {
+        return new Date().toLocaleDateString('en-CA');
+    }
+
+    get isConnectedOnlyFieldsDisabled() {
+        return this.isFeedbackDisabled || this.l1Value !== 'Connected';
+    }
+
+    resetConnectedOnlyFieldsIfNeeded() {
+        if (this.l1Value === 'Connected') {
+            return;
+        }
+
+        this.expectedPaymentDate = null;
+        this.notifyMe = false;
+        this.isDnd = false;
+        this.isSpam = false;
+    }
+
+    isPastExpectedPaymentDate() {
+        return !!this.expectedPaymentDate && this.expectedPaymentDate < this.todayIsoDate;
+    }
+
+    getNormalizedProgramName() {
+        return String(this.levelValue || this.courseValue || this.identity?.level || '')
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, '');
+    }
+
+    isExpectedPaymentDateRequired() {
+        const stage = String(this.stageValue || '').trim().toUpperCase();
+        const program = this.getNormalizedProgramName();
+
+        if (!stage || !program) {
+            return false;
+        }
+
+        if (program.includes('USP')) {
+            return stage === 'U6';
+        }
+
+        if (
+            program.includes('CPA') ||
+            program.includes('CMA') ||
+            program.includes('CAIRA')
+        ) {
+            return stage === 'M6';
+        }
+
+        return false;
+    }
+
     handleCourseChange(event) {
         this.courseValue = event.target.value;
     }
@@ -433,6 +487,7 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
         this.isL2Disabled = this.l2Options.length === 0;
         this.l2Value = '';
         this.isStageDisabled = this.l1Value === 'Not-Connected';
+        this.resetConnectedOnlyFieldsIfNeeded();
 
         this.updateCommentVisibility();
     }
@@ -473,6 +528,13 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
         }
     }
 
+
+    handleNextFollowUpTimeChange(event) {
+        if (!this.autoSetFollowUp) {
+            this.nextFollowUpTime = event.target.value;
+        }
+    }
+
     close() {
         this.dispatchEvent(new CloseActionScreenEvent());
     }
@@ -502,7 +564,7 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
     }
 
     async handleCreateRelatedLead() {
-        if (!this.candidateId || !this.newLeadCourse || !this.newLeadEmail || this.isCreatingRelatedLead) {
+        if (!this.candidateId || !this.newLeadCourse || this.isCreatingRelatedLead) {
             return;
         }
 
@@ -562,7 +624,7 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
         this.clearFeedbackTimers();
 
         if (this.subscription) {
-            unsubscribe(this.subscription, () => {});
+            unsubscribe(this.subscription, () => { });
             this.subscription = null;
         }
     }
@@ -805,6 +867,7 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
         this.showCallPopup = true;
 
         this.l1Value = 'Not-Connected';
+        this.resetConnectedOnlyFieldsIfNeeded();
         this.l2Value = '';
 
         const l2List = this.l1L2Map[this.l1Value] || [];
@@ -897,10 +960,10 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
         const yyyy = next.getFullYear();
         const mm = String(next.getMonth() + 1).padStart(2, '0');
         const dd = String(next.getDate()).padStart(2, '0');
-        const hh = String(next.getHours()).padStart(2, '0');
-        const mi = String(next.getMinutes()).padStart(2, '0');
 
-        this.nextFollowUpDate = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+
+        this.nextFollowUpDate = `${yyyy}-${mm}-${dd}`;
+        this.nextFollowUpTime = `10:00`;
     }
 
     applyAutoStageLogic() {
@@ -955,19 +1018,64 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
             );
             return;
         }
+        if (!this.l2Value) {
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title: 'Error',
+                    message: 'Please select L2 before saving feedback.',
+                    variant: 'error'
+                })
+            );
+            return;
+        }
+
+        if (this.isExpectedPaymentDateRequired() && !this.expectedPaymentDate) {
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title: 'Required',
+                    message: 'Expected Payment Date is mandatory for this stage.',
+                    variant: 'error'
+                })
+            );
+            return;
+        }
+        if (this.isPastExpectedPaymentDate()) {
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title: 'Required',
+                    message: 'Expected Payment Date cannot be in the past.',
+                    variant: 'error'
+                })
+            );
+            return;
+        }
+
 
         if (this.l1Value === 'Not-Connected') {
             this.stageValue = null;
+            this.resetConnectedOnlyFieldsIfNeeded();
         }
 
         this.savingFeedback = true;
 
         try {
+            let combinedDateTime = this.nextFollowUpDate
+                ? this.nextFollowUpDate + 'T' + (this.nextFollowUpTime || '10:00') + ':00'
+                : null;
+
+            // FORCE CLEAN (THIS FIXES YOUR ERROR)
+            if (combinedDateTime) {
+                combinedDateTime = combinedDateTime.split('.')[0];
+            }
+
+            console.log('FINAL DATETIME:', combinedDateTime);
+
+
             const payload = {
                 recordId: this.recordId,
                 callId: this.lastCallId,
                 feedback: this.feedback?.trim(),
-                nextFollowUpDate: this.nextFollowUpDate,
+                nextFollowUpDate: combinedDateTime,
                 l1: this.l1Value,
                 l2: this.l2Value,
                 notifyMe: this.notifyMe,
@@ -1051,7 +1159,7 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
                 } else if (e && e.message) {
                     message = e.message;
                 }
-            } catch (err) {}
+            } catch (err) { }
 
             this.dispatchEvent(
                 new ShowToastEvent({
@@ -1128,7 +1236,7 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
             .then(resp => {
                 this.subscription = resp;
             })
-            .catch(() => {});
+            .catch(() => { });
     }
 
     onRunoEvent(msg) {
@@ -1156,15 +1264,21 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
         const status = p.Status__c || p.status || '';
 
         if (status === 'Completed' && !Number.isNaN(duration) && duration > 0) {
-            this.l1Value = 'Connected';
 
-            const totalSec = Math.floor(duration);
+            this.l1Value = 'Connected';
+            this.isL1Locked = true;
+
+            totalSec = Math.floor(duration);
             const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
             const ss = String(totalSec % 60).padStart(2, '0');
-
             this.elapsedLabel = `${mm}:${ss}`;
+
         } else {
+
             this.l1Value = 'Not-Connected';
+            this.isL1Locked = true;
+            this.resetConnectedOnlyFieldsIfNeeded();
+
             this.elapsedLabel = '00:00';
         }
 

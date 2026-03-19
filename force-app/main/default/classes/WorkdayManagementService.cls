@@ -48,11 +48,13 @@ public with sharing class WorkdayManagementService {
     private static final String STATE_ENDED = 'ENDED';
     private static final String STATE_LEAVE = 'LEAVE';
     private static final String STATE_INACTIVE = 'INACTIVE';
+    private static final String MISSING_TODAY_ATTENDANCE_MESSAGE =
+        'We do not have the attendance record for you. Please contact admin to proceed.';
 
     @AuraEnabled
     public static DashboardResponse loadDashboard() {
         Employee__c employee = getOrCreateEmployee(UserInfo.getUserId());
-        Attendance__c todayAttendance = getOrCreateTodayAttendance(employee, false);
+        Attendance__c todayAttendance = queryTodayAttendance(employee.Id, false);
         List<Break_Time__c> todayBreaks = todayAttendance == null
             ? new List<Break_Time__c>()
             : getBreaksForAttendance(todayAttendance.Id);
@@ -71,7 +73,7 @@ public with sharing class WorkdayManagementService {
             throw new AuraHandledException('Your employee profile is inactive. Please contact your manager.');
         }
 
-        Attendance__c todayAttendance = getOrCreateTodayAttendance(employee, true);
+        Attendance__c todayAttendance = getTodayAttendanceRequired(employee, true);
         if (todayAttendance.Day_Status__c == WorkdayManagementUtil.DAY_STATUS_LEAVE) {
             throw new AuraHandledException('You are marked unavailable for today.');
         }
@@ -99,7 +101,7 @@ public with sharing class WorkdayManagementService {
     @AuraEnabled
     public static DashboardResponse startBreak() {
         Employee__c employee = getOrCreateEmployee(UserInfo.getUserId());
-        Attendance__c todayAttendance = getOrCreateTodayAttendance(employee, true);
+        Attendance__c todayAttendance = getTodayAttendanceRequired(employee, true);
 
         validateAttendanceForBreak(todayAttendance);
 
@@ -138,7 +140,7 @@ public with sharing class WorkdayManagementService {
     @AuraEnabled
     public static DashboardResponse endBreak() {
         Employee__c employee = getOrCreateEmployee(UserInfo.getUserId());
-        Attendance__c todayAttendance = getOrCreateTodayAttendance(employee, true);
+        Attendance__c todayAttendance = getTodayAttendanceRequired(employee, true);
 
         validateAttendanceForBreak(todayAttendance);
 
@@ -172,7 +174,7 @@ public with sharing class WorkdayManagementService {
     @AuraEnabled
     public static DashboardResponse endDay() {
         Employee__c employee = getOrCreateEmployee(UserInfo.getUserId());
-        Attendance__c todayAttendance = getOrCreateTodayAttendance(employee, true);
+        Attendance__c todayAttendance = getTodayAttendanceRequired(employee, true);
 
         if (todayAttendance.Start_Time__c == null) {
             throw new AuraHandledException('Day is not started yet.');
@@ -523,29 +525,12 @@ public with sharing class WorkdayManagementService {
         return employee;
     }
 
-    private static Attendance__c getOrCreateTodayAttendance(Employee__c employee, Boolean forUpdate) {
-        Attendance__c existingAttendance = queryTodayAttendance(employee.Id, forUpdate);
-        if (existingAttendance != null) {
-            return existingAttendance;
+    private static Attendance__c getTodayAttendanceRequired(Employee__c employee, Boolean forUpdate) {
+        Attendance__c attendance = queryTodayAttendance(employee.Id, forUpdate);
+        if (attendance == null) {
+            throw new AuraHandledException(MISSING_TODAY_ATTENDANCE_MESSAGE);
         }
-
-        Date todayDate = Date.today();
-        Boolean isWorkingDay = WorkdayManagementUtil.isWorkingDay(employee, todayDate);
-
-        Attendance__c attendance = new Attendance__c();
-        attendance.Employee__c = employee.Id;
-        attendance.Attendance_Date__c = todayDate;
-        attendance.Unique_Key__c = WorkdayManagementUtil.buildAttendanceKey(employee.Id, todayDate);
-        attendance.Day_Status__c = isWorkingDay
-            ? WorkdayManagementUtil.DAY_STATUS_PLANNED
-            : WorkdayManagementUtil.DAY_STATUS_LEAVE;
-        attendance.Is_Week_Off__c = !isWorkingDay;
-        attendance.Total_Break_Minutes__c = 0;
-        attendance.Gross_Work_Minutes__c = 0;
-        attendance.Net_Work_Minutes__c = 0;
-        insert attendance;
-
-        return queryTodayAttendance(employee.Id, forUpdate);
+        return attendance;
     }
 
     private static Attendance__c queryTodayAttendance(Id employeeId, Boolean forUpdate) {

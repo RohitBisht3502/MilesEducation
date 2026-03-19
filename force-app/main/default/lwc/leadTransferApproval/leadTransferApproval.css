@@ -1,0 +1,15 @@
+.first-step {
+    display: flex;
+    justify-content: center;
+    padding: 20px 0;
+}
+
+.form-container {
+    padding: 10px 0;
+}
+
+.footer {
+    display: flex;
+    justify-content: flex-end; 
+    gap: 10px;
+}

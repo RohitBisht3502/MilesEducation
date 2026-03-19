@@ -161,8 +161,14 @@ export default class PurchaseOrderProductSelector extends NavigationMixin(Lightn
         return Number(loan?.processingFee) || 0;
     }
 
+    get selectedLoanAmount() {
+        if (!this.selectedLoanId || !this.loans || !this.loans.length) return 0;
+        const loan = this.loans.find((l) => l.id === this.selectedLoanId);
+        return Number(loan?.amountRequested) || 0;
+    }
+
     get effectiveMinimumDownPayment() {
-        return Math.max(0, Number(this.minimumDownPayment) || 0) + (Number(this.processingFee) || 0);
+        return 0;
     }
 
     get processingFeeMessage() {
@@ -190,10 +196,17 @@ export default class PurchaseOrderProductSelector extends NavigationMixin(Lightn
     }
 
     get downPaymentMinMessageText() {
-        if (this.effectiveMinimumDownPayment > 0) {
-            return `Minimum down payment should be Rs ${this.effectiveMinimumDownPayment}`;
+        return 'Down payment should be greater than 0.';
+    }
+
+    get downPaymentSuggestionText() {
+        const suggestedAmount = this.selectedLoanId
+            ? Math.max(0, this.finalPayable - this.selectedLoanAmount)
+            : Math.max(0, Number(this.minimumDownPayment) || 0) + (Number(this.processingFee) || 0);
+        if (suggestedAmount > 0) {
+            return `Suggested down payment: Rs ${suggestedAmount}. SPOC can enter any down payment amount.`;
         }
-        return 'Down payment cannot be negative.';
+        return '';
     }
 
     get formattedLoans() {
@@ -404,7 +417,8 @@ export default class PurchaseOrderProductSelector extends NavigationMixin(Lightn
                 status: l.loan_status__c,
                 milesLoanCode: l.miles_loan_code__c,
                 tenure: l.Tenure__c,
-                processingFee: l.Processing_Fee__c
+                processingFee: l.Processing_Fee__c,
+                amountRequested: l.Amount_requested__c
             }));
 
             const addressStatus = await checkAddressByRecordId({ recordId: this.recordId });
@@ -545,6 +559,11 @@ export default class PurchaseOrderProductSelector extends NavigationMixin(Lightn
             return;
         }
 
+        if (this.downPayment <= 0) {
+            this.showToast('Error', 'Down payment should be greater than 0.', 'error');
+            return;
+        }
+
         if (this.downPayment < this.effectiveMinimumDownPayment) {
             this.showToast(
                 'Error',
@@ -586,7 +605,7 @@ export default class PurchaseOrderProductSelector extends NavigationMixin(Lightn
                 productId: p.id,
                 unitPrice: p.price,
                 qty: 1,
-                learningType: p.type
+                learningType: this.getPayloadLearningType(p)
             }))
         };
 
@@ -757,7 +776,9 @@ export default class PurchaseOrderProductSelector extends NavigationMixin(Lightn
         const min = this.effectiveMinimumDownPayment;
         let message = '';
 
-        if (value < min) {
+        if (value <= 0) {
+            message = 'Down payment should be greater than 0.';
+        } else if (value < min) {
             message = `Minimum down payment should be Rs ${min}`;
         } else if (value > this.finalPayable) {
             message = 'Down payment cannot exceed total payable.';
@@ -766,5 +787,13 @@ export default class PurchaseOrderProductSelector extends NavigationMixin(Lightn
         input.setCustomValidity(message);
         input.reportValidity();
         return !message;
+    }
+
+    getPayloadLearningType(product) {
+        const productName = (product?.name || '').trim().toLowerCase();
+        if (productName === 'cpa training' || productName === 'cma training') {
+            return 'Training';
+        }
+        return product?.type || '';
     }
 }

@@ -1,13 +1,11 @@
 <template>
     <lightning-card title="Lead Activity Timeline" icon-name="standard:lead">
-        <!-- LOADER -->
         <template if:true={loading}>
             <div class="center">
                 <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
             </div>
         </template>
 
-        <!-- LEAD HEADER -->
         <template if:true={lead}>
             <div class="section-bar"></div>
             <div class="section-box lead-header">
@@ -50,15 +48,12 @@
                 </div>
             </div>
 
-            <!-- ACTIVITIES LIST -->
             <template if:true={hasActivities}>
                 <template for:each={activities} for:item="act">
                     <div key={act.id}>
                         <div class="section-bar"></div>
 
                         <div class="section-box">
-
-                            <!-- CALL ACTIVITY -->
                             <template if:true={act.isCall}>
                                 <div class="call-header">
                                     <div class="call-title">
@@ -70,10 +65,6 @@
 
                                         <div>
                                             <div class="call-direction">{act.callTypeLabel}</div>
-                                            <div class="call-meta">
-                                                Called by •
-                                                <span class="value">{act.createdByText}</span>
-                                            </div>
                                         </div>
                                     </div>
 
@@ -85,15 +76,11 @@
                                 <div class="call-body">
                                     <div class="call-body-header">
                                         <span>Call Duration</span>
-                                        <span>Comments</span>
                                     </div>
 
                                     <div class="call-body-values">
                                         <span class="call-duration">
                                             {act.formattedDuration}
-                                        </span>
-                                        <span class="call-comment">
-                                            {act.description}
                                         </span>
                                     </div>
                                 </div>
@@ -107,24 +94,10 @@
                                         <template if:true={act.l2}>
                                             <span class="pill">L2: {act.l2}</span>
                                         </template>
-
-                                        <template if:true={act.callRecordingUrl}>
-                                            <a href={act.callRecordingUrl}
-                                               target="_blank"
-                                               class="pill pill-link">
-                                                Recording
-                                            </a>
-                                        </template>
-                                    </div>
-
-                                    <div class="call-actor">
-                                        <span class="label">Action Performed By:</span>
-                                        <span class="value">{act.actionByName}</span>
                                     </div>
                                 </div>
                             </template>
 
-                            <!-- LEVEL CHANGE ACTIVITY -->
                             <template if:true={act.isLevelChange}>
                                 <div class="level-card">
                                     <div class="level-header">
@@ -168,7 +141,52 @@
                                 </div>
                             </template>
 
-                            <!-- MERGE LEAD ACTIVITY -->
+                            <template if:true={act.isOwnerChange}>
+                                <div class="merge-card">
+                                    <div class="merge-header">
+                                        <div class="merge-title-section">
+                                            <lightning-icon
+                                                icon-name="utility:user"
+                                                size="small"
+                                                class="merge-icon">
+                                            </lightning-icon>
+                                            <div>
+                                                <div class="merge-title">{act.name}</div>
+                                                <div class="merge-meta">
+                                                    Category • <span class="value">{act.activityType}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="merge-time">
+                                            {act.formattedChangedDateTime}
+                                        </div>
+                                    </div>
+
+                                    <div class="merge-body">
+                                        <div class="merge-description">{act.description}</div>
+                                        <div class="owner-grid">
+                                            <template if:true={act.previousOwnerName}>
+                                                <div class="owner-grid-item">
+                                                    <span class="label">Previous Owner:</span>
+                                                    <span class="value">{act.previousOwnerName}</span>
+                                                </div>
+                                            </template>
+                                            <template if:true={act.newOwnerName}>
+                                                <div class="owner-grid-item">
+                                                    <span class="label">New Owner:</span>
+                                                    <span class="value">{act.newOwnerName}</span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+
+                                    <div class="merge-footer">
+                                        <span class="label">Action Performed By:</span>
+                                        <span class="value">{act.actionByName}</span>
+                                    </div>
+                                </div>
+                            </template>
+
                             <template if:true={act.isMergeLead}>
                                 <div class="merge-card">
                                     <div class="merge-header">
@@ -203,7 +221,6 @@
                                 </div>
                             </template>
 
-                            <!-- VIEW PHONE NUMBER ON LEAD ACTIVITY -->
                             <template if:true={act.isViewedPhoneNumber}>
                                 <div class="merge-card">
                                     <div class="merge-header">
@@ -229,7 +246,6 @@
                                         <div class="merge-description">
                                             {act.loggingId}
                                         </div>
-                                        
                                     </div>
 
                                     <div class="merge-footer">
@@ -239,7 +255,6 @@
                                 </div>
                             </template>
 
-                            <!-- GMEET ACTIVITY -->
                             <template if:true={act.isGmeet}>
                                 <div class="merge-card">
                                     <div class="merge-header">
@@ -252,7 +267,7 @@
                                             <div>
                                                 <div class="merge-title">{act.name}</div>
                                                 <div class="merge-meta">
-                                                    Category â€¢ <span class="value">{act.activityType}</span>
+                                                    Category • <span class="value">{act.activityType}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -274,7 +289,149 @@
                                 </div>
                             </template>
 
-                            <!-- OTHER ACTIVITY -->
+                            <template if:true={act.isPurchase}>
+                                <div class="merge-card">
+                                    <div class="merge-header">
+                                        <div class="merge-title-section">
+                                            <lightning-icon
+                                                icon-name="utility:cart"
+                                                size="small"
+                                                class="merge-icon">
+                                            </lightning-icon>
+                                            <div>
+                                                <div class="merge-title">{act.name}</div>
+                                                <div class="merge-meta">
+                                                    Category • <span class="value">{act.activityType}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="merge-time">
+                                            {act.formattedChangedDateTime}
+                                        </div>
+                                    </div>
+
+                                    <div class="merge-body">
+                                        <div class="merge-description">
+                                            {act.description}
+                                        </div>
+                                        <template if:true={act.efStatus}>
+                                            <div class="merge-description">
+                                                EF Status: {act.efStatus}
+                                            </div>
+                                        </template>
+                                    </div>
+
+                                    <div class="merge-footer">
+                                        <span class="label">Action Performed By:</span>
+                                        <span class="value">{act.actionByName}</span>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <template if:true={act.isTransaction}>
+                                <div class="merge-card">
+                                    <div class="merge-header">
+                                        <div class="merge-title-section">
+                                            <lightning-icon
+                                                icon-name="utility:money"
+                                                size="small"
+                                                class="merge-icon">
+                                            </lightning-icon>
+                                            <div>
+                                                <div class="merge-title">{act.name}</div>
+                                                <div class="merge-meta">
+                                                    Category • <span class="value">{act.activityType}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="merge-time">
+                                            {act.formattedChangedDateTime}
+                                        </div>
+                                    </div>
+
+                                    <div class="merge-body">
+                                        <div class="merge-description">
+                                            {act.description}
+                                        </div>
+                                        <template if:true={act.transactionStatus}>
+                                            <div class="merge-description">
+                                                Status: {act.transactionStatus}
+                                            </div>
+                                        </template>
+                                        <template if:true={act.transactionAmount}>
+                                            <div class="merge-description">
+                                                Amount: {act.transactionAmount}
+                                            </div>
+                                        </template>
+                                    </div>
+
+                                    <div class="merge-footer">
+                                        <span class="label">Action Performed By:</span>
+                                        <span class="value">{act.actionByName}</span>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <template if:true={act.isLoan}>
+                                <div class="merge-card">
+                                    <div class="merge-header">
+                                        <div class="merge-title-section">
+                                            <lightning-icon
+                                                icon-name="utility:moneybag"
+                                                size="small"
+                                                class="merge-icon">
+                                            </lightning-icon>
+                                            <div>
+                                                <div class="merge-title">{act.name}</div>
+                                                <div class="merge-meta">
+                                                    Category • <span class="value">{act.activityType}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="merge-time">
+                                            {act.formattedChangedDateTime}
+                                        </div>
+                                    </div>
+
+                                    <div class="merge-body">
+                                        <div class="merge-description">
+                                            {act.description}
+                                        </div>
+                                        <div class="loan-grid">
+                                            <template if:true={act.loanProvider}>
+                                                <div class="loan-grid-item">
+                                                    <span class="label">Provider:</span>
+                                                    <span class="value">{act.loanProvider}</span>
+                                                </div>
+                                            </template>
+                                            <template if:true={act.milesLoanCode}>
+                                                <div class="loan-grid-item">
+                                                    <span class="label">Miles Loan Code:</span>
+                                                    <span class="value">{act.milesLoanCode}</span>
+                                                </div>
+                                            </template>
+                                            <template if:true={act.loanAmount}>
+                                                <div class="loan-grid-item">
+                                                    <span class="label">Amount:</span>
+                                                    <span class="value">{act.loanAmount}</span>
+                                                </div>
+                                            </template>
+                                            <template if:true={act.loanStatus}>
+                                                <div class="loan-grid-item">
+                                                    <span class="label">Status:</span>
+                                                    <span class="value">{act.loanStatus}</span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+
+                                    <div class="merge-footer">
+                                        <span class="label">Action Performed By:</span>
+                                        <span class="value">{act.actionByName}</span>
+                                    </div>
+                                </div>
+                            </template>
+
                             <template if:true={act.isOther}>
                                 <div class="merge-card">
                                     <div class="merge-header">
@@ -287,7 +444,7 @@
                                             <div>
                                                 <div class="merge-title">{act.name}</div>
                                                 <div class="merge-meta">
-                                                    Category â€¢ <span class="value">{act.activityType}</span>
+                                                    Category • <span class="value">{act.activityType}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -308,7 +465,6 @@
                                     </div>
                                 </div>
                             </template>
-
                         </div>
                     </div>
                 </template>

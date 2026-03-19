@@ -1,4 +1,4 @@
-import { LightningElement, track, api, wire } from 'lwc';
+import { LightningElement, track, api } from 'lwc';
 import searchLeads from '@salesforce/apex/LeadMergeController.searchLeads';
 import submitMergeForApproval from '@salesforce/apex/LeadMergeController.submitMergeForApproval';
 import getLeadDetails from '@salesforce/apex/LeadMergeController.getLeadDetails';
@@ -22,21 +22,18 @@ export default class LeadMerge extends LightningElement {
     currentUserId = USER_ID;
     searchKey = '';
     @track leads = [];
-    @track selectedLeads = [];
+    @track selectedLead = null; // Changed from selectedLeads array to single object
     mainLeadWrapper = null;
 
     connectedCallback() {
-        // Fallback if recordId was set before connectedCallback
         if (this._recordId && !this.mainLeadWrapper) {
             this.fetchMainLeadDetails();
         }
     }
 
     fetchMainLeadDetails() {
-        console.log('Fetching main lead details for:', this._recordId);
         getLeadDetails({ leadId: this._recordId })
             .then(result => {
-                console.log('Main Lead Details Fetched:', JSON.stringify(result));
                 this.mainLeadWrapper = result;
             })
             .catch(error => {
@@ -54,7 +51,7 @@ export default class LeadMerge extends LightningElement {
             return;
         }
 
-        const selectedLeadIds = this.selectedLeads.map(lead => lead.Id);
+        const selectedLeadIds = this.selectedLead ? [this.selectedLead.Id] : [];
 
         searchLeads({
             searchKey: this.searchKey.trim(),
@@ -81,27 +78,26 @@ export default class LeadMerge extends LightningElement {
 
     handleSelectLead(event) {
         const leadId = event.currentTarget.dataset.id;
-        const selectedLead = this.leads.find(lead => lead.Id === leadId);
+        const lead = this.leads.find(l => l.Id === leadId);
 
-        if (selectedLead) {
-            if (selectedLead.isUnderApproval) {
-                this.showToast('Error', 'This lead is already in an approval process and cannot be selected.', 'error');
+        if (lead) {
+            if (lead.isUnderApproval) {
+                this.showToast('Error', 'This lead is already part of a pending approval process.', 'error');
                 return;
             }
-            this.selectedLeads = [...this.selectedLeads, selectedLead];
-            this.leads = this.leads.filter(lead => lead.Id !== leadId);
+            // Enforce single selection: Replace current selection if exists
+            if (this.selectedLead) {
+                this.leads = [this.selectedLead, ...this.leads];
+            }
+            this.selectedLead = lead;
+            this.leads = this.leads.filter(l => l.Id !== leadId);
         }
     }
 
-    handleRemoveLead(event) {
-        event.stopPropagation();
-        const leadId = event.currentTarget.dataset.id;
-        const removedLead = this.selectedLeads.find(lead => lead.Id === leadId);
-
-        this.selectedLeads = this.selectedLeads.filter(lead => lead.Id !== leadId);
-
-        if (removedLead) {
-            this.leads = [removedLead, ...this.leads];
+    handleRemoveLead() {
+        if (this.selectedLead) {
+            this.leads = [this.selectedLead, ...this.leads];
+            this.selectedLead = null;
         }
     }
 
@@ -112,29 +108,24 @@ export default class LeadMerge extends LightningElement {
     }
 
     handleMerge() {
-        if (this.selectedLeads.length === 0) {
-            this.showToast('Warning', 'Please select at least one lead to merge', 'warning');
+        if (!this.selectedLead) {
+            this.showToast('Warning', 'Please select a lead to merge', 'warning');
             return;
         }
 
-        const leadIdsToMerge = this.selectedLeads.map(lead => lead.Id);
-
-        // If validation logic is required on client side before server call:
-        // For now, reliance on server validation is safe, but we could check comments here if showComments is true.
-        if (this.showComments && !this.mergeComments) {
+        if (!this.mergeComments) {
             this.showToast('Error', 'Please enter comments for this merge.', 'error');
             return;
         }
 
         submitMergeForApproval({
             mainLeadId: this.recordId,
-            leadIdsToMerge: leadIdsToMerge,
+            sourceLeadId: this.selectedLead.Id,
             mergeComments: this.mergeComments
         })
             .then(result => {
                 this.showToast('Success', result, 'success');
                 this.resetComponent();
-                // Use setTimeout to ensure the event is processed after UI updates
                 setTimeout(() => {
                     this.dispatchEvent(new CloseActionScreenEvent());
                 }, 200);
@@ -146,33 +137,19 @@ export default class LeadMerge extends LightningElement {
     }
 
     resetComponent() {
-        this.selectedLeads = [];
+        this.selectedLead = null;
         this.leads = [];
         this.searchKey = '';
         this.mergeComments = '';
-        this.fetchMainLeadDetails(); // Refresh main lead details if needed, though status might have changed.
+        this.fetchMainLeadDetails();
     }
 
     showToast(title, message, variant) {
-        this.dispatchEvent(
-            new ShowToastEvent({
-                title: title,
-                message: message,
-                variant: variant
-            })
-        );
+        this.dispatchEvent(new ShowToastEvent({ title, message, variant }));
     }
 
     get hasSelectedLeads() {
-        return this.selectedLeads.length > 0;
-    }
-
-    get selectedLeadsCount() {
-        return this.selectedLeads.length;
-    }
-
-    get selectedLeadsCountPlural() {
-        return this.selectedLeadsCount > 1 ? 's' : '';
+        return !!this.selectedLead;
     }
 
     get hasAnyContent() {
@@ -181,9 +158,5 @@ export default class LeadMerge extends LightningElement {
 
     get showSearchResults() {
         return this.leads.length > 0 && !this.hasSelectedLeads;
-    }
-
-    get showComments() {
-        return this.hasSelectedLeads;
     }
 }

@@ -15,6 +15,17 @@ public without sharing class Callout_PurchaseOrderService {
         public List<RequestItem> purchase_items;
         public Decimal down_payment;
         public String created_by;
+        public AddressPayload billing_address;
+        public AddressPayload shipping_address;
+    }
+
+    public class AddressPayload {
+        public String address_line_1;
+        public String address_line_2;
+        public String city;
+        public String state;
+        public String pincode;
+        public String phone_number;
     }
 
     public class RequestItem{

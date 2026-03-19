@@ -19,6 +19,37 @@ global without sharing class MilesWebService {
         return combinedName != null ? combinedName.trim() : null;
     }
 
+    private static String getCandidateDisplayName(Lead candidate, String fallbackName) {
+        if (candidate == null) return fallbackName;
+
+        String candidateName = candidate.LastName;
+        if (String.isBlank(candidateName)) {
+            candidateName = fallbackName;
+        }
+
+        return candidateName != null ? candidateName.trim() : fallbackName;
+    }
+
+    private static void applyDefaultCandidateAddress(Lead candidate) {
+        if (candidate == null) return;
+        candidate.Country = 'India';
+        candidate.Shipping_Country__c = 'India';
+    }
+
+    private static void createPhoneAssociation(String phone, Id candidateId, Id studentAccountId) {
+        if (String.isBlank(phone)) return;
+
+        Phone_Number__c phoneRec = new Phone_Number__c(
+            Phone__c              = phone,
+            Candidate__c          = candidateId,
+            Student__c            = studentAccountId,
+            Is_Primary__c         = true,
+            Created_Date__C       = 'true',
+            By_Pass_Validation__c = true
+        );
+        insert phoneRec;
+    }
+
     private static String getCourseFromCourseId(Integer courseId) {
         if (courseId == null) return null;
 
@@ -115,6 +146,8 @@ global without sharing class MilesWebService {
             Phone_Number__c phoneExisting;
             Id studentAccountId;
             Id candidateIdFromPhone;
+            Id candidateIdFromEmail;
+            Id studentAccountIdFromEmail;
 
             // checking all scnerios number staring from +91,0 etc
             Set<String> phoneVariants = Utility.buildPhoneVariants(inputData.phone);
@@ -126,13 +159,36 @@ global without sharing class MilesWebService {
                 candidateIdFromPhone = phoneExisting.Candidate__c;
             }
 
+            if (!String.isBlank(inputData.email)) {
+                List<Email__c> emailExistingList = [
+                    SELECT Id, Candidate__c, Student__c
+                    FROM Email__c
+                    WHERE Email__c = :inputData.email
+                    LIMIT 1
+                ];
+                if (!emailExistingList.isEmpty()) {
+                    candidateIdFromEmail = emailExistingList[0].Candidate__c;
+                    studentAccountIdFromEmail = emailExistingList[0].Student__c;
+                }
+            }
+
+            if (studentAccountId == null && studentAccountIdFromEmail != null) {
+                studentAccountId = studentAccountIdFromEmail;
+            }
+
             Boolean phoneExists = (phoneExisting != null);
             // check Account exist or not 
             Boolean isConvertedStudent = (studentAccountId != null);
             // check candidate exist or not 
             Lead candidate;
-            if (!isConvertedStudent && candidateIdFromPhone != null) {
-                List<Lead> candById = [SELECT Id, OwnerId, Phone, Email, UUID__c FROM Lead WHERE Id = :candidateIdFromPhone LIMIT 1];
+            Id resolvedCandidateId = (candidateIdFromPhone != null ? candidateIdFromPhone : candidateIdFromEmail);
+            if (!isConvertedStudent && resolvedCandidateId != null) {
+                List<Lead> candById = [
+                    SELECT Id, OwnerId, Phone, Email, UUID__c, LastName, City__c
+                    FROM Lead
+                    WHERE Id = :resolvedCandidateId
+                    LIMIT 1
+                ];
                 if (!candById.isEmpty()) candidate = candById[0];
             }
 
@@ -150,12 +206,13 @@ global without sharing class MilesWebService {
 
             Id leadRecordTypeId = getLeadRecordTypeId(inputData.course);
             String leadDefaultStage = getDefaultStageForCourse(inputData.course);
+            String leadDisplayName = getCandidateDisplayName(candidate, fullFirstName);
 
             /* =====================================================
                CASE 0: PHONE NOT EXIST 
                Not Exist -> Create Candidate -> Create Lead -> Create Phone Number -> Email Associations
                ===================================================== */
-            if (!phoneExists) {
+            if (!phoneExists && resolvedCandidateId == null && studentAccountId == null) {
 
                 // Create Candidate (Lead)
                 candidate = new Lead(
@@ -170,11 +227,14 @@ global without sharing class MilesWebService {
                     Interested_Webinar_ID__c = inputData.interested_webinar_id,
                     UUID__c                  = inputData.miles_uuid
                 );
+                applyDefaultCandidateAddress(candidate);
                 insert candidate;
+
+                leadDisplayName = getCandidateDisplayName(candidate, fullFirstName);
 
                 // Create Lead__c
                 Lead__c newLead = new Lead__c(
-                    Name                     = fullFirstName,
+                    Name                     = leadDisplayName,
                     Phone__c                 = inputData.phone,
                     Email__c                 = inputData.email,
                     City__c                  = inputData.city,
@@ -189,14 +249,7 @@ global without sharing class MilesWebService {
                 insert newLead;
 
                 // Create Phone_Number__c (tag phone)
-                Phone_Number__c phoneRec = new Phone_Number__c(
-                    Phone__c               = inputData.phone,
-                    Candidate__c           = candidate.Id,
-                    Is_Primary__c          = true,
-                    Created_Date__C        = 'true',
-                    By_Pass_Validation__c  = true
-                );
-                insert phoneRec;
+                createPhoneAssociation(inputData.phone, candidate.Id, null);
 
                 enquiryCandidateId = candidate.Id;
                 enquiryLeadId      = newLead.Id;
@@ -227,12 +280,14 @@ global without sharing class MilesWebService {
                         Interested_Webinar_ID__c = inputData.interested_webinar_id,
                         UUID__c                  = inputData.miles_uuid
                     );
+                    applyDefaultCandidateAddress(candidate);
                     insert candidate;
+                    leadDisplayName = getCandidateDisplayName(candidate, fullFirstName);
                 }
 
                 // For enquiry linking
                 enquiryCandidateId = (candidate != null ? candidate.Id : null);
-                Id candidateIdForLead = (enquiryCandidateId != null ? enquiryCandidateId : candidateIdFromPhone);
+                Id candidateIdForLead = (enquiryCandidateId != null ? enquiryCandidateId : resolvedCandidateId);
                 if (candidateIdForLead != null) {
                     Lead candidateUpdate = new Lead(Id = candidateIdForLead);
                     Boolean shouldUpdateCandidate = false;
@@ -249,6 +304,19 @@ global without sharing class MilesWebService {
                     if (shouldUpdateCandidate) {
                         update candidateUpdate;
                     }
+
+                    if (candidate == null || candidate.Id != candidateIdForLead) {
+                        List<Lead> candidateForName = [
+                            SELECT Id, LastName
+                            FROM Lead
+                            WHERE Id = :candidateIdForLead
+                            LIMIT 1
+                        ];
+                        if (!candidateForName.isEmpty()) {
+                            candidate = candidateForName[0];
+                        }
+                    }
+                    leadDisplayName = getCandidateDisplayName(candidate, fullFirstName);
                 }
 
                 /* =====================================================
@@ -259,7 +327,7 @@ global without sharing class MilesWebService {
                 Lead__c existingLeadC;
                 if (isConvertedStudent && studentAccountId != null) {
                     List<Lead__c> leadCs = [
-                        SELECT Id, Stage__c, Is_ReEnquiry__c, OwnerId,Candidate__c
+                        SELECT Id, Name, Stage__c, Is_ReEnquiry__c, OwnerId, Candidate__c
                         FROM Lead__c
                         WHERE Student__c = :studentAccountId AND Course__c = :inputData.course
                         LIMIT 1
@@ -267,7 +335,7 @@ global without sharing class MilesWebService {
                     if (!leadCs.isEmpty()) existingLeadC = leadCs[0];
                 } else if (candidate != null && candidate.Id != null) {
                     List<Lead__c> leadCs = [
-                        SELECT Id, Stage__c, Is_ReEnquiry__c, OwnerId,Candidate__c
+                        SELECT Id, Name, Stage__c, Is_ReEnquiry__c, OwnerId, Candidate__c
                         FROM Lead__c
                         WHERE Candidate__c = :candidate.Id AND Course__c = :inputData.course
                         LIMIT 1
@@ -285,12 +353,20 @@ global without sharing class MilesWebService {
                         existingLeadC.Candidate__c = candidateIdForLead;
                         shouldUpdateExistingLead = true;
                     }
+                    if (!String.isBlank(leadDisplayName) && existingLeadC.Name != leadDisplayName) {
+                        existingLeadC.Name = leadDisplayName;
+                        shouldUpdateExistingLead = true;
+                    }
                     if (!String.isBlank(inputData.city)) {
                         existingLeadC.City__c = inputData.city;
                         shouldUpdateExistingLead = true;
                     }
                     if (shouldUpdateExistingLead) {
                         update existingLeadC;
+                    }
+
+                    if (!phoneExists) {
+                        createPhoneAssociation(inputData.phone, candidateIdForLead, studentAccountId);
                     }
 
                     // Email Associations
@@ -312,7 +388,7 @@ global without sharing class MilesWebService {
                     // Create lead with that course + tag the phone number + email associations
 
                     Lead__c newLead2 = new Lead__c(
-                        Name                     = fullFirstName,
+                        Name                     = leadDisplayName,
                         Phone__c                 = inputData.phone,
                         Email__c                 = inputData.email,
                         City__c                  = inputData.city,
@@ -335,6 +411,8 @@ global without sharing class MilesWebService {
                             phoneChanged = true;
                         }
                         if (phoneChanged) update phoneExisting;
+                    } else {
+                        createPhoneAssociation(inputData.phone, candidateIdForLead, studentAccountId);
                     }
 
                     enquiryLeadId = newLead2.Id;

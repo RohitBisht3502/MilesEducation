@@ -21,11 +21,11 @@
             <div class="search-section">
                 <h2 class="section-title">
                     <lightning-icon icon-name="utility:search" size="x-small" class="title-icon"></lightning-icon>
-                    Search Contact
+                    Search Candidate
                 </h2>
 
                 <div class="search-box">
-                    <input type="text" class="custom-input" placeholder="Search by name, phone or candidate ID"
+                    <input type="text" class="custom-input" placeholder="Search by candidate name, phone or candidate ID"
                         value={searchKeyword} oninput={handleSearchInput} onkeypress={handleSearchKeyPress} />
                     <button class="search-button" onclick={handleSearchClick} disabled={isLoading}>
                         <lightning-icon icon-name="utility:search" size="x-small"></lightning-icon>
@@ -42,41 +42,32 @@
 
             <template if:true={showLeadResults}>
                 <div class="results-section">
-                    <template for:each={groupedLeadItems} for:item="cand">
-                        <div key={cand.candidateId} class="lead-wrapper">
-                            <div class="lead-info">
-                                <div class="lead-name">{cand.candidateName}</div>
+                    <template for:each={candidates} for:item="candidate">
+                        <div key={candidate.candidateId} class="lead-wrapper">
+                            <div data-id={candidate.candidateId} class={candidate.cssClass} onclick={selectCandidate}>
+                                <div class="lead-info">
+                                    <div class="lead-name">{candidate.candidateName}</div>
+                                    <div class="lead-details-row">
+                                        <span class="lead-detail">
+                                            <lightning-icon icon-name="utility:user" size="xx-small"></lightning-icon>
+                                            Owner: {candidate.ownerName}
+                                        </span>
+                                        <span class="lead-detail">
+                                            <lightning-icon icon-name="utility:topic" size="xx-small"></lightning-icon>
+                                            Courses: {candidate.courseSummary}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
 
-                            <template for:each={cand.courses} for:item="lead">
-                                <div key={lead.id} class="lead-wrapper">
-                                    <div data-id={lead.id} class={lead.cssClass} onclick={selectLead}>
-                                        <div class="lead-info">
-                                            <div class="lead-details-row">
-                                                <span class="lead-detail">
-                                                    <lightning-icon icon-name="utility:topic"
-                                                        size="xx-small"></lightning-icon>
-                                                    {lead.course}
-                                                </span>
-                                                <span class="lead-detail">
-                                                    <lightning-icon icon-name="utility:user"
-                                                        size="xx-small"></lightning-icon>
-                                                    Owner: {lead.ownerName}
-                                                </span>
-                                            </div>
-                                        </div>
+                            <template if:true={candidate.showTagForm}>
+                                <div class="tag-form-section">
+                                    <div class="tag-form-container">
+                                        <button class="custom-button primary tag-button-inline"
+                                            onclick={handleTagLead} disabled={isLoading}>
+                                            {tagButtonLabel}
+                                        </button>
                                     </div>
-
-                                    <template if:true={lead.showTagForm}>
-                                        <div class="tag-form-section">
-                                            <div class="tag-form-container">
-                                                <button class="custom-button primary tag-button-inline"
-                                                    onclick={handleTagLead} disabled={isLoading}>
-                                                    {tagButtonLabel}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </template>
                                 </div>
                             </template>
                         </div>
@@ -87,9 +78,9 @@
             <template if:true={showNotFound}>
                 <div class="not-found-section">
                     <lightning-icon icon-name="utility:info" size="medium" class="info-icon"></lightning-icon>
-                    <h3 class="not-found-title">No leads found</h3>
+                    <h3 class="not-found-title">No candidates found</h3>
                     <p class="not-found-message">
-                        We couldn't find any leads matching "{searchKeyword}"
+                        We couldn't find any candidates matching "{searchKeyword}"
                     </p>
                 </div>
             </template>
@@ -191,6 +182,15 @@
         </div>
 
         <div class="footer-actions">
+            <template if:true={showSearch}>
+                <button class="custom-button warning" onclick={handleMarkSpam} disabled={isLoading}>
+                    {spamButtonLabel}
+                </button>
+                <button class="custom-button secondary" onclick={handleMarkDnd} disabled={isLoading}>
+                    {dndButtonLabel}
+                </button>
+            </template>
+
             <template if:true={showNotFound}>
                 <button class="custom-button primary" onclick={handleCreateNew}>
                     Create New Lead

@@ -469,6 +469,27 @@ select.custom-input:disabled {
     color: #c9c7c5;
 }
 
+.custom-button.warning {
+    color: #ffffff;
+    background-color: #ba0517;
+    border-color: #ba0517;
+}
+
+.custom-button.warning:hover:not(:disabled) {
+    background-color: #8e030f;
+    border-color: #8e030f;
+}
+
+.custom-button.warning:active:not(:disabled) {
+    background-color: #64020a;
+    border-color: #64020a;
+}
+
+.custom-button.warning:disabled {
+    background-color: #c9c7c5;
+    border-color: #c9c7c5;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .call-details-inline {

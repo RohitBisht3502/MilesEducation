@@ -1,6 +1,7 @@
 import { LightningElement, api, track, wire } from 'lwc';
 import searchLeads from '@salesforce/apex/TagLeadController.searchLeads';
 import tagOrCreateLead from '@salesforce/apex/TagLeadController.tagOrCreateLead';
+import markPhoneNumberStatus from '@salesforce/apex/TagLeadController.markPhoneNumberStatus';
 import getCityOptions from '@salesforce/apex/LeadNewOverrideController.getCityOptions';
 import getSourceOptions from '@salesforce/apex/LeadNewOverrideController.getSourceOptions';
 import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
@@ -19,7 +20,7 @@ const CALL_LOG_FIELDS = [CUSTOMER_NAME_FIELD, PHONE_NUMBER_FIELD];
 export default class TagLeadForCallLog extends LightningElement {
     @api recordId;
 
-    @track leads = [];
+    @track candidates = [];
     @track formData = {
         firstName: '',
         lastName: '',
@@ -35,7 +36,7 @@ export default class TagLeadForCallLog extends LightningElement {
         feedback: ''
     };
     @track searchKeyword = '';
-    selectedLeadId = null;
+    selectedCandidateId = null;
     isLoading = false;
     viewState = 'search';
     hasAutoSearched = false;
@@ -139,8 +140,8 @@ export default class TagLeadForCallLog extends LightningElement {
 
     runSearch(keyword) {
         if (!keyword || keyword.trim().length < 2) {
-            this.leads = [];
-            this.selectedLeadId = null;
+            this.candidates = [];
+            this.selectedCandidateId = null;
             this.viewState = 'search';
             return;
         }
@@ -150,22 +151,22 @@ export default class TagLeadForCallLog extends LightningElement {
         searchLeads({ keyword })
             .then(result => {
                 if (result && result.length > 0) {
-                    this.leads = result.map(lead => ({
-                        ...lead,
-                        selectedClass: '',
-                        OwnerName: lead.Owner ? lead.Owner.Name : 'N/A',
-                        candidateName: lead.Candidate__r ? lead.Candidate__r.Name : lead.Name,
-                        courseDisplay: lead.Course__c || 'NA'
+                    this.candidates = result.map(candidate => ({
+                        ...candidate,
+                        cssClass: candidate.candidateId === this.selectedCandidateId ? 'lead-card selected' : 'lead-card',
+                        showTagForm: candidate.candidateId === this.selectedCandidateId,
+                        ownerName: candidate.ownerName || 'N/A',
+                        courseSummary: candidate.courseSummary || 'No related leads'
                     }));
-                    this.selectedLeadId = null;
+                    this.selectedCandidateId = null;
                     this.viewState = 'search';
                 } else {
-                    this.leads = [];
+                    this.candidates = [];
                     this.viewState = 'notFound';
                 }
             })
             .catch(() => {
-                this.leads = [];
+                this.candidates = [];
                 this.viewState = 'notFound';
             })
             .finally(() => {
@@ -187,9 +188,13 @@ export default class TagLeadForCallLog extends LightningElement {
         }
     }
 
-    selectLead(event) {
-        this.selectedLeadId = event.currentTarget.dataset.id;
-
+    selectCandidate(event) {
+        this.selectedCandidateId = event.currentTarget.dataset.id;
+        this.candidates = this.candidates.map(candidate => ({
+            ...candidate,
+            cssClass: candidate.candidateId === this.selectedCandidateId ? 'lead-card selected' : 'lead-card',
+            showTagForm: candidate.candidateId === this.selectedCandidateId
+        }));
         this.setDefaultFollowUpDate();
     }
 
@@ -239,8 +244,8 @@ export default class TagLeadForCallLog extends LightningElement {
     handleCancel() {
         this.viewState = 'search';
         this.searchKeyword = '';
-        this.leads = [];
-        this.selectedLeadId = null;
+        this.candidates = [];
+        this.selectedCandidateId = null;
         this.setDefaultFollowUpDate();
         this.formData = {
             firstName: '',
@@ -262,8 +267,8 @@ export default class TagLeadForCallLog extends LightningElement {
         this.dispatchEvent(new CloseActionScreenEvent());
     }
 
-    get hasLeads() {
-        return this.leads.length > 0;
+    get hasCandidates() {
+        return this.candidates.length > 0;
     }
 
     get showSearch() {
@@ -279,7 +284,7 @@ export default class TagLeadForCallLog extends LightningElement {
     }
 
     get showLeadResults() {
-        return this.viewState === 'search' && this.hasLeads;
+        return this.viewState === 'search' && this.hasCandidates;
     }
 
     get isFormValid() {
@@ -296,36 +301,22 @@ export default class TagLeadForCallLog extends LightningElement {
     }
 
     get tagButtonLabel() {
-        return this.isLoading ? 'Tagging...' : 'Tag Lead';
+        return this.isLoading ? 'Tagging...' : 'Tag Candidate';
     }
 
-    get groupedLeadItems() {
-        const map = new Map();
-        for (const lead of this.leads) {
-            const candidateId = lead.Candidate__c || lead.Id;
-            const candidateName = lead.Candidate__r ? lead.Candidate__r.Name : lead.Name;
-            const group = map.get(candidateId) || {
-                candidateId,
-                candidateName,
-                courses: []
-            };
-            group.courses.push({
-                id: lead.Id,
-                course: lead.Course__c || 'NA',
-                ownerName: lead.Owner ? lead.Owner.Name : 'N/A',
-                cssClass: lead.Id === this.selectedLeadId ? 'lead-card selected' : 'lead-card',
-                showTagForm: lead.Id === this.selectedLeadId
-            });
-            map.set(candidateId, group);
-        }
-        return Array.from(map.values());
+    get spamButtonLabel() {
+        return this.isLoading ? 'Saving...' : 'Mark as Spam';
+    }
+
+    get dndButtonLabel() {
+        return this.isLoading ? 'Saving...' : 'Mark as DND';
     }
 
     handleTagLead() {
-        if (!this.selectedLeadId) {
+        if (!this.selectedCandidateId) {
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Error',
-                message: 'Please select a lead to tag',
+                message: 'Please select a candidate to tag',
                 variant: 'error'
             }));
             return;
@@ -335,7 +326,7 @@ export default class TagLeadForCallLog extends LightningElement {
 
         tagOrCreateLead({
             callLogId: this.recordId,
-            leadId: this.selectedLeadId,
+            candidateId: this.selectedCandidateId,
             name: null,
             course: null,
             email: null,
@@ -355,7 +346,7 @@ export default class TagLeadForCallLog extends LightningElement {
             .then(() => {
                 this.dispatchEvent(new ShowToastEvent({
                     title: 'Success',
-                    message: 'Lead tagged successfully!',
+                    message: 'Candidate tagged successfully!',
                     variant: 'success'
                 }));
 
@@ -364,7 +355,7 @@ export default class TagLeadForCallLog extends LightningElement {
             .catch((error) => {
                 this.dispatchEvent(new ShowToastEvent({
                     title: 'Error',
-                    message: 'Failed to tag lead: ' + (error.body?.message || error.message),
+                    message: 'Failed to tag candidate: ' + (error.body?.message || error.message),
                     variant: 'error'
                 }));
             })
@@ -397,7 +388,7 @@ export default class TagLeadForCallLog extends LightningElement {
 
         tagOrCreateLead({
             callLogId: this.recordId,
-            leadId: null,
+            candidateId: null,
             name: [this.formData.firstName, this.formData.lastName].filter(Boolean).join(' '),
             course: this.formData.course,
             email: this.formData.email,
@@ -427,6 +418,43 @@ export default class TagLeadForCallLog extends LightningElement {
                 this.dispatchEvent(new ShowToastEvent({
                     title: 'Error',
                     message: 'Failed to create lead: ' + (error.body?.message || error.message),
+                    variant: 'error'
+                }));
+            })
+            .finally(() => {
+                this.isLoading = false;
+            });
+    }
+
+    handleMarkSpam() {
+        this.updatePhoneNumberStatus(true, false, 'Phone number marked as spam successfully!');
+    }
+
+    handleMarkDnd() {
+        this.updatePhoneNumberStatus(false, true, 'Phone number marked as DND successfully!');
+    }
+
+    updatePhoneNumberStatus(isSpam, isDnd, successMessage) {
+        this.isLoading = true;
+
+        markPhoneNumberStatus({
+            callLogId: this.recordId,
+            isSpam,
+            isDnd
+        })
+            .then(() => {
+                this.dispatchEvent(new ShowToastEvent({
+                    title: 'Success',
+                    message: successMessage,
+                    variant: 'success'
+                }));
+
+                this.closeModal();
+            })
+            .catch((error) => {
+                this.dispatchEvent(new ShowToastEvent({
+                    title: 'Error',
+                    message: error.body?.message || error.message || 'Failed to update phone status',
                     variant: 'error'
                 }));
             })

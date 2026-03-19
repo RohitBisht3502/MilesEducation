@@ -7,6 +7,7 @@ import createWebinarMember from '@salesforce/apex/WebinarController.createWebina
 export default class ZoomRegistrationPanel extends LightningElement {
   @api recordId;
   @track webinars = [];
+  @track allWebinars = [];
   @track selectedWebinar = {};
   @track searchKey = '';
 
@@ -14,6 +15,18 @@ export default class ZoomRegistrationPanel extends LightningElement {
   saving = false;
   confirmOpen = false;
   detailsOpen = false;
+
+  get showListView() {
+    return !this.confirmOpen && !this.detailsOpen;
+  }
+
+  get showConfirmView() {
+    return this.confirmOpen;
+  }
+
+  get showDetailsView() {
+    return this.detailsOpen;
+  }
 
   connectedCallback() {
     this.fetchWebinars();
@@ -23,13 +36,15 @@ export default class ZoomRegistrationPanel extends LightningElement {
     return Array.isArray(this.webinars) && this.webinars.length > 0;
   }
 
-  async fetchWebinars(searchKey = '') {
+  async fetchWebinars() {
     this.loading = true;
     this.webinars = [];
+    this.allWebinars = [];
 
     try {
-      const rows = await getWebinarsByNameOrId({ searchKey: (searchKey || '').trim() });
-      this.webinars = (rows || []).map((r) => ({ ...r, isRegistered: false }));
+      const rows = await getWebinarsByNameOrId({ searchKey: '' });
+      this.allWebinars = (rows || []).map((r) => ({ ...r, isRegistered: false }));
+      this.applySearch();
     } catch (e) {
       this.toast('Error loading webinars', this.reduceError(e), 'error');
     } finally {
@@ -40,12 +55,28 @@ export default class ZoomRegistrationPanel extends LightningElement {
   handleSearchChange = (event) => {
     const value = event?.detail?.value ?? event?.target?.value ?? '';
     this.searchKey = value;
-    this.fetchWebinars(this.searchKey);
+    this.applySearch();
   };
+
+  applySearch() {
+    const searchValue = (this.searchKey || '').trim().toLowerCase();
+
+    if (!searchValue) {
+      this.webinars = [...this.allWebinars];
+      return;
+    }
+
+    this.webinars = this.allWebinars.filter((webinar) => {
+      const name = (webinar.name || '').toLowerCase();
+      const webinarId = (webinar.webinarId || '').toLowerCase();
+      return name.includes(searchValue) || webinarId.includes(searchValue);
+    });
+  }
 
   openConfirm = (event) => {
     const webinarId = event.currentTarget?.dataset?.id;
     this.selectWebinar(webinarId);
+    this.detailsOpen = false;
     this.confirmOpen = true;
   };
 
@@ -56,6 +87,7 @@ export default class ZoomRegistrationPanel extends LightningElement {
   openDetails = (event) => {
     const webinarId = event.currentTarget?.dataset?.id;
     this.selectWebinar(webinarId);
+    this.confirmOpen = false;
     this.detailsOpen = true;
   };
 
@@ -86,12 +118,10 @@ export default class ZoomRegistrationPanel extends LightningElement {
       this.confirmOpen = false;
       this.detailsOpen = false;
 
-      const idx = this.webinars.findIndex((w) => w.id === this.selectedWebinar.id);
-      if (idx > -1) {
-        const updated = [...this.webinars];
-        updated[idx] = { ...updated[idx], isRegistered: true };
-        this.webinars = updated;
-      }
+      this.allWebinars = this.allWebinars.map((webinar) =>
+        webinar.id === this.selectedWebinar.id ? { ...webinar, isRegistered: true } : webinar
+      );
+      this.applySearch();
 
       this.dispatchEvent(new CloseActionScreenEvent());
       setTimeout(() => window.location.reload(), 800);

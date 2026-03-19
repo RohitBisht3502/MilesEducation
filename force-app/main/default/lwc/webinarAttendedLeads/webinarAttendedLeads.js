@@ -50,6 +50,7 @@ export default class WebinarAttendedLeads extends LightningElement {
     @track selectedWebinarName = null;
     @track activeWebinarId     = null;
     @track liveAttendeeEmails  = new Set();
+    @track liveAttendeeDurations = {};
     @track allWebinarData      = [];
     @track webinarOptions      = [];
     @track showWebinarSelection = true;
@@ -296,6 +297,7 @@ export default class WebinarAttendedLeads extends LightningElement {
                 );
                 this.hasLiveSyncOccurred = true;
             }
+            this.liveAttendeeDurations = result?.durationByEmail || {};
 
             if (this.isGM) {
                 this.applyLiveAttendeeStatus();
@@ -362,6 +364,7 @@ export default class WebinarAttendedLeads extends LightningElement {
         this.spocSummaryGroups     = [];
         this.expandedGmIds         = [];
         this.liveAttendeeEmails    = new Set();
+        this.liveAttendeeDurations = {};
         this.hasLiveSyncOccurred   = false;
         this.metrics = {
             totalRegistrations: 0,
@@ -391,6 +394,7 @@ export default class WebinarAttendedLeads extends LightningElement {
             return {
                 ...item,
                 status:           finalStatus,
+                duration:         this.getLatestDuration(item),
                 statusBadgeClass: this.getStatusBadgeClass(finalStatus),
                 showCallButton:   true
             };
@@ -546,6 +550,8 @@ export default class WebinarAttendedLeads extends LightningElement {
             ...item,
             studentInitials:  this.generateInitials(item.leadName),
             formattedDate:    this.formatDate(item.createdDate),
+            duration:         this.getLatestDuration(item),
+            formattedDuration: this.formatDuration(this.getLatestDuration(item)),
             status:           finalStatus,
             statusBadgeClass: this.getStatusBadgeClass(finalStatus),
             spocName:         item.spocName || 'Not Assigned',
@@ -715,6 +721,25 @@ export default class WebinarAttendedLeads extends LightningElement {
             this.logError('Date formatting error', error);
             return '';
         }
+    }
+
+    getLatestDuration(item) {
+        const emailKey = item?.email ? item.email.toLowerCase().trim() : '';
+        if (emailKey && this.liveAttendeeDurations && this.liveAttendeeDurations[emailKey] !== undefined) {
+            return this.liveAttendeeDurations[emailKey];
+        }
+        return item?.duration;
+    }
+
+    formatDuration(duration) {
+        const value = Number(duration);
+        if (!value || Number.isNaN(value) || value <= 0) {
+            return '-';
+        }
+        const totalSeconds = Math.floor(value);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes} min ${seconds} sec`;
     }
 
     extractErrorMessage(error) {

@@ -139,10 +139,12 @@ public without sharing class PurchasrOrderApprovalService {
                 List<PurchaseOrderService.SimpleLineItem> baseItems = new List<PurchaseOrderService.SimpleLineItem>();
                 for (Purchase_Order_Line_Item__c line : poLines) {
                     if (line.Product__c == null) continue;
+                    Product2 product = productMap.get(line.Product__c);
                     baseItems.add(new PurchaseOrderService.SimpleLineItem(
                         line.Product__c,
                         line.Unit_Price__c,
-                        line.Quantity__c
+                        line.Quantity__c,
+                        product != null ? product.Type__c : null
                     ));
                 }
 

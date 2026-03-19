@@ -35,9 +35,9 @@
                 <label>Payment</label>
             </value>
             <value>
-                <fullName>Form</fullName>
+                <fullName>Enrolment Form</fullName>
                 <default>false</default>
-                <label>Form</label>
+                <label>Enrolment Form</label>
             </value>
             <value>
                 <fullName>LMS</fullName>

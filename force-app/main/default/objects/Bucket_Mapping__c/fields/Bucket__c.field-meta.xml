@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Bucket__c</fullName>
+    <label>Bucket</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Bucket 1</fullName>
+                <default>false</default>
+                <label>Bucket 1</label>
+            </value>
+            <value>
+                <fullName>Bucket 2</fullName>
+                <default>false</default>
+                <label>Bucket 2</label>
+            </value>
+            <value>
+                <fullName>Bucket 3</fullName>
+                <default>false</default>
+                <label>Bucket 3</label>
+            </value>
+            <value>
+                <fullName>NA</fullName>
+                <default>false</default>
+                <label>NA</label>
+            </value>
+            <value>
+                <fullName>Accounting Vertical</fullName>
+                <default>false</default>
+                <label>Accounting Vertical</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

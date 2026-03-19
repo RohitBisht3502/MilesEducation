@@ -100,6 +100,7 @@ public with sharing class WebinarDashboard {
             SELECT
                 Id,
                 Attendance_Status__c,
+                Duration__c,
                 CreatedDate,
                 Lead__c,
                 Lead__r.Name,
@@ -122,6 +123,7 @@ public with sharing class WebinarDashboard {
             SELECT
                 Id,
                 Attendance_Status__c,
+                Duration__c,
                 CreatedDate,
                 Lead__c,
                 Lead__r.Name,
@@ -149,6 +151,7 @@ public with sharing class WebinarDashboard {
             SELECT
                 Id,
                 Attendance_Status__c,
+                Duration__c,
                 CreatedDate,
                 Lead__c,
                 Lead__r.Name,
@@ -183,6 +186,7 @@ public with sharing class WebinarDashboard {
 
             Set<String> liveAttendeeEmails = new Set<String>();
             List<String> liveEmailsList = new List<String>();
+            Map<String, Decimal> durationByEmail = new Map<String, Decimal>();
 
             if (responseMap.containsKey('registrants') && responseMap.get('registrants') instanceof List<Object>) {
                 List<Object> registrants = (List<Object>) responseMap.get('registrants');
@@ -198,6 +202,16 @@ public with sharing class WebinarDashboard {
                     if (String.isNotBlank(email)) {
                         liveAttendeeEmails.add(email);
                         liveEmailsList.add(email);
+                        Decimal duration = parseDecimal(registrant.get('live_duration'));
+                        if (duration == null) {
+                            duration = parseDecimal(registrant.get('duration'));
+                        }
+                        if (duration == null) {
+                            duration = parseDecimal(registrant.get('participant_duration'));
+                        }
+                        if (duration != null) {
+                            durationByEmail.put(email, duration);
+                        }
                     }
                 }
             } else if (responseMap.containsKey('attendees') && responseMap.get('attendees') instanceof List<Object>) {
@@ -213,9 +227,41 @@ public with sharing class WebinarDashboard {
                 throw new AuraHandledException('Invalid response from webinar service');
             }
 
-            return new LiveSyncResultDTO(0, liveAttendeeEmails.size(), liveEmailsList);
+            List<Webinar_Member__c> membersToUpdate = new List<Webinar_Member__c>();
+            if (!durationByEmail.isEmpty()) {
+                for (Webinar_Member__c wm : [
+                    SELECT Id, Duration__c, Lead__r.Email__c
+                    FROM Webinar_Member__c
+                    WHERE Webinar__r.Webinar_Id__c = :webinarId
+                    AND Lead__r.Email__c IN :durationByEmail.keySet()
+                ]) {
+                    String email = wm.Lead__r != null && String.isNotBlank(wm.Lead__r.Email__c)
+                        ? wm.Lead__r.Email__c.toLowerCase().trim()
+                        : null;
+                    Decimal duration = email != null ? durationByEmail.get(email) : null;
+                    if (duration != null && wm.Duration__c != duration) {
+                        wm.Duration__c = duration;
+                        membersToUpdate.add(wm);
+                    }
+                }
+            }
+
+            if (!membersToUpdate.isEmpty()) {
+                update membersToUpdate;
+            }
+
+            return new LiveSyncResultDTO(membersToUpdate.size(), liveAttendeeEmails.size(), liveEmailsList, durationByEmail);
         } catch (Exception e) {
             throw new AuraHandledException('Error syncing live webinar attendees: ' + e.getMessage());
+        }
+    }
+
+    private static Decimal parseDecimal(Object value) {
+        if (value == null) return null;
+        try {
+            return Decimal.valueOf(String.valueOf(value));
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -254,6 +300,7 @@ public with sharing class WebinarDashboard {
         @AuraEnabled public String phone { get; private set; }
 
         @AuraEnabled public String status { get; private set; }
+        @AuraEnabled public Decimal duration { get; private set; }
         @AuraEnabled public DateTime createdDate { get; private set; }
 
         @AuraEnabled public String spocName { get; private set; }
@@ -268,6 +315,7 @@ public with sharing class WebinarDashboard {
             this.email = m.Lead__r.Email__c;
             this.phone = m.Lead__r.Phone__c;
             this.status = m.Attendance_Status__c;
+            this.duration = m.Duration__c;
             this.createdDate = m.CreatedDate;
             this.spocName = m.Lead__r.Owner.Name;
             this.spocId = m.Lead__r.OwnerId;
@@ -297,11 +345,13 @@ public with sharing class WebinarDashboard {
         @AuraEnabled public Integer updatedCount { get; private set; }
         @AuraEnabled public Integer liveAttendeesCount { get; private set; }
         @AuraEnabled public List<String> liveEmails { get; private set; }
+        @AuraEnabled public Map<String, Decimal> durationByEmail { get; private set; }
 
-        public LiveSyncResultDTO(Integer updated, Integer liveCount, List<String> emails) {
+        public LiveSyncResultDTO(Integer updated, Integer liveCount, List<String> emails, Map<String, Decimal> durationByEmail) {
             this.updatedCount = updated;
             this.liveAttendeesCount = liveCount;
             this.liveEmails = emails;
+            this.durationByEmail = durationByEmail;
         }
     }
 }

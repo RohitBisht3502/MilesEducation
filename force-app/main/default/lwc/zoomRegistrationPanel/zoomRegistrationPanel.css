@@ -2,17 +2,46 @@
   border: 1px solid #d8dde6;
   border-radius: 0.5rem;
   background: #ffffff;
+  max-height: 80vh;
+  overflow: hidden;
 }
 
 .panel-header {
-  background: linear-gradient(90deg, #0176d3 0%, #0b5cab 100%);
+  background: linear-gradient(90deg, #012552 0%, #033b7a 100%);
   color: #ffffff;
   border-top-left-radius: 0.5rem;
   border-top-right-radius: 0.5rem;
 }
 
+.panel-title {
+  margin: 0 0 0.25rem;
+  line-height: 1.2;
+}
+
 .panel-header p {
+  margin: 0;
   color: #eaf5ff;
+}
+
+.panel-content {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(80vh - 4.5rem);
+  overflow-y: auto;
+}
+
+.panel-content_compact {
+  max-height: none;
+  overflow: visible;
+}
+
+.panel-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+  border-top: 1px solid #d8dde6;
+  background: #ffffff;
 }
 
 .table-head-row {
@@ -21,6 +50,7 @@
 
 .webinar-table {
   border-top: 1px solid #d8dde6;
+  max-height: 24rem;
 }
 
 .status-pill {
@@ -33,12 +63,81 @@
   font-weight: 600;
 }
 
-.modal-header-blue {
-  background: #f3f8fe;
-  border-bottom: 1px solid #d8dde6;
+.action-buttons {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.view-shell {
+  display: flex;
+  justify-content: center;
+}
+
+.view-shell_compact {
+  padding-bottom: 1rem;
+}
+
+.details-card,
+.confirm-card {
+  width: 100%;
+  max-width: 44rem;
+  background: #ffffff;
+  border: 1px solid #d8dde6;
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 10px rgba(1, 118, 211, 0.08);
+}
+
+.details-card {
+  padding: 1.25rem 1.5rem;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  column-gap: 1.5rem;
+  row-gap: 0.9rem;
+  margin: 0;
+  align-items: start;
+}
+
+.details-grid dt {
+  margin: 0;
+  color: #5c6b7a;
+  font-weight: 600;
+}
+
+.details-grid dd {
+  margin: 0;
+  color: #181818;
+  word-break: break-word;
+}
+
+.confirm-card {
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.confirm-text {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #181818;
 }
 
 .details-text {
   white-space: normal;
   line-height: 1.4;
+}
+
+@media (max-width: 640px) {
+  .details-grid {
+    grid-template-columns: 1fr;
+    row-gap: 0.35rem;
+  }
+
+  .details-grid dd {
+    margin-bottom: 0.8rem;
+  }
 }
