@@ -1,0 +1,282 @@
+<template>
+    <div class="shell">
+        <div class={filterPanelClass}>
+            <aside class="filters-panel">
+                <div class="filters-header">
+                    <div class="filters-title-wrap">
+                        <span class="header-icon">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M4 6h16l-6 7v5l-4 2v-7z"></path>
+                            </svg>
+                        </span>
+                        <span class="filters-title">Filters</span>
+                    </div>
+                    <div class="filters-header-actions">
+                        <button class="text-button" onclick={handleReset}>Reset</button>
+                        <button class="primary-action" onclick={handleApplyFilters}>Apply</button>
+                    </div>
+                </div>
+
+                <div class="filters-body">
+                    <template for:each={filterSections} for:item="section">
+                        <div key={section.id} class="filter-block">
+                            <button class="filter-trigger" data-id={section.id} onclick={handleToggleSection}>
+                                <span class="filter-step">{section.step}</span>
+                                <span class="filter-label">{section.label}</span>
+                                <span class={section.caretClass}></span>
+                            </button>
+
+                            <template if:true={section.open}>
+                                <div class="filter-content">
+                                    <template if:true={section.isCreatedDate}>
+                                        <div class="filter-field-stack">
+                                            <label class="filter-field-label" for="createdFrom">From</label>
+                                            <input id="createdFrom" class="filter-input" type="date" data-field="createdFrom" value={filters.createdFrom} oninput={handleCreatedDateChange} onclick={handleDateFieldOpen} onfocus={handleDateFieldOpen} />
+
+                                            <label class="filter-field-label" for="createdTo">To</label>
+                                            <input id="createdTo" class="filter-input" type="date" data-field="createdTo" value={filters.createdTo} oninput={handleCreatedDateChange} onclick={handleDateFieldOpen} onfocus={handleDateFieldOpen} />
+                                        </div>
+                                    </template>
+
+                                    <template if:true={section.isLastInquiryDate}>
+                                        <div class="filter-field-stack">
+                                            <label class="filter-field-label" for="lastInquiryFrom">From</label>
+                                            <input id="lastInquiryFrom" class="filter-input" type="date" data-field="lastInquiryFrom" value={filters.lastInquiryFrom} oninput={handleInquiryDateChange} onclick={handleDateFieldOpen} onfocus={handleDateFieldOpen} />
+
+                                            <label class="filter-field-label" for="lastInquiryTo">To</label>
+                                            <input id="lastInquiryTo" class="filter-input" type="date" data-field="lastInquiryTo" value={filters.lastInquiryTo} oninput={handleInquiryDateChange} onclick={handleDateFieldOpen} onfocus={handleDateFieldOpen} />
+                                        </div>
+                                    </template>
+
+                                    <template if:true={section.isFirstInquiryDate}>
+                                        <div class="filter-field-stack">
+                                            <label class="filter-field-label" for="firstInquiryFrom">From</label>
+                                            <input id="firstInquiryFrom" class="filter-input" type="date" data-field="firstInquiryFrom" value={filters.firstInquiryFrom} oninput={handleInquiryDateChange} onclick={handleDateFieldOpen} onfocus={handleDateFieldOpen} />
+
+                                            <label class="filter-field-label" for="firstInquiryTo">To</label>
+                                            <input id="firstInquiryTo" class="filter-input" type="date" data-field="firstInquiryTo" value={filters.firstInquiryTo} oninput={handleInquiryDateChange} onclick={handleDateFieldOpen} onfocus={handleDateFieldOpen} />
+                                        </div>
+                                    </template>
+
+                                    <template if:true={section.isFirstInquirySource}>
+                                        <lightning-checkbox-group
+                                            name="firstInquirySourceFilter"
+                                            label="Select Sources"
+                                            options={enquirySourceOptions}
+                                            value={filters.firstInquirySources}
+                                            onchange={handleFirstInquirySourceChange}>
+                                        </lightning-checkbox-group>
+                                    </template>
+
+                                    <template if:true={section.isLastInquirySource}>
+                                        <lightning-checkbox-group
+                                            name="lastInquirySourceFilter"
+                                            label="Select Sources"
+                                            options={enquirySourceOptions}
+                                            value={filters.lastInquirySources}
+                                            onchange={handleLastInquirySourceChange}>
+                                        </lightning-checkbox-group>
+                                    </template>
+
+                                    <template if:true={section.isLeadLevel}>
+                                        <div class="filter-field-stack">
+                                            <template for:each={levelGroupsView} for:item="group">
+                                                <div key={group.course} class="group-block">
+                                                    <div class="group-title">{group.course}</div>
+                                                    <div class="checkbox-list">
+                                                        <template for:each={group.options} for:item="option">
+                                                            <label key={option.value} class="checkbox-item">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    data-value={option.value}
+                                                                    checked={option.checked}
+                                                                    onchange={handleLevelCheckboxChange} />
+                                                                <span>{option.label}</span>
+                                                            </label>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+
+                                    <template if:true={section.isCallActivity}>
+                                        <div class="filter-field-stack">
+                                            <lightning-combobox
+                                                label="Call Activity"
+                                                value={filters.callActivityType}
+                                                options={callActivityOptions}
+                                                onchange={handleCallActivityTypeChange}>
+                                            </lightning-combobox>
+
+                                            <label class="filter-field-label" for="callFrom">Start Date / Time</label>
+                                            <input id="callFrom" class="filter-input" type="datetime-local" data-field="callFrom" value={filters.callFrom} oninput={handleCallDateTimeChange} onclick={handleDateFieldOpen} onfocus={handleDateFieldOpen} />
+
+                                            <label class="filter-field-label" for="callTo">End Date / Time</label>
+                                            <input id="callTo" class="filter-input" type="datetime-local" data-field="callTo" value={filters.callTo} oninput={handleCallDateTimeChange} onclick={handleDateFieldOpen} onfocus={handleDateFieldOpen} />
+                                        </div>
+                                    </template>
+
+                                    <template if:true={section.isSpoc}>
+                                        <lightning-checkbox-group
+                                            name="spocFilter"
+                                            label="Select SPOCs"
+                                            options={spocOptions}
+                                            value={filters.spocIds}
+                                            onchange={handleSpocChange}>
+                                        </lightning-checkbox-group>
+                                    </template>
+
+                                    <template if:true={section.isFutureFilter}>
+                                        <div class="filter-placeholder">This filter section will be added in the next step.</div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </aside>
+
+            <section class="workspace">
+                <div class="workspace-toolbar">
+                    <div class="toolbar-left">
+                        <button class="secondary-action" onclick={handleToggleFilters}>{filterToggleLabel}</button>
+                        <div class="status-legend">
+                            <span class="legend-item"><span class="legend-dot hot"></span> Hot</span>
+                            <span class="legend-item"><span class="legend-dot warm"></span> Warm</span>
+                            <span class="legend-item"><span class="legend-dot cool"></span> Cool</span>
+                        </div>
+                    </div>
+
+                    <div class="toolbar-right">
+                        <span class="selected-count">{selectedCount} selected</span>
+                        <button class="primary-action" onclick={handleOpenReallocateModal}>Reallocate</button>
+                    </div>
+                </div>
+
+                <template if:true={selectionMessage}>
+                    <div class="message-card warning-card">{selectionMessage}</div>
+                </template>
+
+                <template if:true={isLoading}>
+                    <div class="loading-panel">
+                        <lightning-spinner alternative-text="Loading candidates" size="medium"></lightning-spinner>
+                    </div>
+                </template>
+
+                <template if:true={errorMessage}>
+                    <div class="message-card error-card">{errorMessage}</div>
+                </template>
+
+                <template if:true={showEmptyState}>
+                    <div class="message-card">No candidates found for the selected filters.</div>
+                </template>
+
+                <template if:false={isLoading}>
+                    <template if:false={errorMessage}>
+                        <template if:false={showEmptyState}>
+                            <div class="board-card">
+                                    <div class="table-header">
+                                        <div class="col checkbox-col"></div>
+                                        <div class="col candidate-col">Candidate</div>
+                                        <div class="col program-col">Program / Level</div>
+                                        <div class="col status-col">Status</div>
+                                        <div class="col spoc-col">SPOC</div>
+                                        <div class="col inquiry-col">Last Inquiry</div>
+                                        <div class="col call-col">Call Status</div>
+                                    </div>
+
+                                <template for:each={rowsWithComputedLeads} for:item="row">
+                                    <div key={row.id} class="table-row-wrap">
+                                        <div class="table-row">
+                                            <div class="col checkbox-col">
+                                                <input type="checkbox" data-id={row.id} checked={row.selected} onchange={handleSelectRow} />
+                                            </div>
+
+                                            <div class="col candidate-col">
+                                                <div class="candidate-cell">
+                                                    <div class="candidate-avatar">{row.initial}</div>
+                                                    <div>
+                                                        <a class="candidate-name candidate-link" href={row.candidateUrl} target="_blank">{row.name}</a>
+                                                        <div class="candidate-email">{row.email}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="col program-col">
+                                                <div class="program-stack">
+                                                    <template for:each={row.relatedLeadLabel} for:item="lead">
+                                                        <span key={lead} class="program-pill">{lead}</span>
+                                                    </template>
+                                                </div>
+                                            </div>
+
+                                            <div class="col status-col">
+                                                <span class="status-badge">
+                                                    <span class={row.statusClass}></span>
+                                                    {row.status}
+                                                </span>
+                                            </div>
+
+                                            <div class="col spoc-col">{row.spoc}</div>
+                                            <div class="col inquiry-col">{row.lastInquiry}</div>
+                                            <div class="col call-col">
+                                                <span class={row.callStatusClass}>{row.callStatus}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <template if:false={showEmptyState}>
+                                    <div class="pagination-bar">
+                                        <button class="secondary-action pagination-button" onclick={handlePreviousPage} disabled={isPreviousDisabled}>Previous</button>
+                                        <span class="pagination-status">{pageStatus}</span>
+                                        <button class="secondary-action pagination-button" onclick={handleNextPage} disabled={isNextDisabled}>Next</button>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </template>
+                </template>
+            </section>
+        </div>
+
+        <template if:true={showReallocateModal}>
+            <section class="modal-backdrop"></section>
+            <section class="modal-shell" role="dialog" tabindex="-1" aria-modal="true" aria-label="Reallocate Candidates">
+                <div class="modal-card">
+                    <div class="modal-header">
+                        <h2 class="modal-title">Reallocate Candidates</h2>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="modal-copy">Select the SPOC who should receive the selected candidates.</div>
+                        <lightning-input
+                            type="search"
+                            label="Search SPOC"
+                            value={reallocationUserSearch}
+                            onchange={handleReallocationUserSearch}
+                            class="modal-search">
+                        </lightning-input>
+                        <lightning-radio-group
+                            name="reallocationUser"
+                            label="SPOC Name"
+                            options={reallocationUserOptions}
+                            value={selectedReallocationUserId}
+                            onchange={handleReallocationUserChange}>
+                        </lightning-radio-group>
+
+                        <template if:true={reallocationError}>
+                            <div class="modal-error">{reallocationError}</div>
+                        </template>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button class="secondary-action" onclick={handleCloseReallocateModal}>Cancel</button>
+                        <button class="primary-action" onclick={handleConfirmReallocation}>Transfer</button>
+                    </div>
+                </div>
+            </section>
+        </template>
+    </div>
+</template>

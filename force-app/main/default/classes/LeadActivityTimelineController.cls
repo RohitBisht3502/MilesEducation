@@ -42,7 +42,15 @@ public with sharing class LeadActivityTimelineController {
         @AuraEnabled public String course;
         @AuraEnabled public String source;
         @AuraEnabled public String createdByName;
+        @AuraEnabled public String currentOwnerName;
+        @AuraEnabled public String currentHighestLevel;
+        @AuraEnabled public String currentGm;
         @AuraEnabled public List<ActivityLogDTO> logs;
+    }
+
+    private class OwnerSummary {
+        public String ownerName;
+        public String gmName;
     }
 
     @AuraEnabled(cacheable=true)
@@ -57,19 +65,8 @@ public with sharing class LeadActivityTimelineController {
         Schema.SObjectType sType = leadId.getSObjectType();
 
         if (sType == Lead__c.SObjectType) {
-            Lead__c ld = [
-                SELECT Id,
-                       Name,
-                       Phone__c,
-                       Email__c,
-                       City__c,
-                       Course__c,
-                       Source__c,
-                       CreatedBy.Name
-                FROM Lead__c
-                WHERE Id = :leadId
-                LIMIT 1
-            ];
+            Lead__c ld = [SELECT Id, Name, Phone__c, Email__c, City__c, Course__c, Source__c, CreatedBy.Name, OwnerId, Candidate__r.Highest_Level__c FROM Lead__c WHERE Id = :leadId LIMIT 1];
+            OwnerSummary ownerSummary = getOwnerSummary(ld.OwnerId);
 
             resp.leadId        = ld.Id;
             resp.name          = ld.Name;
@@ -79,6 +76,9 @@ public with sharing class LeadActivityTimelineController {
             resp.course        = ld.Course__c;
             resp.source        = ld.Source__c;
             resp.createdByName = ld.CreatedBy != null ? ld.CreatedBy.Name : null;
+            resp.currentOwnerName = ownerSummary.ownerName;
+            resp.currentHighestLevel = ld.Candidate__r != null ? (String) ld.Candidate__r.get('Highest_Level__c') : null;
+            resp.currentGm = ownerSummary.gmName;
 
             List<Activity_Log__c> logs = [
                 SELECT Id,
@@ -123,11 +123,12 @@ public with sharing class LeadActivityTimelineController {
 
         if (sType == Lead.SObjectType) {
             Map<String, Schema.SObjectField> fMap = Schema.SObjectType.Lead.fields.getMap();
-            List<String> fieldsToSelect = new List<String>{'Id','Name','Phone','Email','City','CreatedBy.Name'};
+            List<String> fieldsToSelect = new List<String>{'Id','Name','Phone','Email','City','CreatedBy.Name','OwnerId'};
 
             if (fMap.containsKey('Course__c')) fieldsToSelect.add('Course__c');
             if (fMap.containsKey('Source__c')) fieldsToSelect.add('Source__c');
             if (fMap.containsKey('LeadSource')) fieldsToSelect.add('LeadSource');
+            if (fMap.containsKey('Highest_Level__c')) fieldsToSelect.add('Highest_Level__c');
 
             String soql = 'SELECT ' + String.join(fieldsToSelect, ',') + ' FROM Lead WHERE Id = :leadId LIMIT 1';
             Lead ldStd = Database.query(soql);
@@ -145,6 +146,10 @@ public with sharing class LeadActivityTimelineController {
             } else if (fMap.containsKey('LeadSource')) {
                 resp.source = (String) ldStd.get('LeadSource');
             }
+            OwnerSummary ownerSummary = getOwnerSummary((Id) ldStd.get('OwnerId'));
+            resp.currentOwnerName = ownerSummary.ownerName;
+            resp.currentHighestLevel = (String) ldStd.get('Highest_Level__c');
+            resp.currentGm = ownerSummary.gmName;
 
             List<Activity_Log__c> logsStd = [
                 SELECT Id,
@@ -188,17 +193,8 @@ public with sharing class LeadActivityTimelineController {
         }
 
         if (sType == Account.SObjectType) {
-            Account student = [
-                SELECT Id,
-                       Name,
-                       Phone,
-                       Email__c,
-                       BillingCity,
-                       CreatedBy.Name
-                FROM Account
-                WHERE Id = :leadId
-                LIMIT 1
-            ];
+            Account student = [SELECT Id, Name, Phone, Email__c, BillingCity, CreatedBy.Name, OwnerId, Highest_Level__c FROM Account WHERE Id = :leadId LIMIT 1];
+            OwnerSummary ownerSummary = getOwnerSummary(student.OwnerId);
 
             resp.leadId = student.Id;
             resp.name = student.Name;
@@ -206,6 +202,9 @@ public with sharing class LeadActivityTimelineController {
             resp.email = (String) student.get('Email__c');
             resp.city = student.BillingCity;
             resp.createdByName = student.CreatedBy != null ? student.CreatedBy.Name : null;
+            resp.currentOwnerName = ownerSummary.ownerName;
+            resp.currentHighestLevel = (String) student.get('Highest_Level__c');
+            resp.currentGm = ownerSummary.gmName;
 
             List<Lead__c> linkedLeads = [
                 SELECT Course__c, Source__c
@@ -380,6 +379,28 @@ public with sharing class LeadActivityTimelineController {
         }
 
         logs.sort(new ActivityLogDateSorter());
+    }
+
+    private static OwnerSummary getOwnerSummary(Id ownerId) {
+        OwnerSummary summary = new OwnerSummary();
+        if (ownerId == null) {
+            return summary;
+        }
+
+        String prefix = String.valueOf(ownerId).left(3);
+        if (prefix == '005') {
+            List<User> users = [SELECT Id, Name, Manager.Name FROM User WHERE Id = :ownerId LIMIT 1];
+            if (!users.isEmpty()) {
+                summary.ownerName = users[0].Name;
+                summary.gmName = users[0].Manager != null ? users[0].Manager.Name : null;
+            }
+        } else if (prefix == '00G') {
+            List<Group> groups = [SELECT Id, Name FROM Group WHERE Id = :ownerId LIMIT 1];
+            if (!groups.isEmpty()) {
+                summary.ownerName = groups[0].Name;
+            }
+        }
+        return summary;
     }
 
     public class ActivityLogDateSorter implements Comparator<ActivityLogDTO> {

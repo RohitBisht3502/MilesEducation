@@ -14,7 +14,7 @@ import {
     minimize
 } from 'lightning/platformUtilityBarApi';
 
-const CHANNEL = '/event/Runo_Call_Completed__e';
+const CHANNEL = '/event/Runo_Call_Initiate__e';
 const COMPONENT_NAME = 'c__runoCallFeedbackUtility';
 const UTILITY_LABEL = 'Runo Call Feedback Utility';
 
@@ -348,6 +348,11 @@ export default class RunoCallFeedbackUtility extends LightningElement {
         if (callType && String(callType).toLowerCase() === 'outgoing') {
             return;
         }
+const status = p.Status__c || p.status || null;
+
+if (status && status.toLowerCase() !== 'initiated') {
+    return;
+}
 
         const evtLeadId = p.Lead_Id__c || p.LeadId__c || p.leadId || null;
         const evtCandidateId = p.Candidate_Id__c || p.CandidateId__c || p.candidateId || null;

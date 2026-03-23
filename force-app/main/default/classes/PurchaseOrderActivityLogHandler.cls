@@ -1,3 +1,6 @@
+/*
+    Author       : Rohit Singh Bisht
+*/
 public class PurchaseOrderActivityLogHandler {
 
     private static final String ENROLMENT_FORM_VALUE = 'Enrolment Form';
@@ -70,7 +73,7 @@ public class PurchaseOrderActivityLogHandler {
         }
 
         if (!logsToInsert.isEmpty()) {
-            insert logsToInsert;
+            ActivityLogService.insertLogs(logsToInsert);
         }
     }
 

@@ -140,21 +140,18 @@ public without sharing class TagLeadController {
     ) {
         Lead__c customLeadRecord;
 
-        Call_Log__c callLog = [
-            SELECT Id, Phone_Number__c, Lead__c, Candidate__c
-            FROM Call_Log__c
-            WHERE Id = :callLogId
-            LIMIT 1
-        ];
+        Call_Log__c callLog = [SELECT Id, Phone_Number__c, Lead__c, Candidate__c, Phone__c FROM Call_Log__c WHERE Id = :callLogId LIMIT 1];
 
         if (candidateId != null) {
             List<Lead> candidates = [SELECT Id FROM Lead WHERE Id = :candidateId LIMIT 1];
             if (candidates.isEmpty()) {
                 throw new AuraHandledException('Candidate not found.');
             }
+            Id phoneLookupId = syncPhoneNumbersWithCandidate(callLog.Phone_Number__c, candidateId);
 
             callLog.Lead__c = null;
             callLog.Candidate__c = candidateId;
+            callLog.Phone__c = phoneLookupId;
             callLog.L1__c = l1;
             callLog.L2__c = l2;
             callLog.Feedback__c = feedback;
@@ -163,8 +160,6 @@ public without sharing class TagLeadController {
                 callLog.Next_Follow_Up_Date__c = parseUiDateTime(nextFollowUpDate);
             }
             update callLog;
-
-            syncPhoneNumbersWithCandidate(callLog.Phone_Number__c, candidateId);
         } else {
             LeadNewOverrideController.Result createResult = LeadNewOverrideController.createLeadByCourse(
                 course,
@@ -185,12 +180,8 @@ public without sharing class TagLeadController {
                 );
             }
 
-            customLeadRecord = [
-                SELECT Id, Candidate__c, Next_Follow_Up_Date__c, Disable_Round_Robin__c
-                FROM Lead__c
-                WHERE Id = :createResult.leadId
-                LIMIT 1
-            ];
+            customLeadRecord = [SELECT Id, Candidate__c, Next_Follow_Up_Date__c, Disable_Round_Robin__c FROM Lead__c WHERE Id = :createResult.leadId LIMIT 1];
+            Id phoneLookupId = syncPhoneNumbersWithCandidate(callLog.Phone_Number__c, customLeadRecord.Candidate__c);
 
             Boolean leadChanged = false;
             if (customLeadRecord.Disable_Round_Robin__c != disableRR) {
@@ -209,6 +200,7 @@ public without sharing class TagLeadController {
 
             callLog.Lead__c = customLeadRecord.Id;
             callLog.Candidate__c = customLeadRecord.Candidate__c;
+            callLog.Phone__c = phoneLookupId;
             callLog.L1__c = l1;
             callLog.L2__c = l2;
             callLog.Feedback__c = feedback;
@@ -243,9 +235,9 @@ public without sharing class TagLeadController {
         syncPhoneNumberStatus(callLog.Phone_Number__c, isSpam, isDnd);
     }
 
-    private static void syncPhoneNumbersWithCandidate(String rawPhone, Id candidateId) {
+    private static Id syncPhoneNumbersWithCandidate(String rawPhone, Id candidateId) {
         if (candidateId == null || String.isBlank(rawPhone)) {
-            return;
+            return null;
         }
 
         Set<String> variants = Utility.buildPhoneVariants(rawPhone);
@@ -271,15 +263,13 @@ public without sharing class TagLeadController {
         }
 
         if (phoneRecords.isEmpty()) {
-            insert new Phone_Number__c(
-                Phone__c = !String.isBlank(last10) ? last10 : rawPhone,
-                Candidate__c = candidateId,
-                Is_Primary__c = true
-            );
-            return;
+            Phone_Number__c newPhone = new Phone_Number__c(Phone__c = !String.isBlank(last10) ? last10 : rawPhone, Candidate__c = candidateId, Is_Primary__c = true);
+            insert newPhone;
+            return newPhone.Id;
         }
 
         List<Phone_Number__c> updates = new List<Phone_Number__c>();
+        Id selectedPhoneId;
         for (Phone_Number__c phoneRecord : phoneRecords) {
             Boolean changed = false;
             if (phoneRecord.Candidate__c != candidateId) {
@@ -297,10 +287,14 @@ public without sharing class TagLeadController {
             if (changed) {
                 updates.add(phoneRecord);
             }
+            if (selectedPhoneId == null || phoneRecord.Is_Primary__c == true) {
+                selectedPhoneId = phoneRecord.Id;
+            }
         }
         if (!updates.isEmpty()) {
             update updates;
         }
+        return selectedPhoneId;
     }
 
     private static void syncPhoneNumberStatus(String rawPhone, Boolean isSpam, Boolean isDnd) {

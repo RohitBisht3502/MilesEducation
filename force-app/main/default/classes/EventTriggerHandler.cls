@@ -1,5 +1,5 @@
 /*
-    Author       : ROHIT SINGH BISHT
+    Author       : Rohit Singh Bisht
     Description  : 
 */
 public without sharing class EventTriggerHandler {
@@ -113,7 +113,7 @@ public without sharing class EventTriggerHandler {
         }
 
         if (!logsToInsert.isEmpty()) {
-            insert logsToInsert;
+            ActivityLogService.insertLogs(logsToInsert);
         }
     }
 

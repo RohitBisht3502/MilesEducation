@@ -1,3 +1,6 @@
+/*
+    Author       : Rohit Singh Bisht
+*/
 public class LeadTriggerConversionClass {
     public static void convertCandidateOnFullPayment( List<Lead__c> newLeads, Map<Id, Lead__c> oldMap) {
         System.debug('=== LeadTriggerConversionClass.convertCandidateOnFullPayment START ===');
@@ -262,7 +265,7 @@ public class LeadTriggerConversionClass {
         }
 
         if (!logsToInsert.isEmpty()) {
-            insert logsToInsert;
+            ActivityLogService.insertLogs(logsToInsert);
         }
     }
 

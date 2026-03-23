@@ -6,21 +6,34 @@
     <!-- MODAL BODY -->
     <lightning-modal-body>
         <div class="slds-p-around_medium">
+            <template if:true={showAccessDenied}>
+                <div class="slds-text-color_error slds-m-bottom_small">
+                    {accessMessage}
+                </div>
+            </template>
 
-            <lightning-textarea 
-                label=" Comments"
-                value={comments}
-                onchange={handleCommentChange}
-                required>
-            </lightning-textarea>
+            <template if:true={isSameOwner}>
+                <div class="slds-text-color_error slds-m-bottom_small">
+                    You cannot transfer this lead because you are the current owner of the candidate.
+                </div>
+            </template>
+
+            <template if:true={hasPendingRequest}>
+                <div class="slds-text-color_error slds-m-bottom_small">
+                    {pendingMessage}
+                </div>
+            </template>
+
+            <template if:true={showCommentBox}>
+                <lightning-textarea 
+                    label=" Comments"
+                    value={comments}
+                    onchange={handleCommentChange}
+                    required>
+                </lightning-textarea>
+            </template>
 
         </div>
-
-        <template if:true={isSameOwner}>
-    <div class="slds-text-color_error slds-m-bottom_small">
-        You cannot send request for your own lead.
-    </div>
-</template>
     </lightning-modal-body>
 
     <!-- MODAL FOOTER -->

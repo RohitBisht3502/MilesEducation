@@ -31,14 +31,57 @@ public without sharing class LeadTriggerHelperClass {
     }
 
     public static void handleBeforeInsert(List<Lead__c> newLeads) {
+        syncLeadNameWithCandidate(newLeads, null);
         BucketAssignmentService.assignBucket((List<SObject>)newLeads, null);
         TriggerRoundRobinService.handleBeforeInsert(newLeads);
     }
 
     public static void handleBeforeUpdate(List<Lead__c> newLeads, Map<Id, Lead__c> oldMap) {
+        syncLeadNameWithCandidate(newLeads, oldMap);
         BucketAssignmentService.assignBucket((List<SObject>)newLeads, (Map<Id, SObject>)oldMap);
         TriggerRoundRobinService.handleBeforeUpdate(newLeads, oldMap);
     }
+
+    private static void syncLeadNameWithCandidate(List<Lead__c> newLeads, Map<Id, Lead__c> oldMap) {
+        if (newLeads == null || newLeads.isEmpty()) {
+            return;
+        }
+
+        Set<Id> candidateIds = new Set<Id>();
+        for (Lead__c leadRecord : newLeads) {
+            if (leadRecord.Candidate__c == null) {
+                continue;
+            }
+
+            Boolean shouldSync = oldMap == null
+                || !oldMap.containsKey(leadRecord.Id)
+                || oldMap.get(leadRecord.Id).Candidate__c != leadRecord.Candidate__c;
+
+            if (shouldSync) {
+                candidateIds.add(leadRecord.Candidate__c);
+            }
+        }
+
+        if (candidateIds.isEmpty()) {
+            return;
+        }
+
+        Map<Id, Lead> candidateById = new Map<Id, Lead>([
+            SELECT Id, Name
+            FROM Lead
+            WHERE Id IN :candidateIds
+        ]);
+
+        for (Lead__c leadRecord : newLeads) {
+            if (leadRecord.Candidate__c != null && candidateById.containsKey(leadRecord.Candidate__c)) {
+                Lead candidate = candidateById.get(leadRecord.Candidate__c);
+                if (candidate != null && String.isNotBlank(candidate.Name)) {
+                    leadRecord.Name = candidate.Name;
+                }
+            }
+        }
+    }
+
 
     public static void handleAfterInsert1(List<Lead__c> newLeads) {
         if (newLeads == null || newLeads.isEmpty()) return;

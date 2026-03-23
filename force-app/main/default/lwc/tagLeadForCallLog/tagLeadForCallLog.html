@@ -1,210 +1,170 @@
 <template>
     <div class="container">
-        <div class="header-section">
-            <div class="call-details-inline">
-                <div class="user-avatar">
-                    <lightning-icon icon-name="standard:avatar" size="medium"></lightning-icon>
-                </div>
-                <div class="user-info">
-                    <h1 class="customer-name">{customerName}</h1>
-                    <div class="contact-details">
-                        <span class="contact-item">
-                            <lightning-icon icon-name="utility:call" size="xx-small"></lightning-icon>
-                            {phoneNumber}
-                        </span>
+        <template if:true={showConfirmation}>
+            <div class="confirm-backdrop"></div>
+            <div class="confirm-modal">
+                <div class="confirm-shell">
+                    <div class="confirm-title">{confirmationTitle}</div>
+                    <div class="confirm-message">{confirmationMessage}</div>
+                    <div class="confirm-actions">
+                        <button class="action-btn secondary-btn" onclick={handleCancelConfirmation} disabled={isLoading}>Cancel</button>
+                        <button class="action-btn primary-btn" onclick={handleConfirmStatusAction} disabled={isLoading}>Confirm</button>
                     </div>
+                </div>
+            </div>
+        </template>
+
+        <div class="hero-header">
+            <div class="hero-avatar">
+                <lightning-icon icon-name="utility:user" size="small"></lightning-icon>
+            </div>
+            <div class="hero-copy">
+                <div class="hero-title">{customerName}</div>
+                <div class="hero-phone">
+                    <lightning-icon icon-name="utility:call" size="xx-small"></lightning-icon>
+                    {phoneNumber}
                 </div>
             </div>
         </div>
 
-        <div class="main-content">
-            <div class="search-section">
-                <h2 class="section-title">
-                    <lightning-icon icon-name="utility:search" size="x-small" class="title-icon"></lightning-icon>
-                    Search Candidate
-                </h2>
-
-                <div class="search-box">
-                    <input type="text" class="custom-input" placeholder="Search by candidate name, phone or candidate ID"
-                        value={searchKeyword} oninput={handleSearchInput} onkeypress={handleSearchKeyPress} />
-                    <button class="search-button" onclick={handleSearchClick} disabled={isLoading}>
-                        <lightning-icon icon-name="utility:search" size="x-small"></lightning-icon>
-                        Search
-                    </button>
+        <template if:true={showSuccess}>
+            <div class="success-shell">
+                <div class="success-icon-wrap">
+                    <lightning-icon icon-name="utility:success" size="small"></lightning-icon>
                 </div>
+                <div class="success-title">{successTitle}</div>
+                <div class="success-message">{successMessage}</div>
+                <button class="action-btn secondary-btn success-btn" onclick={handleSuccessAction}>{successButtonLabel}</button>
             </div>
+        </template>
 
-            <template if:true={isLoading}>
-                <div class="spinner-container">
-                    <lightning-spinner size="small" alternative-text="Loading..."></lightning-spinner>
-                </div>
-            </template>
+        <template if:false={showSuccess}>
+            <div class="body-section">
+                <template if:true={showSearch}>
+                    <div class="panel-section">
+                        <div class="section-heading">Search Existing Lead</div>
+                        <div class="search-row">
+                            <input type="text" class="field-input" placeholder="Search by name, phone, or course" value={searchKeyword} oninput={handleSearchInput} onkeypress={handleSearchKeyPress} />
+                            <button class="icon-btn" onclick={handleSearchClick} disabled={isLoading}>
+                                <lightning-icon icon-name="utility:search" size="x-small"></lightning-icon>
+                            </button>
+                        </div>
+                    </div>
 
-            <template if:true={showLeadResults}>
-                <div class="results-section">
-                    <template for:each={candidates} for:item="candidate">
-                        <div key={candidate.candidateId} class="lead-wrapper">
-                            <div data-id={candidate.candidateId} class={candidate.cssClass} onclick={selectCandidate}>
-                                <div class="lead-info">
-                                    <div class="lead-name">{candidate.candidateName}</div>
-                                    <div class="lead-details-row">
-                                        <span class="lead-detail">
-                                            <lightning-icon icon-name="utility:user" size="xx-small"></lightning-icon>
-                                            Owner: {candidate.ownerName}
-                                        </span>
-                                        <span class="lead-detail">
-                                            <lightning-icon icon-name="utility:topic" size="xx-small"></lightning-icon>
-                                            Courses: {candidate.courseSummary}
-                                        </span>
+                    <div class="divider"></div>
+
+                    <div class="panel-section">
+                        <div class="section-heading">Quick Actions</div>
+                        <div class="quick-actions">
+                            <button class="action-btn danger-btn" onclick={handleMarkSpam} disabled={isLoading}>{spamButtonLabel}</button>
+                            <button class="action-btn neutral-btn" onclick={handleMarkDnd} disabled={isLoading}>{dndButtonLabel}</button>
+                            <button class="action-btn primary-btn" onclick={handleCreateNew} disabled={isLoading}>New Lead</button>
+                        </div>
+                    </div>
+
+                    <template if:true={isLoading}>
+                        <div class="spinner-container">
+                            <lightning-spinner size="small" alternative-text="Loading..."></lightning-spinner>
+                        </div>
+                    </template>
+
+                    <template if:true={showLeadResults}>
+                        <div class="results-list">
+                            <template for:each={candidates} for:item="candidate">
+                                <div key={candidate.candidateId} class="candidate-block">
+                                    <div data-id={candidate.candidateId} class={candidate.cssClass} onclick={selectCandidate}>
+                                        <div class="candidate-name">{candidate.candidateName}</div>
+                                        <div class="candidate-meta">Owner: {candidate.ownerName}</div>
+                                        <div class="candidate-meta">Courses: {candidate.courseSummary}</div>
                                     </div>
-                                </div>
-                            </div>
-
-                            <template if:true={candidate.showTagForm}>
-                                <div class="tag-form-section">
-                                    <div class="tag-form-container">
-                                        <button class="custom-button primary tag-button-inline"
-                                            onclick={handleTagLead} disabled={isLoading}>
-                                            {tagButtonLabel}
-                                        </button>
-                                    </div>
+                                    <template if:true={candidate.showTagForm}>
+                                        <div class="select-action-wrap">
+                                            <button class="action-btn primary-btn full-btn" onclick={handleTagLead} disabled={isLoading}>{tagButtonLabel}</button>
+                                        </div>
+                                    </template>
                                 </div>
                             </template>
                         </div>
                     </template>
-                </div>
-            </template>
+                </template>
 
-            <template if:true={showNotFound}>
-                <div class="not-found-section">
-                    <lightning-icon icon-name="utility:info" size="medium" class="info-icon"></lightning-icon>
-                    <h3 class="not-found-title">No candidates found</h3>
-                    <p class="not-found-message">
-                        We couldn't find any candidates matching "{searchKeyword}"
-                    </p>
-                </div>
-            </template>
+                <template if:true={showCreateForm}>
+                    <div class="panel-section create-section">
+                        <div class="section-heading">Create New Lead</div>
 
-            <template if:true={showCreateForm}>
-                <div class="form-section">
-                    <h2 class="section-title">
-                        <lightning-icon icon-name="utility:adduser" size="x-small" class="title-icon"></lightning-icon>
-                        Create New Lead
-                    </h2>
-
-                    <div class="form-container form-grid">
-                        <div class="form-field form-field-span-2">
-                            <label class="form-label">
-                                First Name
-                            </label>
-                            <input type="text" class="custom-input" placeholder="Enter full name"
-                                value={formData.firstName} onchange={handleNameChange} />
+                        <div class="form-grid two-col">
+                            <div class="form-field">
+                                <label class="field-label">First Name</label>
+                                <input type="text" class="field-input" placeholder="First name" value={formData.firstName} onchange={handleNameChange} />
+                            </div>
+                            <div class="form-field">
+                                <label class="field-label">Last Name <span class="required">*</span></label>
+                                <input type="text" class="field-input" placeholder="Last name" value={formData.lastName} onchange={handleLastNameChange} />
+                            </div>
                         </div>
 
-                        <div class="form-field form-field-span-2">
-                            <label class="form-label">
-                                Last Name <span class="required-asterisk">*</span>
-                            </label>
-                            <input type="text" class="custom-input" placeholder="Enter last name"
-                                value={formData.lastName} onchange={handleLastNameChange} />
-                        </div>
-
-                        <div class="form-field form-field-span-2">
-                            <label class="form-label">
-                                Email <span class="required-asterisk">*</span>
-                            </label>
-                            <input type="email" class="custom-input" placeholder="Enter email address"
-                                value={formData.email} onchange={handleEmailChange} />
-                        </div>
-
-                        <div class="form-field form-field-span-2">
-                            <div class="phone-grid">
-                                <div class="form-field">
-                                    <label class="form-label">Country Code <span class="required-asterisk">*</span></label>
-                                    <select class="custom-input" onchange={handleCountryCodeChange}>
-                                        <option value="+91">+91</option>
-                                        <option value="+971">+971</option>
-                                    </select>
-                                </div>
-
-                                <div class="form-field">
-                                    <label class="form-label">Phone Number <span class="required-asterisk">*</span></label>
-                                    <input type="text" class="custom-input" placeholder="Enter phone number"
-                                        value={formData.phone} onchange={handlePhoneChange} />
+                        <div class="form-grid two-col">
+                            <div class="form-field">
+                                <label class="field-label">Email <span class="required">*</span></label>
+                                <input type="email" class="field-input" placeholder="email@example.com" value={formData.email} onchange={handleEmailChange} />
+                            </div>
+                            <div class="form-field">
+                                <label class="field-label">Phone <span class="required">*</span></label>
+                                <div class="phone-grid">
+                                    <div class="code-field">
+                                        <select class="field-input select-input" onchange={handleCountryCodeChange}>
+                                            <option value="+91">+91</option>
+                                            <option value="+971">+971</option>
+                                        </select>
+                                    </div>
+                                    <div class="phone-field">
+                                        <input type="text" class="field-input" placeholder="Phone" value={formData.phone} onchange={handlePhoneChange} />
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="form-field form-field-span-2">
-                            <label class="form-label">
-                                Course <span class="required-asterisk">*</span>
-                            </label>
-                            <select class="custom-input" onchange={handleCourseChange}>
-                                <option value="">-- Select Course --</option>
-                                <template for:each={courseOptions} for:item="option">
-                                    <option key={option.value} value={option.value}>
-                                        {option.label}
-                                    </option>
-                                </template>
-                            </select>
+                        <div class="form-grid two-col">
+                            <div class="form-field">
+                                <label class="field-label">Course <span class="required">*</span></label>
+                                <select class="field-input select-input" onchange={handleCourseChange}>
+                                    <option value="">Select</option>
+                                    <template for:each={courseOptions} for:item="option">
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    </template>
+                                </select>
+                            </div>
+                            <div class="form-field">
+                                <label class="field-label">City <span class="required">*</span></label>
+                                <select class="field-input select-input" onchange={handleCityChange}>
+                                    <option value="">Select</option>
+                                    <template for:each={cityOptions} for:item="option">
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    </template>
+                                </select>
+                            </div>
                         </div>
 
-                        <div class="form-field form-field-span-2">
-                            <label class="form-label">
-                                City <span class="required-asterisk">*</span>
-                            </label>
-                            <select class="custom-input" onchange={handleCityChange}>
-                                <option value="">-- Select City --</option>
-                                <template for:each={cityOptions} for:item="option">
-                                    <option key={option.value} value={option.value}>
-                                        {option.label}
-                                    </option>
-                                </template>
-                            </select>
+                        <div class="form-grid two-col">
+                            <div class="form-field source-field">
+                                <label class="field-label">Source <span class="required">*</span></label>
+                                <select class="field-input select-input" onchange={handleSourceChange}>
+                                    <option value="">Select</option>
+                                    <template for:each={sourceOptions} for:item="option">
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    </template>
+                                </select>
+                            </div>
+                            <div class="form-field empty-field"></div>
                         </div>
 
-                        <div class="form-field form-field-span-2">
-                            <label class="form-label">
-                                Source <span class="required-asterisk">*</span>
-                            </label>
-                            <select class="custom-input" onchange={handleSourceChange}>
-                                <option value="">-- Select Source --</option>
-                                <template for:each={sourceOptions} for:item="option">
-                                    <option key={option.value} value={option.value}>
-                                        {option.label}
-                                    </option>
-                                </template>
-                            </select>
+                        <div class="footer-actions create-actions">
+                            <button class="action-btn secondary-btn" onclick={handleCancel} disabled={isLoading}>Cancel</button>
+                            <button class="action-btn primary-btn" onclick={handleSubmit} disabled={isLoading}>{submitButtonLabel}</button>
                         </div>
                     </div>
-                </div>
-            </template>
-        </div>
-
-        <div class="footer-actions">
-            <template if:true={showSearch}>
-                <button class="custom-button warning" onclick={handleMarkSpam} disabled={isLoading}>
-                    {spamButtonLabel}
-                </button>
-                <button class="custom-button secondary" onclick={handleMarkDnd} disabled={isLoading}>
-                    {dndButtonLabel}
-                </button>
-            </template>
-
-            <template if:true={showNotFound}>
-                <button class="custom-button primary" onclick={handleCreateNew}>
-                    Create New Lead
-                </button>
-            </template>
-
-            <template if:true={showCreateForm}>
-                <button class="custom-button primary" onclick={handleSubmit} disabled={isLoading}>
-                    {submitButtonLabel}
-                </button>
-                <button class="custom-button secondary" onclick={handleCancel} disabled={isLoading}>
-                    Cancel
-                </button>
-            </template>
-        </div>
+                </template>
+            </div>
+        </template>
     </div>
 </template>

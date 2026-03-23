@@ -25,17 +25,52 @@ global without sharing class Webservice_ClickToCallRuno {
                 IntegrationLogUtil.insertLog('Runo call log initiated', requestBody, responseBody, 'Empty request body received', 'Failed', statusCode);
                 return new ApiResponse(false, 'Missing request body', null);
             }
+ClickToCallPayload payload = (ClickToCallPayload) JSON.deserialize(requestBody, ClickToCallPayload.class);
 
-            ClickToCallPayload payload = (ClickToCallPayload) JSON.deserialize(requestBody, ClickToCallPayload.class);
-            if (payload == null || String.isBlank(payload.callerId) || String.isBlank(payload.contactPhone)) {
-                statusCode = 400;
-                responseBody = '{"error":"callerId and contactPhone are required"}';
-                res.statusCode = statusCode;
-                res.responseBody = Blob.valueOf(responseBody);
-                IntegrationLogUtil.insertLog('Runo call log initiated', requestBody, responseBody, 'Missing required fields', 'Failed', statusCode);
-                return new ApiResponse(false, 'callerId and contactPhone are required', null);
-            }
+if (payload == null || String.isBlank(payload.callerId) || String.isBlank(payload.contactPhone)) {
+    statusCode = 400;
+    responseBody = '{"error":"callerId and contactPhone are required"}';
+    res.statusCode = statusCode;
+    res.responseBody = Blob.valueOf(responseBody);
+    IntegrationLogUtil.insertLog('Runo call log initiated', requestBody, responseBody, 'Missing required fields', 'Failed', statusCode);
+    return new ApiResponse(false, 'callerId and contactPhone are required', null);
+}
 
+// ADD THIS BLOCK HERE
+if (payload.type != null && payload.type.toLowerCase() == 'incoming') {
+
+    // STEP 1: Clean phone
+    String cleanPhone = payload.contactPhone != null 
+        ? payload.contactPhone.replaceAll('[^0-9]', '') 
+        : null;
+
+    //  ADD LEAD MAPPING HERE
+    Lead ld;
+
+    if (cleanPhone != null) {
+        List<Lead> leads = [
+            SELECT Id 
+            FROM Lead 
+            WHERE Phone LIKE :('%' + cleanPhone) 
+            LIMIT 1
+        ];
+
+        if (!leads.isEmpty()) {
+            ld = leads[0];
+        }
+    }
+
+    //  THEN CREATE EVENT
+    Runo_Call_Initiate__e eventMsg = new Runo_Call_Initiate__e(
+        Call_Id__c = payload.callerId,
+        Lead_Id__c = ld != null ? ld.Id : null,   // 
+        Phone__c = cleanPhone != null ? Decimal.valueOf(cleanPhone) : null,
+        Type__c = payload.type,
+        Status__c = 'Initiated'
+    );
+
+    EventBus.publish(eventMsg);
+}
             status = 'Success';
             statusCode = 200;
             responseBody = '{"status":"success","message":"Call log received."}';

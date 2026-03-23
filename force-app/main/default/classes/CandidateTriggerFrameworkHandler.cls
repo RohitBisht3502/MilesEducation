@@ -11,6 +11,7 @@ public without sharing class CandidateTriggerFrameworkHandler extends BaseTrigge
 
     private List<Lead> getNewLeads() { return (List<Lead>)newList; }
     private Map<Id, Lead> getOldLeadMap() { return (Map<Id, Lead>)oldMap; }
+    private Map<Id, Lead> getNewLeadMap() { return (Map<Id, Lead>)newMap; }
     private List<Lead> getOldLeads() { return (List<Lead>)oldList; }
 
     public override void beforeInsert() {
@@ -29,12 +30,14 @@ public without sharing class CandidateTriggerFrameworkHandler extends BaseTrigge
     }
 
     public override void afterUpdate() {
+       // CandidateTriggerHelperClass.syncRelatedLeadNames(getNewLeads(), getOldLeadMap());
         CandidateTriggerHelperClass.transferRecordsOnConversion(getNewLeads(), getOldLeadMap());
         CandidateTriggerHelperClass.syncGpUserToRelatedLeads(getNewLeads(), getOldLeadMap());
         LeadRelatedSyncService.syncRelatedLeadsOnCandidateOwnerChange(getNewLeads(), getOldLeadMap());
         // CandidateTriggerHelperClass.createBridgeCourseLeads(getNewLeads(), getOldLeadMap());
 
         CandidateTriggerHelperClass.handleMilesUuidRecording(getNewLeads(), getOldLeadMap());
+        CandidateTriggerHelperClass.handleCandidateStatusChange(getOldLeadMap(), getNewLeadMap());
     }
 
     public override void beforeDelete() {

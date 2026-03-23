@@ -1,93 +1,104 @@
 <template>
-    <div class="wrap">
-        <div class="toolbar">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div>
-                        <span class="stat-label">Total Q2 Leads</span>
-                        <span class="stat-value">{totalLeads}</span>
+    <div class="main-layout">
+        <div class="left-pane">
+            <div class="sidebar-section">
+                <div class="total-leads-sidebar">
+                    <div class="tl-icon">
+                        <lightning-icon icon-name="utility:groups" size="x-small"></lightning-icon>
                     </div>
-                    <div class="stat-icon users">
-                        <lightning-icon icon-name="utility:groups" size="small"></lightning-icon>
+                    <div class="tl-info">
+                        <span class="tl-label">Total Leads</span>
+                        <span class="tl-value">{totalLeads}</span>
                     </div>
                 </div>
             </div>
 
-            <div class="actions">
-                <lightning-button-icon class="refresh-btn" icon-name="utility:refresh" alternative-text="Refresh"
-                    title="Refresh" onclick={handleRefresh} disabled={isRefreshing}>
-                </lightning-button-icon>
-                <template if:true={isRefreshing}>
-                    <div class="refresh-spinner-wrap">
-                        <lightning-spinner alternative-text="Refreshing" size="small"></lightning-spinner>
-                    </div>
-                </template>
+            <div class="sidebar-section bucket-section">
+                <div class="sidebar-section-title">Bucket</div>
+                <div class="bucket-list">
+                    <template for:each={bucketList} for:item="bucket">
+                        <div
+                            key={bucket.name}
+                            class={bucket.itemClass}
+                            data-bucket={bucket.name}
+                            onclick={handleBucketSelect}>
+                            <span class="bucket-item-name">{bucket.name}</span>
+                            <span class={bucket.countClass}>{bucket.count}</span>
+                        </div>
+                    </template>
+                </div>
             </div>
         </div>
 
-        <div class="table-title-row">
-            <h2 class="table-title">Q2 Lead Queue</h2>
-            <span class="table-meta">Showing {remainingLeads} leads</span>
-        </div>
+        <div class="right-pane">
+            <div class="right-header">
+                <div class="right-header-left">
+                    <span class="queue-title">Q2 Lead Queue</span>
+                    <span class="showing-count">Showing {showingCount} leads</span>
+                </div>
+                <div class="right-header-actions">
+                    <button class="btn-icon" title="Refresh" onclick={handleRefresh} disabled={isRefreshing}>
+                        <lightning-icon icon-name="utility:refresh" size="xx-small"></lightning-icon>
+                    </button>
+                    <template if:true={isRefreshing}>
+                        <div class="refresh-spinner-wrap">
+                            <lightning-spinner alternative-text="Refreshing" size="small"></lightning-spinner>
+                        </div>
+                    </template>
+                </div>
+            </div>
 
-        <div class="table-scroller">
-            <table class="matrix">
-                <thead>
-                    <tr>
-                        <th>S.No</th>
-                        <th>Lead Name</th>
-                        <th>Phone Number</th>
-                        <th>Primary Tag</th>
-                        <th>Bucket</th>
-                        <th>Level</th>
-                        <th>Course</th>
-                        <th>City</th>
-                        <th>Next Follow Up Date</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template if:true={hasLeads}>
-                        <template for:each={leads} for:item="lead">
-                            <tr key={lead.id}>
-                                <td>{lead.rowNumber}</td>
-                                <td class="name-cell">{lead.name}</td>
-                                <td>{lead.phone}</td>
-                                <td><span class={lead.primaryTagClass}>{lead.primaryTagLabel}</span></td>
-                                <td><span class={lead.bucketClass}>{lead.bucketLabel}</span></td>
-                                <td><span class={lead.levelClass}>{lead.levelLabel}</span></td>
-                                <td>{lead.courseLabel}</td>
-                                <td>{lead.cityLabel}</td>
-                                <td>
-                                    <template if:true={lead.nextFollowUpDate}>
-                                        <lightning-formatted-date-time value={lead.nextFollowUpDate} year="numeric"
-                                            month="2-digit" day="2-digit" hour="2-digit" minute="2-digit">
-                                        </lightning-formatted-date-time>
-                                    </template>
-                                </td>
-                                <td>
-                                    <lightning-button label={lead.buttonLabel} variant="brand" icon-name="utility:call"
-                                        data-id={lead.id} onclick={handleCall} disabled={lead.isProcessing}>
-                                    </lightning-button>
-                                </td>
+            <div class="table-scroll">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>CAN ID</th>
+                            <th>Lead Name</th>
+                            <th>Bucket</th>
+                            <th>Level</th>
+                            <th>Course</th>
+                            <th>In Queue Since</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template if:true={hasFilteredLeads}>
+                            <template for:each={filteredLeads} for:item="lead">
+                                <tr key={lead.id}>
+                                    <td>{lead.candidateIdDisplay}</td>
+                                    <td>
+                                        <a class="lead-link" data-id={lead.id} onclick={handleLeadClick}>{lead.name}</a>
+                                    </td>
+                                    <td><span class={lead.bucketBadgeClass}>{lead.bucketLabel}</span></td>
+                                    <td><span class="badge-level">{lead.levelLabel}</span></td>
+                                    <td>{lead.courseLabel}</td>
+                                    <td><span class={lead.inQueueClass}>{lead.inQueueSince}</span></td>
+                                    <td>
+                                        <lightning-button
+                                            label={lead.buttonLabel}
+                                            variant="brand"
+                                            icon-name="utility:call"
+                                            data-id={lead.id}
+                                            onclick={handleCall}
+                                            disabled={lead.isProcessing}>
+                                        </lightning-button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </template>
+                        <template if:false={hasFilteredLeads}>
+                            <tr>
+                                <td colspan="7" class="no-data">No leads available in Q2 Public Queue.</td>
                             </tr>
                         </template>
-                    </template>
-
-                    <template if:false={hasLeads}>
-                        <tr>
-                            <td colspan="10" class="no-data">No leads available in Q2 Public Queue.</td>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <!-- MODAL START -->
         <template if:true={showModal}>
             <div class="modal-overlay slds-backdrop slds-backdrop_open"></div>
-
-            <section class="slds-modal slds-fade-in-open" style="display:block; background:transparent; ">
+            <section class="slds-modal slds-fade-in-open" style="display:block; background:transparent;">
                 <div class="slds-modal__container runo-section" style="background:transparent;">
                     <header class="slds-modal__header modal-header-compact">
                         <button class="slds-button slds-button_icon slds-modal__close" onclick={closeModal}>
@@ -95,13 +106,14 @@
                         </button>
                     </header>
 
-                    <c-runo-allocation-call-q1 record-id={currentLeadId} auto-call="true"
-                        oncallcomplete={handleCallComplete} dispositions={dispositions.data}>
+                    <c-runo-allocation-call-q1
+                        record-id={currentLeadId}
+                        auto-call="true"
+                        oncallcomplete={handleCallComplete}
+                        dispositions={dispositions.data}>
                     </c-runo-allocation-call-q1>
-
                 </div>
             </section>
         </template>
-        <!-- MODAL END -->
     </div>
 </template>

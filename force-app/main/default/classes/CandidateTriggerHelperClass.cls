@@ -1,3 +1,6 @@
+/*
+    Author       : Rohit Singh Bisht
+*/
 public without sharing class CandidateTriggerHelperClass {
 
     public static void handleBeforeInsert(List<Lead> newLeads) {
@@ -332,4 +335,49 @@ public without sharing class CandidateTriggerHelperClass {
             }
         }
     }
+    
+    public static void handleCandidateStatusChange(Map<Id, Lead> oldMap, Map<Id, Lead> newMap) {
+    List<Activity_log__c> activitiesToInsert = new List<Activity_log__c>();
+    
+    for (Id candidateId : newMap.keySet()) {
+        Lead oldCandidate = oldMap.get(candidateId);
+        Lead newCandidate = newMap.get(candidateId);
+        
+        // Check if GP_Lead_Status__c has changed
+        if (oldCandidate.GP_Lead_Status__c != newCandidate.GP_Lead_Status__c) {
+            Activity_log__c activity = createActivityLog(
+                candidateId,
+                'GP_Lead_Status__c',
+                oldCandidate.GP_Lead_Status__c,
+                newCandidate.GP_Lead_Status__c,
+                newCandidate.OwnerId,
+                newCandidate.GP_User__c,
+                System.now()
+            );
+            activitiesToInsert.add(activity);
+        }
+    }
+    
+    // Insert all activity records
+    if (!activitiesToInsert.isEmpty()) {
+        ActivityLogService.insertLogs(activitiesToInsert);
+    }
+}
+
+private static Activity_log__c createActivityLog(Id candidateId, String fieldName, String oldValue, 
+                                                  String newValue, Id ownerId, Id gpUserId, DateTime changedDateTime) {
+    Lead Can = [SELECT Id, Name FROM Lead WHERE Id = :candidateId LIMIT 1];
+    
+    Activity_log__c activity = new Activity_log__c();
+    activity.Name = 'Eligibility Information of '+Can.Name;
+    activity.Candidate__c = candidateId;
+    activity.Logging_Id__c = candidateId;
+    activity.Activity_Type__c = 'Eligibility';
+    activity.Previous_Level__c = oldValue;
+    activity.New_Level__c = newValue;
+    activity.Changed_Date_Time__c = changedDateTime;
+    activity.Description__c = fieldName + ' changed from "' + oldValue + '" to "' + newValue + '"';
+    
+    return activity;
+}
 }

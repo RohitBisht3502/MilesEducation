@@ -1,3 +1,6 @@
+/*
+    Author       : Rohit Singh Bisht
+*/
 public without sharing class WebinarMemberTriggerHandler {
 
     public static void beforeInsert(List<Webinar_Member__c> newMembers) {
@@ -159,7 +162,7 @@ public without sharing class WebinarMemberTriggerHandler {
         }
 
         if (!logsToInsert.isEmpty()) {
-            insert logsToInsert;
+            ActivityLogService.insertLogs(logsToInsert);
         }
     }
 }

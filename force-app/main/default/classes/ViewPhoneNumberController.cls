@@ -202,7 +202,7 @@ public without sharing class ViewPhoneNumberController {
                 }
             }
 
-            insert log;
+            ActivityLogService.insertLogs(new List<Activity_Log__c>{ log });
 
         } 
         catch (Exception e) {

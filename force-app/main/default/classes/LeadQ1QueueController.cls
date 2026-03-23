@@ -25,7 +25,7 @@ public without sharing class LeadQ1QueueController {
         // 3. Fetch leads if membership confirmed
         List<Lead__c> leads = [
             SELECT Id, Name, Phone__c, Email__c, Course__c, City__c, Stage__c, Source_Bucket__c, CreatedDate, 
-                   Primary_tag__c, Next_Follow_Up_Date__c, Candidate__c, Is_ReEnquiry__c, Queue_Stage__c
+                   Primary_tag__c, Next_Follow_Up_Date__c, Candidate__c, Candidate__r.Candidate_ID__c, Is_ReEnquiry__c, Queue_Stage__c
             FROM Lead__c 
             WHERE Owner.Type = 'Queue' 
             AND Owner.Name = :queueSearchName
@@ -57,6 +57,7 @@ public without sharing class LeadQ1QueueController {
             dto.bucketTag   = l.Source_Bucket__c;
             dto.nextFollowUpDate = l.Next_Follow_Up_Date__c;
             dto.candidateId = l.Candidate__c;
+            dto.candidateCode = l.Candidate__r != null ? l.Candidate__r.Candidate_ID__c : null;
             allItems.add(dto);
         }
 

@@ -74,7 +74,8 @@ public with sharing class QueuePriorityService {
         }
 
         List<Queue_Priority_Matrix__c> matrixRows = [
-            SELECT Levels__c,
+            SELECT Name,
+                   Levels__c,
                    Queue_Priority__c,
                    Course_Tag__c,
                    Primary_tag__c,
@@ -109,6 +110,7 @@ public with sharing class QueuePriorityService {
             Integer bestScore = -1;
             Id bestRowId;
             String bestSequenceTag;
+            String bestQueueName;
 
             if (dtoRole == null || (!matrixRoles.isEmpty() && !matrixRoles.contains(dtoRole))) {
                 System.debug(
@@ -131,6 +133,7 @@ public with sharing class QueuePriorityService {
                     ' => no priority, will be pushed to end'
                 );
                 dto.priority = null;
+                dto.queueName = dto.primaryTag;
                 output.add(dto);
                 continue;
             }
@@ -189,11 +192,13 @@ public with sharing class QueuePriorityService {
                     bestScore = score;
                     bestRowId = row.Id;
                     bestSequenceTag = row.Sequence_Tag__c;
+                    bestQueueName = row.Name;
                 }
             }
 
             dto.priority = bestPriority;
             dto.sequenceTag = bestSequenceTag;
+            dto.queueName = String.isBlank(bestQueueName) ? dto.primaryTag : bestQueueName;
             System.debug(
                 'QueuePriorityService.assignPriorities: dtoId=' + dto.id +
                 ', primary=' + dtoPrimary +

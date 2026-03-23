@@ -1,3 +1,6 @@
+/*
+    Author       : Rohit Singh Bisht
+*/
 public without sharing class LeadActivityLogHandler {
 
     public static void createLeadActivityLogs(
@@ -65,7 +68,7 @@ public without sharing class LeadActivityLogHandler {
         }
 
         if (!logsToInsert.isEmpty()) {
-            insert logsToInsert;
+            ActivityLogService.insertLogs(logsToInsert);
         }
     }
 
@@ -171,7 +174,7 @@ public without sharing class LeadActivityLogHandler {
         }
 
         if (!logsToInsert.isEmpty()) {
-            insert logsToInsert;
+            ActivityLogService.insertLogs(logsToInsert);
         }
     }
 

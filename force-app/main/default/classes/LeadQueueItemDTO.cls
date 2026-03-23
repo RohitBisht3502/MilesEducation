@@ -22,4 +22,6 @@ public without sharing class LeadQueueItemDTO {
     @AuraEnabled public Datetime nextFollowUpDate;
     @AuraEnabled public String sequenceTag;
     @AuraEnabled public Id candidateId;
+    @AuraEnabled public String candidateCode;
+    @AuraEnabled public String queueName;
 }

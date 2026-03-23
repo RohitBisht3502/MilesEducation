@@ -207,6 +207,7 @@ public with sharing class LeadNewOverrideController {
                 Source__c    = source,
                 RecordTypeId = recordTypeId,
                 Candidate__c = candidate.Id,
+                Disable_Round_Robin__c = true,
                 Is_Created_Manually__c = true
             );
             insert newLead;
@@ -381,6 +382,7 @@ public with sharing class LeadNewOverrideController {
                 Source__c    = 'Referral',
                 RecordTypeId = rt.Id,
                 Candidate__c = candidate.Id,
+                Disable_Round_Robin__c = true,
                 Is_Created_Manually__c = true
             );
             insert newLead;

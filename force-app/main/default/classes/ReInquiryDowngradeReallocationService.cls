@@ -223,7 +223,9 @@ public without sharing class ReInquiryDowngradeReallocationService {
         );
 
         if (!toUpdate.isEmpty()) update toUpdate;
-        if (!logsToInsert.isEmpty()) insert logsToInsert;
+        if (!logsToInsert.isEmpty()) {
+            ActivityLogService.insertLogs(logsToInsert);
+        }
 
         System.debug(LoggingLevel.INFO,
             'ReInquiryDowngradeReallocationService.processReallocation :: END'

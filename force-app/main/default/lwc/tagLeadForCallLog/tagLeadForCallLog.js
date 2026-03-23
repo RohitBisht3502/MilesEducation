@@ -43,6 +43,8 @@ export default class TagLeadForCallLog extends LightningElement {
     courseOptions = [];
     cityOptions = [];
     sourceOptions = [];
+    successState = null;
+    pendingStatusAction = null;
 
     connectedCallback() {
         this.setDefaultFollowUpDate();
@@ -276,7 +278,7 @@ export default class TagLeadForCallLog extends LightningElement {
     }
 
     get showNotFound() {
-        return this.viewState === 'notFound';
+        return this.viewState === 'notFound' && !this.hasCandidates;
     }
 
     get showCreateForm() {
@@ -285,6 +287,38 @@ export default class TagLeadForCallLog extends LightningElement {
 
     get showLeadResults() {
         return this.viewState === 'search' && this.hasCandidates;
+    }
+
+    get showSuccess() {
+        return this.viewState === 'success' && this.successState;
+    }
+
+    get showConfirmation() {
+        return this.pendingStatusAction !== null;
+    }
+
+    get confirmationTitle() {
+        return this.pendingStatusAction?.title || 'Confirm Action';
+    }
+
+    get confirmationMessage() {
+        return this.pendingStatusAction?.message || '';
+    }
+
+    get successTitle() {
+        return this.successState?.title || 'Processed Successfully';
+    }
+
+    get successMessage() {
+        return this.successState?.message || '';
+    }
+
+    get showProcessAnother() {
+        return this.successState?.allowAnother === true;
+    }
+
+    get successButtonLabel() {
+        return this.showProcessAnother ? 'Process Another Number' : 'Done';
     }
 
     get isFormValid() {
@@ -344,13 +378,12 @@ export default class TagLeadForCallLog extends LightningElement {
             recordTypeId: this.courseRecordTypeId
         })
             .then(() => {
-                this.dispatchEvent(new ShowToastEvent({
-                    title: 'Success',
-                    message: 'Candidate tagged successfully!',
-                    variant: 'success'
-                }));
-
-                this.closeModal();
+                this.successState = {
+                    title: 'Lead Tagged Successfully',
+                    message: `Phone number ${this.phoneNumber} has been processed successfully.`,
+                    allowAnother: true
+                };
+                this.viewState = 'success';
             })
             .catch((error) => {
                 this.dispatchEvent(new ShowToastEvent({
@@ -406,13 +439,12 @@ export default class TagLeadForCallLog extends LightningElement {
             recordTypeId: this.courseRecordTypeId
         })
             .then(() => {
-                this.dispatchEvent(new ShowToastEvent({
-                    title: 'Success',
-                    message: 'Lead created and tagged successfully!',
-                    variant: 'success'
-                }));
-
-                this.closeModal();
+                this.successState = {
+                    title: 'Lead Created Successfully',
+                    message: `Phone number ${this.phoneNumber} has been processed successfully.`,
+                    allowAnother: true
+                };
+                this.viewState = 'success';
             })
             .catch((error) => {
                 this.dispatchEvent(new ShowToastEvent({
@@ -427,11 +459,37 @@ export default class TagLeadForCallLog extends LightningElement {
     }
 
     handleMarkSpam() {
-        this.updatePhoneNumberStatus(true, false, 'Phone number marked as spam successfully!');
+        this.pendingStatusAction = {
+            title: 'Mark as Spam',
+            message: `Are you sure you want to mark ${this.phoneNumber} as spam?`,
+            isSpam: true,
+            isDnd: false,
+            successMessage: 'Marked as Spam'
+        };
     }
 
     handleMarkDnd() {
-        this.updatePhoneNumberStatus(false, true, 'Phone number marked as DND successfully!');
+        this.pendingStatusAction = {
+            title: 'Mark as DND',
+            message: `Are you sure you want to mark ${this.phoneNumber} as DND?`,
+            isSpam: false,
+            isDnd: true,
+            successMessage: 'Marked as DND'
+        };
+    }
+
+    handleCancelConfirmation() {
+        this.pendingStatusAction = null;
+    }
+
+    handleConfirmStatusAction() {
+        if (!this.pendingStatusAction) {
+            return;
+        }
+
+        const { isSpam, isDnd, successMessage } = this.pendingStatusAction;
+        this.pendingStatusAction = null;
+        this.updatePhoneNumberStatus(isSpam, isDnd, successMessage);
     }
 
     updatePhoneNumberStatus(isSpam, isDnd, successMessage) {
@@ -443,13 +501,12 @@ export default class TagLeadForCallLog extends LightningElement {
             isDnd
         })
             .then(() => {
-                this.dispatchEvent(new ShowToastEvent({
-                    title: 'Success',
-                    message: successMessage,
-                    variant: 'success'
-                }));
-
-                this.closeModal();
+                this.successState = {
+                    title: successMessage,
+                    message: `Phone number ${this.phoneNumber} has been processed successfully.`,
+                    allowAnother: false
+                };
+                this.viewState = 'success';
             })
             .catch((error) => {
                 this.dispatchEvent(new ShowToastEvent({
@@ -461,6 +518,15 @@ export default class TagLeadForCallLog extends LightningElement {
             .finally(() => {
                 this.isLoading = false;
             });
+    }
+
+    handleSuccessAction() {
+        if (this.showProcessAnother) {
+            this.successState = null;
+            this.handleCancel();
+            return;
+        }
+        this.closeModal();
     }
 
     @wire(getCityOptions)

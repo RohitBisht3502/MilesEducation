@@ -1,3 +1,6 @@
+/*
+    Author       : Rohit Singh Bisht
+*/
 public class RoundRobinPoolHelpers {
 
     public static void handleWeightChange(
@@ -36,7 +39,7 @@ public class RoundRobinPoolHelpers {
         }
 
         if (!logs.isEmpty()) {
-            insert logs;
+            ActivityLogService.insertLogs(logs);
         }
     }
 }

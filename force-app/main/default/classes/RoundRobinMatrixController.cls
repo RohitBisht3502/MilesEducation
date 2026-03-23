@@ -81,28 +81,9 @@ public without sharing class RoundRobinMatrixController {
     public static Map<String, Object> getBucketConfiguration(String type) {
         Map<String, Object> result = new Map<String, Object>();
 
-        List<Bucket_Value__mdt> bucketConfigs = [
-            SELECT Value__c, Bucket__c, Value_Type__c
-            FROM Bucket_Value__mdt
-            WHERE Active__c = true
-            AND Value_Type__c = :type
-            ORDER BY Bucket__c, Value__c
-        ];
-
-        Map<String, Set<String>> bucketToSources = new Map<String, Set<String>>();
-        Set<String> allSources = new Set<String>();
+        Map<String, Set<String>> bucketToSources = SourceBucketUtility.getBucketToValues(type);
+        Set<String> allSources = SourceBucketUtility.getAllConfiguredValues(type);
         Set<String> businessVerticals = new Set<String>();
-
-        for (Bucket_Value__mdt config : bucketConfigs) {
-            if (!bucketToSources.containsKey(config.Bucket__c)) {
-                bucketToSources.put(config.Bucket__c, new Set<String>());
-            }
-            bucketToSources.get(config.Bucket__c).add(config.Value__c);
-            allSources.add(config.Value__c);
-
-            // If needed later:
-            // if (config.Value_Type__c == 'BusinessVertical') businessVerticals.add(config.Value__c);
-        }
 
         result.put('buckets', new List<String>(bucketToSources.keySet()));
         result.put('bucketSourcesMap', bucketToSources);

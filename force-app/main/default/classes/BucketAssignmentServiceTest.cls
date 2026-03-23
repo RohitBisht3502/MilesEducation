@@ -3,6 +3,21 @@ public class BucketAssignmentServiceTest {
     
     @isTest
     static void testAssignBucketInsert() {
+        insert new Bucket_Mapping__c(
+            Bucket__c = 'Bucket 1',
+            Value_Type__c = 'Course',
+            Active__c = true,
+            Sequence__c = 1,
+            Course_Values__c = 'CPA;CMA'
+        );
+        insert new Bucket_Mapping__c(
+            Bucket__c = 'Bucket 2',
+            Value_Type__c = 'Source',
+            Active__c = true,
+            Sequence__c = 1,
+            Source_Values__c = 'Blog Makreting;CA-DB'
+        );
+
         Lead l = new Lead(
             LastName = 'TestLead',
             Company = 'TestCompany'
@@ -21,10 +36,27 @@ public class BucketAssignmentServiceTest {
         Test.stopTest();
         
         System.assertNotEquals(null, l);
+        System.assertEquals('Bucket 1', (String)l.get('Course_Bucket__c'));
+        System.assertEquals('Bucket 2', (String)l.get('Source_Bucket__c'));
     }
 
     @isTest
     static void testAssignBucketUpdate() {
+        insert new Bucket_Mapping__c(
+            Bucket__c = 'Bucket 1',
+            Value_Type__c = 'Course',
+            Active__c = true,
+            Sequence__c = 1,
+            Course_Values__c = 'CMA'
+        );
+        insert new Bucket_Mapping__c(
+            Bucket__c = 'Bucket 2',
+            Value_Type__c = 'Source',
+            Active__c = true,
+            Sequence__c = 1,
+            Source_Values__c = 'CA-DB'
+        );
+
         Lead oldL = TestDataFactory.createLead('Old', 'Company', 'Open');
         Lead newL = oldL.clone(true, true, true, true);
         
@@ -41,6 +73,8 @@ public class BucketAssignmentServiceTest {
         Test.stopTest();
         
         System.assertNotEquals(null, newList);
+        System.assertEquals('Bucket 1', (String)newL.get('Course_Bucket__c'));
+        System.assertEquals('Bucket 2', (String)newL.get('Source_Bucket__c'));
     }
 
     @isTest

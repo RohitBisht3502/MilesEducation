@@ -1,4 +1,5 @@
 import { LightningElement, track, wire } from 'lwc';
+import { NavigationMixin } from 'lightning/navigation';
 import { refreshApex } from '@salesforce/apex';
 import getQ2Leads from '@salesforce/apex/LeadQ2QueueController.getQ2Leads';
 import updateLeadOwner from '@salesforce/apex/LeadQ2QueueController.updateLeadOwner';
@@ -7,18 +8,17 @@ import getDispositions from '@salesforce/apex/CallDispositionConfigService.getDi
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { subscribe, unsubscribe, onError } from 'lightning/empApi';
 
-export default class LeadQ2QueueManagement extends LightningElement {
-
+export default class LeadQ2QueueManagement extends NavigationMixin(LightningElement) {
     @track leads = [];
+    @track selectedBucket = 'All';
+    @track bucketList = [];
+
     wiredResult;
 
     totalLeads = 0;
-    remainingLeads = 0;
     isRefreshing = false;
     showModal = false;
     currentLeadId = null;
-    currentIsCallLog = false;
-    queueRunning = false;
 
     channelName = '/event/Queue_Lead_Status__e';
     subscription = {};
@@ -32,23 +32,22 @@ export default class LeadQ2QueueManagement extends LightningElement {
         const { data, error } = result;
 
         if (data) {
-            this.leads = data.map((item, i) => ({
+            this.leads = data.map((item, index) => ({
                 ...item,
-                rowNumber: i + 1,
-                primaryTagLabel: item.primaryTag || 'NA',
-                bucketLabel: item.source || 'NA',
+                rowNumber: index + 1,
+                candidateIdDisplay: item.candidateCode || 'N/A',
+                bucketLabel: item.bucketTag || item.source || 'NA',
                 levelLabel: item.stage || '--',
                 courseLabel: item.course || 'NA',
-                cityLabel: item.city || 'NA',
-                primaryTagClass: this.getPrimaryTagClass(item.primaryTag),
-                bucketClass: this.getBucketClass(item.source),
-                levelClass: this.getLevelClass(item.stage),
+                inQueueSince: this.computeInQueueSince(item.createdDate),
+                inQueueClass: this.isInQueueUrgent(item.createdDate) ? 'in-queue urgent' : 'in-queue',
+                bucketBadgeClass: this.getBucketBadgeClass(item.bucketTag || item.source),
                 isProcessing: false,
                 buttonLabel: 'Call'
             }));
 
             this.totalLeads = this.leads.length;
-            this.remainingLeads = this.totalLeads;
+            this.buildBucketList();
         }
 
         if (error) {
@@ -72,10 +71,8 @@ export default class LeadQ2QueueManagement extends LightningElement {
     }
 
     subscribeToEvents() {
-        console.log('Subscribing to channel:', this.channelName);
-        subscribe(this.channelName, -1, (msg) => this.handleEvent(msg))
+        subscribe(this.channelName, -1, msg => this.handleEvent(msg))
             .then(response => {
-                console.log('Subscription request sent to:', response.channel);
                 this.subscription = response;
             })
             .catch(error => {
@@ -84,36 +81,40 @@ export default class LeadQ2QueueManagement extends LightningElement {
     }
 
     handleEvent(msg) {
-        console.log('--- New Queue_Lead_Status__e Event Received ---');
-        console.log('Payload:', JSON.stringify(msg.data.payload));
-
         const payload = msg.data.payload;
         const leadId = payload.Lead_Id__c || payload.Lead_Id || payload.LeadId__c || payload.leadId;
         const status = payload.Status__c || payload.Status || payload.status;
 
         if (!leadId) {
-            console.warn('Event received but no Lead ID found in payload');
             return;
         }
 
-        console.log('Processing event for Lead:', leadId, 'Status:', status);
-
         this.leads = this.leads.map(lead => {
             const isMatch = String(lead.id).substring(0, 15) === String(leadId).substring(0, 15);
-            if (isMatch) {
-                console.log('UI Match Found! Updating row label to:', status);
-                if (status === 'Processing') {
-                    return { ...lead, isProcessing: true, buttonLabel: 'In Progress' };
-                } else {
-                    return { ...lead, isProcessing: false, buttonLabel: 'Call' };
-                }
+            if (!isMatch) {
+                return lead;
             }
-            return lead;
+            return {
+                ...lead,
+                isProcessing: status === 'Processing',
+                buttonLabel: status === 'Processing' ? 'In Progress' : 'Call'
+            };
         });
     }
 
-    get hasLeads() {
-        return this.leads && this.leads.length > 0;
+    get filteredLeads() {
+        if (this.selectedBucket === 'All') {
+            return this.leads;
+        }
+        return this.leads.filter(lead => lead.bucketLabel === this.selectedBucket);
+    }
+
+    get hasFilteredLeads() {
+        return this.filteredLeads.length > 0;
+    }
+
+    get showingCount() {
+        return this.filteredLeads.length;
     }
 
     async handleRefresh() {
@@ -121,6 +122,7 @@ export default class LeadQ2QueueManagement extends LightningElement {
         this.isRefreshing = true;
         try {
             await refreshApex(this.wiredResult);
+            this.buildBucketList();
         } catch (e) {
             console.error('Manual refresh failed', e);
         } finally {
@@ -128,44 +130,110 @@ export default class LeadQ2QueueManagement extends LightningElement {
         }
     }
 
-    getPrimaryTagClass(tag) {
-        const t = (tag || '').toLowerCase();
-        if (t === 'untracked calls') return 'pill pill-blue';
-        if (t === 'ne' || t === 'mhp') return 'pill pill-cyan';
-        if (t === 'delays') return 'pill pill-amber';
-        return 'pill pill-gray';
+    handleBucketSelect(event) {
+        this.selectedBucket = event.currentTarget.dataset.bucket;
+        this.buildBucketList();
     }
 
-    getBucketClass(bucket) {
-        if (!bucket || bucket === 'NA') return 'pill pill-gray';
-        return 'pill pill-green';
+    async handleLeadClick(event) {
+        const recordId = event.currentTarget.dataset.id;
+        if (!recordId) {
+            return;
+        }
+
+        const url = await this[NavigationMixin.GenerateUrl]({
+            type: 'standard__recordPage',
+            attributes: {
+                recordId,
+                objectApiName: 'Lead__c',
+                actionName: 'view'
+            }
+        });
+
+        if (url) {
+            window.open(url, '_blank');
+        }
     }
 
-    getLevelClass(level) {
-        if (!level || level === 'NA' || level === '--') return 'pill pill-gray';
-        return 'pill pill-slate';
+    buildBucketList() {
+        const bucketCounts = {};
+        this.leads.forEach(lead => {
+            const bucket = lead.bucketLabel || 'NA';
+            bucketCounts[bucket] = (bucketCounts[bucket] || 0) + 1;
+        });
+
+        if (this.selectedBucket !== 'All' && !bucketCounts[this.selectedBucket]) {
+            this.selectedBucket = 'All';
+        }
+
+        const list = [{
+            name: 'All',
+            count: this.leads.length,
+            itemClass: 'bucket-item' + (this.selectedBucket === 'All' ? ' active' : ''),
+            countClass: 'bucket-item-count' + (this.selectedBucket === 'All' ? ' active' : '')
+        }];
+
+        Object.keys(bucketCounts).sort().forEach(bucket => {
+            list.push({
+                name: bucket,
+                count: bucketCounts[bucket],
+                itemClass: 'bucket-item' + (this.selectedBucket === bucket ? ' active' : ''),
+                countClass: 'bucket-item-count' + (this.selectedBucket === bucket ? ' active' : '')
+            });
+        });
+
+        this.bucketList = list;
+    }
+
+    getBucketBadgeClass(bucket) {
+        if (!bucket || bucket === 'NA' || bucket === 'ALL') return 'badge badge-bucket-na';
+        const normalized = bucket.toLowerCase().replace(/[\s_]+/g, '');
+        if (normalized.includes('bucket1') || normalized === '1') return 'badge badge-bucket-1';
+        if (normalized.includes('bucket2') || normalized === '2') return 'badge badge-bucket-2';
+        if (normalized.includes('bucket3') || normalized === '3') return 'badge badge-bucket-3';
+        if (normalized.includes('bucket4') || normalized === '4') return 'badge badge-bucket-4';
+        if (normalized.includes('bucket5') || normalized === '5') return 'badge badge-bucket-5';
+        return 'badge badge-bucket-na';
+    }
+
+    computeInQueueSince(createdDate) {
+        if (!createdDate) return '--';
+        const now = new Date();
+        const created = new Date(createdDate);
+        const diffMs = Math.max(now - created, 0);
+        const totalMinutes = Math.floor(diffMs / 60000);
+        const d = Math.floor(totalMinutes / 1440);
+        const h = Math.floor((totalMinutes % 1440) / 60);
+        const m = totalMinutes % 60;
+        return `${d}d ${h}h ${m}m`;
+    }
+
+    isInQueueUrgent(createdDate) {
+        if (!createdDate) return false;
+        return (new Date() - new Date(createdDate)) > (2 * 24 * 60 * 60 * 1000);
     }
 
     handleCall(event) {
-        const leadId = event.getAttribute ? event.getAttribute('data-id') : event.target.dataset.id;
-        const lead = this.leads.find(l => l.id === leadId);
-        if (lead) {
-            if (lead.isProcessing) {
-                this.dispatchEvent(
-                    new ShowToastEvent({
-                        title: 'Warning',
-                        message: 'This lead is already being processed by another user.',
-                        variant: 'warning'
-                    })
-                );
-                return;
-            }
-            this.currentLeadId = lead.id;
-            this.currentIsCallLog = false;
-            this.showModal = true;
-            // Broadcast processing to others
-            startProcessingLead({ leadId: leadId, status: 'Processing' });
+        const leadId = event.currentTarget.dataset.id;
+        const lead = this.leads.find(item => item.id === leadId);
+        if (!lead) {
+            return;
         }
+
+        if (lead.isProcessing) {
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title: 'Warning',
+                    message: 'This lead is already being processed by another user.',
+                    variant: 'warning'
+                })
+            );
+            return;
+        }
+
+        this.currentLeadId = lead.id;
+        this.showModal = true;
+        startProcessingLead({ leadId, status: 'Processing' });
     }
 
     closeModal() {
@@ -181,10 +249,9 @@ export default class LeadQ2QueueManagement extends LightningElement {
         const leadId = detail.recordId;
         const l1Status = detail.l1;
 
-        // Requirement: Change owner ONLY if call was 'Connected'
         if (l1Status === 'Connected') {
             try {
-                await updateLeadOwner({ leadId: leadId });
+                await updateLeadOwner({ leadId });
                 this.dispatchEvent(
                     new ShowToastEvent({
                         title: 'Success',
@@ -206,12 +273,7 @@ export default class LeadQ2QueueManagement extends LightningElement {
         }
 
         this.closeModal();
-
-        // Refresh list
         await refreshApex(this.wiredResult);
-    }
-
-    get refreshIconClass() {
-        return this.isRefreshing ? 'refresh-spin' : '';
+        this.buildBucketList();
     }
 }

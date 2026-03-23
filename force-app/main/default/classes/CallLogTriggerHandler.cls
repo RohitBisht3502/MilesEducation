@@ -1,3 +1,6 @@
+/*
+    Author       : Rohit Singh Bisht
+*/
 public without sharing class CallLogTriggerHandler {
 
     public static void createActivityLogs(
@@ -128,10 +131,10 @@ public without sharing class CallLogTriggerHandler {
         }
 
         if (!activityLogsToInsert.isEmpty()) {
-            insert activityLogsToInsert;
+            ActivityLogService.insertLogs(activityLogsToInsert);
         }
         if (!activityLogsToUpdate.isEmpty()) {
-            update activityLogsToUpdate;
+            ActivityLogService.updateLogs(activityLogsToUpdate);
         }
     }
 

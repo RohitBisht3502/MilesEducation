@@ -1,3 +1,6 @@
+/*
+    Author       : Rohit Singh Bisht
+*/
 public with sharing class SObjectChangeOwnerController {
 
     private ApexPages.StandardSetController ssc;
@@ -116,7 +119,7 @@ public with sharing class SObjectChangeOwnerController {
         System.debug(LoggingLevel.INFO, 'Records updated successfully');
 
         if (!logs.isEmpty()) {
-            insert logs;
+            ActivityLogService.insertLogs(logs);
             System.debug(LoggingLevel.INFO, 'Activity logs inserted: ' + logs.size());
         }
 

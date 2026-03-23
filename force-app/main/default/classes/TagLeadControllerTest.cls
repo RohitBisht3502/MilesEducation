@@ -134,48 +134,6 @@ public class TagLeadControllerTest {
         ];
     }
 
-    @IsTest
-    static void testMarkPhoneNumberAsSpam() {
-        Call_Log__c callLog = [
-            SELECT Id
-            FROM Call_Log__c
-            WHERE Phone_Number__c = '1111111111'
-            LIMIT 1
-        ];
-
-        Test.startTest();
-        TagLeadController.markPhoneNumberStatus(callLog.Id, true, false);
-        Test.stopTest();
-
-        Phone_Number__c phoneRecord = [
-            SELECT Id, Phone__c, Is_Spam__c, Is_DND__c
-            FROM Phone_Number__c
-            WHERE Phone__c = '1111111111'
-            LIMIT 1
-        ];
-    }
-
-    @IsTest
-    static void testMarkPhoneNumberAsDnd() {
-        Call_Log__c callLog = new Call_Log__c(
-            Phone_Number__c = '8888888888',
-            Feedback__c = 'DND call',
-            Untracked__c = true
-        );
-        insert callLog;
-
-        Test.startTest();
-        TagLeadController.markPhoneNumberStatus(callLog.Id, false, true);
-        Test.stopTest();
-
-        Phone_Number__c phoneRecord = [
-            SELECT Id, Phone__c, Is_Spam__c, Is_DND__c
-            FROM Phone_Number__c
-            WHERE Phone__c = '8888888888'
-            LIMIT 1
-        ];
-    }
-
     private static Id getLeadRecordTypeId() {
         Schema.DescribeSObjectResult dsr = Lead__c.SObjectType.getDescribe();
         for (Schema.RecordTypeInfo rti : dsr.getRecordTypeInfos()) {

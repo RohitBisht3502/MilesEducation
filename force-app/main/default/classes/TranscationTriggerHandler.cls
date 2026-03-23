@@ -1,3 +1,6 @@
+/*
+    Author       : Rohit Singh Bisht
+*/
 public class TranscationTriggerHandler {
 
     public static Boolean isFirstRun = true;
@@ -107,7 +110,7 @@ public class TranscationTriggerHandler {
         }
 
         if(!activityList.isEmpty()){
-            insert activityList;
+            ActivityLogService.insertLogs(activityList);
         }
     }
 }

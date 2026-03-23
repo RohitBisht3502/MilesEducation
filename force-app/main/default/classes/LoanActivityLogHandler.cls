@@ -1,3 +1,6 @@
+/*
+    Author       : Rohit Singh Bisht
+*/
 public without sharing class LoanActivityLogHandler {
 
     public static void createLoanActivityLogs(List<Loan__c> newList, Map<Id, Loan__c> oldMap) {
@@ -50,7 +53,7 @@ public without sharing class LoanActivityLogHandler {
         }
 
         if (!logsToInsert.isEmpty()) {
-            insert logsToInsert;
+            ActivityLogService.insertLogs(logsToInsert);
         }
     }
 

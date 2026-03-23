@@ -58,18 +58,8 @@ public class BucketAssignmentService {
             }
         }
 
-        // CMDT lookup
-        Map<String, String> courseBucketMap = new Map<String, String>();
-        Map<String, String> sourceBucketMap = new Map<String, String>();
-
-        for (Bucket_Value__mdt cfg : [ SELECT Value__c, Value_Type__c, Bucket__c FROM Bucket_Value__mdt WHERE Active__c = true]) {
-            if (cfg.Value_Type__c == 'Course' && courseValues.contains(cfg.Value__c)) {
-                courseBucketMap.put(cfg.Value__c, cfg.Bucket__c);
-            }
-            if (cfg.Value_Type__c == 'Source' && sourceValues.contains(cfg.Value__c)) {
-                sourceBucketMap.put(cfg.Value__c, cfg.Bucket__c);
-            }
-        }
+        Map<String, String> courseBucketMap = SourceBucketUtility.getBucketMapForValues(courseValues, 'Course');
+        Map<String, String> sourceBucketMap = SourceBucketUtility.getBucketMapForValues(sourceValues, 'Source');
 
         // Assign BOTH buckets
         for (SObject sob : toProcess) {

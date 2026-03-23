@@ -15,6 +15,9 @@ public without sharing class TriggerRoundRobinService {
             List<Lead__c> regularLeads = new List<Lead__c>();
             
             for (Lead__c lead : newLeads) {
+                if (lead.Disable_Round_Robin__c == true) {
+                    continue;
+                }
                 if ('MCOM'.equalsIgnoreCase(lead.Course__c)) {
                     mcomLeads.add(lead);
                 } else {
@@ -53,6 +56,7 @@ public without sharing class TriggerRoundRobinService {
         for (Lead__c nl : newLeads) {
             Lead__c ol = oldMap.get(nl.Id);
             if (ol == null) continue;
+            if (nl.Disable_Round_Robin__c == true) continue;
 
             Boolean isMCOM = 'MCOM'.equalsIgnoreCase(nl.Course__c);
             String type = isMCOM ? 'MCOM' : 'CC - Pre Enrollment';

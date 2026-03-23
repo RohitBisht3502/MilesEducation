@@ -6,10 +6,10 @@ public class LeadQueueManagementController {
 
     @AuraEnabled(cacheable=true)
     public static List<LeadQueueItemDTO> getUserLeads() {
-        List<Lead__c> leads = [SELECT Id, Name, Phone__c, Email__c, Course__c, City__c, Stage__c, Source__c, CreatedDate, Primary_tag__c, Source_Bucket__c, Next_Follow_Up_Date__c, Candidate__c, Is_ReEnquiry__c FROM Lead__c WHERE OwnerId = :UserInfo.getUserId() AND Is_DND__c = FALSE AND Is_Spam__c = FALSE AND Is_Merged__c = FALSE AND (Next_Follow_Up_Date__c = NULL OR Next_Follow_Up_Date__c <= :Datetime.now()) ORDER BY CreatedDate DESC LIMIT 200];
+        List<Lead__c> leads = [SELECT Id, Name, Phone__c, Email__c, Course__c, City__c, Stage__c, Source__c, CreatedDate, Primary_tag__c, Source_Bucket__c, Next_Follow_Up_Date__c, Candidate__c, Candidate__r.Candidate_ID__c, Is_ReEnquiry__c FROM Lead__c WHERE OwnerId = :UserInfo.getUserId() AND Is_DND__c = FALSE AND Is_Spam__c = FALSE AND Is_Merged__c = FALSE AND (Next_Follow_Up_Date__c = NULL OR Next_Follow_Up_Date__c <= :Datetime.now()) ORDER BY CreatedDate DESC LIMIT 200];
 
         System.debug('LeadQueueManagementController.getUserLeads: fetched leads count = ' + leads);
-        List<Call_Log__c> callLogs = [SELECT Id, Customer_Name__c, Phone_Number__c, CreatedDate, Type__c, Candidate__c FROM Call_Log__c WHERE OwnerId = :UserInfo.getUserId() AND Lead__c = null AND Next_Follow_Up_Date__c = null AND (Untracked__c = TRUE OR (Type__c = 'missed' AND Candidate__c != null)) ORDER BY CreatedDate DESC LIMIT 200];
+        List<Call_Log__c> callLogs = [SELECT Id, Customer_Name__c, Phone_Number__c, CreatedDate, Type__c, Candidate__c, Candidate__r.Candidate_ID__c FROM Call_Log__c WHERE OwnerId = :UserInfo.getUserId() AND Lead__c = null AND Next_Follow_Up_Date__c = null AND (Untracked__c = TRUE OR (Type__c = 'missed' AND Candidate__c != null)) ORDER BY CreatedDate DESC LIMIT 200];
 
         User currentUser = [SELECT Id, UserRole.Name FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1 ];
 
@@ -52,6 +52,7 @@ public class LeadQueueManagementController {
             dto.bucketTag = l.Source_Bucket__c;
             dto.nextFollowUpDate = l.Next_Follow_Up_Date__c;
             dto.candidateId = l.Candidate__c;
+            dto.candidateCode = l.Candidate__r != null ? l.Candidate__r.Candidate_ID__c : null;
             allItems.add(dto);
         }
 
@@ -73,6 +74,7 @@ public class LeadQueueManagementController {
             dto.roleTag     = currentUser.UserRole != null ? currentUser.UserRole.Name : null;
             dto.bucketTag   = 'ALL';
             dto.candidateId = e.Candidate__c;
+            dto.candidateCode = e.Candidate__r != null ? e.Candidate__r.Candidate_ID__c : null;
             allItems.add(dto);
         }
 

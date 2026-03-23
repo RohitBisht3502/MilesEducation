@@ -1,11 +1,13 @@
 import { LightningElement, api, wire, track } from 'lwc';
 import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
-import processApprovalResult from '@salesforce/apex/LeadMergeController.processApprovalResult';
+import processMergeApprovalResult from '@salesforce/apex/LeadMergeController.processApprovalResult';
+import processTransferApprovalResult from '@salesforce/apex/LeadTransferApprovalDecisionController.processApprovalResult';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { NavigationMixin } from 'lightning/navigation';
 import MERGE_STATUS_FIELD from '@salesforce/schema/Approval_Process__c.Merge_Status__c';
 import APPROVER_FIELD from '@salesforce/schema/Approval_Process__c.Approver__c';
 import APPROVER_NAME_FIELD from '@salesforce/schema/Approval_Process__c.Approver__r.Name';
+import RECORD_TYPE_VALUE_FIELD from '@salesforce/schema/Approval_Process__c.Record_Type__c';
 import USER_ID from '@salesforce/user/Id';
 
 export default class ApprovalProcessActionCenter extends NavigationMixin(LightningElement) {
@@ -16,7 +18,7 @@ export default class ApprovalProcessActionCenter extends NavigationMixin(Lightni
     @track modalActionLabel = '';
     @track currentStatusAction = '';
 
-    @wire(getRecord, { recordId: '$recordId', fields: [MERGE_STATUS_FIELD, APPROVER_FIELD, APPROVER_NAME_FIELD] })
+    @wire(getRecord, { recordId: '$recordId', fields: [MERGE_STATUS_FIELD, APPROVER_FIELD, APPROVER_NAME_FIELD, RECORD_TYPE_VALUE_FIELD] })
     approvalRecord;
 
     get currentUserId() {
@@ -39,6 +41,18 @@ export default class ApprovalProcessActionCenter extends NavigationMixin(Lightni
         return getFieldValue(this.approvalRecord.data, MERGE_STATUS_FIELD);
     }
 
+    get requestType() {
+        return getFieldValue(this.approvalRecord.data, RECORD_TYPE_VALUE_FIELD);
+    }
+
+    get isTransferRequest() {
+        return this.requestType === 'Lead Transfer Request' || this.requestType === 'Lead Transfer';
+    }
+
+    get requestLabel() {
+        return this.isTransferRequest ? 'Lead Transfer Request' : 'Lead Merge Request';
+    }
+
     get isPending() {
         return this.currentStatus === 'Pending';
     }
@@ -52,14 +66,14 @@ export default class ApprovalProcessActionCenter extends NavigationMixin(Lightni
     }
 
     handleApproveAction() {
-        this.modalTitle = 'Approve Merge Request';
+        this.modalTitle = `Approve ${this.requestLabel}`;
         this.modalActionLabel = 'Approve';
         this.currentStatusAction = 'Approved';
         this.openModal();
     }
 
     handleRejectAction() {
-        this.modalTitle = 'Reject Merge Request';
+        this.modalTitle = `Reject ${this.requestLabel}`;
         this.modalActionLabel = 'Reject';
         this.currentStatusAction = 'Rejected';
         this.openModal();
@@ -80,13 +94,15 @@ export default class ApprovalProcessActionCenter extends NavigationMixin(Lightni
             return;
         }
 
-        processApprovalResult({ 
+        const processApproval = this.isTransferRequest ? processTransferApprovalResult : processMergeApprovalResult;
+
+        processApproval({ 
             approvalId: this.recordId, 
             status: this.currentStatusAction, 
             managerComments: this.managerComments 
         })
         .then(() => {
-            this.showToast('Success', `Merge Request ${this.currentStatusAction} successfully.`, 'success');
+            this.showToast('Success', `${this.requestLabel} ${this.currentStatusAction} successfully.`, 'success');
             this.closeModal();
             // Simple delay before refresh
             setTimeout(() => {

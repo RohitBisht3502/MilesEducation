@@ -46,7 +46,7 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
         LeadPostEnrollmentRoundRobinHandler.handleBeforeUpdate(newLeads, oldMapLead);
     }
 
-   public override void afterInsert() {
+    public override void afterInsert() {
     List<Lead__c> newLeads = getNewLeads();
 
     LeadTriggerHelperClass.handleAfterInsert1(newLeads);
