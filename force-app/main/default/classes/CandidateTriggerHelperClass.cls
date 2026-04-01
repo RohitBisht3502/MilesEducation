@@ -279,6 +279,104 @@ public without sharing class CandidateTriggerHelperClass {
         }
     }
 
+    public static void createOwnerChangeActivityLogs(List<Lead> newLeads, Map<Id, Lead> oldLeadsMap) {
+        if (newLeads == null || newLeads.isEmpty() || oldLeadsMap == null) {
+            return;
+        }
+
+        List<Activity_Log__c> logsToInsert = new List<Activity_Log__c>();
+        Set<Id> ownerIds = new Set<Id>();
+
+        for (Lead newLead : newLeads) {
+            Lead oldLead = oldLeadsMap.get(newLead.Id);
+            if (oldLead == null || oldLead.OwnerId == newLead.OwnerId) {
+                continue;
+            }
+            if (oldLead.OwnerId != null) {
+                ownerIds.add(oldLead.OwnerId);
+            }
+            if (newLead.OwnerId != null) {
+                ownerIds.add(newLead.OwnerId);
+            }
+        }
+
+        if (ownerIds.isEmpty()) {
+            return;
+        }
+
+        Map<Id, String> ownerNamesById = new Map<Id, String>();
+        for (User userRec : [SELECT Id, Name FROM User WHERE Id IN :ownerIds]) {
+            ownerNamesById.put(userRec.Id, userRec.Name);
+        }
+        for (Group groupRec : [SELECT Id, Name FROM Group WHERE Id IN :ownerIds]) {
+            ownerNamesById.put(groupRec.Id, groupRec.Name);
+        }
+
+        Id ownerChangeRecordTypeId = getActivityLogRecordTypeId('Owner Change');
+        Id queueHandoffRecordTypeId = getActivityLogRecordTypeId('Queue Handoff');
+        Id candidateLostToQueueRecordTypeId = getActivityLogRecordTypeId('Candidate Lost To Queue');
+        Id candidateAssignedFromQueueRecordTypeId = getActivityLogRecordTypeId('Candidate Assigned From Queue');
+
+        for (Lead newLead : newLeads) {
+            Lead oldLead = oldLeadsMap.get(newLead.Id);
+            if (oldLead == null || oldLead.OwnerId == newLead.OwnerId) {
+                continue;
+            }
+
+            Boolean oldIsQueue = isQueueOwner(oldLead.OwnerId);
+            Boolean newIsQueue = isQueueOwner(newLead.OwnerId);
+            Boolean isQueueHandoff = oldIsQueue || newIsQueue;
+            Boolean isCandidateLostToQueue = !oldIsQueue && newIsQueue;
+            Boolean isCandidateAssignedFromQueue = oldIsQueue && !newIsQueue;
+            String queueName = newIsQueue
+                ? getOwnerDisplayName(newLead.OwnerId, ownerNamesById)
+                : (oldIsQueue ? getOwnerDisplayName(oldLead.OwnerId, ownerNamesById) : null);
+
+            Activity_Log__c ownerLog = new Activity_Log__c();
+            ownerLog.Candidate__c = newLead.Id;
+            ownerLog.Logging_Id__c = newLead.Id;
+            ownerLog.Created_By__c = String.valueOf(newLead.OwnerId);
+            ownerLog.Activity_Type__c = isCandidateLostToQueue
+                ? 'Candidate Lost To Queue'
+                : (isCandidateAssignedFromQueue ? 'Candidate Assigned From Queue' : 'Owner Change');
+            ownerLog.Changed_Date_Time__c = newLead.LastModifiedDate;
+            ownerLog.Action_Performed_By__c = newLead.LastModifiedById;
+            ownerLog.Name = isCandidateLostToQueue
+                ? 'Candidate Lost To Queue'
+                : (isCandidateAssignedFromQueue
+                    ? 'Candidate Assigned From Queue'
+                    : (isQueueHandoff ? 'Candidate Queue Handoff' : 'Candidate Owner Updated'));
+            ownerLog.Previous_Owner__c = oldIsQueue ? null : oldLead.OwnerId;
+            ownerLog.New_Owner__c = newIsQueue ? null : newLead.OwnerId;
+            ownerLog.Description__c =
+                'Owner changed from ' + getOwnerDisplayName(oldLead.OwnerId, ownerNamesById) +
+                ' to ' + getOwnerDisplayName(newLead.OwnerId, ownerNamesById) + '.';
+
+            if (!newIsQueue) {
+                ownerLog.OwnerId = newLead.OwnerId;
+            }
+
+            if (isQueueHandoff) {
+                ownerLog.put('Queue_Name__c', queueName);
+                if (isCandidateLostToQueue && candidateLostToQueueRecordTypeId != null) {
+                    ownerLog.RecordTypeId = candidateLostToQueueRecordTypeId;
+                } else if (isCandidateAssignedFromQueue && candidateAssignedFromQueueRecordTypeId != null) {
+                    ownerLog.RecordTypeId = candidateAssignedFromQueueRecordTypeId;
+                } else if (queueHandoffRecordTypeId != null) {
+                    ownerLog.RecordTypeId = queueHandoffRecordTypeId;
+                }
+            } else if (ownerChangeRecordTypeId != null) {
+                ownerLog.RecordTypeId = ownerChangeRecordTypeId;
+            }
+
+            logsToInsert.add(ownerLog);
+        }
+
+        if (!logsToInsert.isEmpty()) {
+            ActivityLogService.insertLogs(logsToInsert);
+        }
+    }
+
     public static void createBridgeCourseLeads(List<Lead> leads, Map<Id, Lead> oldMap) {
         Set<Id> eligibleCandidateIds = new Set<Id>();
         List<Lead__c> leadsToCreate = new List<Lead__c>();
@@ -309,6 +407,7 @@ public without sharing class CandidateTriggerHelperClass {
                 newBridgeLead.Candidate__c = lead.Id;
                 newBridgeLead.Email__c = lead.Email;
                 newBridgeLead.Phone__c = lead.Phone;
+                newBridgeLead.City__c = lead.City__c;
                 newBridgeLead.Course__c = 'MCOM';
                 newBridgeLead.OwnerId = lead.OwnerId;
 
@@ -379,5 +478,32 @@ private static Activity_log__c createActivityLog(Id candidateId, String fieldNam
     activity.Description__c = fieldName + ' changed from "' + oldValue + '" to "' + newValue + '"';
     
     return activity;
+}
+
+private static Id getActivityLogRecordTypeId(String recordTypeName) {
+    if (String.isBlank(recordTypeName)) {
+        return null;
+    }
+
+    Map<String, Schema.RecordTypeInfo> recordTypeInfos =
+        Schema.SObjectType.Activity_Log__c.getRecordTypeInfosByName();
+
+    if (recordTypeInfos != null && recordTypeInfos.containsKey(recordTypeName)) {
+        return recordTypeInfos.get(recordTypeName).getRecordTypeId();
+    }
+
+    return null;
+}
+
+private static String getOwnerDisplayName(Id ownerId, Map<Id, String> ownerNamesById) {
+    if (ownerId == null) {
+        return 'Unknown';
+    }
+    String ownerName = ownerNamesById != null ? ownerNamesById.get(ownerId) : null;
+    return String.isNotBlank(ownerName) ? ownerName : String.valueOf(ownerId);
+}
+
+private static Boolean isQueueOwner(Id ownerId) {
+    return ownerId != null && ownerId.getSObjectType() == Group.SObjectType;
 }
 }

@@ -27,7 +27,7 @@ public without sharing class LeadTransferController {
             ALLOWED_NAMES.contains(currentUser.UserRole != null ? currentUser.UserRole.DeveloperName : null);
         wrapper.message = wrapper.hasAccess
             ? null
-            : 'You do not have access. Only CC and SR users can transfer leads.';
+            : 'You do not have access. Only CC and SR users can transfer candidates.';
         return wrapper;
     }
 
@@ -42,11 +42,18 @@ public without sharing class LeadTransferController {
             return wrapper;
         }
 
-        List<Approval_Process__c> pendingRequests = [SELECT Id FROM Approval_Process__c WHERE Merge_Status__c = 'Pending' AND Record_Type__c = 'Lead Transfer Request' AND Master_Lead__c = :leadId LIMIT 1];
+        List<Approval_Process__c> pendingRequests = [
+            SELECT Id
+            FROM Approval_Process__c
+            WHERE Merge_Status__c = 'Pending'
+            AND Record_Type__c IN ('Lead Transfer Request', 'Candidate Transfer Request', 'Lead Transfer', 'Candidate Transfer')
+            AND Master_Lead__c = :leadId
+            LIMIT 1
+        ];
 
         if (!pendingRequests.isEmpty()) {
             wrapper.hasPendingRequest = true;
-            wrapper.message = 'One process already exists for this lead transfer.';
+            wrapper.message = 'One process already exists for this candidate transfer.';
         }
 
         return wrapper;
@@ -60,7 +67,7 @@ public without sharing class LeadTransferController {
         Lead ld = [SELECT Id, OwnerId FROM Lead WHERE Id = :leadId LIMIT 1];
         
          if (ld.OwnerId == currentUserId) {
-            throw new AuraHandledException('You cannot transfer this lead because you are the current owner of the candidate.');
+            throw new AuraHandledException('You cannot transfer this candidate because you are the current owner of the candidate.');
         }
 
         TransferValidationWrapper validation = getTransferValidationInfo(leadId);
@@ -84,7 +91,7 @@ public without sharing class LeadTransferController {
             approverId = leadOwner.ManagerId;
         }
 
-        Id recordTypeId = Schema.SObjectType.Approval_Process__c.getRecordTypeInfosByDeveloperName().get('Lead_Transfer_Request').getRecordTypeId();
+        Id recordTypeId = Schema.SObjectType.Approval_Process__c.getRecordTypeInfosByDeveloperName().get('Candidate_Transfer_Request').getRecordTypeId();
 
         Approval_Process__c req = new Approval_Process__c();
 
@@ -94,7 +101,7 @@ public without sharing class LeadTransferController {
         req.OwnerId = approverId;
         req.Comments__c = comments;
         req.Merge_Status__c = 'Pending';
-        req.Record_Type__c = 'Lead Transfer Request';
+        req.Record_Type__c = 'Candidate Transfer Request';
         req.RecordTypeId = recordTypeId;
 
         insert req;
@@ -102,10 +109,10 @@ public without sharing class LeadTransferController {
 
         // CREATE INITIAL LOG
         insert new Activity_log__c(
-            Name = 'Lead Transfer Request',
+            Name = 'Candidate Transfer Request',
             Candidate__c = leadId,
             Activity_Type__c = 'Owner Change',
-            Description__c = 'Lead Transfer Request initiated. Status: Pending approval.',
+            Description__c = 'Candidate Transfer Request initiated. Status: Pending approval.',
             Previous_Owner__c = ld.OwnerId,
             New_Owner__c = currentUserId,
             Logging_Id__c = req.Id,
@@ -127,15 +134,15 @@ public without sharing class LeadTransferController {
         Messaging.CustomNotification notification = new Messaging.CustomNotification();
         notification.setNotificationTypeId(types[0].Id);
         notification.setTargetId(processId);
-        notification.setTitle('Lead Transfer Approval Request');
-        notification.setBody('A new lead transfer request is pending your approval.');
+        notification.setTitle('Candidate Transfer Approval Request');
+        notification.setBody('A new candidate transfer request is pending your approval.');
         notification.send(new Set<String>{ String.valueOf(targetUserId) });
     }
 
     private static void validateTransferAccess() {
         UserAccessWrapper access = getUserAccessInfo();
         if (access == null || access.hasAccess != true) {
-            throw new AuraHandledException('You do not have access. Only CC and SR users can transfer leads.');
+            throw new AuraHandledException('You do not have access. Only CC and SR users can transfer candidates.');
         }
     }
 

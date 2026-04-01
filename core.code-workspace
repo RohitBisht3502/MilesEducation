@@ -1,0 +1,19 @@
+{
+  "folders": [
+    {
+      "path": "c:/Users/HP/Desktop/Salesforce/Miles Dev/MILESDEV"
+    }
+  ],
+  "settings": {
+    "eslint.workingDirectories": [
+      "c:/Users/HP/Desktop/Salesforce/Miles Dev/MILESDEV"
+    ],
+    "eslint.validate": [
+      "javascript",
+      "typescript"
+    ],
+    "eslint.options": {
+      "overrideConfigFile": "c:\\Users\\HP\\Desktop\\Salesforce\\Miles Dev\\MILESDEV\\.eslintrc.json"
+    }
+  }
+}

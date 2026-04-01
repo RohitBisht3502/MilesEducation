@@ -152,9 +152,11 @@ public without sharing class EligibilityUploadPathService {
     private static List<PicklistOption> sortOptions(
         List<PicklistOption> options
     ) {
-        if (options == null) return new List<PicklistOption>();
-        options.sort(new PicklistOptionComparator());
-        return options;
+        if (options == null || options.isEmpty()) return new List<PicklistOption>();
+        // Create a modifiable copy since Map.values() is unmodifiable
+        List<PicklistOption> modifiableList = new List<PicklistOption>(options);
+        modifiableList.sort(new PicklistOptionComparator());
+        return modifiableList;
     }
 
     private class PicklistOptionComparator implements System.Comparator<PicklistOption> {

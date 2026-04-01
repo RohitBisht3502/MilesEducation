@@ -53,6 +53,7 @@ public without sharing class LeadTriggerFrameworkHandler extends BaseTriggerHand
     LeadTriggerHelperClass.afterInsertAutoRegisterWebinar(newLeads);
 
     LeadStageTaskHandlerService.checkAndCreateNewTaskForInsert(newLeads);
+    LeadTriggerHelperClass.createMComTasks(newLeads, null);
 
     LeadTriggerHelperClass.updateHighestLevelOnCandidateWhenStageChanges(newLeads, null);
 

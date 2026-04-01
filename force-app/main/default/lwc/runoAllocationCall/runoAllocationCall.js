@@ -121,7 +121,7 @@ export default class RunoAllocationCall extends NavigationMixin(LightningElement
     savingFeedback = false;
     feedback = '';
     nextFollowUpDate = null;
-nextFollowUpTime = null;
+    nextFollowUpTime = null;
     lastCallId = null;
 
     // manual end call if no response in 30s
@@ -236,12 +236,12 @@ nextFollowUpTime = null;
     get isRelatedTab() {
         return this.activeTab === 'related';
     }
-   get showExtendedLeadFields() {
-    if (!this.recordId) return false;
+    get showExtendedLeadFields() {
+        if (!this.recordId) return false;
 
-    // Lead__c custom object prefix usually starts with 'a0'
-    return this.recordId.startsWith('a0');
-}
+        // Lead__c custom object prefix usually starts with 'a0'
+        return this.recordId.startsWith('a0');
+    }
 
     handleTabClick(event) {
         this.activeTab = event.target.dataset.tab;
@@ -318,7 +318,7 @@ nextFollowUpTime = null;
         return (
             !this.candidateId ||
             !this.newLeadCourse ||
-      
+
             this.availableCourseOptions.length === 0 ||
             this.isCreatingRelatedLead
         );
@@ -483,7 +483,7 @@ nextFollowUpTime = null;
             await createRelatedLead({
                 candidateId: this.candidateId,
                 course: this.newLeadCourse,
-              
+
                 sourceRecordId: this.recordId
             });
 
@@ -617,9 +617,9 @@ nextFollowUpTime = null;
     }
 
 
-get isRelatedStageDisabled() {
-    return !this.isApiResponseReceived;
-}
+    get isRelatedStageDisabled() {
+        return !this.isApiResponseReceived;
+    }
 
     // async loadStageOptionsForLeads() {
 
@@ -863,29 +863,29 @@ get isRelatedStageDisabled() {
 
     handleL1Change(e) {
 
-   
-    if (this.isL1Locked) {
-        return;
+
+        if (this.isL1Locked) {
+            return;
+        }
+
+        this.l1Value = e.target.value;
+        this.userChangedStage = false;
+
+        const l2List = this.l1L2Map[this.l1Value] || [];
+
+        this.l2Options = l2List.map(v => ({
+            label: v,
+            value: v
+        }));
+
+        this.isL2Disabled = this.l2Options.length === 0;
+        this.l2Value = '';
+
+        this.isStageDisabled = this.l1Value === 'Not-Connected';
+        this.resetConnectedOnlyFieldsIfNeeded();
+
+        this.updateCommentVisibility();
     }
-
-    this.l1Value = e.target.value;
-    this.userChangedStage = false;
-
-    const l2List = this.l1L2Map[this.l1Value] || [];
-
-    this.l2Options = l2List.map(v => ({
-        label: v,
-        value: v
-    }));
-
-    this.isL2Disabled = this.l2Options.length === 0;
-    this.l2Value = '';
-
-    this.isStageDisabled = this.l1Value === 'Not-Connected';
-    this.resetConnectedOnlyFieldsIfNeeded();
-
-    this.updateCommentVisibility();
-}
 
     handleL2Change(e) {
         this.l2Value = e.target.value;
@@ -918,19 +918,19 @@ get isRelatedStageDisabled() {
         }
     }
 
-handleNextFollowUpDateChange(e) {
-    this.nextFollowUpDate = e.target.value;
-    this.autoSetFollowUp = false;
-}
+    handleNextFollowUpDateChange(e) {
+        this.nextFollowUpDate = e.target.value;
+        this.autoSetFollowUp = false;
+    }
 
 
 
-   handleNextFollowUpTimeChange(e) {
-    this.nextFollowUpTime = e.target.value;
-    this.autoSetFollowUp = false;
-}
+    handleNextFollowUpTimeChange(e) {
+        this.nextFollowUpTime = e.target.value;
+        this.autoSetFollowUp = false;
+    }
 
-    
+
 
     close() {
         this.dispatchEvent(new CloseActionScreenEvent());
@@ -996,10 +996,10 @@ handleNextFollowUpDateChange(e) {
 
         this.callStatus = 'Dialing…';
         this.isLive = false;
-        this.showFeedback = false;
+        this.showFeedback = true;
         this.showCallPopup = true;
 
-        this.l1Value = 'Not-Connected';
+        this.l1Value = '';
         this.resetConnectedOnlyFieldsIfNeeded();
         this.l2Value = '';
 
@@ -1116,39 +1116,29 @@ handleNextFollowUpDateChange(e) {
     }
 
     get isStageFinalDisabled() {
-        return this.isStageDisabled   || this.isFeedbackDisabled;
+        return this.isStageDisabled || this.isFeedbackDisabled;
     }
     get isFollowUpFinalDisabled() {
         return this.autoSetFollowUp || this.isFeedbackDisabled;
     }
 
 
-get filteredL1Options() {
-
-    // before API response → normal
-    if (!this.isApiResponseReceived) {
+    get filteredL1Options() {
         return this.l1Options;
     }
 
-    if (this.isL1Locked) {
-        return this.l1Options.filter(opt => opt.value === this.l1Value);
-    }
-
-    return this.l1Options;
-}
-
     //  helper to set nextFollowUpDate = now + 24h in ISO format
-setAutoDate24() {
-    const next = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    setAutoDate24() {
+        const next = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    const yyyy = next.getFullYear();
-    const mm = String(next.getMonth() + 1).padStart(2, '0');
-    const dd = String(next.getDate()).padStart(2, '0');
+        const yyyy = next.getFullYear();
+        const mm = String(next.getMonth() + 1).padStart(2, '0');
+        const dd = String(next.getDate()).padStart(2, '0');
 
-   
-    this.nextFollowUpDate = `${yyyy}-${mm}-${dd}`;
-    this.nextFollowUpTime = `10:00`;
-}
+
+        this.nextFollowUpDate = `${yyyy}-${mm}-${dd}`;
+        this.nextFollowUpTime = `10:00`;
+    }
     applyAutoStageLogic() {
         // Do nothing if user already selected stage.
         if (this.userChangedStage) {
@@ -1207,38 +1197,38 @@ setAutoDate24() {
             );
             return;
         }
-if (!this.l2Value)  {
-    this.dispatchEvent(
-        new ShowToastEvent({
-            title: 'Error',
-            message: 'Please select L2 before saving feedback.',
-            variant: 'error'
-        })
-    );
-    return; 
-}
+        if (!this.l2Value) {
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title: 'Error',
+                    message: 'Please select L2 before saving feedback.',
+                    variant: 'error'
+                })
+            );
+            return;
+        }
 
-if (this.isExpectedPaymentDateRequired() && !this.expectedPaymentDate) {
-    this.dispatchEvent(
-        new ShowToastEvent({
-            title: 'Required',
-            message: 'Expected Payment Date is mandatory for this stage.',
-            variant: 'error'
-        })
-    );
-    return;
-}
+        if (this.isExpectedPaymentDateRequired() && !this.expectedPaymentDate) {
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title: 'Required',
+                    message: 'Expected Payment Date is mandatory for this stage.',
+                    variant: 'error'
+                })
+            );
+            return;
+        }
 
-if (this.isPastExpectedPaymentDate()) {
-    this.dispatchEvent(
-        new ShowToastEvent({
-            title: 'Required',
-            message: 'Expected Payment Date cannot be in the past.',
-            variant: 'error'
-        })
-    );
-    return;
-}
+        if (this.isPastExpectedPaymentDate()) {
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title: 'Required',
+                    message: 'Expected Payment Date cannot be in the past.',
+                    variant: 'error'
+                })
+            );
+            return;
+        }
 
         if (this.l1Value === 'Not-Connected') {
             this.stageValue = null;
@@ -1249,22 +1239,22 @@ if (this.isPastExpectedPaymentDate()) {
 
         try {
 
-let combinedDateTime = this.nextFollowUpDate
-    ? this.nextFollowUpDate + 'T' + (this.nextFollowUpTime || '10:00') + ':00'
-    : null;
+            let combinedDateTime = this.nextFollowUpDate
+                ? this.nextFollowUpDate + 'T' + (this.nextFollowUpTime || '10:00') + ':00'
+                : null;
 
-// FORCE CLEAN (THIS FIXES YOUR ERROR)
-if (combinedDateTime) {
-    combinedDateTime = combinedDateTime.split('.')[0];
-}
+            // FORCE CLEAN (THIS FIXES YOUR ERROR)
+            if (combinedDateTime) {
+                combinedDateTime = combinedDateTime.split('.')[0];
+            }
 
-console.log('FINAL DATETIME:', combinedDateTime);
+            console.log('FINAL DATETIME:', combinedDateTime);
 
             const payload = {
                 recordId: this.recordId,
                 callId: this.lastCallId,
                 feedback: this.feedback?.trim(),
-                  nextFollowUpDate: combinedDateTime ? String(combinedDateTime) : null,
+                nextFollowUpDate: combinedDateTime ? String(combinedDateTime) : null,
                 l1: this.l1Value,
                 l2: this.l2Value,
                 //    level: this.courseValue,
@@ -1319,7 +1309,7 @@ console.log('FINAL DATETIME:', combinedDateTime);
             // payload.courseId = this.courseValue;
 
 
-            this.showFeedback = false;
+            this.showFeedback = true;
             this.disableCancel = true;
             this.callStatus = 'Idle';
             this.isLive = false;
@@ -1376,7 +1366,7 @@ console.log('FINAL DATETIME:', combinedDateTime);
             );
         }
         finally {
-            this.savingFeedback = false;
+            this.savingFeedback = true;
             this.disableCancel = false;
         }
     }
@@ -1478,24 +1468,24 @@ console.log('FINAL DATETIME:', combinedDateTime);
         let totalSec = 0;
 
         //  FINAL CORRECT LOGIC
-        if (status === 'Completed' && !Number.isNaN(duration) && duration > 0) {
+        // if (status === 'Completed' && !Number.isNaN(duration) && duration > 0) {
 
-    this.l1Value = 'Connected';
-    this.isL1Locked = true; 
+        //     this.l1Value = 'Connected';
+        //     this.isL1Locked = true;
 
-    totalSec = Math.floor(duration);
-    const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
-    const ss = String(totalSec % 60).padStart(2, '0');
-    this.elapsedLabel = `${mm}:${ss}`;
+        //     totalSec = Math.floor(duration);
+        //     const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+        //     const ss = String(totalSec % 60).padStart(2, '0');
+        //     this.elapsedLabel = `${mm}:${ss}`;
 
-} else {
+        // } else {
 
-    this.l1Value = 'Not-Connected';
-    this.isL1Locked = true; 
-    this.resetConnectedOnlyFieldsIfNeeded();
+        //     this.l1Value = 'Not-Connected';
+        //     this.isL1Locked = true;
+        //     this.resetConnectedOnlyFieldsIfNeeded();
 
-    this.elapsedLabel = '00:00';
-}
+        //     this.elapsedLabel = '00:00';
+        // }
         const l2List = this.l1L2Map[this.l1Value] || [];
 
         this.l2Options = l2List.map(v => ({

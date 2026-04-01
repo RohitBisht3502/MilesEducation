@@ -19,16 +19,18 @@
 }
 
 .shell {
-    min-height: 100vh;
+    height: 100vh;
     background: linear-gradient(180deg, hsl(210 45% 98%) 0%, var(--background) 30%);
     color: var(--foreground);
     font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    overflow: hidden;
 }
 
 .layout-shell {
     display: grid;
     grid-template-columns: 280px minmax(0, 1fr);
-    min-height: 100vh;
+    height: 100%;
+    min-height: 0;
 }
 
 .layout-shell.filters-collapsed {
@@ -40,9 +42,9 @@
     background: hsl(0 0% 100%);
     display: flex;
     flex-direction: column;
-    min-width: 0;
+    height: 100%;     /* ✅ ADD THIS */
+    min-height: 0;    /* ✅ VERY IMPORTANT for scroll */
 }
-
 .filters-collapsed .filters-panel {
     overflow: hidden;
     opacity: 0;
@@ -139,11 +141,29 @@
 
 .filters-body {
     flex: 1;
-    overflow: auto;
+    overflow-y: auto;   /* ✅ vertical scroll */
+    overflow-x: hidden;
+    min-height: 0;      /* ✅ REQUIRED */
+}
+
+.filters-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.filters-body::-webkit-scrollbar-thumb {
+    background: hsl(213 20% 70%);
+    border-radius: 10px;
 }
 
 .filter-block {
     border-bottom: 1px solid var(--border);
+}
+
+.layout-shell {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    height: 100vh;   /* ✅ important */
+    overflow: hidden; /* ✅ prevents page scroll */
 }
 
 .filter-trigger {
@@ -258,6 +278,10 @@
 
 .workspace {
     min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .workspace-toolbar {
@@ -339,6 +363,10 @@
     border-radius: 1rem;
     box-shadow: var(--shadow-soft);
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 
 .table-header,
@@ -362,6 +390,20 @@
 
 .table-row-wrap + .table-row-wrap {
     border-top: 1px solid var(--border);
+}
+
+.table-body-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.table-body-scroll::-webkit-scrollbar {
+    width: 0;
+    height: 0;
 }
 
 .pagination-bar {
@@ -522,6 +564,7 @@
     .layout-shell,
     .layout-shell.filters-collapsed {
         grid-template-columns: 1fr;
+        height: auto;
     }
 
     .filters-panel {
@@ -557,6 +600,7 @@
 
     .board-card {
         margin: 1rem;
+        flex: initial;
     }
 
     .table-header {

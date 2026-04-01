@@ -5,16 +5,19 @@ public class WebinarController {
         List<WebinarDTO> out = new List<WebinarDTO>();
         Datetime nowDt = System.now();
 
-        for (Webinar__c w : [
-            SELECT Id, Name, Webinar_Id__c, Topic__c, Agenda__c, Start_Date_Time__c, End_Date_Time__c, Status__c
-            FROM Webinar__c
-            WHERE IsActive__c = TRUE
-                AND Status__c IN ('Created', 'Started')
-                AND Start_Date_Time__c != null
-                // AND Start_Date_Time__c >= :nowDt
-            ORDER BY Start_Date_Time__c DESC, Name ASC
-            LIMIT 200
-        ]) {
+for (Webinar__c w : [
+    SELECT Id, Name, Webinar_Id__c, Topic__c, Agenda__c, Start_Date_Time__c, End_Date_Time__c, Status__c ,Duration__c
+    FROM Webinar__c
+    WHERE IsActive__c = TRUE
+        AND Status__c IN ('Created', 'Started')
+        AND Start_Date_Time__c != null
+        AND (
+            End_Date_Time__c = null 
+            OR End_Date_Time__c > :nowDt
+        )
+    ORDER BY Start_Date_Time__c DESC, Name ASC
+    LIMIT 200
+]) {
             out.add(toWebinarDTO(w));
         }
         return out;
@@ -28,36 +31,53 @@ public class WebinarController {
 
         List<Webinar__c> webinars;
         if (String.isBlank(key)) {
-            webinars = [
-                SELECT Id, Name, Webinar_Id__c, Topic__c, Agenda__c, Start_Date_Time__c, End_Date_Time__c, Status__c
-                FROM Webinar__c
-                WHERE IsActive__c = TRUE
-                    AND Status__c IN ('Created', 'Started')
-                    AND Start_Date_Time__c != null
-                    // AND Start_Date_Time__c >= :nowDts
-                ORDER BY Start_Date_Time__c DESC, Name ASC
-                LIMIT 200
-            ];
-        } else {
-            webinars = [
-                SELECT Id, Name, Webinar_Id__c, Topic__c, Agenda__c, Start_Date_Time__c, End_Date_Time__c, Status__c
-                FROM Webinar__c
-                WHERE IsActive__c = TRUE
-                    AND Status__c IN ('Created', 'Started')
-                    AND Start_Date_Time__c != null
-                    AND (
-                        Name LIKE :key
-                        OR Webinar_Id__c LIKE :key
-                        OR Webinar_Id__c = :trimmedSearchKey
-                    )
-                ORDER BY Start_Date_Time__c DESC, Name ASC
-                LIMIT 200
-            ];
-        }
+           Datetime nowDt = System.now();
 
-        for (Webinar__c w : webinars) {
-            out.add(toWebinarDTO(w));
+webinars = [
+    SELECT Id, Name, Webinar_Id__c, Topic__c, Agenda__c, Start_Date_Time__c, End_Date_Time__c, Status__c, Duration__c
+    FROM Webinar__c
+    WHERE IsActive__c = TRUE
+        AND Status__c IN ('Created', 'Started')
+        AND Start_Date_Time__c != null
+        AND (
+            End_Date_Time__c = null 
+            OR End_Date_Time__c > :nowDt
+        )
+    ORDER BY Start_Date_Time__c DESC, Name ASC
+    LIMIT 200
+];
+        } else {
+            Datetime nowDt = System.now();
+
+webinars = [
+    SELECT Id, Name, Webinar_Id__c, Topic__c, Agenda__c, Start_Date_Time__c, End_Date_Time__c, Status__c, Duration__c
+    FROM Webinar__c
+    WHERE IsActive__c = TRUE
+        AND Status__c IN ('Created', 'Started')
+        AND Start_Date_Time__c != null
+        AND (
+            End_Date_Time__c = null 
+            OR End_Date_Time__c > :nowDt
+        )
+        AND (
+            Name LIKE :key
+            OR Webinar_Id__c LIKE :key
+            OR Webinar_Id__c = :trimmedSearchKey
+        )
+    ORDER BY Start_Date_Time__c DESC, Name ASC
+    LIMIT 200
+];
         }
+for (Webinar__c w : webinars) {
+    WebinarDTO dto = toWebinarDTO(w);
+
+    // Skip expired webinars
+    if (dto.isExpired) {
+        continue;
+    }
+
+    out.add(dto);
+}
 
         System.debug('Webinar search results for key "' + searchKey + '": ' + out.size());
         return out;
@@ -90,18 +110,33 @@ public class WebinarController {
         return System.enqueueJob(new LeadZoomRegistrationJob(recordId, webinarId));
     }
 
-    private static WebinarDTO toWebinarDTO(Webinar__c w) {
-        WebinarDTO d = new WebinarDTO();
-        d.id = w.Id;
-        d.name = w.Name;
-        d.webinarId = w.Webinar_Id__c;
-        d.topic = w.Topic__c;
-        d.agenda = w.Agenda__c;
-        d.startDateTime = w.Start_Date_Time__c;
-        d.endDateTime = w.End_Date_Time__c;
-        d.status = w.Status__c;
-        return d;
+  private static WebinarDTO toWebinarDTO(Webinar__c w) {
+    WebinarDTO d = new WebinarDTO();
+
+    d.id = w.Id;
+    d.name = w.Name;
+    d.webinarId = w.Webinar_Id__c;
+    d.topic = w.Topic__c;
+    d.agenda = w.Agenda__c;
+    d.startDateTime = w.Start_Date_Time__c;
+    d.endDateTime = w.End_Date_Time__c;
+    d.duration = (Integer) w.Duration__c;
+    d.status = w.Status__c;
+
+    //  AUTO CALCULATE END TIME
+    if (d.startDateTime != null && d.endDateTime == null && d.duration != null) {
+        d.endDateTime = d.startDateTime.addMinutes(d.duration);
     }
+
+    // CHECK EXPIRED
+    if (d.endDateTime != null) {
+        d.isExpired = d.endDateTime < System.now();
+    } else {
+        d.isExpired = false;
+    }
+
+    return d;
+}
 
     public class WebinarDTO {
         @AuraEnabled public String id;
@@ -111,6 +146,8 @@ public class WebinarController {
         @AuraEnabled public String agenda;
         @AuraEnabled public DateTime startDateTime;
         @AuraEnabled public DateTime endDateTime;
+        @AuraEnabled public Integer duration;
+@AuraEnabled public Boolean isExpired;
         @AuraEnabled public String status;
     }
 

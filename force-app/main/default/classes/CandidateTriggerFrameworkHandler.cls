@@ -26,18 +26,21 @@ public without sharing class CandidateTriggerFrameworkHandler extends BaseTrigge
     public override void afterInsert() {
         CandidateTriggerHelperClass.handleAfterInsert(getNewLeads());
         CandidateTriggerHelperClass.handleCandidateIdAfterInsert(getNewLeads());
-        // CandidateTriggerHelperClass.createBridgeCourseLeads(getNewLeads(), null);
+        DataChangeEventHelper.publishEvents(getNewLeads(), null, 'Lead');
+        CandidateTriggerHelperClass.createBridgeCourseLeads(getNewLeads(), null);
     }
 
     public override void afterUpdate() {
        // CandidateTriggerHelperClass.syncRelatedLeadNames(getNewLeads(), getOldLeadMap());
         CandidateTriggerHelperClass.transferRecordsOnConversion(getNewLeads(), getOldLeadMap());
         CandidateTriggerHelperClass.syncGpUserToRelatedLeads(getNewLeads(), getOldLeadMap());
+        CandidateTriggerHelperClass.createOwnerChangeActivityLogs(getNewLeads(), getOldLeadMap());
         LeadRelatedSyncService.syncRelatedLeadsOnCandidateOwnerChange(getNewLeads(), getOldLeadMap());
-        // CandidateTriggerHelperClass.createBridgeCourseLeads(getNewLeads(), getOldLeadMap());
+        CandidateTriggerHelperClass.createBridgeCourseLeads(getNewLeads(), getOldLeadMap());
 
         CandidateTriggerHelperClass.handleMilesUuidRecording(getNewLeads(), getOldLeadMap());
         CandidateTriggerHelperClass.handleCandidateStatusChange(getOldLeadMap(), getNewLeadMap());
+        DataChangeEventHelper.publishEvents(getNewLeads(), (Map<Id, SObject>)getOldLeadMap(), 'Lead');
     }
 
     public override void beforeDelete() {

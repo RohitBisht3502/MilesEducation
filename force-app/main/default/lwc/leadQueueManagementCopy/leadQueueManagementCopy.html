@@ -1,0 +1,143 @@
+<template>
+  <div class="main-layout">
+
+    <!-- ═══ LEFT SIDEBAR ═══ -->
+    <div class="left-pane">
+
+      <!-- Sidebar Title -->
+      <div class="sidebar-section sidebar-title">Lead Queue</div>
+
+      <!-- Action Buttons -->
+      <div class="sidebar-section sidebar-actions">
+        <template if:true={showStartButton}>
+          <button class="btn btn-start btn-full" onclick={handleStart} disabled={disableStart}>
+            &#9654; Start
+          </button>
+        </template>
+        <template if:true={showPauseButton}>
+          <button class="btn btn-pause btn-full" onclick={handlePause}>
+            &#10074;&#10074; Pause
+          </button>
+        </template>
+        <template if:true={showResumeButton}>
+          <button class="btn btn-resume btn-full" onclick={handleResume}>
+            &#9654; Resume
+          </button>
+        </template>
+        <button class="btn-icon" title="Refresh" onclick={handleRefresh} disabled={isRefreshing}>
+          <lightning-icon icon-name="utility:refresh" size="xx-small"></lightning-icon>
+        </button>
+        <template if:true={isRefreshing}>
+          <div class="refresh-spinner-wrap">
+            <lightning-spinner alternative-text="Refreshing" size="small"></lightning-spinner>
+          </div>
+        </template>
+      </div>
+
+      <!-- Total Leads -->
+      <div class="sidebar-section">
+        <div class="total-leads-sidebar">
+          <div class="tl-icon">
+            <lightning-icon icon-name="utility:groups" size="x-small"></lightning-icon>
+          </div>
+          <div class="tl-info">
+            <span class="tl-label">Total Leads</span>
+            <span class="tl-value">{totalLeads}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Session Stats -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Session</div>
+        <div class="session-stat">
+          <div class="ss-icon timer-bg">
+            <lightning-icon icon-name="utility:clock" size="xx-small"></lightning-icon>
+          </div>
+          <div class="ss-info">
+            <span class="ss-label">Active Since</span>
+            <span class={sessionTimerClass}>{sessionTimerDisplay}</span>
+          </div>
+        </div>
+        <div class="session-stat">
+          <div class="ss-icon dial-bg">
+            <lightning-icon icon-name="utility:call" size="xx-small"></lightning-icon>
+          </div>
+          <div class="ss-info">
+            <span class="ss-label">Leads Dialled</span>
+            <span class="ss-value blue">{callsCompleted}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Currently Working Badge -->
+      <template if:true={showCurrentBadge}>
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">Currently Working</div>
+          <div class="current-badge">
+            <span class="pulse-dot"></span>
+            {currentlyWorkingLabel}
+          </div>
+        </div>
+      </template>
+
+      <!-- Queue List -->
+      <div class="sidebar-section queue-section">
+        <div class="sidebar-section-title">Queues</div>
+        <div class="queue-list">
+          <template for:each={queueList} for:item="q">
+            <div key={q.name}
+                 class={q.itemClass}
+                 data-queue={q.name}
+                 onclick={handleQueueSelect}>
+              <div class="queue-item-left">
+                <span class={q.dotClass}></span>
+                <span class="queue-item-name">{q.name}</span>
+              </div>
+              <span class={q.countClass}>{q.count}</span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ═══ RIGHT PANE ═══ -->
+    <div class="right-pane">
+
+      <!-- Inline Call UI -->
+      <template if:true={showCallUI}>
+        <c-runo-allocation-calls-copy
+          record-id={currentLeadId}
+          is-call-log={currentIsCallLog}
+          primary-tag={currentPrimaryTag}
+          candidate-id={currentCandidateId}
+          is-queue-running={queueRunning}
+          is-queue-paused={isQueuePaused}
+          oncallcomplete={handleCallComplete}
+          onpausequeue={handlePauseFromChild}
+          onresumequeue={handleResumeFromChild}>
+        </c-runo-allocation-calls-copy>
+      </template>
+
+      <!-- Placeholder when call UI is not shown -->
+      <template if:false={showCallUI}>
+        <div class="placeholder-container">
+          <template if:true={isQueuePaused}>
+            <!-- Paused state -->
+            <div class="placeholder-icon">&#9208;</div>
+            <div class="placeholder-title">Taking a breather?</div>
+            <div class="placeholder-subtitle">Your leads aren't going anywhere... well, hopefully. Hit <strong>Resume</strong> to jump back in!</div>
+          </template>
+          <template if:false={isQueuePaused}>
+            <!-- Idle/initial state -->
+            <div class="placeholder-icon">&#9742;</div>
+            <div class="placeholder-title">Ready when you are!</div>
+            <div class="placeholder-subtitle">Smash that <strong>&#9654; Start</strong> button and let's get dialling!</div>
+          </template>
+        </div>
+      </template>
+
+    </div>
+  </div>
+</template>

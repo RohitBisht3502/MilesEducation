@@ -65,6 +65,21 @@
                 <label>Owner Change</label>
             </value>
             <value>
+                <fullName>Candidate Lost To Queue</fullName>
+                <default>false</default>
+                <label>Candidate Lost To Queue</label>
+            </value>
+            <value>
+                <fullName>Candidate Assigned From Queue</fullName>
+                <default>false</default>
+                <label>Candidate Assigned From Queue</label>
+            </value>
+            <value>
+                <fullName>Enquiry</fullName>
+                <default>false</default>
+                <label>Enquiry</label>
+            </value>
+            <value>
                 <fullName>Gmeet</fullName>
                 <default>false</default>
                 <label>Gmeet</label>

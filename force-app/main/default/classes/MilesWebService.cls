@@ -36,7 +36,20 @@ global without sharing class MilesWebService {
         candidate.Shipping_Country__c = 'India';
     }
 
-    private static void createPhoneAssociation(String phone, Id candidateId, Id studentAccountId) {
+    private static Id resolveAllocatedOwnerId(String allocatedTo) {
+        if (String.isBlank(allocatedTo)) return null;
+
+        List<User> users = [SELECT Id FROM User WHERE Id = :allocatedTo LIMIT 1];
+
+        return users.isEmpty() ? null : users[0].Id;
+    }
+
+    private static void applyOwnerIfPresent(SObject recordObj, Id ownerId) {
+        if (recordObj == null || ownerId == null) return;
+        recordObj.put('OwnerId', ownerId);
+    }
+
+    private static void createPhoneAssociation(String phone, Id candidateId, Id studentAccountId, Id ownerId) {
         if (String.isBlank(phone)) return;
 
         Phone_Number__c phoneRec = new Phone_Number__c(
@@ -47,6 +60,7 @@ global without sharing class MilesWebService {
             Created_Date__C       = 'true',
             By_Pass_Validation__c = true
         );
+        applyOwnerIfPresent(phoneRec, ownerId);
         insert phoneRec;
     }
 
@@ -119,6 +133,7 @@ global without sharing class MilesWebService {
 
             String fullFirstName = getFullFirstName(inputData.first_name, inputData.last_name);
             Boolean whatsappAllow = (inputData.whatsappAllow != null && inputData.whatsappAllow == 1);
+            Id allocatedOwnerId = resolveAllocatedOwnerId(inputData.allocated_to);
 
             /* ------------ CREATE ENQUIRY ------------- */
             Enquiry__c enquiry = new Enquiry__c(
@@ -140,6 +155,7 @@ global without sharing class MilesWebService {
                 Campaign_Name__c         = inputData.campaign_tk, 
                 Stage__c                 = 'Untracked' // Default value Untracked.
             );
+            applyOwnerIfPresent(enquiry, allocatedOwnerId);
             insert enquiry;
 
             // Step 1: Check Phone number exist or not (Phone_Number__c)
@@ -227,6 +243,7 @@ global without sharing class MilesWebService {
                     Interested_Webinar_ID__c = inputData.interested_webinar_id,
                     UUID__c                  = inputData.miles_uuid
                 );
+                applyOwnerIfPresent(candidate, allocatedOwnerId);
                 applyDefaultCandidateAddress(candidate);
                 insert candidate;
 
@@ -238,6 +255,7 @@ global without sharing class MilesWebService {
                     Phone__c                 = inputData.phone,
                     Email__c                 = inputData.email,
                     City__c                  = inputData.city,
+                    Disable_Round_Robin__c   = (allocatedOwnerId != null),
                     Stage__c                 = leadDefaultStage,
                     Course__c                = inputData.course,
                     Source__c                = inputData.coming_from,
@@ -246,17 +264,18 @@ global without sharing class MilesWebService {
                     Candidate__c             = candidate.Id,
                     RecordTypeId             = leadRecordTypeId
                 );
+                applyOwnerIfPresent(newLead, allocatedOwnerId);
                 insert newLead;
 
                 // Create Phone_Number__c (tag phone)
-                createPhoneAssociation(inputData.phone, candidate.Id, null);
+                createPhoneAssociation(inputData.phone, candidate.Id, null, allocatedOwnerId);
 
                 enquiryCandidateId = candidate.Id;
                 enquiryLeadId      = newLead.Id;
                 leadToReturn       = newLead;
 
                 // Email Associations
-                EmailDecision ed = handleEmailAssociation(inputData.email, candidate.Id, enquiry.Id, studentAccountId);
+                EmailDecision ed = handleEmailAssociation(inputData.email, candidate.Id, enquiry.Id, studentAccountId, allocatedOwnerId);
 
             } else {
 
@@ -280,6 +299,7 @@ global without sharing class MilesWebService {
                         Interested_Webinar_ID__c = inputData.interested_webinar_id,
                         UUID__c                  = inputData.miles_uuid
                     );
+                    applyOwnerIfPresent(candidate, allocatedOwnerId);
                     applyDefaultCandidateAddress(candidate);
                     insert candidate;
                     leadDisplayName = getCandidateDisplayName(candidate, fullFirstName);
@@ -366,11 +386,11 @@ global without sharing class MilesWebService {
                     }
 
                     if (!phoneExists) {
-                        createPhoneAssociation(inputData.phone, candidateIdForLead, studentAccountId);
+                        createPhoneAssociation(inputData.phone, candidateIdForLead, studentAccountId, allocatedOwnerId);
                     }
 
                     // Email Associations
-                    EmailDecision ed = handleEmailAssociation(inputData.email, enquiryCandidateId, enquiry.Id, studentAccountId);
+                    EmailDecision ed = handleEmailAssociation(inputData.email, enquiryCandidateId, enquiry.Id, studentAccountId, allocatedOwnerId);
 
                     // If Email is same/unlinked/created -> mark re-enquiry (as in your current logic)
                     if (ed == EmailDecision.SAME_LEAD ||
@@ -392,6 +412,7 @@ global without sharing class MilesWebService {
                         Phone__c                 = inputData.phone,
                         Email__c                 = inputData.email,
                         City__c                  = inputData.city,
+                        Disable_Round_Robin__c   = (allocatedOwnerId != null),
                         Stage__c                 = leadDefaultStage,
                         Course__c                = inputData.course,
                         Source__c                = inputData.coming_from,
@@ -401,6 +422,7 @@ global without sharing class MilesWebService {
                         RecordTypeId             = leadRecordTypeId,
                         Student__c               = (studentAccountId != null ? studentAccountId : null)
                     );
+                    applyOwnerIfPresent(newLead2, allocatedOwnerId);
                     insert newLead2;
 
                     // Tag the phone number (existing phone record)
@@ -412,14 +434,14 @@ global without sharing class MilesWebService {
                         }
                         if (phoneChanged) update phoneExisting;
                     } else {
-                        createPhoneAssociation(inputData.phone, candidateIdForLead, studentAccountId);
+                        createPhoneAssociation(inputData.phone, candidateIdForLead, studentAccountId, allocatedOwnerId);
                     }
 
                     enquiryLeadId = newLead2.Id;
                     leadToReturn  = newLead2;
 
                     // Email Associations
-                    EmailDecision ed = handleEmailAssociation(inputData.email, enquiryCandidateId, enquiry.Id, studentAccountId);
+                    EmailDecision ed = handleEmailAssociation(inputData.email, enquiryCandidateId, enquiry.Id, studentAccountId, allocatedOwnerId);
 
                     if (ed == EmailDecision.DIFFERENT_LEAD) {
                         System.debug('Email exists with different Lead. Not associating.');
@@ -469,7 +491,7 @@ global without sharing class MilesWebService {
         }
     }
 
-    private static EmailDecision handleEmailAssociation(String email, Id candidateId, Id enquiryId, Id studentAccountId) {
+    private static EmailDecision handleEmailAssociation(String email, Id candidateId, Id enquiryId, Id studentAccountId, Id ownerId) {
 
         if (String.isBlank(email)) {
             System.debug('Email association skipped: blank email');
@@ -500,6 +522,7 @@ global without sharing class MilesWebService {
             Created_Date__c  = 'true',
             Is_Primary__c    = true
         );
+        applyOwnerIfPresent(newEmail, ownerId);
         insert newEmail;
 
         System.debug('Email__c created and associated.');
@@ -589,6 +612,7 @@ global without sharing class MilesWebService {
         public String campaign_tk;
         public String stage;
         public String miles_uuid;
+        public String allocated_to;
 
     }
 

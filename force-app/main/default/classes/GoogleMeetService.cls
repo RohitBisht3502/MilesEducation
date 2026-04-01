@@ -41,7 +41,8 @@ public without sharing class GoogleMeetService {
         String meetingType,
         String typeOfMeeting,
         String otherTypeOfMeeting,
-        Integer durationMinutes
+        Integer durationMinutes,
+        List<String> selectedCourses
     ) {
         if (String.isBlank(timeZoneId)) timeZoneId = 'Asia/Kolkata';
         if (attendeeEmails == null) attendeeEmails = new List<String>();
@@ -60,6 +61,12 @@ public without sharing class GoogleMeetService {
             if (String.isNotBlank(meetingType)) parts.add(meetingType);
             if (String.isNotBlank(typeOfMeeting)) parts.add(typeOfMeeting);
             if (!parts.isEmpty()) descriptionFinal = String.join(parts, ' - ');
+        }
+        List<String> normalizedCourses = new List<String>();
+        if (selectedCourses != null) {
+            for (String courseValue : selectedCourses) {
+                if (String.isNotBlank(courseValue)) normalizedCourses.add(courseValue.trim());
+            }
         }
 
         validateLeadEmailIfApplicable(recordId);
@@ -86,7 +93,7 @@ public without sharing class GoogleMeetService {
             ev.Location = result.meetUrl;
         }
         if (recordId != null) {
-            ev.WhatId = recordId;
+            assignEventRelationship(ev, recordId);
         }
 
         Map<String, Schema.SObjectField> fMap = Event.SObjectType.getDescribe().fields.getMap();
@@ -94,6 +101,9 @@ public without sharing class GoogleMeetService {
         putIfPresent(ev, fMap, 'Meeting_type__c', meetingType);
         putIfPresent(ev, fMap, 'Type_of_Meeting__c', typeOfMeeting);
         putIfPresent(ev, fMap, 'Others__c', otherTypeOfMeeting);
+        if (!normalizedCourses.isEmpty() && fMap.containsKey('Courses__c')) {
+            ev.put('Courses__c', String.join(normalizedCourses, ';'));
+        }
 
         if (durationMinutes != null && fMap.containsKey('Duration__c')) {
             ev.put('Duration__c', durationMinutes);
@@ -362,19 +372,49 @@ public without sharing class GoogleMeetService {
     private static void validateLeadEmailIfApplicable(Id recordId) {
         if (recordId == null) return;
 
-        String prefix = String.valueOf(recordId).left(3);
-        if (prefix != Lead__c.SObjectType.getDescribe().getKeyPrefix()) return;
-
-        Lead__c leadRec = [
-            SELECT Id, Email__c
-            FROM Lead__c
-            WHERE Id = :recordId
-            LIMIT 1
-        ];
-
-        if (String.isBlank(leadRec.Email__c)) {
-            throw new AuraHandledException('Lead email is required before registering meeting.');
+        Schema.SObjectType sObjectType = recordId.getSObjectType();
+        if (sObjectType == Lead__c.SObjectType) {
+            Lead__c leadRec = [
+                SELECT Id, Email__c
+                FROM Lead__c
+                WHERE Id = :recordId
+                LIMIT 1
+            ];
+            if (String.isBlank(leadRec.Email__c)) {
+                throw new AuraHandledException('Lead email is required before registering meeting.');
+            }
+        } else if (sObjectType == Lead.SObjectType) {
+            Lead candidateRec = [
+                SELECT Id, Email
+                FROM Lead
+                WHERE Id = :recordId
+                LIMIT 1
+            ];
+            if (String.isBlank(candidateRec.Email)) {
+                throw new AuraHandledException('Candidate email is required before registering meeting.');
+            }
         }
+    }
+
+    private static void assignEventRelationship(Event ev, Id recordId) {
+        if (ev == null || recordId == null) {
+            return;
+        }
+
+        Schema.SObjectType sObjectType = recordId.getSObjectType();
+        if (sObjectType == Lead.SObjectType) {
+            ev.WhoId = recordId;
+            ev.WhatId = null;
+            return;
+        }
+
+        if (sObjectType == Account.SObjectType || sObjectType == Lead__c.SObjectType) {
+            ev.WhatId = recordId;
+            ev.WhoId = null;
+            return;
+        }
+
+        ev.WhatId = recordId;
     }
 
     private static void putIfPresent(Event ev, Map<String, Schema.SObjectField> fMap, String fieldApi, Object value) {

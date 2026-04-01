@@ -1,0 +1,451 @@
+<template>
+  <div class="panel-wrapper">
+
+    <div class="custom-header">
+      <div class="header-left">
+        <span class="header-can-id header-link" onclick={handleViewCandidate}>{candidateIdDisplay}</span>
+        <span class="header-title">{callTitle}</span>
+      </div>
+
+      <template if:true={hasNavData}>
+        <div class="header-center">
+          <!-- Icons (attendance indicators) -->
+          <template if:true={hasIconTabs}>
+            <template for:each={iconTabs} for:item="tab">
+              <div key={tab.name} class="nav-icon-group"
+                   data-tooltip={tab.tooltipText}
+                   onmouseenter={handleIconMouseEnter}
+                   onmouseleave={handleIconMouseLeave}>
+                <img src={tab.iconUrl} alt={tab.label} class="nav-tab-img"
+                     data-name={tab.name} onerror={handleNavImageError} />
+              </div>
+            </template>
+          </template>
+
+          <!-- Vertical divider -->
+          <template if:true={hasIconTabs}>
+            <div class="nav-divider"></div>
+          </template>
+
+          <!-- Latest source label -->
+          <span class="nav-latest-source">{latestSource}</span>
+
+          <!-- Source pills with badges -->
+          <template if:true={hasPillTabs}>
+            <template for:each={pillTabs} for:item="tab">
+              <div key={tab.name} class="nav-pill-group">
+                <span class="nav-pill">{tab.label}</span>
+                <template if:true={tab.count}>
+                  <span class="nav-badge">{tab.count}</span>
+                </template>
+              </div>
+            </template>
+          </template>
+        </div>
+      </template>
+
+      <!-- Floating tooltip (direct child of header to avoid overflow clipping) -->
+      <template if:true={showNavTooltip}>
+        <div class="nav-tooltip" style={navTooltipStyle}>{navTooltipText}</div>
+      </template>
+
+      <div class="header-right">
+        <span class="status-pill">{callStatus}</span>
+        <span class="duration">
+          <lightning-icon icon-name="utility:clock" size="x-small"></lightning-icon>
+          {elapsedLabel}
+        </span>
+      </div>
+    </div>
+
+    <div>
+
+
+
+
+
+
+      <template if:true={showTagLeadUI}>
+        <c-tag-lead-for-call-log lead-id={recordId} phone-number={identity.phone}>
+        </c-tag-lead-for-call-log>
+      </template>
+
+    </div>
+
+
+
+
+    <template if:true={errorText}>
+      <div class="error-box">
+        <div class="error-inner">
+          <lightning-icon icon-name="utility:error" size="x-small" class="error-icon"></lightning-icon>
+          <div class="error-message">{errorText}</div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ===== BODY ===== -->
+    <div class="body-wrapper">
+
+
+      <template if:true={isLeadTab}>
+        <div class="content-row two-col-layout">
+
+
+          <div class="left-panel">
+            <!-- Courses -->
+            <div class="section-card section-compact">
+              <div class="section-header-sm">
+                <lightning-icon icon-name="utility:knowledge_base" size="xx-small"></lightning-icon>
+                <span>Courses</span>
+              </div>
+
+              <template if:true={hasCourseStages}>
+                <div class="course-stage-list">
+                  <template for:each={courseStages} for:item="cs">
+                    <span key={cs.id} class="course-stage-pill">{cs.label}</span>
+                  </template>
+                </div>
+              </template>
+              <template if:false={hasCourseStages}>
+                <div class="empty-state-sm">No course associations found</div>
+              </template>
+
+            </div>
+
+            <!-- Enquiry History -->
+            <div class="section-card section-compact">
+              <div class="section-header-sm">
+                <lightning-icon icon-name="utility:record" size="xx-small"></lightning-icon>
+                <span>Enquiry History</span>
+              </div>
+              <template if:true={hasEnquiries}>
+                <div class="conversation-list">
+                  <template for:each={enquiries} for:item="enq">
+                    <div key={enq.id} class="conversation-item">
+                      <div class="conv-left-badge">
+                        <span class="conv-course">{enq.source}</span>
+                      </div>
+                      <div class="conv-right-content">
+                        <div class="conv-meta">{enq.dateLabel}</div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+              <template if:false={hasEnquiries}>
+                <div class="empty-state-sm">No enquiry records</div>
+              </template>
+            </div>
+
+            <!-- Conversation History -->
+            <div class="section-card section-compact">
+              <div class="section-header-sm">
+                <lightning-icon icon-name="utility:comments" size="xx-small"></lightning-icon>
+                <span>Conversation History</span>
+              </div>
+              <template if:true={hasConversations}>
+                <div class="conversation-list">
+                  <template for:each={displayConversations} for:item="conv">
+                    <div key={conv.id} class="conversation-item">
+                      <div class="conv-left-badge">
+                        <span class="conv-course">{conv.course}</span>
+                        <span class="conv-stage">{conv.stage}</span>
+                      </div>
+                      <div class="conv-right-content">
+                        <div class="conv-meta">{conv.dateLabel} &bull; {conv.calledBy} &bull; {conv.l1} / {conv.l2}</div>
+                        <div class="conv-feedback">{conv.feedback}</div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+              <template if:false={hasConversations}>
+                <div class="empty-state-sm">No previous conversations</div>
+              </template>
+            </div>
+
+            <!-- Last Call Attempt -->
+            <template if:true={hasLastCall}>
+              <div class="section-card section-compact">
+                <div class="section-header-sm">
+                  <lightning-icon icon-name="utility:outbound_call" size="xx-small"></lightning-icon>
+                  <span>Last Call Attempt</span>
+                </div>
+                <div class="last-call-grid">
+                  <div class="last-call-row">
+                    <small>Date</small>
+                    <strong>{lastCallDateLabel}</strong>
+                  </div>
+                  <div class="last-call-row">
+                    <small>Called By</small>
+                    <strong>{lastCall.calledBy}</strong>
+                  </div>
+                  <div class="last-call-row">
+                    <small>Duration</small>
+                    <strong>{lastCallDurationLabel}</strong>
+                  </div>
+                  <div class="last-call-row">
+                    <small>L1 / L2</small>
+                    <strong>{lastCall.l1} / {lastCall.l2}</strong>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Education (Dummy Data) -->
+            <div class="section-card section-compact">
+              <div class="section-header-sm">
+                <lightning-icon icon-name="utility:education" size="xx-small"></lightning-icon>
+                <span>Education</span>
+              </div>
+              <template if:true={hasQualifications}>
+                <template for:each={dummyQualifications} for:item="qual">
+                  <div key={qual.id} class="editable-row">
+                    <template if:false={qual.isEditing}>
+                      <div class="editable-row-content">
+                        <span class="editable-tag">{qual.type}</span>
+                        <span class="editable-main">{qual.title} — {qual.university} ({qual.year})</span>
+                      </div>
+                      <div class="editable-row-actions">
+                        <lightning-button-icon icon-name="utility:edit" alternative-text="Edit" size="small"
+                          data-id={qual.id} data-section="qualification" onclick={handleEditRow}></lightning-button-icon>
+                        <lightning-button-icon icon-name="utility:delete" alternative-text="Delete" size="small"
+                          data-id={qual.id} data-section="qualification" onclick={handleDeleteRow}></lightning-button-icon>
+                      </div>
+                    </template>
+                    <template if:true={qual.isEditing}>
+                      <div class="editable-row-edit">
+                        <lightning-input label="Type" value={qual.type} data-id={qual.id} data-field="type" data-section="qualification" onchange={handleFieldChange}></lightning-input>
+                        <lightning-input label="Title" value={qual.title} data-id={qual.id} data-field="title" data-section="qualification" onchange={handleFieldChange}></lightning-input>
+                        <lightning-input label="University" value={qual.university} data-id={qual.id} data-field="university" data-section="qualification" onchange={handleFieldChange}></lightning-input>
+                        <lightning-input label="Year" value={qual.year} data-id={qual.id} data-field="year" data-section="qualification" onchange={handleFieldChange}></lightning-input>
+                      </div>
+                      <div class="edit-actions">
+                        <lightning-button label="Save" variant="brand" size="small" data-id={qual.id} data-section="qualification" onclick={handleSaveRow}></lightning-button>
+                        <lightning-button label="Cancel" size="small" data-id={qual.id} data-section="qualification" onclick={handleCancelRow}></lightning-button>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </template>
+              <template if:false={hasQualifications}>
+                <div class="empty-state-sm">No education records</div>
+              </template>
+              <button class="add-row-btn" data-section="qualification" onclick={handleAddRow}>+ Add Education</button>
+            </div>
+
+            <!-- Certifications (Dummy Data) -->
+            <div class="section-card section-compact">
+              <div class="section-header-sm">
+                <lightning-icon icon-name="utility:ribbon" size="xx-small"></lightning-icon>
+                <span>Certifications</span>
+              </div>
+              <template if:true={hasCertifications}>
+                <template for:each={dummyCertifications} for:item="cert">
+                  <div key={cert.id} class="editable-row">
+                    <template if:false={cert.isEditing}>
+                      <div class="editable-row-content">
+                        <span class="editable-main">{cert.name}</span>
+                        <span class="editable-tag">{cert.status}</span>
+                      </div>
+                      <div class="editable-row-actions">
+                        <lightning-button-icon icon-name="utility:edit" alternative-text="Edit" size="small"
+                          data-id={cert.id} data-section="certification" onclick={handleEditRow}></lightning-button-icon>
+                        <lightning-button-icon icon-name="utility:delete" alternative-text="Delete" size="small"
+                          data-id={cert.id} data-section="certification" onclick={handleDeleteRow}></lightning-button-icon>
+                      </div>
+                    </template>
+                    <template if:true={cert.isEditing}>
+                      <div class="editable-row-edit">
+                        <lightning-input label="Name" value={cert.name} data-id={cert.id} data-field="name" data-section="certification" onchange={handleFieldChange}></lightning-input>
+                        <lightning-input label="Status" value={cert.status} data-id={cert.id} data-field="status" data-section="certification" onchange={handleFieldChange}></lightning-input>
+                      </div>
+                      <div class="edit-actions">
+                        <lightning-button label="Save" variant="brand" size="small" data-id={cert.id} data-section="certification" onclick={handleSaveRow}></lightning-button>
+                        <lightning-button label="Cancel" size="small" data-id={cert.id} data-section="certification" onclick={handleCancelRow}></lightning-button>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </template>
+              <template if:false={hasCertifications}>
+                <div class="empty-state-sm">No certifications</div>
+              </template>
+              <button class="add-row-btn" data-section="certification" onclick={handleAddRow}>+ Add Certification</button>
+            </div>
+
+            <!-- Work Experience (Dummy Data) -->
+            <div class="section-card section-compact">
+              <div class="section-header-sm">
+                <lightning-icon icon-name="utility:company" size="xx-small"></lightning-icon>
+                <span>Work Experience</span>
+              </div>
+              <template if:true={hasWorkExperience}>
+                <template for:each={dummyWorkExperience} for:item="work">
+                  <div key={work.id} class="editable-row">
+                    <template if:false={work.isEditing}>
+                      <div class="editable-row-content">
+                        <span class="editable-main">{work.role} at {work.company}</span>
+                        <span class="editable-tag">{work.period}</span>
+                      </div>
+                      <div class="editable-row-actions">
+                        <lightning-button-icon icon-name="utility:edit" alternative-text="Edit" size="small"
+                          data-id={work.id} data-section="workExperience" onclick={handleEditRow}></lightning-button-icon>
+                        <lightning-button-icon icon-name="utility:delete" alternative-text="Delete" size="small"
+                          data-id={work.id} data-section="workExperience" onclick={handleDeleteRow}></lightning-button-icon>
+                      </div>
+                    </template>
+                    <template if:true={work.isEditing}>
+                      <div class="editable-row-edit">
+                        <lightning-input label="Company" value={work.company} data-id={work.id} data-field="company" data-section="workExperience" onchange={handleFieldChange}></lightning-input>
+                        <lightning-input label="Role" value={work.role} data-id={work.id} data-field="role" data-section="workExperience" onchange={handleFieldChange}></lightning-input>
+                        <lightning-input label="Period" value={work.period} data-id={work.id} data-field="period" data-section="workExperience" onchange={handleFieldChange}></lightning-input>
+                      </div>
+                      <div class="edit-actions">
+                        <lightning-button label="Save" variant="brand" size="small" data-id={work.id} data-section="workExperience" onclick={handleSaveRow}></lightning-button>
+                        <lightning-button label="Cancel" size="small" data-id={work.id} data-section="workExperience" onclick={handleCancelRow}></lightning-button>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </template>
+              <template if:false={hasWorkExperience}>
+                <div class="empty-state-sm">No work experience</div>
+              </template>
+              <button class="add-row-btn" data-section="workExperience" onclick={handleAddRow}>+ Add Experience</button>
+            </div>
+
+            <div class="scroll-spacer"></div>
+
+          </div>
+
+          <!-- RIGHT SIDE — Feedback -->
+          <div class="right-panel">
+            <template if:true={showRingingAnimation}>
+              <div class="section-card ringing-card">
+                <div class="ringing-icon">
+                  <lightning-icon icon-name="utility:call" size="large"></lightning-icon>
+                </div>
+                <div class="ringing-status">{callStatus}</div>
+                <div class="ringing-elapsed">{elapsedLabel}</div>
+                <div class="wave-loader">
+                  <span></span><span></span><span></span><span></span>
+                </div>
+              </div>
+            </template>
+            <template if:true={showFeedback}>
+              <div class="section-card feedback-card">
+                <div class="section-header">
+                  <lightning-icon icon-name="utility:feedback" size="small"></lightning-icon>
+                  <span>Call Feedback</span>
+                </div>
+
+                <div class="feedback-grid ">
+
+                  <div class="row-2">
+                    <lightning-combobox label="Call Status (L1)" value={l1Value} options={filteredL1Options}
+                      onchange={handleL1Change}   disabled={disableL1}>  
+                    </lightning-combobox>
+
+                    <lightning-combobox label="Sub Status (L2)" value={l2Value} options={l2Options}
+                      onchange={handleL2Change} disabled={disableL2Final}>
+                    </lightning-combobox>
+                  </div>
+
+                  <!-- Row 2 -->
+                  <div class="row-2">
+                    <div>
+                      <lightning-combobox label="Stage" value={stageValue} options={stageOptions}
+                        onchange={handleStageChange} disabled={isStageDisabled}>
+                      </lightning-combobox>
+
+                      <template if:true={isStageDisabled}>
+                        <div class="helper-text">
+                          Stage not applicable for Not-Connected calls
+                        </div>
+                      </template>
+                    </div>
+
+                    <lightning-input type="date" label="Expected Date" value={expectedDate} min={todayIsoDate}
+                      onchange={handleExpectedDateChange}  disabled={isConnectedOnlyFieldsDisabled}>
+                    </lightning-input>
+                  </div>
+
+                  <!-- Row 3 -->
+                  <div class="followup-section">
+                    <div class="followup-title">Next Follow Up</div>
+
+                    <div class="row-3">
+                      <lightning-input type="date" label="Date" value={nextFollowUpDateOnly}
+                        onchange={handleNextFollowUpDateChange}  disabled={disableFollowUpDateTime}>
+                      </lightning-input>
+
+                      <lightning-input type="time" label="Time" value={nextFollowUpTimeOnly}
+                        onchange={handleNextFollowUpTimeChange}   disabled={disableFollowUpDateTime}>
+                      </lightning-input>
+
+                      <div class="auto-checkbox">
+                        <lightning-input type="checkbox" label="Auto set (+24 hrs)" checked={autoSetFollowUp}
+                          onchange={handleAutoSetChange}>
+                        </lightning-input>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Row 4 -->
+                  <div class="checkbox-box">
+                    <lightning-input type="checkbox" label="Notify Me" checked={notifyMe} onchange={handleNotifyChange}   disabled={isConnectedOnlyFieldsDisabled}>
+                    </lightning-input>
+
+                    <lightning-input type="checkbox" label="DND" checked={isDnd} onchange={handleDndChange} disabled={isConnectedOnlyFieldsDisabled}>
+                    </lightning-input>
+
+                    <lightning-input type="checkbox" label="Is Spam" checked={isSpam} onchange={handleSpamChange}   disabled={isConnectedOnlyFieldsDisabled}>
+                    </lightning-input>
+                  </div>
+
+                  <!-- Row 5 -->
+                  <div class="comments-wrapper">
+                    <div class="comments-label-row">
+                      <span class="comments-label">Comments{commentsMandatoryStar}</span>
+                      <button class={micBtnClass} onclick={handleMicToggle} title={micTooltip}>
+                        <lightning-icon icon-name={micIcon} size="xx-small" alternative-text="Dictate"></lightning-icon>
+                      </button>
+                      <template if:true={isRecording}>
+                        <span class="recording-indicator">
+                          <span class="rec-dot"></span> Listening
+                        </span>
+                      </template>
+                    </div>
+                    <lightning-textarea value={feedback} onchange={handleFeedbackChange}
+                      required={isCommentMandatory} variant="label-hidden">
+                    </lightning-textarea>
+                  </div>
+
+                  <!-- Action Buttons -->
+                  <div class="feedback-actions">
+                    <lightning-button variant="brand" label="Save Disposition" onclick={saveFeedback}
+                      disabled={disableSaveDispositionBtn}>
+                    </lightning-button>
+                    <lightning-button variant="neutral" label="Save & Pause" onclick={handlePauseQueue}
+                      disabled={disablePauseBtnFinal}>
+                    </lightning-button>
+                  </div>
+
+                </div>
+              </div>
+            </template>
+          </div>
+
+        </div>
+      </template>
+
+
+
+    </div>
+
+
+
+  </div>
+</template>

@@ -5,6 +5,13 @@
                 <lightning-spinner alternative-text="Loading workday" size="medium"></lightning-spinner>
             </template>
 
+            <template if:true={employeeUnavailableMessage}>
+                <div class="slds-notify slds-notify_alert slds-theme_error slds-m-bottom_medium" role="alert">
+                    <span class="slds-assistive-text">error</span>
+                    <h2>{employeeUnavailableMessage}</h2>
+                </div>
+            </template>
+
             <div class="hero">
                 <div class="hero-layout">
                     <div class="hero-left">

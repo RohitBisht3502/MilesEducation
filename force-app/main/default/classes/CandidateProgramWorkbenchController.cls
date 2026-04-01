@@ -3,6 +3,7 @@ public with sharing class CandidateProgramWorkbenchController {
     public class ReallocationRequest {
         @AuraEnabled public List<Id> candidateIds;
         @AuraEnabled public Id targetOwnerId;
+        @AuraEnabled public String comment;
     }
 
     public class FilterRequest {
@@ -16,6 +17,7 @@ public with sharing class CandidateProgramWorkbenchController {
         @AuraEnabled public List<String> lastInquirySources;
         @AuraEnabled public List<String> levelKeys;
         @AuraEnabled public List<String> spocIds;
+        @AuraEnabled public List<String> cities;
         @AuraEnabled public String callActivityType;
         @AuraEnabled public String callFrom;
         @AuraEnabled public String callTo;
@@ -26,19 +28,21 @@ public with sharing class CandidateProgramWorkbenchController {
         @AuraEnabled public List<FilterOption> spocOptions;
         @AuraEnabled public List<LevelGroup> levelGroups;
         @AuraEnabled public List<FilterOption> enquirySourceOptions;
+        @AuraEnabled public List<FilterOption> cityOptions;
     }
 
     public class CandidateRow {
         @AuraEnabled public Id id;
         @AuraEnabled public Id spocId;
         @AuraEnabled public String name;
-        @AuraEnabled public String email;
+        @AuraEnabled public String candidateId;
         @AuraEnabled public String createdDate;
         @AuraEnabled public String firstInquiryDate;
         @AuraEnabled public String firstInquirySource;
         @AuraEnabled public String status;
         @AuraEnabled public String statusClass;
         @AuraEnabled public String spoc;
+        @AuraEnabled public String city;
         @AuraEnabled public String lastInquiry;
         @AuraEnabled public String lastInquirySource;
         @AuraEnabled public String callStatus;
@@ -80,6 +84,13 @@ public with sharing class CandidateProgramWorkbenchController {
         response.spocOptions = new List<FilterOption>();
         response.levelGroups = new List<LevelGroup>();
         response.enquirySourceOptions = new List<FilterOption>();
+        response.cityOptions = new List<FilterOption>();
+
+        for (Schema.PicklistEntry cityEntry : Schema.SObjectType.Round_Robin_Pool__c.fields.City__c.getPicklistValues()) {
+            if (cityEntry.isActive()) {
+                response.cityOptions.add(new FilterOption(cityEntry.getLabel(), cityEntry.getValue()));
+            }
+        }
 
         Set<Id> subordinateIds = getSubordinateUserIds();
         if (subordinateIds.isEmpty()) {
@@ -115,8 +126,13 @@ public with sharing class CandidateProgramWorkbenchController {
             return response;
         }
 
+        Set<String> selectedCities = new Set<String>();
+        if (request != null && request.cities != null) {
+            selectedCities.addAll(request.cities);
+        }
+
         List<Lead> candidates = [
-            SELECT Id, Name, Email, OwnerId, Owner.Name, CreatedDate
+            SELECT Id, Name, Candidate_ID__c, OwnerId, Owner.Name, CreatedDate, City__c
             FROM Lead
             WHERE OwnerId IN :subordinateIds
             AND (Is_Merged__c = false OR Is_Merged__c = null)
@@ -128,6 +144,7 @@ public with sharing class CandidateProgramWorkbenchController {
         for (Lead candidate : candidates) {
             if (createdFrom != null && candidate.CreatedDate.date() < createdFrom) continue;
             if (createdTo != null && candidate.CreatedDate.date() > createdTo) continue;
+            if (!selectedCities.isEmpty() && !selectedCities.contains(candidate.City__c)) continue;
             candidateById.put(candidate.Id, candidate);
         }
 
@@ -252,11 +269,12 @@ public with sharing class CandidateProgramWorkbenchController {
             row.id = candidate.Id;
             row.spocId = candidate.OwnerId;
             row.name = candidate.Name;
-            row.email = candidate.Email;
+            row.candidateId = candidate.Candidate_ID__c;
             row.createdDate = formatDate(candidate.CreatedDate);
             row.firstInquiryDate = formatDate(getFirstInquiryDate(candidateEnquiries));
             row.firstInquirySource = getFirstInquirySource(candidateEnquiries);
             row.spoc = candidate.Owner != null ? candidate.Owner.Name : 'Unassigned';
+            row.city = candidate.City__c;
             row.lastInquiry = formatDate(getLastEnquiryDate(candidateEnquiries, getLastInquiryDate(relatedLeads, candidate.CreatedDate)));
             row.lastInquirySource = getLastInquirySource(candidateEnquiries);
             row.expanded = false;
@@ -279,12 +297,15 @@ public with sharing class CandidateProgramWorkbenchController {
     }
 
     @AuraEnabled
-    public static void reallocateCandidates(List<Id> candidateIds, Id targetOwnerId) {
+    public static void reallocateCandidates(List<Id> candidateIds, Id targetOwnerId, String comment) {
         if (candidateIds == null || candidateIds.isEmpty()) {
             throw new AuraHandledException('Please select at least one candidate.');
         }
         if (targetOwnerId == null) {
             throw new AuraHandledException('Please select a SPOC.');
+        }
+        if (String.isBlank(comment)) {
+            throw new AuraHandledException('Please enter reallocation comments.');
         }
 
         Set<Id> allowedSpocIds = getSubordinateUserIds();
@@ -292,23 +313,49 @@ public with sharing class CandidateProgramWorkbenchController {
             throw new AuraHandledException('You can reallocate only to your SPOC users.');
         }
 
+        User targetOwner = [
+            SELECT Id, Name
+            FROM User
+            WHERE Id = :targetOwnerId
+            LIMIT 1
+        ];
+
         List<Lead> candidatesToUpdate = [
-            SELECT Id, OwnerId
+            SELECT Id, Name, OwnerId, Owner.Name
             FROM Lead
             WHERE Id IN :candidateIds
         ];
 
         Map<Id, Lead> oldLeadMap = new Map<Id, Lead>();
         List<Lead> changedCandidates = new List<Lead>();
+        List<Activity_Log__c> activityLogs = new List<Activity_Log__c>();
+        Datetime changedOn = System.now();
+        String trimmedComment = comment != null ? comment.trim() : null;
 
         for (Lead candidate : candidatesToUpdate) {
             if (candidate.OwnerId == targetOwnerId) {
                 continue;
             }
 
-            oldLeadMap.put(candidate.Id, candidate.clone(true, true, true, true));
+            String previousOwnerName = candidate.Owner != null ? candidate.Owner.Name : 'Unknown';
+            Lead oldCandidate = candidate.clone(true, true, true, true);
+            oldLeadMap.put(candidate.Id, oldCandidate);
             candidate.OwnerId = targetOwnerId;
             changedCandidates.add(candidate);
+
+            ActivityLogService.Request logRequest = new ActivityLogService.Request();
+            logRequest.name = 'Candidate Reallocated';
+            logRequest.activityType = 'Candidate Reallocation';
+            logRequest.description = 'Candidate reallocated from ' + previousOwnerName + ' to ' + targetOwner.Name + '.';
+            logRequest.createdBy = UserInfo.getName();
+            logRequest.changedDateTime = changedOn;
+            logRequest.actionPerformedBy = UserInfo.getUserId();
+            logRequest.loggingId = candidate.Id;
+            logRequest.candidateId = candidate.Id;
+            logRequest.previousOwnerId = oldCandidate.OwnerId;
+            logRequest.newOwnerId = targetOwnerId;
+            logRequest.extraFields.put('Reason_For_Change__c', trimmedComment);
+            activityLogs.add(ActivityLogService.createLog(logRequest));
         }
 
         if (changedCandidates.isEmpty()) {
@@ -316,7 +363,36 @@ public with sharing class CandidateProgramWorkbenchController {
         }
 
         update changedCandidates;
+        // Get Notification Type Id
+Id notifTypeId = [
+    SELECT Id 
+    FROM CustomNotificationType 
+    WHERE DeveloperName = 'Lead_Assigned_by_GM' 
+    LIMIT 1
+].Id;
+
+// Prepare recipient (SPOC)
+Set<String> recipientIds = new Set<String>{
+    String.valueOf(targetOwnerId)
+};
+
+// Send notification for each lead
+for (Lead leadRec : changedCandidates) {
+    Messaging.CustomNotification notification = new Messaging.CustomNotification();
+
+    notification.setTitle('New Lead Assigned');
+    notification.setBody(
+        'GM ' + UserInfo.getName() + 
+        ' has assigned you a lead: ' + leadRec.Name
+    );
+
+    notification.setNotificationTypeId(notifTypeId);
+    notification.setTargetId(leadRec.Id);
+
+    notification.send(recipientIds);
+}
         LeadRelatedSyncService.syncRelatedLeadsOnCandidateOwnerChange(changedCandidates, oldLeadMap);
+        ActivityLogService.insertLogs(activityLogs);
     }
 
     private static Set<Id> getSubordinateUserIds() {
@@ -527,8 +603,8 @@ public with sharing class CandidateProgramWorkbenchController {
         }
     }
 
-    private static String formatDate(Datetime value) {
-        return value == null ? null : value.date().format();
-    }
+   private static String formatDate(Datetime value) {
+    return value == null ? null : value.format('yyyy-MM-dd');
+}
 
 }

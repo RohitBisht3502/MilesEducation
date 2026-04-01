@@ -110,7 +110,7 @@ export default class LeadTransferApproval extends LightningElement {
                 this.dispatchEvent(
                     new ShowToastEvent({
                         title: 'Success',
-                        message: 'Approval sent successfully',
+                        message: 'Candidate transfer approval sent successfully',
                         variant: 'success'
                     })
                 );
@@ -141,7 +141,7 @@ export default class LeadTransferApproval extends LightningElement {
     }
 
     get accessMessage() {
-        return this.accessInfo?.message || 'You do not have access. Only CC and SR users can transfer leads.';
+        return this.accessInfo?.message || 'You do not have access. Only CC and SR users can transfer candidates.';
     }
 
     get hasPendingRequest() {
@@ -149,6 +149,6 @@ export default class LeadTransferApproval extends LightningElement {
     }
 
     get pendingMessage() {
-        return this.validationInfo?.message || 'One process already exists for this lead transfer.';
+        return this.validationInfo?.message || 'One process already exists for this candidate transfer.';
     }
 }

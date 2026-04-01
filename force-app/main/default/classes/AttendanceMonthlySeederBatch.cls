@@ -1,10 +1,23 @@
 public with sharing class AttendanceMonthlySeederBatch implements Database.Batchable<SObject>, Schedulable {
+    private static final String EMPLOYEE_SALES_USER_FIELD = 'Sales_User__c';
+    private static final String EMPLOYEE_USER_FIELD = 'User__c';
+
     public Database.QueryLocator start(Database.BatchableContext context) {
-        return Database.getQueryLocator([
-            SELECT Id, Name, Is_Active__c, Working_Days__c, Weekly_Off_Day__c
-            FROM Employee__c
-            WHERE Is_Active__c = true
-        ]);
+        List<String> selectFields = new List<String>{
+            'Id',
+            'Is_Active__c',
+            'Working_Days__c',
+            'Weekly_Off_Day__c'
+        };
+        for (String ownerFieldApiName : getEmployeeOwnerFieldApiNames()) {
+            selectFields.add(ownerFieldApiName);
+        }
+
+        String soql =
+            'SELECT ' +
+            String.join(selectFields, ', ') +
+            ' FROM Employee__c WHERE Is_Active__c = true';
+        return Database.getQueryLocator(soql);
     }
 
     public void execute(Database.BatchableContext context, List<SObject> scope) {
@@ -51,6 +64,12 @@ public with sharing class AttendanceMonthlySeederBatch implements Database.Batch
             record.Total_Break_Minutes__c = 0;
             record.Gross_Work_Minutes__c = 0;
             record.Net_Work_Minutes__c = 0;
+
+            Id ownerId = resolveAttendanceOwnerId(employee);
+            if (ownerId != null) {
+                record.OwnerId = ownerId;
+            }
+
             recordsToInsert.add(record);
             existingKeys.add(keyValue);
         }
@@ -66,5 +85,39 @@ public with sharing class AttendanceMonthlySeederBatch implements Database.Batch
 
     public void execute(SchedulableContext context) {
         Database.executeBatch(new AttendanceMonthlySeederBatch(), 200);
+    }
+
+    private static Set<String> getEmployeeOwnerFieldApiNames() {
+        Map<String, Schema.SObjectField> employeeFieldMap = Schema.SObjectType.Employee__c.fields.getMap();
+        Set<String> ownerFieldApiNames = new Set<String>();
+        if (employeeFieldMap.containsKey(EMPLOYEE_SALES_USER_FIELD)) {
+            ownerFieldApiNames.add(EMPLOYEE_SALES_USER_FIELD);
+        }
+        if (employeeFieldMap.containsKey(EMPLOYEE_USER_FIELD)) {
+            ownerFieldApiNames.add(EMPLOYEE_USER_FIELD);
+        }
+        return ownerFieldApiNames;
+    }
+
+    private static Id resolveAttendanceOwnerId(Employee__c employee) {
+        Id salesUserId = getLookupId(employee, EMPLOYEE_SALES_USER_FIELD);
+        if (salesUserId != null) {
+            return salesUserId;
+        }
+        return getLookupId(employee, EMPLOYEE_USER_FIELD);
+    }
+
+    private static Id getLookupId(Employee__c employee, String fieldApiName) {
+        if (employee == null || String.isBlank(fieldApiName)) {
+            return null;
+        }
+
+        Map<String, Object> populatedFieldMap = employee.getPopulatedFieldsAsMap();
+        if (!populatedFieldMap.containsKey(fieldApiName)) {
+            return null;
+        }
+
+        Object fieldValue = populatedFieldMap.get(fieldApiName);
+        return fieldValue == null ? null : (Id) fieldValue;
     }
 }

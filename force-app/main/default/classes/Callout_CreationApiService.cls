@@ -35,6 +35,7 @@ public with sharing class Callout_CreationApiService {
 
         Map<String, Object> body = new Map<String, Object>{
             'loan_provider' => provider,
+            'sf_id' => candidateUuid,
             'miles_uuid' => candidateUuid,
             'program_name' => loan.Program_Name__c,
             'first_name' => loan.First_Name__c,

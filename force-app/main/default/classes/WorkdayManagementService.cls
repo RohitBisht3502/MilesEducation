@@ -48,12 +48,14 @@ public with sharing class WorkdayManagementService {
     private static final String STATE_ENDED = 'ENDED';
     private static final String STATE_LEAVE = 'LEAVE';
     private static final String STATE_INACTIVE = 'INACTIVE';
+    private static final String MISSING_EMPLOYEE_MESSAGE =
+        'We do not have your employee profile in the system. Please contact admin for further process.';
     private static final String MISSING_TODAY_ATTENDANCE_MESSAGE =
         'We do not have the attendance record for you. Please contact admin to proceed.';
 
     @AuraEnabled
     public static DashboardResponse loadDashboard() {
-        Employee__c employee = getOrCreateEmployee(UserInfo.getUserId());
+        Employee__c employee = getEmployeeRequired(UserInfo.getUserId());
         Attendance__c todayAttendance = queryTodayAttendance(employee.Id, false);
         List<Break_Time__c> todayBreaks = todayAttendance == null
             ? new List<Break_Time__c>()
@@ -68,7 +70,7 @@ public with sharing class WorkdayManagementService {
 
     @AuraEnabled
     public static DashboardResponse startDay() {
-        Employee__c employee = getOrCreateEmployee(UserInfo.getUserId());
+        Employee__c employee = getEmployeeRequired(UserInfo.getUserId());
         if (!employee.Is_Active__c) {
             throw new AuraHandledException('Your employee profile is inactive. Please contact your manager.');
         }
@@ -100,7 +102,7 @@ public with sharing class WorkdayManagementService {
 
     @AuraEnabled
     public static DashboardResponse startBreak() {
-        Employee__c employee = getOrCreateEmployee(UserInfo.getUserId());
+        Employee__c employee = getEmployeeRequired(UserInfo.getUserId());
         Attendance__c todayAttendance = getTodayAttendanceRequired(employee, true);
 
         validateAttendanceForBreak(todayAttendance);
@@ -139,7 +141,7 @@ public with sharing class WorkdayManagementService {
 
     @AuraEnabled
     public static DashboardResponse endBreak() {
-        Employee__c employee = getOrCreateEmployee(UserInfo.getUserId());
+        Employee__c employee = getEmployeeRequired(UserInfo.getUserId());
         Attendance__c todayAttendance = getTodayAttendanceRequired(employee, true);
 
         validateAttendanceForBreak(todayAttendance);
@@ -173,7 +175,7 @@ public with sharing class WorkdayManagementService {
 
     @AuraEnabled
     public static DashboardResponse endDay() {
-        Employee__c employee = getOrCreateEmployee(UserInfo.getUserId());
+        Employee__c employee = getEmployeeRequired(UserInfo.getUserId());
         Attendance__c todayAttendance = getTodayAttendanceRequired(employee, true);
 
         if (todayAttendance.Start_Time__c == null) {
@@ -489,7 +491,7 @@ public with sharing class WorkdayManagementService {
         return 'status-ended';
     }
 
-    private static Employee__c getOrCreateEmployee(Id userId) {
+    private static Employee__c getEmployeeRequired(Id userId) {
         List<Employee__c> employees = [
             SELECT Id, Name, User__c, Team__c, Is_Active__c, Is_Shift_Based__c,
                    Shift_Start_Time__c, Shift_End_Time__c, Weekly_Off_Day__c,
@@ -502,27 +504,7 @@ public with sharing class WorkdayManagementService {
         if (!employees.isEmpty()) {
             return employees[0];
         }
-
-        User currentUser = [
-            SELECT Id, Name
-            FROM User
-            WHERE Id = :userId
-            LIMIT 1
-        ];
-
-        Employee__c employee = new Employee__c();
-        employee.Name = currentUser.Name;
-        employee.User__c = currentUser.Id;
-        employee.Team__c = 'Sales';
-        employee.Is_Active__c = true;
-        employee.Weekly_Off_Day__c = 'Monday';
-        employee.Working_Days__c = 'Tuesday;Wednesday;Thursday;Friday;Saturday;Sunday';
-        employee.Shift_Start_Time__c = Time.newInstance(10, 0, 0, 0);
-        employee.Shift_End_Time__c = Time.newInstance(19, 0, 0, 0);
-        employee.Current_Day_Status__c = 'Not Started';
-        employee.Availability_Status__c = 'Present';
-        insert employee;
-        return employee;
+        throw new AuraHandledException(MISSING_EMPLOYEE_MESSAGE);
     }
 
     private static Attendance__c getTodayAttendanceRequired(Employee__c employee, Boolean forUpdate) {

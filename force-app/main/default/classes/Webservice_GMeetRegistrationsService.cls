@@ -24,22 +24,27 @@ public without sharing class Webservice_GMeetRegistrationsService {
         String method = String.isBlank(cfg.Http_Method__c) ? 'POST' : cfg.Http_Method__c.trim().toUpperCase();
         if (method != 'POST') method = 'POST';
 
-        List<Event> events = [SELECT Id,WhatId, ConferenceId__c,Event_Id__c,StartDateTime, EndDateTime, Location, Meeting_type__c FROM Event WHERE Id IN :eventIds];
+        List<Event> events = [SELECT Id, WhoId, WhatId, ConferenceId__c, Event_Id__c, StartDateTime, EndDateTime, Location, Meeting_type__c FROM Event WHERE Id IN :eventIds];
         if (events.isEmpty()) return;
 
-        Set<Id> leadIds = new Set<Id>();
+        Set<Id> candidateIds = new Set<Id>();
+        Set<Id> studentIds = new Set<Id>();
         for (Event e : events) {
-            if (e.WhatId != null && e.WhatId.getSObjectType() == Lead__c.SObjectType) {
-                leadIds.add(e.WhatId);
+            if (e.WhoId != null && e.WhoId.getSObjectType() == Lead.SObjectType) {
+                candidateIds.add(e.WhoId);
+            }
+            if (e.WhatId != null && e.WhatId.getSObjectType() == Account.SObjectType) {
+                studentIds.add(e.WhatId);
             }
         }
 
-        Map<Id, Lead__c> leadMap = new Map<Id, Lead__c>();
-        if (!leadIds.isEmpty()) {
-            for (Lead__c ld : [SELECT Id, Candidate__c, Candidate__r.UUID__c FROM Lead__c WHERE Id IN :leadIds]) {
-                leadMap.put(ld.Id, ld);
-            }
-        }
+        Map<Id, Lead> candidateMap = candidateIds.isEmpty()
+            ? new Map<Id, Lead>()
+            : new Map<Id, Lead>([SELECT Id, UUID__c FROM Lead WHERE Id IN :candidateIds]);
+
+        Map<Id, Account> studentMap = studentIds.isEmpty()
+            ? new Map<Id, Account>()
+            : new Map<Id, Account>([SELECT Id, UUID__c FROM Account WHERE Id IN :studentIds]);
 
         Http http = new Http();
 
@@ -57,12 +62,15 @@ public without sharing class Webservice_GMeetRegistrationsService {
 
             Id sfIdToSend = ev.Id;
             String milesUuid;
-            if (ev.WhatId != null && ev.WhatId.getSObjectType() == Lead__c.SObjectType) {
-                Lead__c ld = leadMap.get(ev.WhatId);
-                if (ld != null && ld.Candidate__c != null) {
-                    sfIdToSend = ld.Candidate__c;
-                    milesUuid = ld.Candidate__r != null ? ld.Candidate__r.UUID__c : null;
-                }
+
+            if (ev.WhoId != null && candidateMap.containsKey(ev.WhoId)) {
+                Lead candidate = candidateMap.get(ev.WhoId);
+                sfIdToSend = candidate.Id;
+                milesUuid = candidate.UUID__c;
+            } else if (ev.WhatId != null && studentMap.containsKey(ev.WhatId)) {
+                Account student = studentMap.get(ev.WhatId);
+                sfIdToSend = student.Id;
+                milesUuid = student.UUID__c;
             }
 
             Map<String, Object> payload = new Map<String, Object>{

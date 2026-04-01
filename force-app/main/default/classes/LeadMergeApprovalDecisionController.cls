@@ -10,8 +10,13 @@ public with sharing class LeadMergeApprovalDecisionController {
         }
 
         Approval_Process__c approvalRecord = [SELECT Id, Source_Candidate__c, Target_Candidate__c, Merge_Status__c, Approval_Comments__c, Requestor__c, Record_Type__c FROM Approval_Process__c WHERE Id = :approvalId LIMIT 1];
-        if (approvalRecord.Record_Type__c != 'Lead Merged Request' && approvalRecord.Record_Type__c != 'Lead Merge') {
-            throw new AuraHandledException('This action is only supported for lead merge approvals.');
+        if (
+            approvalRecord.Record_Type__c != 'Lead Merged Request' &&
+            approvalRecord.Record_Type__c != 'Candidate Merged Request' &&
+            approvalRecord.Record_Type__c != 'Lead Merge' &&
+            approvalRecord.Record_Type__c != 'Candidate Merge'
+        ) {
+            throw new AuraHandledException('This action is only supported for candidate merge approvals.');
         }
 
         approvalRecord.Merge_Status__c = status;
@@ -50,8 +55,8 @@ public with sharing class LeadMergeApprovalDecisionController {
             } else if (String.isNotBlank(recipient.Email)) {
                 Messaging.SingleEmailMessage plainMail = new Messaging.SingleEmailMessage();
                 plainMail.setToAddresses(new String[] { recipient.Email });
-                plainMail.setSubject(templateDeveloperName == 'Lead_Merge_Approval_Request' ? 'Lead Merge Approval Request' : (templateDeveloperName == 'Lead_Merge_Approved' ? 'Lead Merge Approved' : 'Lead Merge Rejected'));
-                plainMail.setPlainTextBody(templateDeveloperName == 'Lead_Merge_Approval_Request' ? 'A new lead merge request requires your approval.' : (templateDeveloperName == 'Lead_Merge_Approved' ? 'Your lead merge request has been approved.' : 'Your lead merge request has been rejected.'));
+                plainMail.setSubject(templateDeveloperName == 'Lead_Merge_Approval_Request' ? 'Candidate Merge Approval Request' : (templateDeveloperName == 'Lead_Merge_Approved' ? 'Candidate Merge Approved' : 'Candidate Merge Rejected'));
+                plainMail.setPlainTextBody(templateDeveloperName == 'Lead_Merge_Approval_Request' ? 'A new candidate merge request requires your approval.' : (templateDeveloperName == 'Lead_Merge_Approved' ? 'Your candidate merge request has been approved.' : 'Your candidate merge request has been rejected.'));
                 plainMail.setSaveAsActivity(false);
                 Messaging.sendEmail(new Messaging.SingleEmailMessage[] { plainMail });
             }
@@ -62,7 +67,7 @@ public with sharing class LeadMergeApprovalDecisionController {
                 notification.setNotificationTypeId(types[0].Id);
                 notification.setTargetId(processId);
                 notification.setTitle(templateDeveloperName == 'Lead_Merge_Approval_Request' ? 'Merge Request Pending' : (templateDeveloperName == 'Lead_Merge_Approved' ? 'Merge Request Approved' : 'Merge Request Rejected'));
-                notification.setBody(templateDeveloperName == 'Lead_Merge_Approval_Request' ? 'A new lead merge request requires your approval.' : (templateDeveloperName == 'Lead_Merge_Approved' ? 'Your lead merge request has been approved and finalized.' : 'Your lead merge request has been rejected.'));
+                notification.setBody(templateDeveloperName == 'Lead_Merge_Approval_Request' ? 'A new candidate merge request requires your approval.' : (templateDeveloperName == 'Lead_Merge_Approved' ? 'Your candidate merge request has been approved and finalized.' : 'Your candidate merge request has been rejected.'));
                 notification.send(new Set<String>{ String.valueOf(targetUserId) });
             }
         } catch (Exception e) {

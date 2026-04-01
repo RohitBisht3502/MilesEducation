@@ -141,7 +141,7 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
     }
     dynamicRecordTypeId;
 
-    showFeedback = false;
+    showFeedback = true;
     savingFeedback = false;
     feedback = '';
     nextFollowUpDate = null;
@@ -367,35 +367,35 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
         }
     }
 
-   async loadRelatedLeads() {
-    if (!this.candidateId) {
-        this.relatedLeads = [];
-        this.relatedLeadsLoaded = true;
-        return;
+    async loadRelatedLeads() {
+        if (!this.candidateId) {
+            this.relatedLeads = [];
+            this.relatedLeadsLoaded = true;
+            return;
+        }
+
+        try {
+            const rows = await getRelatedLeads({
+                candidateId: this.candidateId
+            });
+
+            this.relatedLeads = (rows || []).map(r => {
+                return {
+                    id: r.id,
+                    course: r.course || 'NA',
+                    stage: r.stage || '',
+                    stageOptions: this.stageOptions
+                };
+            });
+
+            this.relatedLeadsLoaded = true;
+
+        } catch (e) {
+            console.error('Related leads load failed:', e);
+            this.relatedLeads = [];
+            this.relatedLeadsLoaded = true;
+        }
     }
-
-    try {
-        const rows = await getRelatedLeads({
-            candidateId: this.candidateId
-        });
-
-        this.relatedLeads = (rows || []).map(r => {
-            return {
-                id: r.id,
-                course: r.course || 'NA',
-                stage: r.stage || '',
-                stageOptions: this.stageOptions
-            };
-        });
-
-        this.relatedLeadsLoaded = true;
-
-    } catch (e) {
-        console.error('Related leads load failed:', e);
-        this.relatedLeads = [];
-        this.relatedLeadsLoaded = true;
-    }
-}
     // async loadStageOptionsForRecordType(recordTypeId) {
     //     if (this.recordTypeStageMap[recordTypeId]) {
     //         return this.recordTypeStageMap[recordTypeId];
@@ -686,14 +686,7 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
     }
 
     get filteredL1Options() {
-        if (!this.isApiResponseReceived) {
-            return this.l1Options;
-        }
-
-        // After API response → remove Not-Connected
-        return (this.l1Options || []).filter(
-            opt => opt.value !== 'Not-Connected'
-        );
+        return this.l1Options;
     }
 
     get isMissedCall() {
@@ -886,14 +879,14 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
         this.loading = true;
         this.errorText = null;
         this.isApiResponseReceived = false;
-        this.l1Value = 'Not-Connected';
+        this.l1Value = '';
         this.handleL1Change({ target: { value: this.l1Value } });
         if (this.l2Options.length > 0) {
             this.l2Value = this.l2Options[0].value;
         }
         this.callStatus = 'Dialing…';
         this.isLive = false;
-        this.showFeedback = false;
+         this.showFeedback = true;
         this.showCallPopup = true;
         this.canEndCall = false;
 
@@ -1158,7 +1151,7 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
             };
 
             this.clearFeedbackTimers();
-            this.showFeedback = false;
+            this.showFeedback = true;
             this.callStatus = 'Idle';
             this.isLive = false;
             this.showCallPopup = false;
@@ -1225,50 +1218,50 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
 
 
     async loadCallHistory() {
-    if (!this.candidateId) return;
+        if (!this.candidateId) return;
 
-    try {
-        const rows = await getCallHistory({
-            recordId: this.candidateId
-        });
+        try {
+            const rows = await getCallHistory({
+                recordId: this.candidateId
+            });
 
-        console.log('Call History rows:', rows);
+            console.log('Call History rows:', rows);
 
-        const dateFmt = new Intl.DateTimeFormat('en-IN', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
-        });
+            const dateFmt = new Intl.DateTimeFormat('en-IN', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            });
 
-        const timeFmt = new Intl.DateTimeFormat('en-IN', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+            const timeFmt = new Intl.DateTimeFormat('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
 
-        this.callHistory = (rows || []).map(r => {
-            const dt = r.startTime || r.createdDate;
-            const d = dt ? new Date(dt) : null;
+            this.callHistory = (rows || []).map(r => {
+                const dt = r.startTime || r.createdDate;
+                const d = dt ? new Date(dt) : null;
 
-            const totalSec = Number(r.durationSeconds || 0);
-            const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
-            const ss = String(totalSec % 60).padStart(2, '0');
+                const totalSec = Number(r.durationSeconds || 0);
+                const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+                const ss = String(totalSec % 60).padStart(2, '0');
 
-            return {
-                id: r.id,
-                dateLabel: d ? dateFmt.format(d) : 'NA',
-                timeLabel: d ? timeFmt.format(d) : '',
-                durationLabel: `${mm}:${ss}`,
-                status: r.status || 'NA',
-                l1: r.l1 || '',
-                l2: r.l2 || '',
-                stage: r.stage || ''
-            };
-        });
+                return {
+                    id: r.id,
+                    dateLabel: d ? dateFmt.format(d) : 'NA',
+                    timeLabel: d ? timeFmt.format(d) : '',
+                    durationLabel: `${mm}:${ss}`,
+                    status: r.status || 'NA',
+                    l1: r.l1 || '',
+                    l2: r.l2 || '',
+                    stage: r.stage || ''
+                };
+            });
 
-    } catch (e) {
-        console.error('Call history load failed:', e);
+        } catch (e) {
+            console.error('Call history load failed:', e);
+        }
     }
-}
 
     get disablePauseBtnFinal() {
         return (
@@ -1343,9 +1336,9 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
 
         // if (evtLeadId && String(evtLeadId) !== String(this.recordId)) return;
 
-        // if (evtCallId) {
-        //     this.lastCallId = String(evtCallId);
-        // }
+        if (evtCallId) {
+            this.lastCallId = String(evtCallId);
+        }
 
         const s = Number(
             p.Duration_Seconds__c ||
@@ -1353,23 +1346,23 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
             p.durationSeconds
         );
 
-        if (!Number.isNaN(s) && s > 0) {
+        // if (!Number.isNaN(s) && s > 0) {
 
-            //  CONNECTED CASE
-            this.l1Value = 'Connected';
-            this.handleL1Change({ target: { value: this.l1Value } });
+        //     //  CONNECTED CASE
+        //     this.l1Value = 'Connected';
+        //     this.handleL1Change({ target: { value: this.l1Value } });
 
-        } else {
+        // } else {
 
-            //  NOT CONNECTED CASE
-            this.l1Value = 'Not-Connected';
-            this.handleL1Change({ target: { value: this.l1Value } });
+        //     //  NOT CONNECTED CASE
+        //     this.l1Value = 'Not-Connected';
+        //     this.handleL1Change({ target: { value: this.l1Value } });
 
-            // AUTO SELECT L2 WHEN DURATION = 0
-            if (this.l2Options.length > 0) {
-                this.l2Value = this.l2Options[0].value;
-            }
-        }
+        //     // AUTO SELECT L2 WHEN DURATION = 0
+        //     if (this.l2Options.length > 0) {
+        //         this.l2Value = this.l2Options[0].value;
+        //     }
+        // }
 
         if (!Number.isNaN(s) && s > 0) {
             const totalSec = Math.floor(s);

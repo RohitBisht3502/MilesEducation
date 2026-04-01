@@ -9,7 +9,7 @@ public without sharing class LeadMergeController {
         wrapper.profileName = currentUser.Profile != null ? currentUser.Profile.Name : null;
         wrapper.roleName = currentUser.UserRole != null ? currentUser.UserRole.DeveloperName : null;
         wrapper.hasAccess = ALLOWED_NAMES.contains(wrapper.profileName) || ALLOWED_NAMES.contains(wrapper.roleName);
-        wrapper.message = wrapper.hasAccess ? null : 'You do not have access. Only CC and SR users can merge leads.';
+        wrapper.message = wrapper.hasAccess ? null : 'You do not have access. Only CC and SR users can merge candidates.';
         return wrapper;
     }
 
@@ -51,7 +51,13 @@ public without sharing class LeadMergeController {
         }
 
         Set<Id> pendingLeadIds = new Set<Id>();
-        for (Approval_Process__c approvalRecord : [SELECT Source_Candidate__c, Target_Candidate__c FROM Approval_Process__c WHERE Merge_Status__c = 'Pending' AND Record_Type__c = 'Lead Merged Request' AND (Source_Candidate__c IN :leadIds OR Target_Candidate__c IN :leadIds)]) {
+        for (Approval_Process__c approvalRecord : [
+            SELECT Source_Candidate__c, Target_Candidate__c
+            FROM Approval_Process__c
+            WHERE Merge_Status__c = 'Pending'
+            AND Record_Type__c IN ('Lead Merged Request', 'Candidate Merged Request', 'Lead Merge', 'Candidate Merge')
+            AND (Source_Candidate__c IN :leadIds OR Target_Candidate__c IN :leadIds)
+        ]) {
             if (approvalRecord.Source_Candidate__c != null) pendingLeadIds.add(approvalRecord.Source_Candidate__c);
             if (approvalRecord.Target_Candidate__c != null) pendingLeadIds.add(approvalRecord.Target_Candidate__c);
         }
@@ -70,7 +76,7 @@ public without sharing class LeadMergeController {
             wrapper.lead = leadRecord;
             wrapper.ownerManagerId = ownerManagerMap.get(leadRecord.OwnerId);
             wrapper.isUnderApproval = pendingLeadIds.contains(leadRecord.Id);
-            wrapper.approvalMessage = wrapper.isUnderApproval ? 'One process already exists for this lead merge.' : null;
+            wrapper.approvalMessage = wrapper.isUnderApproval ? 'One process already exists for this candidate merge.' : null;
             wrapper.customLeads = customLeadsByCandidate.containsKey(leadRecord.Id) ? customLeadsByCandidate.get(leadRecord.Id) : new List<Lead__c>();
             wrapper.courseSummary = buildCourseSummary(wrapper.customLeads);
             wrappers.add(wrapper);
@@ -86,12 +92,19 @@ public without sharing class LeadMergeController {
         if (leads.isEmpty()) return null;
 
         Lead leadRecord = leads[0];
-        Boolean isPending = ![SELECT Id FROM Approval_Process__c WHERE Merge_Status__c = 'Pending' AND Record_Type__c = 'Lead Merged Request' AND (Source_Candidate__c = :leadId OR Target_Candidate__c = :leadId) LIMIT 1].isEmpty();
+        Boolean isPending = ![
+            SELECT Id
+            FROM Approval_Process__c
+            WHERE Merge_Status__c = 'Pending'
+            AND Record_Type__c IN ('Lead Merged Request', 'Candidate Merged Request', 'Lead Merge', 'Candidate Merge')
+            AND (Source_Candidate__c = :leadId OR Target_Candidate__c = :leadId)
+            LIMIT 1
+        ].isEmpty();
 
         LeadWrapper wrapper = new LeadWrapper();
         wrapper.lead = leadRecord;
         wrapper.isUnderApproval = isPending;
-        wrapper.approvalMessage = isPending ? 'One process already exists for this lead merge.' : null;
+        wrapper.approvalMessage = isPending ? 'One process already exists for this candidate merge.' : null;
         wrapper.customLeads = getCustomLeadsByCandidate(new Set<Id>{ leadId }).get(leadId);
         if (wrapper.customLeads == null) {
             wrapper.customLeads = new List<Lead__c>();
@@ -132,13 +145,19 @@ public without sharing class LeadMergeController {
             finalSourceId = leadIdsToMerge[0];
         }
         if (finalSourceId == null) {
-            throw new AuraHandledException('No lead selected to merge');
+            throw new AuraHandledException('No candidate selected to merge');
         }
 
         Set<Id> allIdsToCheck = new Set<Id>{ mainLeadId, finalSourceId };
-        List<Approval_Process__c> pendingRequests = [SELECT Source_Candidate__c, Target_Candidate__c, Source_Candidate__r.Name FROM Approval_Process__c WHERE Merge_Status__c = 'Pending' AND Record_Type__c = 'Lead Merged Request' AND (Source_Candidate__c IN :allIdsToCheck OR Target_Candidate__c IN :allIdsToCheck)];
+        List<Approval_Process__c> pendingRequests = [
+            SELECT Source_Candidate__c, Target_Candidate__c, Source_Candidate__r.Name
+            FROM Approval_Process__c
+            WHERE Merge_Status__c = 'Pending'
+            AND Record_Type__c IN ('Lead Merged Request', 'Candidate Merged Request', 'Lead Merge', 'Candidate Merge')
+            AND (Source_Candidate__c IN :allIdsToCheck OR Target_Candidate__c IN :allIdsToCheck)
+        ];
         if (!pendingRequests.isEmpty()) {
-            throw new AuraHandledException('One of the involves leads is already part of a pending merge request.');
+            throw new AuraHandledException('One of the involved candidates is already part of a pending merge request.');
         }
 
         Lead sourceLead = [SELECT Id, Name, OwnerId FROM Lead WHERE Id = :finalSourceId];
@@ -170,13 +189,13 @@ public without sharing class LeadMergeController {
         approvalRecord.Approver__c = approverId;
         approvalRecord.Merge_Status__c = isSameGM ? 'Approved' : 'Pending';
         approvalRecord.RecordTypeId = recordTypeId;
-        approvalRecord.Record_Type__c = 'Lead Merged Request';
+        approvalRecord.Record_Type__c = 'Candidate Merged Request';
         insert approvalRecord;
 
         if (isSameGM) {
             CandidateMergeService.mergeCandidates(finalSourceId, mainLeadId, mergeComments);
             LeadMergeApprovalDecisionController.sendNotifications(approvalRecord.Id, currentUserId, 'Lead_Merge_Approved');
-            return 'Leads merged successfully (Directly Approved).';
+            return 'Candidate merged successfully (Directly Approved).';
         }
 
         LeadMergeApprovalDecisionController.sendNotifications(approvalRecord.Id, approverId, 'Lead_Merge_Approval_Request');
@@ -243,7 +262,7 @@ public without sharing class LeadMergeController {
     private static void validateMergeAccess() {
         UserAccessWrapper access = getUserAccessInfo();
         if (access == null || access.hasAccess != true) {
-            throw new AuraHandledException('You do not have access. Only CC and SR users can merge leads.');
+            throw new AuraHandledException('You do not have access. Only CC and SR users can merge candidates.');
         }
     }
 
@@ -264,7 +283,7 @@ public without sharing class LeadMergeController {
 
     private static String buildCourseSummary(List<Lead__c> customLeads) {
         if (customLeads == null || customLeads.isEmpty()) {
-            return 'No related leads';
+            return 'No related candidates';
         }
 
         Set<String> uniqueCourses = new Set<String>();
@@ -274,7 +293,7 @@ public without sharing class LeadMergeController {
             }
         }
         if (uniqueCourses.isEmpty()) {
-            return 'No related leads';
+            return 'No related candidates';
         }
 
         List<String> sortedCourses = new List<String>();

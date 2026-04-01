@@ -1,5 +1,14 @@
 public without sharing class TagLeadController {
 
+    public class LeadCreationValidationResult {
+        @AuraEnabled public Boolean isValid;
+        @AuraEnabled public Boolean phoneExists;
+        @AuraEnabled public Boolean emailExists;
+        @AuraEnabled public Boolean isSpam;
+        @AuraEnabled public Boolean isDnd;
+        @AuraEnabled public String message;
+    }
+
     public class CandidateCourseWrapper {
         @AuraEnabled public Id leadId;
         @AuraEnabled public String leadName;
@@ -233,6 +242,76 @@ public without sharing class TagLeadController {
         }
 
         syncPhoneNumberStatus(callLog.Phone_Number__c, isSpam, isDnd);
+    }
+
+    @AuraEnabled(cacheable=true)
+    public static LeadCreationValidationResult validateLeadCreationInput(String phone, String email, String countryCode) {
+        LeadCreationValidationResult result = new LeadCreationValidationResult();
+        result.isValid = true;
+        result.phoneExists = false;
+        result.emailExists = false;
+        result.isSpam = false;
+        result.isDnd = false;
+
+        String normalizedCountryCode = String.isBlank(countryCode) ? '+91' : countryCode.trim();
+        String phoneDigits = String.isBlank(phone) ? '' : phone.replaceAll('[^0-9]', '');
+
+        if (String.isNotBlank(phoneDigits)) {
+            Set<String> variants = Utility.buildPhoneVariants(phoneDigits);
+            String last10 = phoneDigits.length() > 10 ? phoneDigits.substring(phoneDigits.length() - 10) : phoneDigits;
+            List<Phone_Number__c> phoneRecords;
+
+            if (String.isNotBlank(last10)) {
+                String likePattern = '%' + last10;
+                phoneRecords = [
+                    SELECT Id, Is_Spam__c, Is_DND__c
+                    FROM Phone_Number__c
+                    WHERE Phone__c IN :variants OR Phone__c LIKE :likePattern
+                    LIMIT 1
+                ];
+            } else if (!variants.isEmpty()) {
+                phoneRecords = [
+                    SELECT Id, Is_Spam__c, Is_DND__c
+                    FROM Phone_Number__c
+                    WHERE Phone__c IN :variants
+                    LIMIT 1
+                ];
+            } else {
+                phoneRecords = new List<Phone_Number__c>();
+            }
+
+            if (!phoneRecords.isEmpty()) {
+                result.phoneExists = true;
+                result.isSpam = phoneRecords[0].Is_Spam__c == true;
+                result.isDnd = phoneRecords[0].Is_DND__c == true;
+            }
+        }
+
+        if (String.isNotBlank(email)) {
+            List<Email__c> emailRecords = [
+                SELECT Id
+                FROM Email__c
+                WHERE Email__c = :email
+                LIMIT 1
+            ];
+            result.emailExists = !emailRecords.isEmpty();
+        }
+
+        if (result.isSpam) {
+            result.isValid = false;
+            result.message = 'This phone number is marked as Spam.';
+        } else if (result.isDnd) {
+            result.isValid = false;
+            result.message = 'This phone number is marked as DND.';
+        } else if (result.phoneExists) {
+            result.isValid = false;
+            result.message = 'This phone number already exists.';
+        } else if (result.emailExists) {
+            result.isValid = false;
+            result.message = 'This email already exists.';
+        }
+
+        return result;
     }
 
     private static Id syncPhoneNumbersWithCandidate(String rawPhone, Id candidateId) {

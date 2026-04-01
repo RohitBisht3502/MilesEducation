@@ -71,7 +71,8 @@ export default class FileUploader extends NavigationMixin(LightningElement) {
     } else if (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to load path options', error);
-      this.toast('Error', 'Failed to load folder options for upload.', 'error');
+      const msg = this.getApexErrorMessage(error) || 'Failed to load folder options for upload.';
+      this.toast('Error', msg, 'error');
     }
   }
 

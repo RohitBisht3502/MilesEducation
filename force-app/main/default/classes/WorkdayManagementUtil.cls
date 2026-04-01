@@ -1,4 +1,4 @@
-public with sharing class WorkdayManagementUtil {
+public without sharing class WorkdayManagementUtil {
     public static final String DAY_STATUS_PLANNED = 'Planned';
     public static final String DAY_STATUS_ACTIVE = 'Active';
     public static final String DAY_STATUS_ON_BREAK = 'On Break';

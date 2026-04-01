@@ -15,9 +15,9 @@
             </value>
         </inputParameters>
         <inputParameters>
-            <name>leadId</name>
+            <name>comment</name>
             <value>
-                <elementReference>Get_Lead_Related_to_Event_Record.Id</elementReference>
+                <elementReference>Comment</elementReference>
             </value>
         </inputParameters>
         <nameSegment>EventApprovalEmailInvocable</nameSegment>
@@ -101,50 +101,6 @@
             <label>Event Not Completed</label>
         </rules>
     </decisions>
-    <decisions>
-        <name>Check_Having_Manager_Or_Not</name>
-        <label>Check Having Manager Or Not</label>
-        <locationX>0</locationX>
-        <locationY>0</locationY>
-        <defaultConnectorLabel>Default Outcome</defaultConnectorLabel>
-        <rules>
-            <name>IF_YES</name>
-            <conditionLogic>and</conditionLogic>
-            <conditions>
-                <leftValueReference>Get_Lead_Related_to_Event_Record.Owner:User.ManagerId</leftValueReference>
-                <operator>NotEqualTo</operator>
-                <rightValue>
-                    <stringValue></stringValue>
-                </rightValue>
-            </conditions>
-            <connector>
-                <targetReference>Update_Comment_on_Event</targetReference>
-            </connector>
-            <label>IF YES</label>
-        </rules>
-    </decisions>
-    <decisions>
-        <name>Check_Whether_Event_is_Related_to_Custom_Lead_or_not</name>
-        <label>Check Whether Event is Related to Custom Lead or not.</label>
-        <locationX>0</locationX>
-        <locationY>0</locationY>
-        <defaultConnectorLabel>Default Outcome</defaultConnectorLabel>
-        <rules>
-            <name>if_Yes_Belong_to_Custom_Lead</name>
-            <conditionLogic>and</conditionLogic>
-            <conditions>
-                <leftValueReference>Get_Event.WhatId</leftValueReference>
-                <operator>NotEqualTo</operator>
-                <rightValue>
-                    <stringValue>null</stringValue>
-                </rightValue>
-            </conditions>
-            <connector>
-                <targetReference>Get_Lead_Related_to_Event_Record</targetReference>
-            </connector>
-            <label>if Yes Belong to Custom Lead</label>
-        </rules>
-    </decisions>
     <environments>Default</environments>
     <interviewLabel>Send Notification and Email to Gm When GMeet is Completed. {!$Flow.CurrentDateTime}</interviewLabel>
     <isAdditionalPermissionRequiredToRun>true</isAdditionalPermissionRequiredToRun>
@@ -189,63 +145,6 @@
         <object>Event</object>
         <storeOutputAutomatically>true</storeOutputAutomatically>
     </recordLookups>
-    <recordLookups>
-        <name>Get_Lead_Related_to_Event_Record</name>
-        <label>Get Lead Related to Event Record</label>
-        <locationX>0</locationX>
-        <locationY>0</locationY>
-        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
-        <connector>
-            <targetReference>Check_Having_Manager_Or_Not</targetReference>
-        </connector>
-        <filterLogic>and</filterLogic>
-        <filters>
-            <field>Id</field>
-            <operator>EqualTo</operator>
-            <value>
-                <elementReference>Get_Event.WhatId</elementReference>
-            </value>
-        </filters>
-        <getFirstRecordOnly>true</getFirstRecordOnly>
-        <object>Lead__c</object>
-        <storeOutputAutomatically>true</storeOutputAutomatically>
-    </recordLookups>
-    <recordUpdates>
-        <name>Update_Comment_on_Event</name>
-        <label>Update Comment on Event</label>
-        <locationX>0</locationX>
-        <locationY>0</locationY>
-        <connector>
-            <targetReference>Send_Email_To_GM</targetReference>
-        </connector>
-        <filterLogic>and</filterLogic>
-        <filters>
-            <field>Id</field>
-            <operator>EqualTo</operator>
-            <value>
-                <elementReference>Get_Event.Id</elementReference>
-            </value>
-        </filters>
-        <inputAssignments>
-            <field>Approval_Status__c</field>
-            <value>
-                <stringValue>Pending For Approval</stringValue>
-            </value>
-        </inputAssignments>
-        <inputAssignments>
-            <field>Approver__c</field>
-            <value>
-                <elementReference>Get_Lead_Related_to_Event_Record.Owner:User.ManagerId</elementReference>
-            </value>
-        </inputAssignments>
-        <inputAssignments>
-            <field>Comment__c</field>
-            <value>
-                <elementReference>Comment</elementReference>
-            </value>
-        </inputAssignments>
-        <object>Event</object>
-    </recordUpdates>
     <screens>
         <name>Already_Approved_or_Pending</name>
         <label>Already Approved or Pending</label>
@@ -303,7 +202,7 @@
         <allowFinish>true</allowFinish>
         <allowPause>false</allowPause>
         <connector>
-            <targetReference>Check_Whether_Event_is_Related_to_Custom_Lead_or_not</targetReference>
+            <targetReference>Send_Email_To_GM</targetReference>
         </connector>
         <fields>
             <name>Comment</name>
@@ -334,7 +233,7 @@
     <textTemplates>
         <name>Template_Used_In_Notification</name>
         <isViewedAsPlainText>true</isViewedAsPlainText>
-        <text>Gmeet {!Get_Event.Subject} for Lead {!Get_Lead_Related_to_Event_Record.Name}  requires approval.</text>
+        <text>Gmeet {!Get_Event.Subject} requires approval.</text>
     </textTemplates>
     <textTemplates>
         <name>Title_Used_In_Notification</name>

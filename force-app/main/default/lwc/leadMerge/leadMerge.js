@@ -192,7 +192,7 @@ export default class LeadMerge extends LightningElement {
             approvalMessage: wrapper.approvalMessage,
             ownerManagerId: wrapper.ownerManagerId,
             customLeads,
-            courseSummary: wrapper.courseSummary || 'No related leads',
+            courseSummary: wrapper.courseSummary || 'No related candidates',
             initials: this.getInitials(lead.Name),
             candidateUrl: lead.Id ? `/${lead.Id}` : '#',
             programLevels,

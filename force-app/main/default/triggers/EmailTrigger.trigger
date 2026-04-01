@@ -12,7 +12,15 @@ trigger EmailTrigger on Email__c (after insert, after update) {
     );
 
     if (Trigger.isAfter) {
-        if (Trigger.isInsert) handler.afterInsert();
-        if (Trigger.isUpdate) handler.afterUpdate();
+        if (Trigger.isInsert){
+            
+         handler.afterInsert();
+           DataChangeEventHelper.publishEvents(Trigger.new, null, 'Email__c');
+
+        }
+        if (Trigger.isUpdate){ 
+            handler.afterUpdate();
+DataChangeEventHelper.publishEvents(Trigger.new, Trigger.oldMap, 'Email__c');
+        }
     }
 }

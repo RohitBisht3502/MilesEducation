@@ -140,9 +140,13 @@ public without sharing class RunoCallIdentityService {
     }
 
     @AuraEnabled
-    public static void updateRelatedLeadStages(List<LeadStageUpdate> updates) {
+    public static void updateRelatedLeadStages(List<LeadStageUpdate> updates, String callDisposition) {
         if (updates == null || updates.isEmpty()) {
             return;
+        }
+
+        if (callDisposition != 'Connected') {
+            throw new AuraHandledException('Related lead stage can only be updated for connected calls.');
         }
 
         List<Lead__c> toUpdate = new List<Lead__c>();

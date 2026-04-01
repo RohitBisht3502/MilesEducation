@@ -11,7 +11,8 @@ const BASE_FILTER_SECTIONS = [
     { id: 'lastInquirySource', label: 'Last Inquiry Source', step: 5, open: false, isLastInquirySource: true },
     { id: 'leadLevel', label: 'Lead Level', step: 6, open: false, isLeadLevel: true },
     { id: 'callActivity', label: 'Call Activity', step: 7, open: false, isCallActivity: true },
-    { id: 'spocName', label: 'SPOC Name', step: 8, open: false, isSpoc: true }
+    { id: 'spocName', label: 'SPOC Name', step: 8, open: false, isSpoc: true },
+    { id: 'city', label: 'City', step: 9, open: false, isCity: true }
 ];
 
 const CALL_ACTIVITY_OPTIONS = [
@@ -39,10 +40,12 @@ export default class CandidateProgramWorkbench extends LightningElement {
     @track spocOptions = [];
     @track levelGroups = [];
     @track enquirySourceOptions = [];
+    @track cityOptions = [];
     @track isLoading = false;
     @track errorMessage = '';
     @track showReallocateModal = false;
     @track selectedReallocationUserId = '';
+    @track reallocationComment = '';
     @track reallocationError = '';
     @track selectionMessage = '';
     @track reallocationUserSearch = '';
@@ -58,6 +61,7 @@ export default class CandidateProgramWorkbench extends LightningElement {
         lastInquirySources: [],
         levelKeys: [],
         spocIds: [],
+        cities: [],
         callActivityType: '',
         callFrom: '',
         callTo: '',
@@ -82,6 +86,7 @@ export default class CandidateProgramWorkbench extends LightningElement {
             this.spocOptions = response?.spocOptions || [];
             this.levelGroups = response?.levelGroups || [];
             this.enquirySourceOptions = response?.enquirySourceOptions || [];
+            this.cityOptions = response?.cityOptions || [];
         } catch (error) {
             this.errorMessage = error?.body?.message || error?.message || 'Failed to load workbench data.';
             this.rows = [];
@@ -89,6 +94,7 @@ export default class CandidateProgramWorkbench extends LightningElement {
             this.spocOptions = [];
             this.levelGroups = [];
             this.enquirySourceOptions = [];
+            this.cityOptions = [];
             this.selectionMessage = '';
         } finally {
             this.isLoading = false;
@@ -166,6 +172,11 @@ export default class CandidateProgramWorkbench extends LightningElement {
         return this.selectedCount > 0;
     }
 
+    get isAllSelected() {
+    return this.paginatedRows.length > 0 &&
+           this.paginatedRows.every(row => this.selectedCandidateIds.has(row.id));
+}
+
     get reallocationUserOptions() {
         const searchKey = this.normalizeFilterValue(this.reallocationUserSearch);
         const options = this.spocOptions || [];
@@ -183,6 +194,39 @@ export default class CandidateProgramWorkbench extends LightningElement {
         this.filtersOpen = !this.filtersOpen;
     }
 
+handleSelectAll(event) {
+    const checked = event.target.checked;
+    this.selectionMessage = '';
+
+    let updatedSelectedIds = new Set(this.selectedCandidateIds);
+
+    this.paginatedRows.forEach(row => {
+        if (checked) {
+            updatedSelectedIds.add(row.id);
+        } else {
+            updatedSelectedIds.delete(row.id);
+        }
+    });
+
+    this.selectedCandidateIds = updatedSelectedIds;
+
+    // update UI rows
+    this.rows = this.rows.map(row =>
+        this.paginatedRows.some(r => r.id === row.id)
+            ? { ...row, selected: checked }
+            : row
+    );
+
+    this.allRows = this.allRows.map(row =>
+        this.paginatedRows.some(r => r.id === row.id)
+            ? { ...row, selected: checked }
+            : row
+    );
+}
+
+
+
+
     async handleReset() {
         this.selectedCandidateIds = new Set();
         this.filterSections = buildSections();
@@ -197,6 +241,7 @@ export default class CandidateProgramWorkbench extends LightningElement {
             lastInquirySources: [],
             levelKeys: [],
             spocIds: [],
+            cities: [],
             callActivityType: '',
             callFrom: '',
             callTo: '',
@@ -251,6 +296,13 @@ export default class CandidateProgramWorkbench extends LightningElement {
         this.filters = {
             ...this.filters,
             spocIds: event.detail.value
+        };
+    }
+
+    handleCityChange(event) {
+        this.filters = {
+            ...this.filters,
+            cities: event.detail.value
         };
     }
 
@@ -309,6 +361,7 @@ export default class CandidateProgramWorkbench extends LightningElement {
 
         this.selectionMessage = '';
         this.selectedReallocationUserId = '';
+        this.reallocationComment = '';
         this.reallocationUserSearch = '';
         this.reallocationError = '';
         this.showReallocateModal = true;
@@ -317,6 +370,7 @@ export default class CandidateProgramWorkbench extends LightningElement {
     handleCloseReallocateModal() {
         this.showReallocateModal = false;
         this.selectedReallocationUserId = '';
+        this.reallocationComment = '';
         this.reallocationUserSearch = '';
         this.reallocationError = '';
     }
@@ -328,6 +382,11 @@ export default class CandidateProgramWorkbench extends LightningElement {
 
     handleReallocationUserSearch(event) {
         this.reallocationUserSearch = event.target.value;
+    }
+
+    handleReallocationCommentChange(event) {
+        this.reallocationComment = event.target.value;
+        this.reallocationError = '';
     }
 
     async handleConfirmReallocation() {
@@ -342,6 +401,10 @@ export default class CandidateProgramWorkbench extends LightningElement {
             this.reallocationError = 'Please select at least one candidate.';
             return;
         }
+        if (!this.reallocationComment || !this.reallocationComment.trim()) {
+            this.reallocationError = 'Please enter reallocation comments.';
+            return;
+        }
 
         this.isLoading = true;
         this.reallocationError = '';
@@ -349,7 +412,8 @@ export default class CandidateProgramWorkbench extends LightningElement {
         try {
             await reallocateCandidates({
                 candidateIds: selectedCandidateIds,
-                targetOwnerId: this.selectedReallocationUserId
+                targetOwnerId: this.selectedReallocationUserId,
+                comment: this.reallocationComment.trim()
             });
 
             this.dispatchEvent(
@@ -424,6 +488,7 @@ export default class CandidateProgramWorkbench extends LightningElement {
         const lastInquiryTo = this.parseDateOnly(this.filters.lastInquiryTo);
         const firstInquirySources = new Set((this.filters.firstInquirySources || []).map((value) => this.normalizeFilterValue(value)));
         const lastInquirySources = new Set((this.filters.lastInquirySources || []).map((value) => this.normalizeFilterValue(value)));
+        const selectedCities = new Set((this.filters.cities || []).map((value) => this.normalizeFilterValue(value)));
 
         return (sourceRows || []).filter((row) => {
             const rowCreatedDate = this.parseDateOnly(row.createdDate);
@@ -443,6 +508,7 @@ export default class CandidateProgramWorkbench extends LightningElement {
             const matchesLastInquirySource =
                 !lastInquirySources.size || lastInquirySources.has(this.normalizeFilterValue(row.lastInquirySource));
             const matchesSpoc = !selectedSpocIds.size || selectedSpocIds.has(row.spocId);
+            const matchesCity = !selectedCities.size || selectedCities.has(this.normalizeFilterValue(row.city));
             const rowLevelKeys = (row.relatedLeads || []).map((lead) => this.buildLevelKey(lead.course, lead.level));
             const matchesLevel = !selectedLevelKeys.size || rowLevelKeys.some((key) => selectedLevelKeys.has(key));
             return matchesCreatedDate &&
@@ -451,6 +517,7 @@ export default class CandidateProgramWorkbench extends LightningElement {
                 matchesFirstInquirySource &&
                 matchesLastInquirySource &&
                 matchesSpoc &&
+                matchesCity &&
                 matchesLevel;
         });
     }

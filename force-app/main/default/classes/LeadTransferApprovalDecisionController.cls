@@ -17,8 +17,13 @@ public without sharing class LeadTransferApprovalDecisionController {
 
         Approval_Process__c approvalRecord = [SELECT Id, Record_Type__c, Merge_Status__c, Master_Lead__c, Requestor__c FROM Approval_Process__c WHERE Id = :approvalId LIMIT 1];
 
-        if (approvalRecord.Record_Type__c != 'Lead Transfer Request' && approvalRecord.Record_Type__c != 'Lead Transfer') {
-            throw new AuraHandledException('This action is only supported for lead transfer approvals.');
+        if (
+            approvalRecord.Record_Type__c != 'Lead Transfer Request' &&
+            approvalRecord.Record_Type__c != 'Candidate Transfer Request' &&
+            approvalRecord.Record_Type__c != 'Lead Transfer' &&
+            approvalRecord.Record_Type__c != 'Candidate Transfer'
+        ) {
+            throw new AuraHandledException('This action is only supported for candidate transfer approvals.');
         }
 
         approvalRecord.Merge_Status__c = status;
@@ -53,14 +58,14 @@ public without sharing class LeadTransferApprovalDecisionController {
 
         try {
             String templateDeveloperName = status == 'Approved' ? 'Lead_Transfer_Approved' : 'Lead_Transfer_Rejected';
-            String emailSubject = status == 'Approved' ? 'Lead Transfer Approved' : 'Lead Transfer Rejected';
+            String emailSubject = status == 'Approved' ? 'Candidate Transfer Approved' : 'Candidate Transfer Rejected';
             String emailBody = status == 'Approved'
-                ? 'Your lead transfer request has been approved.'
-                : 'Your lead transfer request has been rejected.';
+                ? 'Your candidate transfer request has been approved.'
+                : 'Your candidate transfer request has been rejected.';
             String notificationTitle = status == 'Approved' ? 'Transfer Request Approved' : 'Transfer Request Rejected';
             String notificationBody = status == 'Approved'
-                ? 'Your lead transfer request has been approved and finalized.'
-                : 'Your lead transfer request has been rejected.';
+                ? 'Your candidate transfer request has been approved and finalized.'
+                : 'Your candidate transfer request has been rejected.';
 
             User recipient = [SELECT Email FROM User WHERE Id = :targetUserId LIMIT 1];
             Approval_Process__c approvalRecord = [SELECT Master_Lead__c FROM Approval_Process__c WHERE Id = :processId LIMIT 1];

@@ -88,25 +88,31 @@ public without sharing class EligibilityRecordResolver {
 
         Schema.SObjectType sobjectType = recordId.getSObjectType();
         if (sobjectType == Lead.SObjectType) {
-            Lead l = [
+            List<Lead> leads = [
                 SELECT Id, OwnerId, GP_User__c, UUID__c
                 FROM Lead
                 WHERE Id = :recordId
                 LIMIT 1
             ];
-            ctx.candidate = l;
-            ctx.candidateId = l.Id;
-            ctx.uuid = l.UUID__c;
+            if (!leads.isEmpty()) {
+                Lead l = leads[0];
+                ctx.candidate = l;
+                ctx.candidateId = l.Id;
+                ctx.uuid = l.UUID__c;
+            }
         } else if (sobjectType == Account.SObjectType) {
-            Account a = [
+            List<Account> accounts = [
                 SELECT Id, OwnerId, GP_User__c, UUID__c
                 FROM Account
                 WHERE Id = :recordId
                 LIMIT 1
             ];
-            ctx.student = a;
-            ctx.studentId = a.Id;
-            ctx.uuid = a.UUID__c;
+            if (!accounts.isEmpty()) {
+                Account a = accounts[0];
+                ctx.student = a;
+                ctx.studentId = a.Id;
+                ctx.uuid = a.UUID__c;
+            }
         }
 
         if (String.isNotBlank(ctx.uuid)) {

@@ -183,7 +183,7 @@
 
           <!-- RIGHT SIDE — Feedback -->
           <div class="right-panel">
-            <template if:true={showFeedback}>
+              <template if:true={isLeadTab}>
               <div class="section-card feedback-card">
                 <div class="section-header">
                   <lightning-icon icon-name="utility:feedback" size="small"></lightning-icon>
@@ -194,7 +194,7 @@
 
                   <div class="row-2">
                     <lightning-combobox label="Call Status (L1)" value={l1Value} options={filteredL1Options}
-                      onchange={handleL1Change}   disabled={disableL1}>  
+                      onchange={handleL1Change}>  
                     </lightning-combobox>
 
                     <lightning-combobox label="Sub Status (L2)" value={l2Value} options={l2Options}
@@ -216,7 +216,7 @@
                       </template>
                     </div>
 
-                    <lightning-input type="date" label="Expected Date" value={expectedDate} min={todayIsoDate}
+                    <lightning-input type="date" label="Expected Payment Date" value={expectedDate} min={todayIsoDate}
                       onchange={handleExpectedDateChange}  disabled={isConnectedOnlyFieldsDisabled}>
                     </lightning-input>
                   </div>

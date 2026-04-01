@@ -1,20 +1,18 @@
 <template>
   <div class="panel-wrap">
     <template if:true={showListView}>
-      <div class="panel-header slds-p-around_medium">
-        <h1 class="slds-text-heading_medium">Webinar Registration</h1>
-        <p class="slds-text-body_small">You can register this lead for a webinar.</p>
+      <div class="panel-header slds-p-around_medium header-flex">
+        <div class="header-icon">📡</div>
+        <div>
+          <h1 class="slds-text-heading_medium">Webinar Registration</h1>
+          <p class="slds-text-body_small">Register this lead for a webinar</p>
+        </div>
       </div>
 
       <div class="panel-content">
         <div class="slds-p-around_medium slds-border_bottom">
-          <lightning-input
-            type="search"
-            label="Search Webinar"
-            placeholder="Search by name or webinar ID"
-            value={searchKey}
-            onchange={handleSearchChange}
-            onkeyup={handleSearchChange}>
+          <lightning-input type="search" label="Search Webinar" placeholder="Search by name or webinar ID"
+            value={searchKey} onchange={handleSearchChange} onkeyup={handleSearchChange}>
           </lightning-input>
         </div>
 
@@ -28,10 +26,18 @@
               <table class="slds-table slds-table_cell-buffer slds-table_bordered slds-table_striped">
                 <thead>
                   <tr class="slds-line-height_reset table-head-row">
-                    <th scope="col"><div class="slds-truncate" title="Webinar">Webinar</div></th>
-                    <th scope="col"><div class="slds-truncate" title="Start Time">Start Time</div></th>
-                    <th scope="col"><div class="slds-truncate" title="Status">Status</div></th>
-                    <th scope="col" class="slds-text-align_right"><div class="slds-truncate" title="Actions">Actions</div></th>
+                    <th scope="col">
+                      <div class="slds-truncate" title="Webinar">Webinar</div>
+                    </th>
+                    <th scope="col">
+                      <div class="slds-truncate" title="Start Time">Start Time</div>
+                    </th>
+                    <th scope="col">
+                      <div class="slds-truncate" title="Status">Status</div>
+                    </th>
+                    <th scope="col" class="slds-text-align_right">
+                      <div class="slds-truncate" title="Actions">Actions</div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -42,38 +48,33 @@
                         <div class="slds-text-color_weak slds-text-body_small">ID: {w.webinarId}</div>
                       </td>
                       <td>
-                        <lightning-formatted-date-time
-                          value={w.startDateTime}
-                          year="numeric"
-                          month="short"
-                          day="2-digit"
-                          hour="2-digit"
-                          minute="2-digit">
-                        </lightning-formatted-date-time>
+                        <div class="date-cell">
+                          📅
+                          <lightning-formatted-date-time value={w.startDateTime} year="numeric" month="short"
+                            day="2-digit" hour="2-digit" minute="2-digit">
+                          </lightning-formatted-date-time>
+                        </div>
                       </td>
                       <td>
-                        <span class="status-pill">{w.status}</span>
+                        <span class={w.statusClass}>{w.status}</span>
                       </td>
                       <td class="slds-text-align_right">
                         <div class="action-buttons">
-                          <lightning-button
-                            label="Details"
-                            variant="neutral"
-                            onclick={openDetails}
+                          <lightning-button-icon icon-name="utility:info" label="Details" onclick={openDetails}
                             data-id={w.id}>
-                          </lightning-button>
-
+                          </lightning-button-icon>
+                          <template if:true={w.isDisabled}>
+  <span class="expired-badge">Expired</span>
+</template>
                           <template if:true={w.isRegistered}>
-                            <lightning-button label="Registered" variant="success" disabled></lightning-button>
+                            <lightning-button label="Registered" class="registered-btn" disabled>
+                            </lightning-button>
                           </template>
 
                           <template if:false={w.isRegistered}>
-                            <lightning-button
-                              label="Register"
-                              variant="brand"
-                              onclick={openConfirm}
-                              data-id={w.id}
-                              disabled={saving}>
+                            <lightning-button variant="brand" label="Register" icon-name="utility:adduser"
+                              class="register-btn" onclick={openConfirm} data-id={w.id} disabled={w.isDisabled}>
+
                             </lightning-button>
                           </template>
                         </div>
@@ -101,16 +102,18 @@
       <div class="panel-content panel-content_compact">
         <div class="view-shell view-shell_compact slds-p-around_large">
           <div class="confirm-card">
+            <div class="confirm-icon">👤</div>
             <p class="confirm-text">
               Are you sure you want to register this lead for
-              <strong>{selectedWebinar.name}</strong>?
+              <strong class="highlight">{selectedWebinar.name}</strong>?
             </p>
           </div>
         </div>
 
         <div class="panel-footer slds-p-around_medium">
           <lightning-button variant="neutral" label="Back" onclick={closeConfirm}></lightning-button>
-          <lightning-button variant="brand" label="Yes, Register" onclick={confirmRegister} disabled={saving}></lightning-button>
+          <lightning-button variant="brand" label="Yes, Register" onclick={confirmRegister} disabled={saving}>
+          </lightning-button>
         </div>
       </div>
     </template>
@@ -142,25 +145,15 @@
 
               <dt>Start Time</dt>
               <dd>
-                <lightning-formatted-date-time
-                  value={selectedWebinar.startDateTime}
-                  year="numeric"
-                  month="short"
-                  day="2-digit"
-                  hour="2-digit"
-                  minute="2-digit">
+                <lightning-formatted-date-time value={selectedWebinar.startDateTime} year="numeric" month="short"
+                  day="2-digit" hour="2-digit" minute="2-digit">
                 </lightning-formatted-date-time>
               </dd>
 
               <dt>End Time</dt>
               <dd>
-                <lightning-formatted-date-time
-                  value={selectedWebinar.endDateTime}
-                  year="numeric"
-                  month="short"
-                  day="2-digit"
-                  hour="2-digit"
-                  minute="2-digit">
+                <lightning-formatted-date-time value={selectedWebinar.endDateTime} year="numeric" month="short"
+                  day="2-digit" hour="2-digit" minute="2-digit">
                 </lightning-formatted-date-time>
               </dd>
             </dl>

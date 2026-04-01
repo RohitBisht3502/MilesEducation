@@ -59,21 +59,15 @@
                                     </template>
 
                                     <template if:true={section.isFirstInquirySource}>
-                                        <lightning-checkbox-group
-                                            name="firstInquirySourceFilter"
-                                            label="Select Sources"
-                                            options={enquirySourceOptions}
-                                            value={filters.firstInquirySources}
+                                        <lightning-checkbox-group name="firstInquirySourceFilter" label="Select Sources"
+                                            options={enquirySourceOptions} value={filters.firstInquirySources}
                                             onchange={handleFirstInquirySourceChange}>
                                         </lightning-checkbox-group>
                                     </template>
 
                                     <template if:true={section.isLastInquirySource}>
-                                        <lightning-checkbox-group
-                                            name="lastInquirySourceFilter"
-                                            label="Select Sources"
-                                            options={enquirySourceOptions}
-                                            value={filters.lastInquirySources}
+                                        <lightning-checkbox-group name="lastInquirySourceFilter" label="Select Sources"
+                                            options={enquirySourceOptions} value={filters.lastInquirySources}
                                             onchange={handleLastInquirySourceChange}>
                                         </lightning-checkbox-group>
                                     </template>
@@ -102,11 +96,8 @@
 
                                     <template if:true={section.isCallActivity}>
                                         <div class="filter-field-stack">
-                                            <lightning-combobox
-                                                label="Call Activity"
-                                                value={filters.callActivityType}
-                                                options={callActivityOptions}
-                                                onchange={handleCallActivityTypeChange}>
+                                            <lightning-combobox label="Call Activity" value={filters.callActivityType}
+                                                options={callActivityOptions} onchange={handleCallActivityTypeChange}>
                                             </lightning-combobox>
 
                                             <label class="filter-field-label" for="callFrom">Start Date / Time</label>
@@ -118,17 +109,20 @@
                                     </template>
 
                                     <template if:true={section.isSpoc}>
-                                        <lightning-checkbox-group
-                                            name="spocFilter"
-                                            label="Select SPOCs"
-                                            options={spocOptions}
-                                            value={filters.spocIds}
-                                            onchange={handleSpocChange}>
+                                        <lightning-checkbox-group name="spocFilter" label="Select SPOCs"
+                                            options={spocOptions} value={filters.spocIds} onchange={handleSpocChange}>
+                                        </lightning-checkbox-group>
+                                    </template>
+
+                                    <template if:true={section.isCity}>
+                                        <lightning-checkbox-group name="cityFilter" label="Select Cities"
+                                            options={cityOptions} value={filters.cities} onchange={handleCityChange}>
                                         </lightning-checkbox-group>
                                     </template>
 
                                     <template if:true={section.isFutureFilter}>
-                                        <div class="filter-placeholder">This filter section will be added in the next step.</div>
+                                        <div class="filter-placeholder">This filter section will be added in the next
+                                            step.</div>
                                     </template>
                                 </div>
                             </template>
@@ -176,56 +170,61 @@
                     <template if:false={errorMessage}>
                         <template if:false={showEmptyState}>
                             <div class="board-card">
-                                    <div class="table-header">
-                                        <div class="col checkbox-col"></div>
-                                        <div class="col candidate-col">Candidate</div>
-                                        <div class="col program-col">Program / Level</div>
-                                        <div class="col status-col">Status</div>
-                                        <div class="col spoc-col">SPOC</div>
-                                        <div class="col inquiry-col">Last Inquiry</div>
-                                        <div class="col call-col">Call Status</div>
+                                <div class="table-header">
+                                    <div class="col checkbox-col">
+                                        <input type="checkbox" onchange={handleSelectAll} checked={isAllSelected}/>
                                     </div>
+                                    <div class="col candidate-col">Candidate</div>
+                                    <div class="col program-col">Program / Level</div>
+                                    <div class="col status-col">Status</div>
+                                    <div class="col spoc-col">SPOC</div>
+                                    <div class="col inquiry-col">Last Inquiry</div>
+                                    <div class="col call-col">Call Status</div>
+                                </div>
 
-                                <template for:each={rowsWithComputedLeads} for:item="row">
-                                    <div key={row.id} class="table-row-wrap">
-                                        <div class="table-row">
-                                            <div class="col checkbox-col">
-                                                <input type="checkbox" data-id={row.id} checked={row.selected} onchange={handleSelectRow} />
-                                            </div>
+                                <div class="table-body-scroll">
+                                    <template for:each={rowsWithComputedLeads} for:item="row">
+                                        <div key={row.id} class="table-row-wrap">
+                                            <div class="table-row">
+                                                <div class="col checkbox-col">
+                                                    <input type="checkbox" data-id={row.id} checked={row.selected} onchange={handleSelectRow} />
+                                                </div>
 
-                                            <div class="col candidate-col">
-                                                <div class="candidate-cell">
-                                                    <div class="candidate-avatar">{row.initial}</div>
-                                                    <div>
-                                                        <a class="candidate-name candidate-link" href={row.candidateUrl} target="_blank">{row.name}</a>
-                                                        <div class="candidate-email">{row.email}</div>
+                                                <div class="col candidate-col">
+                                                    <div class="candidate-cell">
+                                                        <div class="candidate-avatar">{row.initial}</div>
+                                                        <div>
+                                                            <a class="candidate-name candidate-link"
+                                                                href={row.candidateUrl} target="_blank">{row.name}</a>
+                                                            <div class="candidate-email">{row.candidateId}</div>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
 
-                                            <div class="col program-col">
-                                                <div class="program-stack">
-                                                    <template for:each={row.relatedLeadLabel} for:item="lead">
-                                                        <span key={lead} class="program-pill">{lead}</span>
-                                                    </template>
+                                                <div class="col program-col">
+                                                    <div class="program-stack">
+                                                        <template for:each={row.relatedLeadLabel} for:item="lead">
+                                                            <span key={lead} class="program-pill">{lead}</span>
+                                                        </template>
+                                                    </div>
+                                                </div>
+
+                                                <div class="col status-col">
+                                                    <span class="status-badge">
+                                                        <span class={row.statusClass}></span>
+                                                    {row.status}
+                                                    </span>
+                                                </div>
+
+                                                <div class="col spoc-col">{row.spoc}</div>
+                                                <div class="col inquiry-col">{row.lastInquiry}</div>
+                                                <div class="col call-col">
+                                                    <span class={row.callStatusClass}>{row.callStatus}</span>
                                                 </div>
                                             </div>
-
-                                            <div class="col status-col">
-                                                <span class="status-badge">
-                                                    <span class={row.statusClass}></span>
-                                                    {row.status}
-                                                </span>
-                                            </div>
-
-                                            <div class="col spoc-col">{row.spoc}</div>
-                                            <div class="col inquiry-col">{row.lastInquiry}</div>
-                                            <div class="col call-col">
-                                                <span class={row.callStatusClass}>{row.callStatus}</span>
-                                            </div>
                                         </div>
-                                    </div>
-                                </template>
+                                    </template>
+                                </div>
 
                                 <template if:false={showEmptyState}>
                                     <div class="pagination-bar">
@@ -243,7 +242,8 @@
 
         <template if:true={showReallocateModal}>
             <section class="modal-backdrop"></section>
-            <section class="modal-shell" role="dialog" tabindex="-1" aria-modal="true" aria-label="Reallocate Candidates">
+            <section class="modal-shell" role="dialog" tabindex="-1" aria-modal="true"
+                aria-label="Reallocate Candidates">
                 <div class="modal-card">
                     <div class="modal-header">
                         <h2 class="modal-title">Reallocate Candidates</h2>
@@ -251,20 +251,16 @@
 
                     <div class="modal-body">
                         <div class="modal-copy">Select the SPOC who should receive the selected candidates.</div>
-                        <lightning-input
-                            type="search"
-                            label="Search SPOC"
-                            value={reallocationUserSearch}
-                            onchange={handleReallocationUserSearch}
-                            class="modal-search">
+                        <lightning-input type="search" label="Search SPOC" value={reallocationUserSearch}
+                            onchange={handleReallocationUserSearch} class="modal-search">
                         </lightning-input>
-                        <lightning-radio-group
-                            name="reallocationUser"
-                            label="SPOC Name"
-                            options={reallocationUserOptions}
-                            value={selectedReallocationUserId}
+                        <lightning-radio-group name="reallocationUser" label="SPOC Name"
+                            options={reallocationUserOptions} value={selectedReallocationUserId}
                             onchange={handleReallocationUserChange}>
                         </lightning-radio-group>
+                        <lightning-textarea label="Reallocation Comments" value={reallocationComment} required
+                            placeholder="Enter the reason for reallocation" onchange={handleReallocationCommentChange}>
+                        </lightning-textarea>
 
                         <template if:true={reallocationError}>
                             <div class="modal-error">{reallocationError}</div>

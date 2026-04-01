@@ -1,6 +1,6 @@
 import { LightningElement, api, wire, track } from 'lwc';
 import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
-import processMergeApprovalResult from '@salesforce/apex/LeadMergeController.processApprovalResult';
+import processMergeApprovalResult from '@salesforce/apex/LeadMergeApprovalDecisionController.processApprovalResult';
 import processTransferApprovalResult from '@salesforce/apex/LeadTransferApprovalDecisionController.processApprovalResult';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { NavigationMixin } from 'lightning/navigation';
@@ -46,11 +46,16 @@ export default class ApprovalProcessActionCenter extends NavigationMixin(Lightni
     }
 
     get isTransferRequest() {
-        return this.requestType === 'Lead Transfer Request' || this.requestType === 'Lead Transfer';
+        return (
+            this.requestType === 'Lead Transfer Request' ||
+            this.requestType === 'Candidate Transfer Request' ||
+            this.requestType === 'Lead Transfer' ||
+            this.requestType === 'Candidate Transfer'
+        );
     }
 
     get requestLabel() {
-        return this.isTransferRequest ? 'Lead Transfer Request' : 'Lead Merge Request';
+        return this.isTransferRequest ? 'Candidate Transfer Request' : 'Candidate Merge Request';
     }
 
     get isPending() {

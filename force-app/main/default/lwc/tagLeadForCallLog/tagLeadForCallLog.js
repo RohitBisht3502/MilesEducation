@@ -2,6 +2,7 @@ import { LightningElement, api, track, wire } from 'lwc';
 import searchLeads from '@salesforce/apex/TagLeadController.searchLeads';
 import tagOrCreateLead from '@salesforce/apex/TagLeadController.tagOrCreateLead';
 import markPhoneNumberStatus from '@salesforce/apex/TagLeadController.markPhoneNumberStatus';
+import validateLeadCreationInput from '@salesforce/apex/TagLeadController.validateLeadCreationInput';
 import getCityOptions from '@salesforce/apex/LeadNewOverrideController.getCityOptions';
 import getSourceOptions from '@salesforce/apex/LeadNewOverrideController.getSourceOptions';
 import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
@@ -397,7 +398,7 @@ export default class TagLeadForCallLog extends LightningElement {
             });
     }
 
-    handleSubmit() {
+    async handleSubmit() {
         if (!this.isFormValid) {
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Error',
@@ -411,6 +412,30 @@ export default class TagLeadForCallLog extends LightningElement {
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Error',
                 message: 'Follow up date cannot be in the past',
+                variant: 'error'
+            }));
+            return;
+        }
+
+        try {
+            const validationResult = await validateLeadCreationInput({
+                phone: this.formData.phone,
+                email: this.formData.email,
+                countryCode: this.formData.countryCode
+            });
+
+            if (validationResult && validationResult.isValid === false) {
+                this.dispatchEvent(new ShowToastEvent({
+                    title: 'Error',
+                    message: validationResult.message,
+                    variant: 'error'
+                }));
+                return;
+            }
+        } catch (error) {
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Error',
+                message: error.body?.message || error.message || 'Validation failed',
                 variant: 'error'
             }));
             return;

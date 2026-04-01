@@ -1,7 +1,7 @@
 <template>
 
     <!-- MODAL HEADER -->
-    <lightning-modal-header label="Lead Transfer Request"></lightning-modal-header>
+    <lightning-modal-header label="Candidate Transfer Request"></lightning-modal-header>
 
     <!-- MODAL BODY -->
     <lightning-modal-body>
@@ -14,7 +14,7 @@
 
             <template if:true={isSameOwner}>
                 <div class="slds-text-color_error slds-m-bottom_small">
-                    You cannot transfer this lead because you are the current owner of the candidate.
+                    You cannot transfer this candidate because you are the current owner of the candidate.
                 </div>
             </template>
 

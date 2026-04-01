@@ -116,6 +116,11 @@ global without sharing class Webservice_RunoWebhookService_v2 {
             upsert callLogObj;
 
             Integer dur = callLogObj.Duration_Seconds__c != null  ? Integer.valueOf(callLogObj.Duration_Seconds__c): null;
+            User matchedUser;
+            List<User> users = [SELECT Id, CallerId__c FROM User WHERE CallerId__c = :wrapperObj.callerId LIMIT 1];
+            if (!users.isEmpty()) {
+                matchedUser = users[0];
+            }
 
             RunoEventPublisher.publishCallCompleted(
                 callLogObj.Call_Id__c,
@@ -124,7 +129,8 @@ global without sharing class Webservice_RunoWebhookService_v2 {
                 callLogObj.Candidate__c,
                 callLogObj.Phone_Number__c,
                 callLogObj.Type__c,
-                'Completed'
+                'Completed',
+                matchedUser != null ? matchedUser.Id : (owners.isEmpty() ? null : owners[0].Id)
             );
             
             RunoEnquiryTaskService.handle(callLogObj);

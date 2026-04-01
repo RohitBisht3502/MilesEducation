@@ -12,7 +12,19 @@ trigger PhoneNumberTrigger on Phone_Number__c (after insert, after update) {
     );
 
     if (Trigger.isAfter) {
-        if (Trigger.isInsert) handler.afterInsert();
-        if (Trigger.isUpdate) handler.afterUpdate();
+        if (Trigger.isInsert){
+            
+             handler.afterInsert();
+ DataChangeEventHelper.publishEvents(Trigger.new, null, 'Phone_Number__c');
+
+
+        }
+        if (Trigger.isUpdate){
+            
+             handler.afterUpdate();
+             DataChangeEventHelper.publishEvents(Trigger.new, Trigger.oldMap, 'Phone_Number__c');
+
+
+        }
     }
 }

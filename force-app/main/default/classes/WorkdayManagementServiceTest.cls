@@ -109,4 +109,43 @@ private class WorkdayManagementServiceTest {
         System.assertEquals(null, attendance.Start_Time__c);
         System.assertEquals(null, attendance.End_Time__c);
     }
+
+    @IsTest
+    static void testLoadDashboardThrowsWhenEmployeeProfileMissing() {
+        User templateUser = [
+            SELECT ProfileId, TimeZoneSidKey, LocaleSidKey, EmailEncodingKey, LanguageLocaleKey
+            FROM User
+            WHERE Id = :UserInfo.getUserId()
+            LIMIT 1
+        ];
+
+        String uniqueToken = String.valueOf(System.now().getTime());
+        User noEmployeeUser = new User(
+            FirstName = 'No',
+            LastName = 'Employee',
+            Alias = 'noemp',
+            Email = 'no-employee-' + uniqueToken + '@example.com',
+            Username = 'no-employee-' + uniqueToken + '@example.com',
+            ProfileId = templateUser.ProfileId,
+            TimeZoneSidKey = templateUser.TimeZoneSidKey,
+            LocaleSidKey = templateUser.LocaleSidKey,
+            EmailEncodingKey = templateUser.EmailEncodingKey,
+            LanguageLocaleKey = templateUser.LanguageLocaleKey
+        );
+        insert noEmployeeUser;
+
+        Test.startTest();
+        System.runAs(noEmployeeUser) {
+            try {
+                WorkdayManagementService.loadDashboard();
+                System.assert(false, 'Load dashboard should fail when employee profile is missing.');
+            } catch (AuraHandledException ex) {
+                System.assertEquals(
+                    'We do not have your employee profile in the system. Please contact admin for further process.',
+                    ex.getMessage()
+                );
+            }
+        }
+        Test.stopTest();
+    }
 }

@@ -43,7 +43,12 @@ export default class ZoomRegistrationPanel extends LightningElement {
 
     try {
       const rows = await getWebinarsByNameOrId({ searchKey: '' });
-      this.allWebinars = (rows || []).map((r) => ({ ...r, isRegistered: false }));
+      this.allWebinars = (rows || []).map((r) => ({
+        ...r,
+        isRegistered: false,
+         isDisabled: r.isExpired,
+        statusClass: this.getStatusClass(r.status)
+      }));
       this.applySearch();
     } catch (e) {
       this.toast('Error loading webinars', this.reduceError(e), 'error');
@@ -73,8 +78,26 @@ export default class ZoomRegistrationPanel extends LightningElement {
     });
   }
 
+
+  getStatusClass(status) {
+    const s = (status || '').toLowerCase();
+
+    if (s === 'live') return 'status-pill live';
+    if (s === 'upcoming') return 'status-pill upcoming';
+    if (s === 'completed') return 'status-pill completed';
+    if (s === 'created') return 'status-pill upcoming';
+
+    return 'status-pill';
+  }
+
   openConfirm = (event) => {
     const webinarId = event.currentTarget?.dataset?.id;
+     const webinar = this.webinars.find(w => w.id === webinarId);
+
+  if (webinar?.isExpired) {
+    this.toast('Registration Closed', 'This webinar has already ended.', 'error');
+    return;
+  }
     this.selectWebinar(webinarId);
     this.detailsOpen = false;
     this.confirmOpen = true;
@@ -119,12 +142,15 @@ export default class ZoomRegistrationPanel extends LightningElement {
       this.detailsOpen = false;
 
       this.allWebinars = this.allWebinars.map((webinar) =>
-        webinar.id === this.selectedWebinar.id ? { ...webinar, isRegistered: true } : webinar
+        webinar.id === this.selectedWebinar.id
+          ? { ...webinar, isRegistered: true }
+          : webinar
       );
-      this.applySearch();
 
-      this.dispatchEvent(new CloseActionScreenEvent());
+      this.applySearch();
+ this.dispatchEvent(new CloseActionScreenEvent());
       setTimeout(() => window.location.reload(), 800);
+
     } catch (e) {
       this.toast('Registration failed', this.reduceError(e), 'error');
     } finally {

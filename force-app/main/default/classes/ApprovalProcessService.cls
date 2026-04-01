@@ -148,17 +148,17 @@ public without sharing class ApprovalProcessService {
 
             if (isLeadTransferRequest(rec.Record_Type__c)) {
                 Lead ld = leadMap.get(rec.Master_Lead__c);
-                log.Name = 'Lead Transfer Decision';
+                log.Name = 'Candidate Transfer Decision';
                 log.Candidate__c = rec.Master_Lead__c;
                 log.Activity_Type__c = 'Owner Change';
-                log.Description__c = 'Lead Transfer Request ' + rec.Merge_Status__c + '. Decision Comments: ' + rec.Approval_Comments__c;
+                log.Description__c = 'Candidate Transfer Request ' + rec.Merge_Status__c + '. Decision Comments: ' + rec.Approval_Comments__c;
                 log.Previous_Owner__c = (ld != null) ? ld.OwnerId : null;
                 log.New_Owner__c = rec.Requestor__c;
             } else if (isLeadMergeRequest(rec.Record_Type__c)) {
-                log.Name = 'Lead Merge Decision';
+                log.Name = 'Candidate Merge Decision';
                 log.Candidate__c = rec.Target_Candidate__c;
                 log.Activity_Type__c = 'Lead Merge';
-                log.Description__c = 'Lead Merge Request ' + rec.Merge_Status__c + '. Decision Comments: ' + rec.Approval_Comments__c;
+                log.Description__c = 'Candidate Merge Request ' + rec.Merge_Status__c + '. Decision Comments: ' + rec.Approval_Comments__c;
             } else {
                 continue;
             }
@@ -170,10 +170,18 @@ public without sharing class ApprovalProcessService {
     }
 
     private static Boolean isLeadTransferRequest(String recordTypeValue) {
-        return recordTypeValue == 'Lead Transfer' || recordTypeValue == 'Lead Transfer Request';
+        return
+            recordTypeValue == 'Lead Transfer' ||
+            recordTypeValue == 'Lead Transfer Request' ||
+            recordTypeValue == 'Candidate Transfer' ||
+            recordTypeValue == 'Candidate Transfer Request';
     }
 
     private static Boolean isLeadMergeRequest(String recordTypeValue) {
-        return recordTypeValue == 'Lead Merge' || recordTypeValue == 'Lead Merged Request';
+        return
+            recordTypeValue == 'Lead Merge' ||
+            recordTypeValue == 'Lead Merged Request' ||
+            recordTypeValue == 'Candidate Merge' ||
+            recordTypeValue == 'Candidate Merged Request';
     }
 }

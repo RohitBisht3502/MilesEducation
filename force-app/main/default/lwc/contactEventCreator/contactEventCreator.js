@@ -1,5 +1,4 @@
 import { LightningElement, api, wire, track } from 'lwc';
-import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { getObjectInfo, getPicklistValuesByRecordType } from 'lightning/uiObjectInfoApi';
 import { CloseActionScreenEvent } from 'lightning/actions';
@@ -9,18 +8,30 @@ import checkExistingMeetings from '@salesforce/apex/GoogleMeetService.checkExist
 import createMeetingWithEvent from '@salesforce/apex/GoogleMeetService.createMeetingWithEvent';
 import getCurrentUserInfo from '@salesforce/apex/UserController.getCurrentUserInfo';
 import getAvailableUsers from '@salesforce/apex/UserController.getAvailableUsers';
+import getMeetingRecordContext from '@salesforce/apex/UserController.getMeetingRecordContext';
 
 import EVENT_OBJECT from '@salesforce/schema/Event';
 
-const LEAD_EMAIL_FIELD = 'Lead__c.Email__c';
-const LEAD_NAME_FIELD = 'Lead__c.Name';
 const ORG_MEETING_EMAIL = 'meetings@mileseducation.com';
 
 export default class ContactEventCreator extends LightningElement {
-    @api recordId;
+    _recordId;
+
+    @api
+    get recordId() {
+        return this._recordId;
+    }
+
+    set recordId(value) {
+        this._recordId = value;
+        if (value) {
+            this.loadRecordContext();
+        }
+    }
 
     // Form fields
     subject = '';
+    subjectManuallyEdited = false;
     description = '';
     startDateTime = '';
     endDateTime = '';
@@ -35,10 +46,14 @@ export default class ContactEventCreator extends LightningElement {
     @track typeOfMeeting = '';
     @track otherTypeOfMeeting = '';
     @track typeOfMeetingOptions = [];
+    @track selectedCourses = [];
+    @track courseOptions = [];
+    @track isCourseDropdownOpen = false;
 
     // Data
     @track participants = [];
     contactEmail = '';
+    candidateName = '';
     currentUserEmail = '';
     currentUserName = '';
     organizerEmail = ORG_MEETING_EMAIL;
@@ -49,6 +64,7 @@ export default class ContactEventCreator extends LightningElement {
     @track meetingTypeOptions = [];
 
     // State
+    currentStep = 1;
     isLoading = false;
     showSuccess = false;
     error = '';
@@ -91,6 +107,66 @@ export default class ContactEventCreator extends LightningElement {
         return !this.customEmail;
     }
 
+    get hasSelectedCourses() {
+        return this.selectedCourses.length > 0;
+    }
+
+    get hasSingleCourseOption() {
+        return this.courseOptions.length === 1;
+    }
+
+    get isStep1() {
+        return this.currentStep === 1;
+    }
+
+    get isStep2() {
+        return this.currentStep === 2;
+    }
+
+    get isStep3() {
+        return this.currentStep === 3;
+    }
+
+    get isStep4() {
+        return this.currentStep === 4;
+    }
+
+    get isFirstStep() {
+        return this.currentStep === 1;
+    }
+
+    get isLastStep() {
+        return this.currentStep === 4;
+    }
+
+    get step1Class() {
+        return this.currentStep > 1 ? 'step is-complete' : this.currentStep === 1 ? 'step is-active' : 'step';
+    }
+
+    get step2Class() {
+        return this.currentStep > 2 ? 'step is-complete' : this.currentStep === 2 ? 'step is-active' : 'step';
+    }
+
+    get step3Class() {
+        return this.currentStep > 3 ? 'step is-complete' : this.currentStep === 3 ? 'step is-active' : 'step';
+    }
+
+    get step4Class() {
+        return this.currentStep === 4 ? 'step is-active' : 'step';
+    }
+
+    get stepLine1Class() {
+        return this.currentStep > 1 ? 'step-line step-line-active' : 'step-line';
+    }
+
+    get stepLine2Class() {
+        return this.currentStep > 2 ? 'step-line step-line-active' : 'step-line';
+    }
+
+    get stepLine3Class() {
+        return this.currentStep > 3 ? 'step-line step-line-active' : 'step-line';
+    }
+
     get durationOptions() {
         const isOffline = this.meetingType === 'Offline';
         const values = isOffline ? [30, 45, 60, 90] : [30, 45, 60];
@@ -101,25 +177,49 @@ export default class ContactEventCreator extends LightningElement {
         }));
     }
 
+    get selectedCourseSummary() {
+        return this.selectedCourses.length ? this.selectedCourses.join(', ') : 'Select courses';
+    }
+
+    get computedCourseOptions() {
+        return this.courseOptions.map(option => ({
+            ...option,
+            checked: this.selectedCourses.includes(option.value),
+            cssClass: this.selectedCourses.includes(option.value)
+                ? 'course-chip course-chip-selected'
+                : 'course-chip'
+        }));
+    }
+
     connectedCallback() {
         this.loadCurrentUserInfo();
         this.loadAvailableUsers();
         this.loadActivityPicklists();
     }
 
-    @wire(getRecord, { recordId: '$recordId', fields: [LEAD_EMAIL_FIELD, LEAD_NAME_FIELD] })
-    wiredLead({ error, data }) {
-        if (data) {
-            const email = getFieldValue(data, LEAD_EMAIL_FIELD) || '';
-            const name = getFieldValue(data, LEAD_NAME_FIELD) || '';
+    async loadRecordContext() {
+        if (!this.recordId) {
+            return;
+        }
 
-            this.contactEmail = email;
+        try {
+            const recordContext = await getMeetingRecordContext({ recordId: this.recordId });
+            this.contactEmail = recordContext?.email || '';
+            this.candidateName = recordContext?.name || '';
+            this.courseOptions = (recordContext?.availableCourses || []).map(course => ({
+                label: course,
+                value: course
+            }));
+            this.selectedCourses = this.selectedCourses.filter(selectedCourse =>
+                this.courseOptions.some(option => option.value === selectedCourse)
+            );
+            this.syncDefaultCourseSelection();
 
             if (this.contactEmail && this.contactEmail !== this.currentUserEmail) {
-                this.addParticipantWithData(this.contactEmail, name || 'Lead', false, true);
+                this.addParticipantWithData(this.contactEmail, this.candidateName || 'Record', false, true);
             }
-        } else if (error) {
-            this.showToast('Error', 'Error loading lead information', 'error');
+        } catch (error) {
+            this.showToast('Error', this.extractErrorMessage(error), 'error');
         }
     }
 
@@ -194,6 +294,7 @@ export default class ContactEventCreator extends LightningElement {
 
     handleSubjectChange(event) {
         this.subject = event.target.value;
+        this.subjectManuallyEdited = true;
         this.clearError();
     }
 
@@ -225,23 +326,82 @@ export default class ContactEventCreator extends LightningElement {
     }
 
     handleDurationChange(event) {
-        this.duration = event.detail.value;
+        this.duration = '45';
+    }
+
+    handleCourseDropdownToggle() {
+        this.isCourseDropdownOpen = !this.isCourseDropdownOpen;
+    }
+
+    handleCourseOptionClick(event) {
+        if (this.hasSingleCourseOption) {
+            return;
+        }
+
+        const courseValue = event.currentTarget.dataset.value;
+        if (!courseValue) {
+            return;
+        }
+
+        if (this.selectedCourses.includes(courseValue)) {
+            this.selectedCourses = this.selectedCourses.filter(value => value !== courseValue);
+        } else {
+            this.selectedCourses = [...this.selectedCourses, courseValue];
+        }
+
         this.clearError();
-        this.updateEndDateTimeFromDuration();
+        this.updateSubjectAndDescription();
+    }
+
+    handleCoursePillRemove(event) {
+        if (this.hasSingleCourseOption) {
+            return;
+        }
+
+        const courseValue = event.currentTarget.dataset.value;
+        this.selectedCourses = this.selectedCourses.filter(value => value !== courseValue);
+        this.clearError();
+        this.updateSubjectAndDescription();
+    }
+
+    syncDefaultCourseSelection() {
+        if (this.courseOptions.length === 1) {
+            const onlyCourse = this.courseOptions[0].value;
+            this.selectedCourses = [onlyCourse];
+            this.updateSubjectAndDescription();
+            return;
+        }
+
+        this.selectedCourses = this.selectedCourses.filter(selectedCourse =>
+            this.courseOptions.some(option => option.value === selectedCourse)
+        );
+    }
+
+    getDefaultSubject() {
+        const purpose = (this.typeOfMeeting || '').trim();
+        const recordName = (this.candidateName || '').trim();
+
+        if (purpose && recordName) {
+            return `${purpose} - ${recordName}`;
+        }
+
+        return purpose || recordName || '';
     }
 
     updateSubjectAndDescription() {
         const mt = (this.meetingType || '').trim();
         const tom = (this.typeOfMeeting || '').trim();
+        const courses = this.selectedCourses.filter(Boolean);
 
-        if (tom) {
-            this.subject = tom;
+        if (!this.subjectManuallyEdited) {
+            this.subject = this.getDefaultSubject();
         }
 
-        if (mt || tom) {
+        if (mt || tom || courses.length) {
             const parts = [];
             if (mt) parts.push(mt);
             if (tom) parts.push(tom);
+            if (courses.length) parts.push(`Courses: ${courses.join(', ')}`);
             this.description = parts.join(' - ');
         }
     }
@@ -433,7 +593,8 @@ export default class ContactEventCreator extends LightningElement {
                 meetingType: this.meetingType,
                 typeOfMeeting: this.typeOfMeeting,
                 otherTypeOfMeeting: this.otherTypeOfMeeting,
-                durationMinutes: parseInt(this.duration, 10)
+                durationMinutes: parseInt(this.duration, 10),
+                selectedCourses: this.selectedCourses
             });
 
             this.meetingResult = result;
@@ -451,75 +612,7 @@ export default class ContactEventCreator extends LightningElement {
     }
 
     validateForm() {
-        if (!this.contactEmail || this.contactEmail.trim() === '') {
-            this.showToast(
-                'Error',
-                'Lead email is required before scheduling a meeting. Please update Lead email first.',
-                'error'
-            );
-            return false;
-        }
-
-        if (!this.subject) {
-            this.showToast('Error', 'Please enter a meeting subject', 'error');
-            return false;
-        }
-
-        if (!this.meetingType) {
-            this.showToast('Error', 'Please select a Meeting Type', 'error');
-            return false;
-        }
-
-        if (!this.startDateTime) {
-            this.showToast('Error', 'Please select start date/time', 'error');
-            return false;
-        }
-
-        if (!this.endDateTime) {
-            this.showToast('Error', 'Please select end date/time', 'error');
-            return false;
-        }
-
-        if (!this.duration) {
-            this.showToast('Error', 'Please select meeting duration', 'error');
-            return false;
-        }
-
-        if (this.participants.length === 0) {
-            this.showToast('Error', 'Please add at least one participant', 'error');
-            return false;
-        }
-
-        if (!this.typeOfMeeting) {
-            this.showToast('Error', 'Please select Type of Meeting', 'error');
-            return false;
-        }
-
-        if (this.showOtherTypeOfMeeting && !this.otherTypeOfMeeting?.trim()) {
-            this.showToast('Error', 'Please enter Other Type of Meeting', 'error');
-            return false;
-        }
-
-        const start = new Date(this.startDateTime);
-        const end = new Date(this.endDateTime);
-        const now = new Date();
-
-        if (start < now) {
-            this.showToast('Error', 'Start date/time cannot be in the past', 'error');
-            return false;
-        }
-
-        if (end < now) {
-            this.showToast('Error', 'End date/time cannot be in the past', 'error');
-            return false;
-        }
-
-        if (end <= start) {
-            this.showToast('Error', 'End date/time must be after start date/time', 'error');
-            return false;
-        }
-
-        return true;
+        return this.validateStep1() && this.validateStep2() && this.validateStep3();
     }
 
     extractErrorMessage(error) {
@@ -545,6 +638,7 @@ export default class ContactEventCreator extends LightningElement {
 
     clearForm() {
         this.subject = '';
+        this.subjectManuallyEdited = false;
         this.description = '';
         this.startDateTime = '';
         this.endDateTime = '';
@@ -552,6 +646,8 @@ export default class ContactEventCreator extends LightningElement {
         this.customEmail = '';
         this.duration = '45';
         this.otherTypeOfMeeting = '';
+        this.selectedCourses = [];
+        this.syncDefaultCourseSelection();
 
         this.participants = this.participants.filter(
             p => p.isCurrentUser || p.email === this.contactEmail
@@ -567,6 +663,111 @@ export default class ContactEventCreator extends LightningElement {
 
     clearError() {
         this.error = '';
+    }
+
+    goToNextStep() {
+        if (this.currentStep === 1 && !this.validateStep1()) {
+            return;
+        }
+
+        if (this.currentStep === 2 && !this.validateStep2()) {
+            return;
+        }
+
+        if (this.currentStep === 3 && !this.validateStep3()) {
+            return;
+        }
+
+        if (this.currentStep < 4) {
+            this.currentStep += 1;
+        }
+    }
+
+    goToPreviousStep() {
+        if (this.currentStep > 1) {
+            this.currentStep -= 1;
+        }
+    }
+
+    validateStep1() {
+        if (!this.contactEmail || this.contactEmail.trim() === '') {
+            this.showToast('Error', 'Record email is required before scheduling a meeting. Please update the email first.', 'error');
+            return false;
+        }
+
+        if (!this.selectedCourses.length) {
+            this.showToast('Error', 'Please select at least one course', 'error');
+            return false;
+        }
+
+        if (!this.subject) {
+            this.showToast('Error', 'Please enter a meeting subject', 'error');
+            return false;
+        }
+
+        if (!this.meetingType) {
+            this.showToast('Error', 'Please select a Meeting Type', 'error');
+            return false;
+        }
+
+        if (!this.typeOfMeeting) {
+            this.showToast('Error', 'Please select Type of Meeting', 'error');
+            return false;
+        }
+
+        if (this.showOtherTypeOfMeeting && !this.otherTypeOfMeeting?.trim()) {
+            this.showToast('Error', 'Please enter Other Type of Meeting', 'error');
+            return false;
+        }
+
+        return true;
+    }
+
+    validateStep2() {
+        if (!this.duration) {
+            this.showToast('Error', 'Please select meeting duration', 'error');
+            return false;
+        }
+
+        if (!this.startDateTime) {
+            this.showToast('Error', 'Please select start date/time', 'error');
+            return false;
+        }
+
+        if (!this.endDateTime) {
+            this.showToast('Error', 'Please select end date/time', 'error');
+            return false;
+        }
+
+        const start = new Date(this.startDateTime);
+        const end = new Date(this.endDateTime);
+        const now = new Date();
+
+        if (start < now) {
+            this.showToast('Error', 'Start date/time cannot be in the past', 'error');
+            return false;
+        }
+
+        if (end < now) {
+            this.showToast('Error', 'End date/time cannot be in the past', 'error');
+            return false;
+        }
+
+        if (end <= start) {
+            this.showToast('Error', 'End date/time must be after start date/time', 'error');
+            return false;
+        }
+
+        return true;
+    }
+
+    validateStep3() {
+        if (this.participants.length === 0) {
+            this.showToast('Error', 'Please add at least one participant', 'error');
+            return false;
+        }
+
+        return true;
     }
 
     showToast(title, message, variant) {
@@ -596,5 +797,64 @@ export default class ContactEventCreator extends LightningElement {
 
     get showOtherTypeOfMeeting() {
         return (this.typeOfMeeting || '').toLowerCase() === 'other';
+    }
+
+    get participantNamesSummary() {
+        const names = this.participants
+            .map(participant => (participant.name || participant.email || '').trim())
+            .filter(Boolean);
+        return names.length ? names.join(', ') : '-';
+    }
+
+    get selectedCoursesSummary() {
+        return this.selectedCourses.length ? this.selectedCourses.join(', ') : '-';
+    }
+
+    get durationSummary() {
+        const option = this.durationOptions.find(item => item.value === this.duration);
+        return option ? option.label : '-';
+    }
+
+    get formattedStartDateTime() {
+        return this.formatReviewDateTime(this.startDateTime);
+    }
+
+    get formattedEndDateTime() {
+        return this.formatReviewDateTime(this.endDateTime);
+    }
+
+    get displayParticipants() {
+        return this.participants.map(participant => {
+            const source = (participant.name || participant.email || '').trim();
+            const parts = source.split(/\s+/).filter(Boolean);
+            const initials = parts.length > 1
+                ? `${parts[0].charAt(0)}${parts[1].charAt(0)}`
+                : source.substring(0, 1);
+
+            return {
+                ...participant,
+                initials: initials.toUpperCase()
+            };
+        });
+    }
+
+    formatReviewDateTime(value) {
+        if (!value) {
+            return '-';
+        }
+
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return value;
+        }
+
+        return new Intl.DateTimeFormat('en-IN', {
+            year: 'numeric',
+            month: 'short',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        }).format(date);
     }
 }

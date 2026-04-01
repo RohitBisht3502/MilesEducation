@@ -8,22 +8,30 @@ import endDay from '@salesforce/apex/WorkdayManagementService.endDay';
 
 const MISSING_ATTENDANCE_MESSAGE =
     'We do not have the attendance record for you. Please contact admin to proceed.';
+const MISSING_EMPLOYEE_MESSAGE =
+    'We do not have your employee profile in the system. Please contact admin for further process.';
+const DASHBOARD_REFRESH_INTERVAL_MS = 15000;
 
 export default class WorkdayManagement extends LightningElement {
     @track dashboard;
     @track isLoading = false;
     @track liveTimerLabel = '00:00:00';
+    @track employeeUnavailableMessage = '';
 
     timerIntervalId;
+    dashboardRefreshIntervalId;
+    isDashboardRequestInFlight = false;
     hasShownMissingAttendanceToast = false;
 
     connectedCallback() {
         this.startLiveTimer();
-        this.refreshDashboard(true);
+        this.refreshDashboard(true, true);
+        this.startDashboardRefresh();
     }
 
     disconnectedCallback() {
         this.stopLiveTimer();
+        this.stopDashboardRefresh();
     }
 
     get state() {
@@ -78,7 +86,12 @@ export default class WorkdayManagement extends LightningElement {
     }
 
     get actionsDisabled() {
-        return this.isLoading || !this.dashboard?.employeeActive || !this.hasTodayAttendance;
+        return (
+            this.isLoading ||
+            this.isDashboardRequestInFlight ||
+            !this.dashboard?.employeeActive ||
+            !this.hasTodayAttendance
+        );
     }
 
     get statePillClass() {
@@ -99,22 +112,49 @@ export default class WorkdayManagement extends LightningElement {
         return `Team: ${team}`;
     }
 
-    refreshDashboard(showSpinner) {
+    refreshDashboard(showSpinner, showErrorToast = true) {
+        if (this.isLoading || this.isDashboardRequestInFlight) {
+            return;
+        }
+
+        this.isDashboardRequestInFlight = true;
         if (showSpinner) {
             this.isLoading = true;
         }
         loadDashboard()
             .then(response => {
                 this.dashboard = this.decorateResponse(response);
+                this.employeeUnavailableMessage = '';
                 this.handleMissingAttendanceRecord();
                 this.updateLiveTimer();
             })
             .catch(error => {
-                this.handleError(error);
+                this.handleError(error, showErrorToast);
             })
             .finally(() => {
-                this.isLoading = false;
+                this.isDashboardRequestInFlight = false;
+                if (showSpinner) {
+                    this.isLoading = false;
+                }
             });
+    }
+
+    startDashboardRefresh() {
+        if (this.dashboardRefreshIntervalId) {
+            return;
+        }
+        // Keep UI synced with backend changes made outside this component.
+        this.dashboardRefreshIntervalId = setInterval(() => {
+            this.refreshDashboard(false, false);
+        }, DASHBOARD_REFRESH_INTERVAL_MS);
+    }
+
+    stopDashboardRefresh() {
+        if (!this.dashboardRefreshIntervalId) {
+            return;
+        }
+        clearInterval(this.dashboardRefreshIntervalId);
+        this.dashboardRefreshIntervalId = null;
     }
 
     decorateResponse(response) {
@@ -278,25 +318,36 @@ export default class WorkdayManagement extends LightningElement {
         actionMethod()
             .then(response => {
                 this.dashboard = this.decorateResponse(response);
+                this.employeeUnavailableMessage = '';
+                this.handleMissingAttendanceRecord();
                 this.updateLiveTimer();
                 this.showToast('Success', successMessage, 'success');
             })
             .catch(error => {
-                this.handleError(error);
+                this.handleError(error, true);
             })
             .finally(() => {
                 this.isLoading = false;
             });
     }
 
-    handleError(error) {
+    handleError(error, showToast = true) {
         let message = 'Something went wrong.';
         if (error?.body?.message) {
             message = error.body.message;
         } else if (error?.message) {
             message = error.message;
         }
-        this.showToast('Error', message, 'error');
+
+        if (message === MISSING_EMPLOYEE_MESSAGE) {
+            this.employeeUnavailableMessage = message;
+            this.dashboard = null;
+            this.liveTimerLabel = '00:00:00';
+        }
+
+        if (showToast) {
+            this.showToast('Error', message, 'error');
+        }
     }
 
     showToast(title, message, variant) {

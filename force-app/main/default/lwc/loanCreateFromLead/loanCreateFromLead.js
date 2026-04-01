@@ -16,7 +16,8 @@ const EXCLUDED_FIELDS = new Set([
     'application_id__c',
     'redirection_url__c',
     'loan_id__c',
-    'loan_provider__c'
+    'loan_provider__c',
+    'student__c'
 ]);
 
 const PROVIDERS = {
@@ -57,6 +58,21 @@ const AKSHAR_REQUIRED = new Set([
     'state__c',
     'pincode__c'
 ]);
+
+const LOAN_TYPE_META = {
+    AKSHAR: {
+        description: 'Property & asset backed loans',
+        iconName: 'utility:moneybag'
+    },
+    AVANSE: {
+        description: 'Education financing solutions',
+        iconName: 'utility:education'
+    },
+    PROPELLD: {
+        description: 'Skill & career development loans',
+        iconName: 'utility:work_order_type'
+    }
+};
 
 export default class LoanCreateFromLead extends LightningElement {
     _recordId;
@@ -102,6 +118,7 @@ export default class LoanCreateFromLead extends LightningElement {
     isResubmitting = false;
 
     step = 'select';
+    activeSectionIndex = 0;
 
     get isRecordTypeStep() {
         return this.step === 'select';
@@ -116,6 +133,101 @@ export default class LoanCreateFromLead extends LightningElement {
             return `New Loan: ${this.selectedRecordTypeLabel}`;
         }
         return 'New Loan';
+    }
+
+    get wizardTitle() {
+        if (this.isFormStep && this.selectedRecordTypeLabel) {
+            return `New Loan: ${this.selectedRecordTypeLabel}`;
+        }
+        return 'New Loan Application';
+    }
+
+    get stepSubtitle() {
+        return this.isFormStep ? 'Step 2 of 2' : 'Step 1 of 2';
+    }
+
+    get footerHint() {
+        if (this.isFormStep) {
+            return this.isLastFormSection
+                ? 'Fields marked with * are required'
+                : 'Complete this section to continue';
+        }
+        return 'Select a loan type to proceed';
+    }
+
+    get stepOneClass() {
+        return this.isFormStep ? 'step-indicator step-done' : 'step-indicator step-active';
+    }
+
+    get stepTwoClass() {
+        return this.isFormStep ? 'step-indicator step-active' : 'step-indicator step-inactive';
+    }
+
+    get stepOneLabelClass() {
+        return this.isFormStep ? 'step-label step-label-done' : 'step-label step-label-active';
+    }
+
+    get stepTwoLabelClass() {
+        return this.isFormStep ? 'step-label step-label-active' : 'step-label step-label-inactive';
+    }
+
+    get loanTypeCards() {
+        return (this.recordTypeOptions || []).map((option) => {
+            const meta = LOAN_TYPE_META[option.developerName] || {};
+            const isSelected = option.value === this.selectedRecordTypeId;
+            return {
+                ...option,
+                description: meta.description || 'Loan application flow',
+                iconName: meta.iconName || 'utility:form',
+                cardClass: isSelected ? 'loan-type-card loan-type-card-selected' : 'loan-type-card',
+                iconClass: isSelected ? 'loan-type-icon loan-type-icon-selected' : 'loan-type-icon',
+                textClass: isSelected ? 'loan-type-name loan-type-name-selected' : 'loan-type-name',
+                radioClass: isSelected ? 'loan-type-radio loan-type-radio-selected' : 'loan-type-radio',
+                showRadioDot: isSelected
+            };
+        });
+    }
+
+    get hasSections() {
+        return (this.layoutSections || []).length > 0;
+    }
+
+    get totalSectionSteps() {
+        return (this.layoutSections || []).length;
+    }
+
+    get currentSection() {
+        if (!this.hasSections) return null;
+        return this.layoutSections[this.activeSectionIndex] || null;
+    }
+
+    get isFirstFormSection() {
+        return this.activeSectionIndex === 0;
+    }
+
+    get isLastFormSection() {
+        return !this.hasSections || this.activeSectionIndex >= this.totalSectionSteps - 1;
+    }
+
+    get formSectionSteps() {
+        return (this.layoutSections || []).map((section, index) => ({
+            key: section.key || `section-step-${index}`,
+            label: section.heading,
+            index,
+            indicatorClass:
+                index === this.activeSectionIndex
+                    ? 'form-step-indicator form-step-indicator-active'
+                    : index < this.activeSectionIndex
+                        ? 'form-step-indicator form-step-indicator-done'
+                        : 'form-step-indicator form-step-indicator-inactive',
+            labelClass:
+                index === this.activeSectionIndex
+                    ? 'form-step-label form-step-label-active'
+                    : 'form-step-label form-step-label-inactive',
+            isDone: index < this.activeSectionIndex,
+            isCurrent: index === this.activeSectionIndex,
+            stepNumber: index + 1
+        }));
     }
 
     get disableNext() {
@@ -163,7 +275,7 @@ export default class LoanCreateFromLead extends LightningElement {
                 this.leadLookupFieldApi = data ? data.leadLookupFieldApi : null;
                 this.emailFieldApi = data ? data.emailFieldApi : null;
                 this.mobileFieldApi = data ? data.mobileFieldApi : null;
-                this.prefillValues = (data && data.prefillValues) ? data.prefillValues : {};
+                this.prefillValues = (data && data.prefillValues) ? { ...data.prefillValues } : {};
                 this.normalizeMobilePrefill(this.prefillValues);
                 this.prefillValuesLower = this.buildLowercaseMap(this.prefillValues);
                 this.prefillApplied = false;
@@ -185,21 +297,43 @@ export default class LoanCreateFromLead extends LightningElement {
         this.updateRequiredFlags();
     }
 
+    handleRecordTypeCardClick(event) {
+        const recordTypeId = event.currentTarget.dataset.id;
+        if (!recordTypeId) return;
+        this.selectedRecordTypeId = recordTypeId;
+        const match = this.recordTypeOptions.find((opt) => opt.value === recordTypeId);
+        this.selectedRecordTypeLabel = match ? match.label : 'New Loan';
+        this.selectedRecordTypeDevName = match ? match.developerName : null;
+        this.updateRequiredFlags();
+    }
+
     handleNext() {
+        if (this.isFormStep) {
+            if (!this.isLastFormSection) {
+                this.activeSectionIndex += 1;
+            }
+            return;
+        }
         if (!this.selectedRecordTypeId) return;
         this.errorMessage = '';
         this.noVisibleFields = false;
         this.prefillApplied = false;
         this.step = 'form';
+        this.activeSectionIndex = 0;
         this.updateRequiredFlags();
     }
 
     handleBack() {
+        if (this.isFormStep && !this.isFirstFormSection) {
+            this.activeSectionIndex -= 1;
+            return;
+        }
         this.step = 'select';
         this.errorMessage = '';
         this.noVisibleFields = false;
         this.prefillApplied = false;
         this.formValues = {};
+        this.activeSectionIndex = 0;
     }
 
     handleSave() {
@@ -240,6 +374,12 @@ export default class LoanCreateFromLead extends LightningElement {
 
     handleCancel() {
         this.dispatchEvent(new CloseActionScreenEvent());
+    }
+
+    handleSectionStepClick(event) {
+        const index = Number(event.currentTarget.dataset.index);
+        if (Number.isNaN(index)) return;
+        this.activeSectionIndex = index;
     }
 
     applyPrefillFields(fields) {
@@ -624,6 +764,20 @@ export default class LoanCreateFromLead extends LightningElement {
         inputs.forEach((input) => {
             if (!input.fieldName) return;
             fields[input.fieldName] = input.value;
+        });
+
+        Object.keys(this.formValues || {}).forEach((key) => {
+            if (!key) return;
+            const existingApi = Object.keys(fields).find((apiName) => apiName.toLowerCase() === key);
+            const value = this.formValues[key];
+
+            if (existingApi) {
+                if (fields[existingApi] === undefined || fields[existingApi] === null || fields[existingApi] === '') {
+                    fields[existingApi] = value;
+                }
+            } else {
+                fields[key] = value;
+            }
         });
 
         const mobileApi = this.getMobileFieldApiName();

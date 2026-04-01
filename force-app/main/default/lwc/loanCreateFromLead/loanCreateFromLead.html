@@ -1,113 +1,196 @@
 <template>
-    <lightning-quick-action-panel header={panelHeader} class="loan-panel">
-        <div class="panel-body">
-            <template if:true={isLoading}>
-                <div class="loading-row">
-                    <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
-                    <span class="loading-text">Loading...</span>
+    <div class="wizard-shell">
+        <div class="wizard-card">
+            <div class="wizard-header">
+                <div class="wizard-header-left">
+                    <div class="header-icon-wrap">
+                        <lightning-icon icon-name="utility:file" size="x-small" class="header-icon"></lightning-icon>
+                    </div>
+                    <div>
+                        <div class="wizard-title">{wizardTitle}</div>
+                        <div class="wizard-subtitle">{stepSubtitle}</div>
+                    </div>
                 </div>
-            </template>
 
-            <template if:true={isRecordTypeStep}>
-                <div class="record-type-card">
-                    <p class="record-type-title">Which loan do you want to apply?</p>
-                    <lightning-radio-group
-                        name="loanRecordType"
-                        label="Loan Type"
-                        options={recordTypeOptions}
-                        value={selectedRecordTypeId}
-                        type="radio"
-                        onchange={handleRecordTypeChange}>
-                    </lightning-radio-group>
+                <button class="header-close" onclick={handleCancel} title="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+
+            <div class="wizard-stepper">
+                <div class="step-item">
+                    <span class={stepOneClass}>
+                        <template if:true={isFormStep}>&#10003;</template>
+                        <template if:false={isFormStep}>1</template>
+                    </span>
+                    <span class={stepOneLabelClass}>Loan Type</span>
                 </div>
-            </template>
 
-            <template if:true={isFormStep}>
-                <div class="required-note">* = Required Information</div>
-                <template if:true={noVisibleFields}>
-                    <div class="slds-notify slds-notify_alert slds-theme_warning slds-m-bottom_small" role="alert">
-                        <span class="slds-assistive-text">Warning</span>
-                        <h2>No visible fields. Check Field Set fields and FLS permissions.</h2>
+                <span class="step-divider">&rsaquo;</span>
+
+                <div class="step-item">
+                    <span class={stepTwoClass}>2</span>
+                    <span class={stepTwoLabelClass}>Applicant Details</span>
+                </div>
+            </div>
+
+            <div class="wizard-body">
+                <template if:true={isLoading}>
+                    <div class="loading-state">
+                        <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+                        <span class="loading-text">Loading...</span>
                     </div>
                 </template>
 
-                <lightning-record-edit-form
-                    object-api-name={loanObjectApiName}
-                    record-type-id={selectedRecordTypeId}
-                    onsubmit={handleSubmit}
-                    onsuccess={handleSuccess}
-                    onerror={handleError}>
+                <template if:true={errorMessage}>
+                    <div class="error-banner">{errorMessage}</div>
+                </template>
 
-                    <template if:true={layoutSections}>
-                        <template for:each={layoutSections} for:item="section">
-                            <div key={section.key} class="section-block">
-                                <div class="section-title">{section.heading}</div>
-                                <div class="section-body">
-                                    <template for:each={section.rows} for:item="row">
-                                        <div key={row.key} class="slds-grid slds-wrap row-grid">
-                                            <template for:each={row.cols} for:item="col">
-                                                <div key={col.key} class="slds-col slds-size_1-of-2 slds-p-around_x-small">
-                                                    <template if:true={col.fieldApiName}>
-                                                        <template if:true={col.isMobileField}>
-                                                            <div class="slds-form-element slds-form-element_horizontal">
-                                                                <label class="slds-form-element__label">
-                                                                    <template if:true={col.required}>
-                                                                        <abbr class="slds-required" title="required">*</abbr>
-                                                                    </template>
-                                                                    Mobile
-                                                                </label>
-                                                                <div class="slds-form-element__control">
-                                                                    <lightning-input
-                                                                        data-id="mobileInput"
-                                                                        type="tel"
-                                                                        label="Mobile"
-                                                                        variant="label-hidden"
+                <template if:true={isRecordTypeStep}>
+                    <div class="step-content">
+                        <div class="intro-copy">
+                            <h2 class="intro-title">Which loan do you want to apply for?</h2>
+                            <p class="intro-text">Select the loan type that best fits your needs</p>
+                        </div>
+
+                        <div class="loan-type-list">
+                            <template for:each={loanTypeCards} for:item="option">
+                                <button
+                                    key={option.value}
+                                    class={option.cardClass}
+                                    data-id={option.value}
+                                    onclick={handleRecordTypeCardClick}>
+                                    <span class={option.iconClass}>
+                                        <lightning-icon icon-name={option.iconName} size="x-small"></lightning-icon>
+                                    </span>
+
+                                    <span class="loan-type-copy">
+                                        <span class={option.textClass}>{option.label}</span>
+                                    </span>
+
+                                    <span class={option.radioClass}>
+                                        <template if:true={option.showRadioDot}>
+                                            <span class="loan-type-radio-dot"></span>
+                                        </template>
+                                    </span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+
+                <template if:true={isFormStep}>
+                    <div class="form-step-scroll">
+                        <template if:true={hasSections}>
+                            <div class="form-stepper">
+                                <template for:each={formSectionSteps} for:item="sectionStep">
+                                    <button
+                                        key={sectionStep.key}
+                                        class="form-stepper-item"
+                                        data-index={sectionStep.index}
+                                        onclick={handleSectionStepClick}>
+                                        <span class={sectionStep.indicatorClass}>
+                                            <template if:true={sectionStep.isDone}>&#10003;</template>
+                                            <template if:false={sectionStep.isDone}>{sectionStep.stepNumber}</template>
+                                        </span>
+                                        <span class={sectionStep.labelClass}>{sectionStep.label}</span>
+                                    </button>
+                                </template>
+                            </div>
+                        </template>
+
+                        <template if:true={noVisibleFields}>
+                            <div class="warning-banner">No visible fields. Check Field Set fields and FLS permissions.</div>
+                        </template>
+
+                        <lightning-record-edit-form
+                            object-api-name={loanObjectApiName}
+                            record-type-id={selectedRecordTypeId}
+                            onsuccess={handleSuccess}
+                            onerror={handleError}>
+
+                            <template if:true={layoutSections}>
+                                <template if:true={currentSection}>
+                                    <section key={currentSection.key} class="section-block">
+                                        <div class="section-title">{currentSection.heading}</div>
+                                        <div class="section-body">
+                                            <template for:each={currentSection.rows} for:item="row">
+                                                <div key={row.key} class="form-row-grid">
+                                                    <template for:each={row.cols} for:item="col">
+                                                        <div key={col.key} class="form-col">
+                                                            <template if:true={col.fieldApiName}>
+                                                                <template if:true={col.isMobileField}>
+                                                                    <div class="slds-form-element slds-form-element_horizontal mobile-field-wrap">
+                                                                        <label class="slds-form-element__label mobile-field-label">
+                                                                            <template if:true={col.required}>
+                                                                                <abbr class="slds-required" title="required">*</abbr>
+                                                                            </template>
+                                                                            Mobile
+                                                                        </label>
+                                                                        <div class="slds-form-element__control mobile-field-control">
+                                                                            <lightning-input
+                                                                                data-id="mobileInput"
+                                                                                type="tel"
+                                                                                label="Mobile"
+                                                                                variant="label-hidden"
+                                                                                value={col.prefillValue}
+                                                                                disabled={col.disabled}
+                                                                                required={col.required}
+                                                                                minlength="10"
+                                                                                maxlength="10"
+                                                                                pattern="[0-9]{10}"
+                                                                                message-when-pattern-mismatch="Mobile number must be exactly 10 digits."
+                                                                                message-when-too-short="Mobile number must be exactly 10 digits."
+                                                                                message-when-too-long="Mobile number must be exactly 10 digits."
+                                                                                onchange={handleMobileChange}>
+                                                                            </lightning-input>
+                                                                        </div>
+                                                                    </div>
+                                                                </template>
+
+                                                                <template if:false={col.isMobileField}>
+                                                                    <lightning-input-field
+                                                                        field-name={col.fieldApiName}
                                                                         value={col.prefillValue}
                                                                         disabled={col.disabled}
                                                                         required={col.required}
-                                                                        minlength="10"
-                                                                        maxlength="10"
-                                                                        pattern="[0-9]{10}"
-                                                                        message-when-pattern-mismatch="Mobile number must be exactly 10 digits."
-                                                                        message-when-too-short="Mobile number must be exactly 10 digits."
-                                                                        message-when-too-long="Mobile number must be exactly 10 digits."
-                                                                        onchange={handleMobileChange}>
-                                                                    </lightning-input>
-                                                                </div>
-                                                            </div>
-                                                        </template>
-                                                        <template if:false={col.isMobileField}>
-                                                            <lightning-input-field
-                                                                field-name={col.fieldApiName}
-                                                                value={col.prefillValue}
-                                                                disabled={col.disabled}
-                                                                required={col.required}
-                                                                onchange={handleFieldChange}>
-                                                            </lightning-input-field>
-                                                        </template>
+                                                                        onchange={handleFieldChange}>
+                                                                    </lightning-input-field>
+                                                                </template>
+                                                            </template>
+                                                        </div>
                                                     </template>
                                                 </div>
                                             </template>
                                         </div>
-                                    </template>
-                                </div>
-                            </div>
+                                    </section>
+                                </template>
+                            </template>
+                        </lightning-record-edit-form>
+                    </div>
+                </template>
+            </div>
+
+            <div class="wizard-footer">
+                <div class="footer-hint">{footerHint}</div>
+
+                <div class="footer-actions">
+                    <template if:true={isRecordTypeStep}>
+                        <button class="footer-button footer-button-secondary" onclick={handleCancel}>Cancel</button>
+                        <button class="footer-button footer-button-primary" onclick={handleNext} disabled={disableNext}>Next</button>
+                    </template>
+
+                    <template if:true={isFormStep}>
+                        <button class="footer-button footer-button-secondary" onclick={handleBack}>Back</button>
+                        <template if:true={isLastFormSection}>
+                            <button class="footer-button footer-button-primary" onclick={handleSave} disabled={isSaving}>Save</button>
+                        </template>
+                        <template if:false={isLastFormSection}>
+                            <button class="footer-button footer-button-primary" onclick={handleNext}>Next</button>
                         </template>
                     </template>
-                </lightning-record-edit-form>
-            </template>
+                </div>
+            </div>
         </div>
-
-        <div slot="footer" class="footer-actions">
-            <template if:true={isRecordTypeStep}>
-                <lightning-button variant="neutral" label="Cancel" onclick={handleCancel}></lightning-button>
-                <lightning-button class="slds-m-left_small" variant="brand" label="Next" onclick={handleNext} disabled={disableNext}></lightning-button>
-            </template>
-
-            <template if:true={isFormStep}>
-                <lightning-button variant="neutral" label="Back" onclick={handleBack}></lightning-button>
-                <lightning-button class="slds-m-left_small" variant="brand" label="Save" onclick={handleSave} disabled={isSaving}></lightning-button>
-            </template>
-        </div>
-    </lightning-quick-action-panel>
+    </div>
 </template>

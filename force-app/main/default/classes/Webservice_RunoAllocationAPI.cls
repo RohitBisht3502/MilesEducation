@@ -39,75 +39,80 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         @AuraEnabled public String attendance;
     }
 
-
-
-@AuraEnabled(cacheable=true)
-public static List<CallHistoryDTO> getCallHistory(Id recordId) {
-
-    if (recordId == null) {
-        return new List<CallHistoryDTO>();
-    }
-
-    List<Call_Log__c> logs = [
-        SELECT Id, Start_Time__c, CreatedDate, Duration_Seconds__c,
-               Status__c, L1__c, L2__c, Stage__c
-        FROM Call_Log__c
-        WHERE Candidate__c = :recordId
-           OR Lead__c = :recordId
-           OR Student__c = :recordId
-        ORDER BY Start_Time__c DESC NULLS LAST, CreatedDate DESC
-        LIMIT 10
-    ];
-
-    List<CallHistoryDTO> res = new List<CallHistoryDTO>();
-
-    for (Call_Log__c cl : logs) {
-        CallHistoryDTO dto = new CallHistoryDTO();
-        dto.id = cl.Id;
-        dto.startTime = cl.Start_Time__c;
-        dto.createdDate = cl.CreatedDate;
-        dto.durationSeconds = cl.Duration_Seconds__c != null
-            ? Integer.valueOf(cl.Duration_Seconds__c)
-            : 0;
-        dto.status = cl.Status__c;
-        dto.l1 = cl.L1__c;
-        dto.l2 = cl.L2__c;
-        dto.stage = cl.Stage__c;
-
-        res.add(dto);
-    }
-
-    return res;
-}
     @AuraEnabled(cacheable=true)
-public static List<EventDTO> getLeadEvents(Id recordId) {
-    if (recordId == null) return new List<EventDTO>();
+    public static List<CallHistoryDTO> getCallHistory(Id recordId) {
+        if (recordId == null) {
+            return new List<CallHistoryDTO>();
+        }
 
-    List<Event> events = [
-        SELECT Id, Subject, Candidate_Attendance__c
-        FROM Event
-        WHERE WhoId = :recordId
-           OR WhatId = :recordId
-        ORDER BY ActivityDateTime DESC
-        LIMIT 20
-    ];
+        List<Call_Log__c> logs = [
+            SELECT Id, Start_Time__c, CreatedDate, Duration_Seconds__c,
+                   Status__c, L1__c, L2__c, Stage__c
+            FROM Call_Log__c
+            WHERE Candidate__c = :recordId
+               OR Lead__c = :recordId
+               OR Student__c = :recordId
+            ORDER BY Start_Time__c DESC NULLS LAST, CreatedDate DESC
+            LIMIT 10
+        ];
 
-    List<EventDTO> res = new List<EventDTO>();
+        List<CallHistoryDTO> res = new List<CallHistoryDTO>();
 
-    for (Event e : events) {
-        EventDTO dto = new EventDTO();
-        dto.id = e.Id;
-        dto.subject = e.Subject;
-        dto.attendance = e.Candidate_Attendance__c;
-        res.add(dto);
+        for (Call_Log__c cl : logs) {
+            CallHistoryDTO dto = new CallHistoryDTO();
+            dto.id = cl.Id;
+            dto.startTime = cl.Start_Time__c;
+            dto.createdDate = cl.CreatedDate;
+            dto.durationSeconds = cl.Duration_Seconds__c != null
+                ? Integer.valueOf(cl.Duration_Seconds__c)
+                : 0;
+            dto.status = cl.Status__c;
+            dto.l1 = cl.L1__c;
+            dto.l2 = cl.L2__c;
+            dto.stage = cl.Stage__c;
+            res.add(dto);
+        }
+
+        return res;
     }
 
-    return res;
-}
+    @AuraEnabled(cacheable=true)
+    public static List<EventDTO> getLeadEvents(Id recordId) {
+        if (recordId == null) {
+            return new List<EventDTO>();
+        }
+
+        List<Event> events = [
+            SELECT Id, Subject, Candidate_Attendance__c
+            FROM Event
+            WHERE WhoId = :recordId
+               OR WhatId = :recordId
+            ORDER BY ActivityDateTime DESC
+            LIMIT 20
+        ];
+
+        List<EventDTO> res = new List<EventDTO>();
+
+        for (Event e : events) {
+            EventDTO dto = new EventDTO();
+            dto.id = e.Id;
+            dto.subject = e.Subject;
+            dto.attendance = e.Candidate_Attendance__c;
+            res.add(dto);
+        }
+
+        return res;
+    }
 
     @AuraEnabled(cacheable=true)
     public static Id getLatestUntrackedCallLog(Id leadId) {
-        List<Call_Log__c> logs = [SELECT Id, Untracked__c FROM Call_Log__c WHERE Lead__c = :leadId ORDER BY CreatedDate DESC LIMIT 1];
+        List<Call_Log__c> logs = [
+            SELECT Id, Untracked__c
+            FROM Call_Log__c
+            WHERE Lead__c = :leadId
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
 
         if (!logs.isEmpty() && logs[0].Untracked__c == true) {
             return logs[0].Id;
@@ -122,7 +127,13 @@ public static List<EventDTO> getLeadEvents(Id recordId) {
             return new List<WebinarMemberDTO>();
         }
 
-        List<Webinar_Member__c> members = [SELECT Id, Name, Attendance_Status__c, Webinar__r.Name, CreatedDate FROM Webinar_Member__c WHERE Candidate__c = :candidateId ORDER BY CreatedDate DESC LIMIT 10];
+        List<Webinar_Member__c> members = [
+            SELECT Id, Name, Attendance_Status__c, Webinar__r.Name, CreatedDate
+            FROM Webinar_Member__c
+            WHERE Candidate__c = :candidateId
+            ORDER BY CreatedDate DESC
+            LIMIT 10
+        ];
 
         List<WebinarMemberDTO> res = new List<WebinarMemberDTO>();
 
@@ -227,7 +238,12 @@ public static List<EventDTO> getLeadEvents(Id recordId) {
     }
 
     public static External_Service_Config__mdt getRunoConfig() {
-        External_Service_Config__mdt cfg = [SELECT Endpoint_URL__c, Http_Method__c, Api_Key__c, Api_Key_Header__c, Is_Active__c FROM External_Service_Config__mdt WHERE DeveloperName = 'RunoAllocationAPI' LIMIT 1];
+        External_Service_Config__mdt cfg = [
+            SELECT Endpoint_URL__c, Http_Method__c, Api_Key__c, Api_Key_Header__c, Is_Active__c
+            FROM External_Service_Config__mdt
+            WHERE DeveloperName = 'RunoAllocationAPI'
+            LIMIT 1
+        ];
 
         if (cfg == null ||
             !cfg.Is_Active__c ||
@@ -292,18 +308,13 @@ public static List<EventDTO> getLeadEvents(Id recordId) {
         if (recordId != null) {
             SObjectType sType = recordId.getSObjectType();
 
-          
-if (sType == Lead__c.SObjectType) {
-    callLog.Lead__c = recordId;
-}
-
-else if (sType == Lead.SObjectType) {
-    callLog.Candidate__c = recordId;
-}
-
-else if (sType == Account.SObjectType) {
-    callLog.Student__c = recordId;
-}
+            if (sType == Lead__c.SObjectType) {
+                callLog.Lead__c = recordId;
+            } else if (sType == Lead.SObjectType) {
+                callLog.Candidate__c = recordId;
+            } else if (sType == Account.SObjectType) {
+                callLog.Student__c = recordId;
+            }
         }
 
         insert callLog;
@@ -377,7 +388,12 @@ else if (sType == Account.SObjectType) {
             if (!String.isBlank(level)) {
                 leadUpdate.Course__c = level;
 
-                List<RecordType> rts = [SELECT Id FROM RecordType WHERE SObjectType = 'Lead__c' AND Name = :level AND IsActive = true LIMIT 1];
+                List<RecordType> rts = [
+                    SELECT Id
+                    FROM RecordType
+                    WHERE SObjectType = 'Lead__c' AND Name = :level AND IsActive = true
+                    LIMIT 1
+                ];
 
                 if (!rts.isEmpty()) {
                     leadUpdate.RecordTypeId = rts[0].Id;
@@ -414,37 +430,38 @@ else if (sType == Account.SObjectType) {
             throw new AuraHandledException('Stage is required when L1 is Connected.');
         }
 
-if (String.isBlank(request.l2)) {
-    throw new AuraHandledException('L2 selection is required before saving feedback.');
-}
-       
-        logRecord.Feedback__c = request.feedback;
-       
-       
-  Datetime parsedDate;
-
-if (!String.isBlank(request.nextFollowUpDate)) {
-    try {
-        String cleanDate = request.nextFollowUpDate;
-
-        //  REMOVE milliseconds if present
-        if (cleanDate.contains('.')) {
-            cleanDate = cleanDate.split('\\.')[0];
+        if (String.isBlank(request.l2)) {
+            throw new AuraHandledException('L2 selection is required before saving feedback.');
         }
 
-        //  IMPORTANT FIX → replace T with space
-        cleanDate = cleanDate.replace('T', ' ');
+        logRecord.Feedback__c = request.feedback;
 
-        System.debug('FINAL CLEAN DATE: ' + cleanDate);
+        Datetime parsedDate;
 
-        parsedDate = Datetime.valueOf(cleanDate);
+        if (!String.isBlank(request.nextFollowUpDate)) {
+            try {
+                String cleanDate = request.nextFollowUpDate;
 
-    } catch (Exception e) {
-        throw new AuraHandledException('Invalid date format: ' + request.nextFollowUpDate);
-    }
-}
+                //  REMOVE milliseconds if present
+                if (cleanDate.contains('.')) {
+                    cleanDate = cleanDate.split('\\.')[0];
+                }
 
-logRecord.Next_Follow_Up_Date__c = parsedDate;
+                //  IMPORTANT FIX â†’ replace T with space
+                cleanDate = cleanDate.replace('T', ' ');
+
+                if (cleanDate.length() == 16) {
+                    cleanDate += ':00';
+                }
+
+                System.debug('FINAL CLEAN DATE: ' + cleanDate);
+                parsedDate = Datetime.valueOf(cleanDate);
+            } catch (Exception e) {
+                throw new AuraHandledException('Invalid date format: ' + request.nextFollowUpDate);
+            }
+        }
+
+        logRecord.Next_Follow_Up_Date__c = parsedDate;
         logRecord.L1__c = request.l1;
         logRecord.L2__c = request.l2;
         logRecord.Notify_Me__c = request.notifyMe;
@@ -468,11 +485,13 @@ logRecord.Next_Follow_Up_Date__c = parsedDate;
             leadIdToUpdate = recordId;
         }
 
-        if (leadIdToUpdate == null) return;
+        if (leadIdToUpdate == null) {
+            return;
+        }
 
         Lead__c leadUpdate = new Lead__c(
             Id = leadIdToUpdate,
-          Next_Follow_Up_Date__c = parsedDate,
+            Next_Follow_Up_Date__c = parsedDate,
             Notify_Me__c = request.notifyMe,
             Expected_payment_date__c = request.expectedPaymentDate
         );
@@ -484,7 +503,12 @@ logRecord.Next_Follow_Up_Date__c = parsedDate;
         if (!String.isBlank(request.level)) {
             leadUpdate.Course__c = request.level;
 
-                List<RecordType> rts = [SELECT Id FROM RecordType WHERE SObjectType = 'Lead__c' AND Name = :request.level AND IsActive = true LIMIT 1];
+            List<RecordType> rts = [
+                SELECT Id
+                FROM RecordType
+                WHERE SObjectType = 'Lead__c' AND Name = :request.level AND IsActive = true
+                LIMIT 1
+            ];
 
             if (!rts.isEmpty()) {
                 leadUpdate.RecordTypeId = rts[0].Id;
@@ -492,6 +516,7 @@ logRecord.Next_Follow_Up_Date__c = parsedDate;
         }
 
         update leadUpdate;
+        syncRelatedEnquiriesToTracked(leadIdToUpdate, request.l1, request.stage);
 
         if (request.isDnd == true || request.isSpam == true) {
             Lead__c leadRec = [SELECT Phone__c FROM Lead__c WHERE Id = :leadIdToUpdate LIMIT 1];
@@ -499,7 +524,11 @@ logRecord.Next_Follow_Up_Date__c = parsedDate;
             String phoneToMatch = leadRec.Phone__c;
 
             if (!String.isBlank(phoneToMatch)) {
-                List<Phone_Number__c> phoneRecords = [SELECT Id, Is_DND__c, Is_Spam__c FROM Phone_Number__c WHERE Phone__c = :phoneToMatch];
+                List<Phone_Number__c> phoneRecords = [
+                    SELECT Id, Is_DND__c, Is_Spam__c
+                    FROM Phone_Number__c
+                    WHERE Phone__c = :phoneToMatch
+                ];
 
                 for (Phone_Number__c p : phoneRecords) {
                     if (request.isDnd != null) {
@@ -522,7 +551,13 @@ logRecord.Next_Follow_Up_Date__c = parsedDate;
         Call_Log__c logRecord;
 
         if (String.isNotBlank(callId)) {
-            List<Call_Log__c> logs = [SELECT Id, Phone_Number__c, Lead__c FROM Call_Log__c WHERE Call_Id__c = :callId ORDER BY CreatedDate DESC LIMIT 1];
+            List<Call_Log__c> logs = [
+                SELECT Id, Phone_Number__c, Lead__c
+                FROM Call_Log__c
+                WHERE Call_Id__c = :callId
+                ORDER BY CreatedDate DESC
+                LIMIT 1
+            ];
             if (!logs.isEmpty()) logRecord = logs[0];
         }
 
@@ -530,28 +565,38 @@ logRecord.Next_Follow_Up_Date__c = parsedDate;
             recordId != null &&
             recordId.getSObjectType() == Call_Log__c.SObjectType) {
 
-            List<Call_Log__c> logs = [SELECT Id, Phone_Number__c, Lead__c FROM Call_Log__c WHERE Id = :recordId ORDER BY CreatedDate DESC LIMIT 1];
+            List<Call_Log__c> logs = [
+                SELECT Id, Phone_Number__c, Lead__c
+                FROM Call_Log__c
+                WHERE Id = :recordId
+                ORDER BY CreatedDate DESC
+                LIMIT 1
+            ];
             if (!logs.isEmpty()) logRecord = logs[0];
         }
 
-       if (logRecord == null && recordId != null) {
+        if (logRecord == null && recordId != null) {
+            List<Call_Log__c> logs = [
+                SELECT Id, Phone_Number__c, Lead__c, Candidate__c, Student__c
+                FROM Call_Log__c
+                WHERE Lead__c = :recordId
+                   OR Candidate__c = :recordId
+                   OR Student__c = :recordId
+                ORDER BY CreatedDate DESC
+                LIMIT 1
+            ];
 
-    List<Call_Log__c> logs = [
-        SELECT Id, Phone_Number__c, Lead__c, Candidate__c, Student__c
-        FROM Call_Log__c
-        WHERE Lead__c = :recordId
-           OR Candidate__c = :recordId
-           OR Student__c = :recordId
-        ORDER BY CreatedDate DESC
-        LIMIT 1
-    ];
+            if (!logs.isEmpty()) {
+                logRecord = logs[0];
+            }
+        }
 
-    if (!logs.isEmpty()) {
-        logRecord = logs[0];
-    }
-}
         if (logRecord != null && String.isNotBlank(logRecord.Phone_Number__c)) {
-            List<Call_Log__c> phoneLogs = [SELECT Id, Untracked__c FROM Call_Log__c WHERE Phone_Number__c = :logRecord.Phone_Number__c AND Untracked__c = true];
+            List<Call_Log__c> phoneLogs = [
+                SELECT Id, Untracked__c
+                FROM Call_Log__c
+                WHERE Phone_Number__c = :logRecord.Phone_Number__c AND Untracked__c = true
+            ];
             for (Call_Log__c cl : phoneLogs) {
                 cl.Untracked__c = false;
             }
@@ -561,9 +606,29 @@ logRecord.Next_Follow_Up_Date__c = parsedDate;
         return logRecord;
     }
 
+    private static void syncRelatedEnquiriesToTracked(Id leadId, String l1, String stage) {
+        if (leadId == null || l1 != 'Connected' || String.isBlank(stage)) {
+            return;
+        }
+
+        List<Enquiry__c> enquiriesToUpdate = [
+            SELECT Id, Stage__c
+            FROM Enquiry__c
+            WHERE Lead__c = :leadId
+        ];
+
+        for (Enquiry__c enquiry : enquiriesToUpdate) {
+            enquiry.Stage__c = 'Tracked';
+        }
+
+        if (!enquiriesToUpdate.isEmpty()) {
+            update enquiriesToUpdate;
+        }
+    }
+
     @AuraEnabled(cacheable=true)
     public static Map<String, List<String>> getStageLevelValues(Id recordId) {
-         System.debug('RecordId Received: ' + recordId);
+        System.debug('RecordId Received: ' + recordId);
         if (recordId == null) return new Map<String, List<String>>();
 
         Map<String, List<String>> result = new Map<String, List<String>>();
@@ -578,15 +643,11 @@ logRecord.Next_Follow_Up_Date__c = parsedDate;
             getPicklistValues(Lead__c.Course__c)
         );
 
-         System.debug('Stage Values: ' + result.get('stage'));
-    System.debug('Level Values: ' + result.get('level'));
-
+        System.debug('Stage Values: ' + result.get('stage'));
+        System.debug('Level Values: ' + result.get('level'));
 
         return result;
     }
-
-
-    
 
     private static List<String> getPicklistValues(Schema.SObjectField fieldRef) {
         List<String> values = new List<String>();
@@ -617,7 +678,7 @@ logRecord.Next_Follow_Up_Date__c = parsedDate;
         public String recordId;
         public String callId;
         public String feedback;
-      public String nextFollowUpDate;
+        public String nextFollowUpDate;
         public String l1;
         public String l2;
         public String stage;

@@ -6,6 +6,9 @@ public without sharing class EventApprovalEmailInvocable {
 
         @InvocableVariable
         public Id leadId;
+
+        @InvocableVariable
+        public String comment;
     }
 
     public class Result {
@@ -31,6 +34,8 @@ public without sharing class EventApprovalEmailInvocable {
 
         Set<Id> eventIds = new Set<Id>();
         Set<Id> leadIds = new Set<Id>();
+        Set<Id> standardLeadIds = new Set<Id>();
+        Set<Id> accountIds = new Set<Id>();
 
         for (Request r : requests) {
             if (r != null) {
@@ -65,7 +70,15 @@ public without sharing class EventApprovalEmailInvocable {
 
         for (Event ev : evMap.values()) {
             if (ev.WhatId != null) {
-                leadIds.add(ev.WhatId);
+                Schema.SObjectType whatType = ev.WhatId.getSObjectType();
+                if (whatType == Lead__c.SObjectType) {
+                    leadIds.add(ev.WhatId);
+                } else if (whatType == Account.SObjectType) {
+                    accountIds.add(ev.WhatId);
+                }
+            }
+            if (ev.WhoId != null && ev.WhoId.getSObjectType() == Lead.SObjectType) {
+                standardLeadIds.add(ev.WhoId);
             }
         }
 
@@ -77,9 +90,31 @@ public without sharing class EventApprovalEmailInvocable {
                 WHERE Id IN :leadIds
             ]);
 
+        Map<Id, Lead> standardLeadMap = standardLeadIds.isEmpty()
+            ? new Map<Id, Lead>()
+            : new Map<Id, Lead>([
+                SELECT Id, Name, OwnerId
+                FROM Lead
+                WHERE Id IN :standardLeadIds
+            ]);
+
+        Map<Id, Account> accountMap = accountIds.isEmpty()
+            ? new Map<Id, Account>()
+            : new Map<Id, Account>([
+                SELECT Id, Name, OwnerId
+                FROM Account
+                WHERE Id IN :accountIds
+            ]);
+
         Set<Id> ownerIds = new Set<Id>();
         for (Lead__c l : leadMap.values()) {
             if (l.OwnerId != null) ownerIds.add(l.OwnerId);
+        }
+        for (Lead l : standardLeadMap.values()) {
+            if (l.OwnerId != null) ownerIds.add(l.OwnerId);
+        }
+        for (Account a : accountMap.values()) {
+            if (a.OwnerId != null) ownerIds.add(a.OwnerId);
         }
 
         Map<Id, User> ownerUserMap = ownerIds.isEmpty()
@@ -202,19 +237,40 @@ public without sharing class EventApprovalEmailInvocable {
                 }
 
 
-                Lead__c leadRec = (r.leadId != null) ? leadMap.get(r.leadId) : null;
-                if (leadRec == null && ev.WhatId != null) {
-                    leadRec = leadMap.get(ev.WhatId);
+                String relatedName = '';
+                Id relatedOwnerId;
+                Id relatedRefId;
+
+                if (r.leadId != null && leadMap.containsKey(r.leadId)) {
+                    Lead__c leadRec = leadMap.get(r.leadId);
+                    relatedName = leadRec.Name;
+                    relatedOwnerId = leadRec.OwnerId;
+                    relatedRefId = leadRec.Id;
+                } else if (ev.WhatId != null && leadMap.containsKey(ev.WhatId)) {
+                    Lead__c leadRec = leadMap.get(ev.WhatId);
+                    relatedName = leadRec.Name;
+                    relatedOwnerId = leadRec.OwnerId;
+                    relatedRefId = leadRec.Id;
+                } else if (ev.WhoId != null && standardLeadMap.containsKey(ev.WhoId)) {
+                    Lead leadRec = standardLeadMap.get(ev.WhoId);
+                    relatedName = leadRec.Name;
+                    relatedOwnerId = leadRec.OwnerId;
+                    relatedRefId = leadRec.Id;
+                } else if (ev.WhatId != null && accountMap.containsKey(ev.WhatId)) {
+                    Account accRec = accountMap.get(ev.WhatId);
+                    relatedName = accRec.Name;
+                    relatedOwnerId = accRec.OwnerId;
+                    relatedRefId = accRec.Id;
                 }
-                if (leadRec == null || leadRec.OwnerId == null) {
-                    Id leadRefId = (r.leadId != null) ? r.leadId : ev.WhatId;
-                    out.success = false; out.message = 'Lead owner manager not found for lead: ' + leadRefId;
+
+                if (relatedOwnerId == null) {
+                    out.success = false; out.message = 'Related record owner manager not found for event: ' + ev.Id;
                     results.add(out); continue;
                 }
 
-                User ownerUser = ownerUserMap.get(leadRec.OwnerId);
+                User ownerUser = ownerUserMap.get(relatedOwnerId);
                 if (ownerUser == null || ownerUser.ManagerId == null) {
-                    out.success = false; out.message = 'Lead owner manager not found for lead: ' + leadRec.Id;
+                    out.success = false; out.message = 'Related record owner manager not found for record: ' + relatedRefId;
                     results.add(out); continue;
                 }
 
@@ -224,25 +280,28 @@ public without sharing class EventApprovalEmailInvocable {
                     results.add(out); continue;
                 }
 
-                String leadName = '';
-                if (leadRec != null) {
-                    leadName = leadRec.Name;
+                if (ev.Approval_Status__c != 'Pending For Approval') {
+                    Event eventToUpdate = new Event(
+                        Id = ev.Id,
+                        Approval_Status__c = 'Pending For Approval',
+                        Approver__c = manager.Id,
+                        Comment__c = r.comment
+                    );
+                    update eventToUpdate;
+                    ev.Approval_Status__c = 'Pending For Approval';
                 }
-
-                //String reviewUrl = URL.getOrgDomainUrl().toExternalForm()
-                  //  + '/lightning/r/Event/' + ev.Id + '/view';
 
                 String subject = tmpl.Subject;
                 String htmlBody = tmpl.HtmlValue;
                 String textBody = tmpl.Body;
 
-                subject = replaceTokens(subject, ev, reviewUrl, leadName, currentUserName, eventOwnerName);
+                subject = replaceTokens(subject, ev, reviewUrl, relatedName, currentUserName, eventOwnerName);
 
                 if (!String.isBlank(htmlBody)) {
-                    htmlBody = replaceTokens(htmlBody, ev, reviewUrl, leadName, currentUserName, eventOwnerName);
+                    htmlBody = replaceTokens(htmlBody, ev, reviewUrl, relatedName, currentUserName, eventOwnerName);
                 }
                 if (!String.isBlank(textBody)) {
-                    textBody = replaceTokens(textBody, ev, reviewUrl, leadName, currentUserName, eventOwnerName);
+                    textBody = replaceTokens(textBody, ev, reviewUrl, relatedName, currentUserName, eventOwnerName);
                 }
 
                 Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
@@ -260,7 +319,7 @@ public without sharing class EventApprovalEmailInvocable {
 
                 String notifTitle = 'Gmeet Approval Request';
                 String notifBody = 'Gmeet ' + (ev.Subject == null ? '' : ev.Subject)
-                    + ' for Lead ' + leadName + '  requires approval.';
+                    + ' for ' + relatedName + ' requires approval.';
                 pendingNotifs.add(new PendingNotification(manager.Id, ev.Id, notifTitle, notifBody));
 
                 out.success = true;

@@ -104,8 +104,8 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
 
     webinarHistory = [];
     webinarLoaded = false;
-
-    showFeedback = false;
+  showCallButton = true;
+showFeedback = false;   
     savingFeedback = false;
     feedback = '';
     nextFollowUpDate = null;
@@ -208,9 +208,9 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
         return this.leadRecordTypeId || this.objectInfo?.data?.defaultRecordTypeId;
     }
 
-    get showFeedbackInLeadTab() {
-        return this.isLeadTab && this.showFeedback;
-    }
+    // get showFeedbackInLeadTab() {
+    //     return this.isLeadTab && this.showFeedback;
+    // }
 
     get availableCourseOptions() {
         const existing = new Set(
@@ -329,14 +329,6 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
     }
 
     get filteredL1Options() {
-        if (!this.isApiResponseReceived) {
-            return this.l1Options;
-        }
-
-        if (this.l1Value === 'Connected') {
-            return this.l1Options.filter(opt => opt.value === 'Connected');
-        }
-
         return this.l1Options;
     }
 
@@ -863,10 +855,11 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
 
         this.callStatus = 'Dialing…';
         this.isLive = false;
-        this.showFeedback = false;
+        this.showCallButton = false;  
+this.showFeedback = false; 
         this.showCallPopup = true;
 
-        this.l1Value = 'Not-Connected';
+        this.l1Value = '';
         this.resetConnectedOnlyFieldsIfNeeded();
         this.l2Value = '';
 
@@ -895,7 +888,7 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
             this.isLive = true;
 
             this.showPopup = true;
-            setTimeout(() => (this.showPopup = false), 4200);
+            setTimeout(() => (this.showPopup = false),200);
 
             this.clearFeedbackTimers();
 
@@ -930,6 +923,13 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
         }
     }
 
+
+    toggleToFeedbackMode() {
+    this.showCallButton = false;
+    this.showFeedback = true;
+    this.isFeedbackDisabled = false;
+}
+
     handleEndCall() {
         if (!this.canEndCall && !this.isLive) {
             return;
@@ -941,13 +941,13 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
 
         this.stopTimer();
         this.clearFeedbackTimers();
-        this.showFeedbackSection();
+       this.toggleToFeedbackMode();
         this.callButtonDisabled = true;
     }
 
     showFeedbackSection() {
-        this.showFeedback = true;
-        this.disableCancel = false;
+      
+    this.toggleToFeedbackMode();
 
         if (this.autoSetFollowUp) {
             this.setAutoDate24();
@@ -1124,7 +1124,7 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
             this.dispatchEvent(new CloseActionScreenEvent());
 
             this.clearFeedbackTimers();
-            this.showFeedback = false;
+            this.showFeedback = true;
             this.disableCancel = true;
             this.callStatus = 'Idle';
             this.isLive = false;
@@ -1301,6 +1301,7 @@ export default class RunoStudentAllocationCall extends NavigationMixin(Lightning
 
         this.showFeedbackSection();
         this.callButtonDisabled = true;
+this.toggleToFeedbackMode();
         this.isFeedbackDisabled = false;
 
         console.log('RUNO EVENT => CALL ENDED');

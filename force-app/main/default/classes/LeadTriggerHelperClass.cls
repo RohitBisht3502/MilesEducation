@@ -549,16 +549,16 @@ public without sharing class LeadTriggerHelperClass {
                 tasksToInsert.add(t);
             }
 
-            // 2. Post-Enrollment (Change to B7 Enrolled)
-            if (lead.Stage__c == 'B7' && oldStage != 'B7') {
+            // 2. Interest and Discussion (Change from B3 to B3+ or B3++)
+            if ((lead.Stage__c == 'B3+' || lead.Stage__c == 'B3++') && oldStage == 'B3') {
                 // 3 Days
-                tasksToInsert.add(createTask(lead, 'M.Com Post-Enrollment: 3 Days Follow-up', 3));
+                tasksToInsert.add(createTask(lead, 'M.Com Initial Follow-up: 3 Days', 3));
                 // 7 Days
-                tasksToInsert.add(createTask(lead, 'M.Com Post-Enrollment: 7 Days Follow-up', 7));
+                tasksToInsert.add(createTask(lead, 'M.Com Initial Follow-up: 7 Days', 7));
                 // 30, 60, 90 Days
-                tasksToInsert.add(createTask(lead, 'M.Com Monthly Call: 30 Days', 30));
-                tasksToInsert.add(createTask(lead, 'M.Com Monthly Call: 60 Days', 60));
-                tasksToInsert.add(createTask(lead, 'M.Com Monthly Call: 90 Days', 90));
+                tasksToInsert.add(createTask(lead, 'M.Com Ongoing Follow-up: 30 Days', 30));
+                tasksToInsert.add(createTask(lead, 'M.Com Ongoing Follow-up: 60 Days', 60));
+                tasksToInsert.add(createTask(lead, 'M.Com Ongoing Follow-up: 90 Days', 90));
             }
         }
 

@@ -23,8 +23,15 @@ trigger CandidateTrigger on Lead (before insert, after insert, before update, af
 
     // ===== AFTER =====
     if (Trigger.isAfter) {
-        if (Trigger.isInsert) handler.afterInsert();
-        if (Trigger.isUpdate) handler.afterUpdate();
+
+        if (Trigger.isInsert) {
+            handler.afterInsert();
+        }
+
+        if (Trigger.isUpdate) {
+            handler.afterUpdate();
+        }
+
         if (Trigger.isDelete) handler.afterDelete();
         if (Trigger.isUndelete) handler.afterUndelete();
     }

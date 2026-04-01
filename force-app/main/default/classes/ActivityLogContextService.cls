@@ -105,7 +105,7 @@ public without sharing class ActivityLogContextService {
             currentLevelByIndex.put(rowKey, currentLevel);
             highestLevelByIndex.put(rowKey, highestLevel);
 
-            if (ownerId != null) {
+            if (ownerId != null && !isQueueOwner(ownerId)) {
                 userIds.add(ownerId);
             }
             if (gpUserId != null) {
@@ -122,13 +122,14 @@ public without sharing class ActivityLogContextService {
             rowKey++;
             Id ownerId = ownerByIndex.get(rowKey);
             Id gpUserId = gpUserByIndex.get(rowKey);
+            Boolean ownerIsQueue = isQueueOwner(ownerId);
 
-            putIfFieldExists(activityFieldMap, logRec, 'Current_Owner__c', ownerId);
+            putIfFieldExists(activityFieldMap, logRec, 'Current_Owner__c', ownerIsQueue ? null : ownerId);
             putIfFieldExists(activityFieldMap, logRec, 'Current_GP_User__c', gpUserId);
             putIfFieldExists(activityFieldMap, logRec, 'Current_Highest_Level__c', highestLevelByIndex.get(rowKey));
             putIfFieldExists(activityFieldMap, logRec, 'Current_Level__c', currentLevelByIndex.get(rowKey));
 
-            User ownerUser = ownerId != null ? userMap.get(ownerId) : null;
+            User ownerUser = !ownerIsQueue && ownerId != null ? userMap.get(ownerId) : null;
             User gpUser = gpUserId != null ? userMap.get(gpUserId) : null;
 
             putIfFieldExists(activityFieldMap, logRec, 'Current_GM__c',
@@ -136,6 +137,10 @@ public without sharing class ActivityLogContextService {
             putIfFieldExists(activityFieldMap, logRec, 'Current_GP_User_GM__c',
                 gpUser != null && gpUser.ManagerId != null ? gpUser.Manager.Name : null);
         }
+    }
+
+    private static Boolean isQueueOwner(Id ownerId) {
+        return ownerId != null && ownerId.getSObjectType() == Group.SObjectType;
     }
 
     private static void putIfFieldExists(
