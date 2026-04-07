@@ -70,7 +70,7 @@
             <template if:true={hasFilteredLeads}>
               <template for:each={filteredLeads} for:item="lead">
                 <tr key={lead.id}>
-                  <td>{lead.candidateIdDisplay}</td>
+                  <td class="candidate-cell">{lead.candidateIdDisplay}</td>
                   <td>
                     <a
                       class="lead-link"
@@ -88,7 +88,7 @@
                   </td>
                   <td><span class={lead.bucketBadgeClass}>{lead.bucketLabel}</span></td>
                   <td><span class="badge-level">{lead.levelLabel}</span></td>
-                  <td>{lead.courseLabel}</td>
+                  <td class="course-cell" title={lead.courseLabel}>{lead.courseLabel}</td>
                   <td><span class={lead.inQueueClass}>{lead.inQueueSince}</span></td>
                 </tr>
               </template>

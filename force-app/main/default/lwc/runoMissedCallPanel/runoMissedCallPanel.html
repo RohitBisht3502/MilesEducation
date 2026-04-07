@@ -1,0 +1,75 @@
+<template>
+    <div class="missed-shell">
+        <div class="list-card">
+            <div class="list-header">
+                <span>Missed Calls</span>
+                <span>{missedCallCountLabel}</span>
+            </div>
+
+            <template if:true={hasMissedCalls}>
+                <div class="call-list">
+                    <template for:each={groupedMissedCalls} for:item="group">
+                        <section key={group.key} class="group-card">
+                            <div class="group-header">
+                                <template if:true={group.latestRow.hasRecordLink}>
+                                    <a class="identity-link" href={group.latestRow.recordUrl} target="_blank">
+                                        <span class="candidate-name">{group.candidateName}</span>
+                                        <template if:true={group.latestRow.canId}>
+                                            <span class="can-inline">{group.latestRow.canId}</span>
+                                        </template>
+                                    </a>
+                                </template>
+                                <template if:false={group.latestRow.hasRecordLink}>
+                                    <div class="identity-link identity-link-static">
+                                        <span class="candidate-name">{group.candidateName}</span>
+                                        <template if:true={group.latestRow.canId}>
+                                            <span class="can-inline">{group.latestRow.canId}</span>
+                                        </template>
+                                    </div>
+                                </template>
+                                <div class="group-count">{group.count}</div>
+                            </div>
+
+                            <div class="course-line">{group.relatedCourses}</div>
+
+                            <div class="call-row">
+                                <div class="call-main">
+                                    <div class="call-time">{group.latestRow.dateLabel} {group.latestRow.timeLabel}</div>
+                                    <div class="call-meta">
+                                        <span>{group.latestRow.status}</span>
+                                        <template if:true={group.latestRow.l1}>
+                                            <span>{group.latestRow.l1}</span>
+                                        </template>
+                                        <template if:true={group.latestRow.l2}>
+                                            <span>{group.latestRow.l2}</span>
+                                        </template>
+                                    </div>
+                                </div>
+
+                                <div class="call-actions">
+                                    <lightning-button
+                                        label="Fill Feedback"
+                                        variant="neutral"
+                                        value={group.latestRow.id}
+                                        onclick={handleFillFeedback}>
+                                    </lightning-button>
+
+                                    <lightning-button
+                                        label="Call Candidate"
+                                        variant="brand"
+                                        value={group.latestRow.id}
+                                        onclick={handleCallCandidate}>
+                                    </lightning-button>
+                                </div>
+                            </div>
+                        </section>
+                    </template>
+                </div>
+            </template>
+
+            <template if:false={hasMissedCalls}>
+                <div class="empty-state">No missed calls found in recent call logs.</div>
+            </template>
+        </div>
+    </div>
+</template>

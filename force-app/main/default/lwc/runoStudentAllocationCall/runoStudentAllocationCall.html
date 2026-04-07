@@ -1,5 +1,5 @@
 <template>
-    <lightning-quick-action-panel class="panel-wrapper">
+    <div class="panel-wrapper">
 
         <!-- ===== HEADER ===== -->
         <div class="custom-header">
@@ -31,13 +31,8 @@
 
             <!-- TABS -->
             <div class="tab-bar">
-                <div class={leadTabClass} data-tab="lead" onclick={handleTabClick}>
+                <div class={feedbackTabClass} data-tab="feedback" onclick={handleTabClick}>
                     Lead Information
-                </div>
-
-
-                <div class={relatedTabClass} data-tab="related" onclick={handleTabClick}>
-                    Related Leads
                 </div>
 
                 <div class={historyTabClass} data-tab="history" onclick={handleTabClick}>
@@ -59,17 +54,16 @@
 
 
             <!-- CONTENT ROW -->
-            <div class="content-row two-col-layout">
+            <div class={contentRowClass}>
 
                 <!-- LEFT SIDE -->
                 <div class="left-panel">
-                    <template if:true={isLeadTab}>
-                        <div class="section-card">
-                            <div class="section-header">
-                                <lightning-icon icon-name="standard:lead" size="small"></lightning-icon>
+                    <template if:true={showLeadInfoPanel}>
+                        <div class="section-card lead-info-card">
+                            <div class="section-header compact-header">
+                                <lightning-icon icon-name="utility:user" size="x-small"></lightning-icon>
                                 <span>Lead Information</span>
                             </div>
-
                             <div class="info-grid">
 
                                 <template if:true={identity.canId}>
@@ -97,38 +91,40 @@
                                     </div>
                                 </div>
 
-                                <!-- <div class="info-tile">
-                                    <lightning-icon icon-name="utility:topic"></lightning-icon>
-                                    <div>
-                                        <small>Course:-</small>
-                                        <strong>{identity.source}</strong>
+                                <template if:true={showExtendedLeadFields}>
+                                    <div class="info-tile">
+                                        <lightning-icon icon-name="utility:topic"></lightning-icon>
+                                        <div>
+                                            <small>Course:-</small>
+                                            <strong>{identity.source}</strong>
+                                        </div>
                                     </div>
-                                </div> -->
 
-                                <!-- <div class="info-tile">
-                                    <lightning-icon icon-name="utility:collection"></lightning-icon>
-                                    <div>
-                                        <small>Stage:-</small>
-                                        <strong>{identity.stage}</strong>
+                                    <div class="info-tile">
+                                        <lightning-icon icon-name="utility:collection"></lightning-icon>
+                                        <div>
+                                            <small>Stage:-</small>
+                                            <strong>{identity.stage}</strong>
+                                        </div>
                                     </div>
-                                </div> -->
+
+                                    <div class="info-tile">
+                                        <lightning-icon icon-name="utility:check"></lightning-icon>
+                                        <div>
+                                            <small>MHP:-</small>
+                                            <strong>{identity.mhpTag}</strong>
+                                        </div>
+                                    </div>
+
+                                </template>
 
                                 <div class="info-tile">
                                     <lightning-icon icon-name="utility:event"></lightning-icon>
                                     <div>
                                         <small>Created Date:-</small>
                                         <strong>{formattedCreatedDate}</strong>
-
                                     </div>
                                 </div>
-
-                                <!-- <div class="info-tile">
-                                    <lightning-icon icon-name="utility:check"></lightning-icon>
-                                    <div>
-                                        <small>MHP:-</small>
-                                        <strong>{identity.mhpTag}</strong>
-                                    </div> 
-                                </div> -->
 
                                 <div class="info-tile">
                                     <lightning-icon icon-name="utility:user_role"></lightning-icon>
@@ -137,6 +133,7 @@
                                         <strong>{identity.leadOwner}</strong>
                                     </div>
                                 </div>
+
                                 <template if:true={showPopup}>
                                     <div class="call-popup">Call Successfully sent</div>
                                 </template>
@@ -146,92 +143,203 @@
                 </div>
 
                 <!-- RIGHT SIDE -->
-                <template if:true={isLeadTab}>
-                    <div class="right-panel">
+                <div class="right-panel">
+                    <template if:true={isFeedbackTab}>
                         <div class="section-card feedback-card">
-                            <div class="section-header">
-                                <lightning-icon icon-name="utility:feedback" size="small"></lightning-icon>
-                                <span>Call Feedback</span>
-                            </div>
-
+                            <div class="disposition-kicker">Disposition</div>
                             <div class="feedback-grid">
-                                <!-- Row 1 -->
+
+                                <!-- Row 1: L1 + L2 -->
                                 <div class="row-2">
-                                    <lightning-combobox label="Call Status (L1)" value={l1Value}
+                                    <lightning-combobox label="L1 Disposition" value={l1Value}
                                         options={filteredL1Options} onchange={handleL1Change}>
                                     </lightning-combobox>
 
-                                    <lightning-combobox label="Sub Status (L2)" value={l2Value} options={l2Options}
+                                    <lightning-combobox label="L2 Disposition" value={l2Value} options={l2Options}
                                         onchange={handleL2Change} disabled={disableL2Final}>
                                     </lightning-combobox>
                                 </div>
 
-                                <!-- Row 2 -->
-                                <div class="row-2">
-                                    <div>
-                                        <lightning-combobox label="Stage" value={stageValue} options={stageOptions}
-                                            onchange={handleStageChange} disabled={isStageFinalDisabled}>
-                                        </lightning-combobox>
+                                <!-- UNTRACKED CALL -->
+                                <template if:true={isUntrackedCall}>
+                                    <c-tag-lead-for-call-log record-id={recordId}></c-tag-lead-for-call-log>
+                                </template>
 
-                                        <template if:true={isStageDisabled}>
-                                            <div class="helper-text">
-                                                Stage not applicable for Not-Connected calls
+                                <!-- RELATED LEADS — no section heading -->
+                                <div class="disposition-section">
+                                    <div class="section-label">Follow-up Date</div>
+                                    <div class="follow-up-grid">
+                                        <div class="follow-date follow-date-full">
+                                            <lightning-input type="date" variant="label-hidden"
+                                                value={nextFollowUpDate} onchange={handleNextFollowUpDateChange}>
+                                            </lightning-input>
+                                        </div>
+
+                                        <div class="follow-time">
+                                            <lightning-input type="time" label="Time" variant="label-hidden"
+                                                value={nextFollowUpTime} onchange={handleNextFollowUpTimeChange}>
+                                            </lightning-input>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="disposition-section courses-section">
+                                    <div class="courses-header">
+                                        <div class="section-label courses-title">Courses</div>
+                                        <div class="add-course-link" onclick={toggleCreateLead}>+ Add Course</div>
+                                    </div>
+                                    <div class="call-history-list">
+                                        <template if:true={hasRelatedLeads}>
+                                            <template for:each={relatedLeads} for:item="row">
+                                                <div key={row.id} class="course-card">
+                                                    <div class="course-card-header">
+                                                        <div class="course-card-title">Course {row.displayIndex}</div>
+                                                        <lightning-icon icon-name="utility:delete" size="xx-small"
+                                                            class="course-delete-icon"></lightning-icon>
+                                                    </div>
+
+                                                    <div class="course-grid">
+                                                        <div class="course-field">
+                                                            <div class="field-label">Course</div>
+                                                            <div class="course-value-box">{row.course}</div>
+                                                        </div>
+
+                                                        <div class="course-field">
+                                                            <lightning-combobox label="Level" value={row.stage}
+                                                                options={row.stageOptions} data-id={row.id}
+                                                                onchange={handleRelatedStageChange}>
+                                                            </lightning-combobox>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="course-field course-epd">
+                                                        <div class="field-label">Expected Payment Date</div>
+                                                        <lightning-input type="date" variant="label-hidden"
+                                                            value={row.expectedPaymentDate} data-id={row.id}
+                                                            onchange={handleExpectedDateChange}>
+                                                        </lightning-input>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </template>
+
+                                        <template if:false={hasRelatedLeads}>
+                                            <div class="call-history-empty">
+                                                No related leads found
+                                            </div>
+                                        </template>
+
+                                        <template if:true={showCreateLeadSection}>
+                                            <div class="create-inline-form add-course-form">
+                                                <lightning-combobox label="Course" value={newLeadCourse}
+                                                    options={availableCourseOptions} onchange={handleNewLeadCourseChange}>
+                                                </lightning-combobox>
+
+                                                <lightning-button label="Create Lead" variant="brand" class="create-btn"
+                                                    onclick={handleCreateRelatedLead}>
+                                                </lightning-button>
                                             </div>
                                         </template>
                                     </div>
-
-                                    <lightning-input type="date" label="Expected Payment Date" value={expectedPaymentDate}
-                                        onchange={handleExpectedDateChange} min={todayIsoDate}
-                                        disabled={isConnectedOnlyFieldsDisabled}>
-                                    </lightning-input>
                                 </div>
 
-                                <!-- Row 3 -->
-                                <div class="row-3-followup">
-                                    <div class="follow-date">
-                                        <lightning-input type="date" label="Next Follow Up - Date"
-                                            value={nextFollowUpDate} onchange={handleNextFollowUpDateChange}>
-                                        </lightning-input>
-                                    </div>
+                                <div class="disposition-section">
+                                    <div class="section-label">Options</div>
+                                    <div class="checkbox-row options-row">
+                                        <div class="option-card">
+                                            <lightning-input type="toggle" label="Notify" checked={notifyMe}
+                                                message-toggle-active="" message-toggle-inactive=""
+                                                onchange={handleNotifyChange}>
+                                            </lightning-input>
+                                        </div>
 
-                                    <div class="follow-time">
-                                        <lightning-input type="time" label="Time" value={nextFollowUpTime}
-                                            onchange={handleNextFollowUpTimeChange}>
-                                        </lightning-input>
-                                    </div>
+                                        <div class="option-card">
+                                            <lightning-input type="toggle" label="DND" checked={isDnd}
+                                                message-toggle-active="" message-toggle-inactive=""
+                                                onchange={handleDndChange}>
+                                            </lightning-input>
+                                        </div>
 
-                                    <div class="follow-auto">
-                                        <lightning-input type="checkbox" label="Auto set (+24 hrs)"
-                                            checked={autoSetFollowUp} onchange={handleAutoSetChange}>
-                                        </lightning-input>
+                                        <div class="option-card">
+                                            <lightning-input type="toggle" label="Spam" checked={isSpam}
+                                                message-toggle-active="" message-toggle-inactive=""
+                                                onchange={handleSpamChange}>
+                                            </lightning-input>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <!-- Row 4 -->
-                                <div class="checkbox-row">
-                                    <lightning-input type="checkbox" label="Notify Me" checked={notifyMe}
-                                        onchange={handleNotifyChange} disabled={isConnectedOnlyFieldsDisabled}>
-                                    </lightning-input>
+                                <!-- Row 4: Comments -->
+                                <div class="comment-wrapper">
 
-                                    <lightning-input type="checkbox" label="DND" checked={isDnd}
-                                        onchange={handleDndChange} disabled={isConnectedOnlyFieldsDisabled}>
-                                    </lightning-input>
+                                    <!-- Label row: "Comments" + mic / stop button -->
+                                    <div class="comment-label-row">
+                                        <label class="comment-label">
+                                            Comments
+                                            <template if:true={isCommentMandatory}>
+                                                <abbr class="slds-required" title="required">*</abbr>
+                                            </template>
+                                        </label>
 
-                                    <lightning-input type="checkbox" label="Is Spam" checked={isSpam}
-                                        onchange={handleSpamChange} disabled={isConnectedOnlyFieldsDisabled}>
-                                    </lightning-input>
+                                        <!-- IDLE STATE — microphone button -->
+                                        <template if:false={isListening}>
+                                            <button class="mic-btn" onclick={handleMicClick}
+                                                title="Click to dictate">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                    width="16" height="16" fill="currentColor">
+                                                    <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm-1 1.93V18H9v2h6v-2h-2v-2.07A5.001 5.001 0 0 0 17 11h-2a3 3 0 0 1-6 0H7a5.001 5.001 0 0 0 4 4.93z"/>
+                                                </svg>
+                                            </button>
+                                        </template>
+
+                                        <!-- LISTENING STATE — stop button + pulse dot -->
+                                        <template if:true={isListening}>
+                                            <button class="mic-btn mic-stop-btn" onclick={handleMicStop}
+                                                title="Stop listening">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                    width="14" height="14" fill="currentColor">
+                                                    <rect x="4" y="4" width="16" height="16" rx="2"/>
+                                                </svg>
+                                            </button>
+                                            <span class="listening-badge">
+                                                <span class="listening-dot"></span>
+                                            Listening
+                                            </span>
+                                        </template>
+                                    </div>
+
+                                    <!-- Native textarea (replaces lightning-textarea) -->
+                                    <textarea
+                                        class={commentTextareaClass}
+                                        oninput={handleFeedbackChange}
+                                        placeholder="Type or dictate your comment..."
+                                        rows="4">
+                                    </textarea>
+
+                                    <!-- Interim transcript preview -->
+                                    <template if:true={interimText}>
+                                        <div class="interim-preview">
+                                            <span>{interimText}</span>
+                                        </div>
+                                    </template>
+
                                 </div>
+                                <!-- END COMMENTS WITH MIC -->
 
-                                <!-- Row 5 -->
-                                <lightning-textarea label="Comments" value={feedback} required={isCommentMandatory}
-                                    onchange={handleFeedbackChange}>
-                                </lightning-textarea>
                             </div>
                         </div>
-                    </div>
-                </template>
+                    </template>
 
+
+
+
+                </div>
             </div>
+
+
+
+
+
 
             <!-- CALL HISTORY -->
             <template if:true={isHistoryTab}>
@@ -242,9 +350,8 @@
                         <span>Call History</span>
                     </div>
 
-
                     <template if:true={hasCallHistory}>
-                        <div class="call-history-list">
+                        <div class="call-classs-list">
 
                             <template for:each={callHistory} for:item="row">
                                 <div key={row.id} class="call-history-item">
@@ -304,7 +411,6 @@
                                         <div>{row.createdDate}</div>
                                     </div>
 
-
                                     <template if:true={row.meeting}>
                                         <div class="call-history-meta">
                                             {row.meeting}
@@ -360,103 +466,106 @@
                     </template>
 
                 </div>
-
             </template>
-            <template if:true={isRelatedTab}>
 
-                <!-- UNTRACKED CALL -->
+            <!-- ===== RELATED LEADS TAB ===== -->
+            <!-- <template if:true={isRelatedTab}>
+ 
+                 UNTRACKED CALL 
                 <template if:true={isUntrackedCall}>
                     <c-tag-lead-for-call-log record-id={recordId}></c-tag-lead-for-call-log>
                 </template>
-
-                <!-- TRACKED CALL -->
+ 
+               TRACKED CALL 
                 <template if:false={isUntrackedCall}>
-
-                    <!-- RELATED LEADS LIST -->
+ 
+                   RELATED LEADS LIST 
                     <div class="section-card history-card">
                         <div class="section-header">
                             <lightning-icon icon-name="standard:lead" size="small"></lightning-icon>
                             <span>Related Leads</span>
                         </div>
-
+ 
                         <template if:true={hasRelatedLeads}>
                             <div class="call-history-list">
-
+ 
                                 <template for:each={relatedLeads} for:item="row">
                                     <div key={row.id} class="call-history-item">
-
+ 
                                         <div class="call-history-left">
                                             <strong>{row.course}</strong>
                                         </div>
-
+ 
                                         <div class="call-history-right">
                                             <lightning-combobox value={row.stage} options={row.stageOptions}
                                                 data-id={row.id} onchange={handleRelatedStageChange}
                                                 disabled={isRelatedStageDisabled}>
                                             </lightning-combobox>
                                         </div>
-
+ 
                                     </div>
                                 </template>
-
+ 
                             </div>
                         </template>
-
+ 
                         <template if:false={hasRelatedLeads}>
                             <div class="call-history-empty">
                                 No related leads found
                             </div>
                         </template>
-
+ 
                     </div>
-
-                    <!-- CREATE NEW LEAD -->
+ 
+                    
                     <div class="section-card history-card">
                         <div class="section-header">
                             <lightning-icon icon-name="utility:add" size="small"></lightning-icon>
                             <span>Create New Lead</span>
                         </div>
-
+ 
                         <div class="feedback-grid two-column">
-
+ 
                             <lightning-combobox label="Course" value={newLeadCourse} options={availableCourseOptions}
                                 onchange={handleNewLeadCourseChange} disabled={isRelatedStageDisabled}>
                             </lightning-combobox>
-
+ 
                             <lightning-input type="email" label="Email" value={newLeadEmail}
                                 onchange={handleNewLeadEmailChange}>
                             </lightning-input>
-
+ 
                             <lightning-button class="create-lead-btn" variant="brand" label="Create Lead"
                                 onclick={handleCreateRelatedLead} disabled={disableCreateLead}>
                             </lightning-button>
-
+ 
                         </div>
                     </div>
-
+ 
                 </template>
-
-            </template>
-
+ 
+            </template> -->
         </div>
 
+
+
         <!-- ===== FOOTER ===== -->
-        <div slot="footer" class="footer-actions">
+        <div class="footer-actions">
 
-            <template if:true={showCallButton}>
-                <lightning-button variant="brand" label={callButtonLabel} onclick={callApi}
-                    disabled={callButtonDisabled}>
-                </lightning-button>
-            </template>
-
-            <!-- SAVE BUTTON -->
-            <template if:true={showFeedback}>
+            <template if:true={isFeedbackTab}>
                 <lightning-button variant="brand" label="Save Feedback" onclick={saveFeedback}
                     disabled={isSaveDisabled}>
                 </lightning-button>
             </template>
 
+            <template if:true={isFeedbackTab}>
+                <template if:false={showFeedback}>
+                    <lightning-button variant="brand" label={callButtonLabel} onclick={callApi}
+                        disabled={callButtonDisabled} class="call-runo-btn">
+                    </lightning-button>
+                </template>
+            </template>
+
         </div>
 
-    </lightning-quick-action-panel>
+    </div>
 </template>

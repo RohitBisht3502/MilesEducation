@@ -91,15 +91,24 @@ public without sharing class CreateNewLeadController {
             WHERE Student__c = :studentId
             ORDER BY CreatedDate DESC
         ];
-        if (relatedLeads.isEmpty()) {
-            throw new AuraHandledException('No Lead found for this student.');
-        }
 
         ContextData contextData = new ContextData();
         contextData.studentId = studentId;
-        contextData.candidateId = relatedLeads[0].Candidate__c;
-        contextData.sourceLead = relatedLeads[0];
         contextData.existingCourses = extractExistingCourses(relatedLeads);
+
+        if (!relatedLeads.isEmpty()) {
+            contextData.candidateId = relatedLeads[0].Candidate__c;
+            contextData.sourceLead = relatedLeads[0];
+            return contextData;
+        }
+
+        Account student = [
+            SELECT Id, Name, Email__c, Phone
+            FROM Account
+            WHERE Id = :studentId
+            LIMIT 1
+        ];
+        contextData.sourceLead = buildSourceLead(student.Name, student.Email__c, student.Phone, null, studentId);
         return contextData;
     }
 
@@ -110,15 +119,24 @@ public without sharing class CreateNewLeadController {
             WHERE Candidate__c = :candidateId
             ORDER BY CreatedDate DESC
         ];
-        if (relatedLeads.isEmpty()) {
-            throw new AuraHandledException('No Lead found for this candidate.');
-        }
 
         ContextData contextData = new ContextData();
-        contextData.studentId = relatedLeads[0].Student__c;
         contextData.candidateId = candidateId;
-        contextData.sourceLead = relatedLeads[0];
         contextData.existingCourses = extractExistingCourses(relatedLeads);
+
+        if (!relatedLeads.isEmpty()) {
+            contextData.studentId = relatedLeads[0].Student__c;
+            contextData.sourceLead = relatedLeads[0];
+            return contextData;
+        }
+
+        Lead candidate = [
+            SELECT Id, Name, Email, Phone
+            FROM Lead
+            WHERE Id = :candidateId
+            LIMIT 1
+        ];
+        contextData.sourceLead = buildSourceLead(candidate.Name, candidate.Email, candidate.Phone, candidateId, null);
         return contextData;
     }
 
@@ -197,6 +215,16 @@ public without sharing class CreateNewLeadController {
         if (courseKey == 'US Pathway') return 'U3';
         if (courseKey == 'CPA' || courseKey == 'CMA' || courseKey == 'CAIRA') return 'M3';
         return null;
+    }
+
+    private static Lead__c buildSourceLead(String name, String email, String phone, Id candidateId, Id studentId) {
+        Lead__c sourceLead = new Lead__c();
+        sourceLead.Name = String.isBlank(name) ? 'New Lead' : name;
+        sourceLead.Email__c = email;
+        sourceLead.Phone__c = phone;
+        sourceLead.Candidate__c = candidateId;
+        sourceLead.Student__c = studentId;
+        return sourceLead;
     }
 
     private class ContextData {

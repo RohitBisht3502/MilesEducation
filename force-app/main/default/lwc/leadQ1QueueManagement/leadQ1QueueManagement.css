@@ -239,6 +239,25 @@
     white-space: nowrap;
 }
 
+.group-row {
+    background: #eef4fd !important;
+}
+
+.group-row td {
+    padding: 10px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--sf-navy);
+    border-top: 1px solid #d8e6f7;
+    border-bottom: 1px solid #d8e6f7;
+}
+
+.group-meta {
+    margin-left: 8px;
+    font-weight: 500;
+    color: var(--sf-gray-500);
+}
+
 .badge,
 .badge-level {
     display: inline-flex;

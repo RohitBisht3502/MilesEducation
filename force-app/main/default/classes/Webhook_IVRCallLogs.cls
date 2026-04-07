@@ -62,17 +62,9 @@ global without sharing class Webhook_IVRCallLogs {
                 return buildResponse(false, 'Invalid sf_user_id', null, requestBody, 400);
             }
 
-            Call_Log__c callLog = fetchCallLog(candidate.Id, ownerId);
-            if (callLog == null) {
-                return buildResponse(
-                    false,
-                    'No call log found for the given candidate and user',
-                    null,
-                    requestBody,
-                    404
-                );
-            }
-
+            Call_Log__c callLog = new Call_Log__c();
+            callLog.Lead__c = candidate.Id;
+            callLog.OwnerId = ownerId;
             callLog.Start_Time__c = parseDateTime(input.start_date);
             callLog.End_Time__c = parseDateTime(input.end_date);
             callLog.exotel_call_id__c = input.exotel_call_id;
@@ -82,11 +74,11 @@ global without sharing class Webhook_IVRCallLogs {
             callLog.Recording_Url__c = input.call_recording_url;
             callLog.Call_Id__c = input.exotel_call_id;
 
-            update callLog;
+            insert callLog;
 
             return buildResponse(
                 true,
-                'Call log updated successfully',
+                'Call log inserted successfully',
                 callLog.Id,
                 requestBody,
                 200
@@ -94,7 +86,7 @@ global without sharing class Webhook_IVRCallLogs {
         } catch (DmlException e) {
             return buildResponse(
                 false,
-                'DML error while updating call log: ' + e.getMessage(),
+                'DML error while inserting call log: ' + e.getMessage(),
                 null,
                 requestBody,
                 500
@@ -111,13 +103,13 @@ global without sharing class Webhook_IVRCallLogs {
     }
 
     private static Lead fetchCandidate(String candidateId) {
-        List<Lead> candidates = [SELECT Id FROM Lead WHERE Candidate_ID__c = :candidateId LIMIT 1];
-        return candidates.isEmpty() ? null : candidates[0];
-    }
+        Id leadId = parseId(candidateId);
+        if (leadId == null) {
+            return null;
+        }
 
-    private static Call_Log__c fetchCallLog(Id leadId, Id ownerId) {
-        List<Call_Log__c> callLogs = [SELECT Id, OwnerId FROM Call_Log__c WHERE Lead__c = :leadId AND OwnerId = :ownerId LIMIT 1];
-        return callLogs.isEmpty() ? null : callLogs[0];
+        List<Lead> candidates = [SELECT Id FROM Lead WHERE Id = :leadId LIMIT 1];
+        return candidates.isEmpty() ? null : candidates[0];
     }
 
     private static CallLogResponseDTO buildResponse(

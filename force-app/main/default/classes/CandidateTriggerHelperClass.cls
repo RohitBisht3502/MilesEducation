@@ -379,13 +379,16 @@ public without sharing class CandidateTriggerHelperClass {
 
     public static void createBridgeCourseLeads(List<Lead> leads, Map<Id, Lead> oldMap) {
         Set<Id> eligibleCandidateIds = new Set<Id>();
-        List<Lead__c> leadsToCreate = new List<Lead__c>();
+        List<Lead> potentialCandidates = new List<Lead>();
 
         for (Lead lead : leads) {
-            Boolean isEligible = String.isNotBlank(lead.CPA_Eligibility_Status__c) && (lead.CPA_Eligibility_Status__c == 'Eligible for Exams' || lead.CPA_Eligibility_Status__c == 'Conditional Eligible' || lead.CPA_Eligibility_Status__c == 'Conditionally Eligible');
+            Lead oldLead = oldMap != null ? oldMap.get(lead.Id) : null;
+            Boolean isStatusEligible = String.isNotBlank(lead.CPA_Eligibility_Status__c) && (lead.CPA_Eligibility_Status__c == 'Eligible for Exams' || lead.CPA_Eligibility_Status__c == 'Conditional Eligible' || lead.CPA_Eligibility_Status__c == 'Conditionally Eligible');
+            Boolean wasStatusEligible = oldLead != null && String.isNotBlank(oldLead.CPA_Eligibility_Status__c) && (oldLead.CPA_Eligibility_Status__c == 'Eligible for Exams' || oldLead.CPA_Eligibility_Status__c == 'Conditional Eligible' || oldLead.CPA_Eligibility_Status__c == 'Conditionally Eligible');
 
-            if (isEligible) {
+            if (isStatusEligible && (oldLead == null || !wasStatusEligible)) {
                 eligibleCandidateIds.add(lead.Id);
+                potentialCandidates.add(lead);
             }
         }
 
@@ -393,15 +396,29 @@ public without sharing class CandidateTriggerHelperClass {
             return;
         }
 
+        // Map to store Candidate Id to its CPA Lead's Source
+        Map<Id, String> candidateToCpaSource = new Map<Id, String>();
+        for (Lead__c cpaLead : [SELECT Candidate__c, Source__c FROM Lead__c 
+                                 WHERE Candidate__c IN :eligibleCandidateIds 
+                                 AND Course__c = 'CPA' 
+                                 AND Source__c IN ('Retail', 'IR', 'Corporate')]) {
+            candidateToCpaSource.put(cpaLead.Candidate__c, cpaLead.Source__c);
+        }
+
+        if (candidateToCpaSource.isEmpty()) {
+            return;
+        }
+
         Set<Id> candidatesWithExistingMCom = new Set<Id>();
-        for (Lead__c existingLead : [SELECT Candidate__c FROM Lead__c WHERE Candidate__c IN :eligibleCandidateIds AND Course__c = 'MCOM']) {
+        for (Lead__c existingLead : [SELECT Candidate__c FROM Lead__c WHERE Candidate__c IN :candidateToCpaSource.keySet() AND Course__c = 'MCOM']) {
             candidatesWithExistingMCom.add(existingLead.Candidate__c);
         }
 
         Id mcomRecordTypeId = Schema.SObjectType.Lead__c.getRecordTypeInfosByDeveloperName().get('MCOM').getRecordTypeId();
+        List<Lead__c> leadsToCreate = new List<Lead__c>();
 
-        for (Lead lead : leads) {
-            if (eligibleCandidateIds.contains(lead.Id) && !candidatesWithExistingMCom.contains(lead.Id)) {
+        for (Lead lead : potentialCandidates) {
+            if (candidateToCpaSource.containsKey(lead.Id) && !candidatesWithExistingMCom.contains(lead.Id)) {
                 Lead__c newBridgeLead = new Lead__c();
                 newBridgeLead.Name = lead.Name;
                 newBridgeLead.Candidate__c = lead.Id;
@@ -410,6 +427,7 @@ public without sharing class CandidateTriggerHelperClass {
                 newBridgeLead.City__c = lead.City__c;
                 newBridgeLead.Course__c = 'MCOM';
                 newBridgeLead.OwnerId = lead.OwnerId;
+                newBridgeLead.Source__c = candidateToCpaSource.get(lead.Id);
 
                 if (mcomRecordTypeId != null) {
                     newBridgeLead.RecordTypeId = mcomRecordTypeId;

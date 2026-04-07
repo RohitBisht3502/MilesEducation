@@ -239,6 +239,12 @@
     white-space: nowrap;
 }
 
+.group-meta {
+    margin-left: 8px;
+    font-weight: 500;
+    color: var(--sf-gray-500);
+}
+
 .badge,
 .badge-level {
     display: inline-flex;

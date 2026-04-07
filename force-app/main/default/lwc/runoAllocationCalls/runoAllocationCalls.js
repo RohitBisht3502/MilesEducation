@@ -1127,7 +1127,11 @@ export default class RunoAllocationCalls extends NavigationMixin(LightningElemen
             }));
             if (edits.length > 0) {
                 try {
-                    await updateRelatedLeadStages({ updates: edits });
+                    await updateRelatedLeadStages({
+                        jsonBody: JSON.stringify({
+                            updates: edits
+                        })
+                    });
                     await this.loadRelatedLeads();
                 } catch (e) {
                     console.error('Related leads update failed:', e);

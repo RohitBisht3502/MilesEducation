@@ -10,6 +10,7 @@ import { subscribe, unsubscribe, onError } from 'lightning/empApi';
 
 export default class LeadQ1QueueManagement extends NavigationMixin(LightningElement) {
     @track leads = [];
+    @track groupedLeads = [];
     @track selectedBucket = 'All';
     @track bucketList = [];
 
@@ -36,6 +37,7 @@ export default class LeadQ1QueueManagement extends NavigationMixin(LightningElem
                 ...item,
                 rowNumber: index + 1,
                 candidateIdDisplay: item.candidateCode || 'N/A',
+                candidateNameDisplay: item.candidateName || item.name || 'N/A',
                 bucketLabel: item.bucketTag || item.source || 'NA',
                 levelLabel: item.stage || '--',
                 courseLabel: item.course || 'NA',
@@ -46,6 +48,7 @@ export default class LeadQ1QueueManagement extends NavigationMixin(LightningElem
                 buttonLabel: 'Call'
             }));
 
+            this.groupedLeads = this.buildGroupedLeads(this.leads);
             this.totalLeads = this.leads.length;
             this.buildBucketList();
         }
@@ -100,6 +103,15 @@ export default class LeadQ1QueueManagement extends NavigationMixin(LightningElem
                 buttonLabel: status === 'Processing' ? 'In Progress' : 'Call'
             };
         });
+        this.groupedLeads = this.buildGroupedLeads(this.leads);
+    }
+
+    get filteredLeadGroups() {
+        const leadsToGroup = this.selectedBucket === 'All'
+            ? this.leads
+            : this.leads.filter(lead => lead.bucketLabel === this.selectedBucket);
+
+        return this.buildGroupedLeads(leadsToGroup);
     }
 
     get filteredLeads() {
@@ -110,7 +122,7 @@ export default class LeadQ1QueueManagement extends NavigationMixin(LightningElem
     }
 
     get hasFilteredLeads() {
-        return this.filteredLeads.length > 0;
+        return this.filteredLeadGroups.length > 0;
     }
 
     get showingCount() {
@@ -122,6 +134,7 @@ export default class LeadQ1QueueManagement extends NavigationMixin(LightningElem
         this.isRefreshing = true;
         try {
             await refreshApex(this.wiredResult);
+            this.groupedLeads = this.buildGroupedLeads(this.leads);
             this.buildBucketList();
         } catch (e) {
             console.error('Manual refresh failed', e);
@@ -135,7 +148,7 @@ export default class LeadQ1QueueManagement extends NavigationMixin(LightningElem
         this.buildBucketList();
     }
 
-    async handleLeadClick(event) {
+    async handleCandidateClick(event) {
         const recordId = event.currentTarget.dataset.id;
         if (!recordId) {
             return;
@@ -145,7 +158,7 @@ export default class LeadQ1QueueManagement extends NavigationMixin(LightningElem
             type: 'standard__recordPage',
             attributes: {
                 recordId,
-                objectApiName: 'Lead__c',
+                objectApiName: 'Candidate__c',
                 actionName: 'view'
             }
         });
@@ -185,6 +198,69 @@ export default class LeadQ1QueueManagement extends NavigationMixin(LightningElem
         this.bucketList = list;
     }
 
+    buildGroupedLeads(leads = []) {
+        const groups = new Map();
+
+        leads.forEach(lead => {
+            const key = lead.candidateId || `lead-${lead.id}`;
+            if (!groups.has(key)) {
+                groups.set(key, {
+                    key,
+                    candidateId: lead.candidateId,
+                    candidateIdDisplay: lead.candidateIdDisplay,
+                    candidateNameDisplay: lead.candidateNameDisplay,
+                    candidateCount: 0,
+                    leads: [],
+                    primaryLeadId: lead.id,
+                    oldestCreatedDate: lead.createdDate,
+                    isProcessing: false,
+                    buttonLabel: 'Call',
+                    inQueueSince: lead.inQueueSince,
+                    inQueueClass: lead.inQueueClass
+                });
+            }
+
+            const group = groups.get(key);
+            group.leads.push(lead);
+            group.candidateCount += 1;
+            group.isProcessing = group.isProcessing || lead.isProcessing;
+            group.buttonLabel = group.isProcessing ? 'In Progress' : 'Call';
+
+            if (new Date(lead.createdDate) < new Date(group.oldestCreatedDate)) {
+                group.primaryLeadId = lead.id;
+                group.oldestCreatedDate = lead.createdDate;
+                group.inQueueSince = lead.inQueueSince;
+                group.inQueueClass = lead.inQueueClass;
+            }
+        });
+
+        return Array.from(groups.values()).map(group => {
+            const buckets = [...new Set(group.leads.map(lead => lead.bucketLabel).filter(Boolean))];
+            const levels = [...new Set(group.leads.map(lead => lead.levelLabel).filter(Boolean))];
+            const courses = [...new Set(group.leads.map(lead => lead.courseLabel).filter(Boolean))];
+
+            return {
+                ...group,
+                bucketDisplay: this.formatGroupSummary(buckets),
+                levelDisplay: this.formatGroupSummary(levels),
+                courseDisplay: this.formatGroupSummary(courses),
+                bucketBadgeClass: buckets.length === 1
+                    ? this.getBucketBadgeClass(buckets[0])
+                    : 'badge badge-bucket-na'
+            };
+        });
+    }
+
+    formatGroupSummary(values = []) {
+        if (values.length === 0) {
+            return 'NA';
+        }
+        if (values.length === 1) {
+            return values[0];
+        }
+        return `Multiple (${values.length})`;
+    }
+
     getBucketBadgeClass(bucket) {
         if (!bucket || bucket === 'NA' || bucket === 'ALL') return 'badge badge-bucket-na';
         const normalized = bucket.toLowerCase().replace(/[\s_]+/g, '');
@@ -213,7 +289,7 @@ export default class LeadQ1QueueManagement extends NavigationMixin(LightningElem
         return (new Date() - new Date(createdDate)) > (2 * 24 * 60 * 60 * 1000);
     }
 
-    handleCall(event) {
+    async handleCall(event) {
         const leadId = event.currentTarget.dataset.id;
         const lead = this.leads.find(item => item.id === leadId);
         if (!lead) {
@@ -231,9 +307,21 @@ export default class LeadQ1QueueManagement extends NavigationMixin(LightningElem
             return;
         }
 
-        this.currentLeadId = lead.id;
-        this.showModal = true;
-        startProcessingLead({ leadId, status: 'Processing' });
+        try {
+            await updateLeadOwner({ leadId, candidateId: lead.candidateId });
+            this.currentLeadId = lead.id;
+            this.showModal = true;
+            startProcessingLead({ leadId, status: 'Processing' });
+        } catch (error) {
+            console.error('Failed to assign lead/candidate owner', error);
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title: 'Error',
+                    message: 'Failed to assign lead and candidate to you.',
+                    variant: 'error'
+                })
+            );
+        }
     }
 
     closeModal() {
@@ -245,35 +333,9 @@ export default class LeadQ1QueueManagement extends NavigationMixin(LightningElem
     }
 
     async handleCallComplete(event) {
-        const detail = event.detail;
-        const leadId = detail.recordId;
-        const l1Status = detail.l1;
-
-        if (l1Status === 'Connected') {
-            try {
-                await updateLeadOwner({ leadId });
-                this.dispatchEvent(
-                    new ShowToastEvent({
-                        title: 'Success',
-                        message: 'Lead owner updated to you.',
-                        variant: 'success'
-                    })
-                );
-            } catch (error) {
-                console.error('Failed to update lead owner', error);
-            }
-        } else {
-            this.dispatchEvent(
-                new ShowToastEvent({
-                    title: 'Info',
-                    message: 'Lead owner not updated (Call not connected).',
-                    variant: 'info'
-                })
-            );
-        }
-
         this.closeModal();
         await refreshApex(this.wiredResult);
+        this.groupedLeads = this.buildGroupedLeads(this.leads);
         this.buildBucketList();
     }
 }

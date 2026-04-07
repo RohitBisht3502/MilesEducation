@@ -5,7 +5,7 @@ trigger StudentTrigger on Account (before insert,  after insert ,after update) {
         }
 
         if (Trigger.isUpdate) {
-              StudentTriggerHelperClass.handleStudentStatusChange(Trigger.newMap, Trigger.oldMap);
+             // StudentTriggerHelperClass.handleStudentStatusChange(Trigger.newMap, Trigger.oldMap);
             DataChangeEventHelper.publishEvents(Trigger.new, Trigger.oldMap, 'Account');
         }
     }

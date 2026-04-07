@@ -4,64 +4,47 @@ public without sharing class LeadQ1QueueController {
     public static List<LeadQueueItemDTO> getQ1Leads() {
         User currentUser = [SELECT Id, City__c, UserRole.Name FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1];
         String userCity = currentUser.City__c;
-
         String queueSearchName = userCity + ' High Priorty Queue';
-        
-        // 1. Verify if the current user is a member of this specific Queue
-        List<GroupMember> membership = [
-            SELECT Id 
-            FROM GroupMember 
-            WHERE Group.Type = 'Queue' 
-            AND Group.Name = :queueSearchName 
-            AND UserOrGroupId = :UserInfo.getUserId()
-            LIMIT 1
-        ];
-
-        // 2. If user is not a member (and not a system admin), return empty list
+        List<GroupMember> membership = [SELECT Id FROM GroupMember WHERE Group.Type = 'Queue' AND Group.Name = :queueSearchName AND UserOrGroupId = :UserInfo.getUserId() LIMIT 1];
         if (membership.isEmpty()) {
             return new List<LeadQueueItemDTO>();
         }
 
-        // 3. Fetch leads if membership confirmed
-        List<Lead__c> leads = [
-            SELECT Id, Name, Phone__c, Email__c, Course__c, City__c, Stage__c, Source_Bucket__c, CreatedDate, 
-                   Primary_tag__c, Next_Follow_Up_Date__c, Candidate__c, Candidate__r.Candidate_ID__c, Is_ReEnquiry__c, Queue_Stage__c
-            FROM Lead__c 
-            WHERE Owner.Type = 'Queue' 
-            AND Owner.Name = :queueSearchName
-            AND Queue_Stage__c = 'Q1'
-            AND Is_DND__c = FALSE 
-            AND Is_Spam__c = FALSE 
-            AND Is_Merged__c = FALSE 
-            ORDER BY CreatedDate DESC 
-            LIMIT 200
-        ];
+        List<Lead> candidates = [SELECT Id, Name, Candidate_ID__c, Next_Follow_Up_Date__c, (SELECT Id, Name, Phone__c, Email__c, Course__c, City__c, Stage__c, Source_Bucket__c, CreatedDate, Primary_tag__c, Candidate__c, Is_ReEnquiry__c, Queue_Stage__c FROM Leads__r WHERE Owner.Type = 'Queue' AND Owner.Name = :queueSearchName AND Queue_Stage__c = 'Q1' AND Is_DND__c = FALSE AND Is_Spam__c = FALSE AND Is_Merged__c = FALSE ORDER BY CreatedDate DESC) FROM Lead WHERE Id IN (SELECT Candidate__c FROM Lead__c WHERE Candidate__c != null AND Owner.Type = 'Queue' AND Owner.Name = :queueSearchName AND Queue_Stage__c = 'Q1' AND Is_DND__c = FALSE AND Is_Spam__c = FALSE AND Is_Merged__c = FALSE) LIMIT 200];
+        return buildQueueItems(candidates, currentUser);
+    }
 
-        List<LeadQueueItemDTO> allItems = new List<LeadQueueItemDTO>();
-        for (Lead__c l : leads) {
-            LeadQueueItemDTO dto = new LeadQueueItemDTO();
-            dto.id          = l.Id;
-            dto.name        = l.Name;
-            dto.phone       = l.Phone__c;
-            dto.course      = l.Course__c;
-            dto.city        = l.City__c;
-            dto.stage       = l.Stage__c;
-            dto.source      = l.Source_Bucket__c;
-            dto.createdDate = l.CreatedDate;
-            dto.iscallLog   = false;
-            
-            // Reusing derivation logic if available or default to something sensible
-            dto.primaryTag   = derivePrimaryTag(l.Next_Follow_Up_Date__c, null, l.Candidate__c, l.Is_ReEnquiry__c);
+    private static List<LeadQueueItemDTO> buildQueueItems(List<Lead> candidates, User currentUser) {
+        List<LeadQueueItemDTO> items = new List<LeadQueueItemDTO>();
+        for (Lead candidate : candidates) {
+            List<SObject> relatedLeadRecords = candidate.getSObjects('Leads__r');
+            if (relatedLeadRecords == null || relatedLeadRecords.isEmpty()) {
+                continue;
+            }
 
-            dto.roleTag     = currentUser.UserRole != null ? currentUser.UserRole.Name : null;
-            dto.bucketTag   = l.Source_Bucket__c;
-            dto.nextFollowUpDate = l.Next_Follow_Up_Date__c;
-            dto.candidateId = l.Candidate__c;
-            dto.candidateCode = l.Candidate__r != null ? l.Candidate__r.Candidate_ID__c : null;
-            allItems.add(dto);
+            for (SObject relatedLeadRecord : relatedLeadRecords) {
+                Lead__c relatedLead = (Lead__c) relatedLeadRecord;
+                LeadQueueItemDTO dto = new LeadQueueItemDTO();
+                dto.id = relatedLead.Id;
+                dto.name = relatedLead.Name;
+                dto.phone = relatedLead.Phone__c;
+                dto.course = relatedLead.Course__c;
+                dto.city = relatedLead.City__c;
+                dto.stage = relatedLead.Stage__c;
+                dto.source = relatedLead.Source_Bucket__c;
+                dto.createdDate = relatedLead.CreatedDate;
+                dto.iscallLog = false;
+                dto.primaryTag = derivePrimaryTag(candidate.Next_Follow_Up_Date__c, null, candidate.Id, relatedLead.Is_ReEnquiry__c);
+                dto.roleTag = currentUser.UserRole != null ? currentUser.UserRole.Name : null;
+                dto.bucketTag = relatedLead.Source_Bucket__c;
+                dto.nextFollowUpDate = candidate.Next_Follow_Up_Date__c;
+                dto.candidateId = candidate.Id;
+                dto.candidateCode = candidate.Candidate_ID__c;
+                dto.candidateName = candidate.Name;
+                items.add(dto);
+            }
         }
-
-        return allItems;
+        return items;
     }
 
     @AuraEnabled
@@ -74,11 +57,26 @@ public without sharing class LeadQ1QueueController {
     }
 
     @AuraEnabled
-    public static void updateLeadOwner(Id leadId) {
-        if (leadId == null) return;
-        Lead__c l = [SELECT Id, OwnerId FROM Lead__c WHERE Id = :leadId LIMIT 1];
-        l.OwnerId = UserInfo.getUserId();
-        update l;
+    public static void updateLeadOwner(Id leadId, Id candidateId) {
+        List<SObject> recordsToUpdate = new List<SObject>();
+
+        if (leadId != null) {
+            recordsToUpdate.add(new Lead__c(
+                Id = leadId,
+                OwnerId = UserInfo.getUserId()
+            ));
+        }
+
+        if (candidateId != null) {
+            recordsToUpdate.add(new Lead(
+                Id = candidateId,
+                OwnerId = UserInfo.getUserId()
+            ));
+        }
+
+        if (!recordsToUpdate.isEmpty()) {
+            update recordsToUpdate;
+        }
     }
 
     public static String derivePrimaryTag(Datetime nextFollowupDate, String callStatus, Id canId, Boolean isReEnquiry) {

@@ -345,10 +345,6 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
             throw new AuraHandledException('No Call Log found for this record.');
         }
 
-        if (l1 == 'Connected' && String.isBlank(stage)) {
-            throw new AuraHandledException('Stage is required when L1 is Connected.');
-        }
-
         logRecord.Feedback__c = feedback;
         logRecord.Next_Follow_Up_Date__c = nextFollowUpDate;
         logRecord.L1__c = l1;
@@ -367,6 +363,8 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         update logRecord;
 
         Id leadIdToUpdate;
+        Id candidateIdToUpdate = logRecord.Candidate__c;
+        Id studentIdToUpdate = logRecord.Student__c;
 
         if (logRecord.Lead__c != null) {
             leadIdToUpdate = logRecord.Lead__c;
@@ -375,9 +373,22 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         }
 
         if (leadIdToUpdate != null) {
+            Lead__c existingLead = [
+                SELECT Id, RecordTypeId, Stage__c, Course__c, Candidate__c, Student__c
+                FROM Lead__c
+                WHERE Id = :leadIdToUpdate
+                LIMIT 1
+            ];
+
+            if (candidateIdToUpdate == null) {
+                candidateIdToUpdate = existingLead.Candidate__c;
+            }
+            if (studentIdToUpdate == null) {
+                studentIdToUpdate = existingLead.Student__c;
+            }
+
             Lead__c leadUpdate = new Lead__c(
                 Id = leadIdToUpdate,
-                Next_Follow_Up_Date__c = nextFollowUpDate,
                 Notify_Me__c = notifyMe
             );
 
@@ -402,6 +413,8 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
 
             update leadUpdate;
         }
+
+        syncNextFollowUpToCandidateAndStudent(candidateIdToUpdate, studentIdToUpdate, nextFollowUpDate);
     }
 
     @AuraEnabled
@@ -419,16 +432,15 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
 
         Id recordId = !String.isBlank(request.recordId) ? (Id)request.recordId : null;
         String callId = request.callId;
+        System.debug(LoggingLevel.ERROR, 'Runo updateCallFeedback jsonBody => ' + jsonBody);
+        System.debug(LoggingLevel.ERROR, 'Runo updateCallFeedback parsed request => recordId=' + recordId + ', callId=' + callId + ', l1=' + request.l1 + ', l2=' + request.l2 + ', stage=' + request.stage + ', level=' + request.level + ', nextFollowUpDate=' + request.nextFollowUpDate + ', expectedPaymentDate=' + request.expectedPaymentDate);
 
         Call_Log__c logRecord = findCallLog(recordId, callId);
 
         if (logRecord == null) {
             throw new AuraHandledException('No Call Log found for this record.');
         }
-
-        if (request.l1 == 'Connected' && String.isBlank(request.stage)) {
-            throw new AuraHandledException('Stage is required when L1 is Connected.');
-        }
+        System.debug(LoggingLevel.ERROR, 'Runo updateCallFeedback resolved logRecord => Id=' + logRecord.Id + ', Lead__c=' + logRecord.Lead__c + ', Candidate__c=' + logRecord.Candidate__c + ', Student__c=' + logRecord.Student__c);
 
         if (String.isBlank(request.l2)) {
             throw new AuraHandledException('L2 selection is required before saving feedback.');
@@ -478,6 +490,8 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         update logRecord;
 
         Id leadIdToUpdate;
+        Id candidateIdToUpdate = logRecord.Candidate__c;
+        Id studentIdToUpdate = logRecord.Student__c;
 
         if (logRecord.Lead__c != null) {
             leadIdToUpdate = logRecord.Lead__c;
@@ -486,12 +500,27 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
         }
 
         if (leadIdToUpdate == null) {
+            syncNextFollowUpToCandidateAndStudent(candidateIdToUpdate, studentIdToUpdate, parsedDate);
             return;
+        }
+
+        Lead__c existingLead = [
+            SELECT Id, RecordTypeId, Stage__c, Course__c, Candidate__c, Student__c
+            FROM Lead__c
+            WHERE Id = :leadIdToUpdate
+            LIMIT 1
+        ];
+        System.debug(LoggingLevel.ERROR, 'Runo updateCallFeedback existing lead => Id=' + existingLead.Id + ', RecordTypeId=' + existingLead.RecordTypeId + ', Stage__c=' + existingLead.Stage__c + ', Course__c=' + existingLead.Course__c);
+
+        if (candidateIdToUpdate == null) {
+            candidateIdToUpdate = existingLead.Candidate__c;
+        }
+        if (studentIdToUpdate == null) {
+            studentIdToUpdate = existingLead.Student__c;
         }
 
         Lead__c leadUpdate = new Lead__c(
             Id = leadIdToUpdate,
-            Next_Follow_Up_Date__c = parsedDate,
             Notify_Me__c = request.notifyMe,
             Expected_payment_date__c = request.expectedPaymentDate
         );
@@ -515,7 +544,9 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
             }
         }
 
+        System.debug(LoggingLevel.ERROR, 'Runo updateCallFeedback leadUpdate payload => Id=' + leadUpdate.Id + ', RecordTypeId=' + leadUpdate.RecordTypeId + ', Stage__c=' + leadUpdate.Stage__c + ', Course__c=' + leadUpdate.Course__c + ', Expected_payment_date__c=' + leadUpdate.Expected_payment_date__c);
         update leadUpdate;
+        syncNextFollowUpToCandidateAndStudent(candidateIdToUpdate, studentIdToUpdate, parsedDate);
         syncRelatedEnquiriesToTracked(leadIdToUpdate, request.l1, request.stage);
 
         if (request.isDnd == true || request.isSpam == true) {
@@ -552,7 +583,7 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
 
         if (String.isNotBlank(callId)) {
             List<Call_Log__c> logs = [
-                SELECT Id, Phone_Number__c, Lead__c
+                SELECT Id, Phone_Number__c, Lead__c, Candidate__c, Student__c
                 FROM Call_Log__c
                 WHERE Call_Id__c = :callId
                 ORDER BY CreatedDate DESC
@@ -566,7 +597,7 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
             recordId.getSObjectType() == Call_Log__c.SObjectType) {
 
             List<Call_Log__c> logs = [
-                SELECT Id, Phone_Number__c, Lead__c
+                SELECT Id, Phone_Number__c, Lead__c, Candidate__c, Student__c
                 FROM Call_Log__c
                 WHERE Id = :recordId
                 ORDER BY CreatedDate DESC
@@ -623,6 +654,26 @@ public without sharing class Webservice_RunoAllocationAPI implements Database.Al
 
         if (!enquiriesToUpdate.isEmpty()) {
             update enquiriesToUpdate;
+        }
+    }
+
+    private static void syncNextFollowUpToCandidateAndStudent(Id candidateId, Id studentId, Datetime nextFollowUpDate) {
+        List<SObject> recordsToUpdate = new List<SObject>();
+
+        if (candidateId != null) {
+            Lead candidateUpdate = new Lead(Id = candidateId);
+            candidateUpdate.put('Next_Follow_Up_Date__c', nextFollowUpDate);
+            recordsToUpdate.add(candidateUpdate);
+        }
+
+        if (studentId != null) {
+            Account studentUpdate = new Account(Id = studentId);
+            studentUpdate.put('Next_Follow_Up_Date__c', nextFollowUpDate);
+            recordsToUpdate.add(studentUpdate);
+        }
+
+        if (!recordsToUpdate.isEmpty()) {
+            update recordsToUpdate;
         }
     }
 

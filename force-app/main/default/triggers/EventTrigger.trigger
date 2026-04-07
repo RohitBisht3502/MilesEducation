@@ -19,8 +19,15 @@ trigger EventTrigger on Event (before insert, after insert, before update, after
     }
 
     if (Trigger.isAfter) {
-        if (Trigger.isInsert) handler.afterInsert();
-        if (Trigger.isUpdate) handler.afterUpdate();
+        if (Trigger.isInsert){
+DataChangeEventHelper.publishEvents(Trigger.new, null, 'Event');
+         handler.afterInsert();
+        }
+        if (Trigger.isUpdate){
+
+           DataChangeEventHelper.publishEvents(Trigger.new, Trigger.oldMap, 'Event');
+             handler.afterUpdate();
+        }
         if (Trigger.isDelete) handler.afterDelete();
         if (Trigger.isUndelete) handler.afterUndelete();
     }

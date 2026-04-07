@@ -13,6 +13,7 @@ public without sharing class RunoCallIdentityService {
         @AuraEnabled public String leadOwner;
         @AuraEnabled public Id candidateId;
         @AuraEnabled public Id studentId;
+        @AuraEnabled public Date expectedPaymentDate;
     }
 
     public class RelatedLeadDTO {
@@ -20,11 +21,19 @@ public without sharing class RunoCallIdentityService {
         @AuraEnabled public Id recordTypeId;
         @AuraEnabled public String course;
         @AuraEnabled public String stage;
+        @AuraEnabled public Date expectedPaymentDate;
     }
 
     public class LeadStageUpdate {
         @AuraEnabled public Id id;
         @AuraEnabled public String stage;
+        @AuraEnabled public String expectedPaymentDate;
+        @AuraEnabled public String nextFollowUpDate;
+    }
+
+    public class RelatedLeadUpdateRequest {
+        @AuraEnabled public List<LeadStageUpdate> updates;
+        @AuraEnabled public String callDisposition;
     }
 
     @AuraEnabled(cacheable=true)
@@ -37,14 +46,14 @@ public without sharing class RunoCallIdentityService {
         SObjectType sObjType = recordId.getSObjectType();
 
         if (sObjType == Lead__c.SObjectType) {
-            Lead__c l = [SELECT Id, Name, Email__c, Phone__c, City__c, Course__c, Stage__c, CAN_ID__c, Candidate__c, Student__c, CreatedDate, Is_ReEnquiry__c, Owner.Name FROM Lead__c WHERE Id = :recordId LIMIT 1];
+            Lead__c l = [SELECT Id, Name, Email__c, Phone__c, City__c, Course__c, Stage__c, CAN_ID__c, Candidate__c, Student__c, CreatedDate, Is_ReEnquiry__c, Owner.Name, Expected_payment_date__c FROM Lead__c WHERE Id = :recordId LIMIT 1];
 
             IdentityDTO dto = new IdentityDTO();
             dto.name = l.Name;
             dto.email = l.Email__c;
             dto.phone = l.Phone__c;
             dto.city = l.City__c;
-            dto.source = l.Course__c;
+            dto.source = buildCourseSummary(l.Candidate__c, l.Student__c, l.Course__c);
             dto.stage = l.Stage__c;
             dto.canId = l.CAN_ID__c;
             dto.candidateId = l.Candidate__c;
@@ -52,6 +61,7 @@ public without sharing class RunoCallIdentityService {
             dto.createdDate = l.CreatedDate;
             dto.mhpTag = l.Is_ReEnquiry__c ? 'Yes' : 'No';
             dto.leadOwner = l.Owner.Name;
+            dto.expectedPaymentDate = l.Expected_payment_date__c;
             return dto;
         }
 
@@ -68,27 +78,25 @@ public without sharing class RunoCallIdentityService {
             dto.canId = null;
             dto.candidateId = cl.Candidate__c;
             dto.studentId = cl.Student__c;
-            
             return dto;
         }
 
         if (sObjType == Lead.SObjectType) {
-            Lead c = [SELECT Id, Name, Email, Phone, City, ConvertedAccountId ,Owner.Name ,	City__c, 	Course__c, CreatedDate,Highest_Level__c FROM Lead WHERE Id = :recordId LIMIT 1];
+            Lead c = [SELECT Id, Name, Email, Phone, City, ConvertedAccountId, Owner.Name, City__c, Course__c, CreatedDate, Highest_Level__c FROM Lead WHERE Id = :recordId LIMIT 1];
 
             IdentityDTO dto = new IdentityDTO();
             dto.name = c.Name;
             dto.email = c.Email;
             dto.phone = c.Phone;
             dto.city = c.City;
-            dto.source = c.Course__c;
+            dto.source = buildCourseSummary(c.Id, c.ConvertedAccountId, c.Course__c);
             dto.stage = c.Highest_Level__c;
             dto.candidateId = c.Id;
             dto.studentId = c.ConvertedAccountId;
             dto.leadOwner = c.Owner.Name;
-             dto.CreatedDate = c.CreatedDate;
-             dto.mhpTag = 'NA';
-             dto.city = c.City__c;
-               
+            dto.createdDate = c.CreatedDate;
+            dto.mhpTag = 'NA';
+            dto.city = c.City__c;
             return dto;
         }
 
@@ -101,7 +109,7 @@ public without sharing class RunoCallIdentityService {
             dto.email = acc.Email__c;
             dto.phone = acc.Phone;
             dto.city = acc.BillingCity;
-            dto.source = 'Student';
+            dto.source = buildCourseSummary(null, acc.Id, 'Student');
             dto.stage = null;
             dto.canId = null;
             dto.createdDate = acc.CreatedDate;
@@ -118,13 +126,51 @@ public without sharing class RunoCallIdentityService {
         return null;
     }
 
+    private static String buildCourseSummary(Id candidateId, Id studentId, String fallbackCourse) {
+        if (candidateId == null && studentId == null) {
+            return fallbackCourse;
+        }
+
+        List<Lead__c> relatedLeads;
+        if (candidateId != null && studentId != null) {
+            relatedLeads = [SELECT Course__c FROM Lead__c WHERE (Candidate__c = :candidateId OR Student__c = :studentId) AND Is_Merged__c = FALSE ORDER BY CreatedDate DESC];
+        } else if (candidateId != null) {
+            relatedLeads = [SELECT Course__c FROM Lead__c WHERE Candidate__c = :candidateId AND Is_Merged__c = FALSE ORDER BY CreatedDate DESC];
+        } else {
+            relatedLeads = [SELECT Course__c FROM Lead__c WHERE Student__c = :studentId AND Is_Merged__c = FALSE ORDER BY CreatedDate DESC];
+        }
+
+        List<String> orderedCourses = new List<String>();
+        Set<String> normalizedCourses = new Set<String>();
+
+        for (Lead__c relatedLead : relatedLeads) {
+            if (String.isBlank(relatedLead.Course__c)) {
+                continue;
+            }
+
+            String normalizedCourse = relatedLead.Course__c.trim().toUpperCase();
+            if (normalizedCourses.contains(normalizedCourse)) {
+                continue;
+            }
+
+            normalizedCourses.add(normalizedCourse);
+            orderedCourses.add(relatedLead.Course__c.trim());
+        }
+
+        if (!orderedCourses.isEmpty()) {
+            return String.join(orderedCourses, ', ');
+        }
+
+        return fallbackCourse;
+    }
+
     @AuraEnabled(cacheable=true)
     public static List<RelatedLeadDTO> getRelatedLeads(Id candidateId) {
         if (candidateId == null) {
             return new List<RelatedLeadDTO>();
         }
 
-        List<Lead__c> leads = [SELECT Id, RecordTypeId, Course__c, Stage__c FROM Lead__c WHERE Candidate__c = :candidateId OR Student__c = :candidateId ORDER BY CreatedDate DESC LIMIT 20];
+        List<Lead__c> leads = [SELECT Id, RecordTypeId, Course__c, Stage__c, Expected_payment_date__c FROM Lead__c WHERE Candidate__c = :candidateId OR Student__c = :candidateId ORDER BY CreatedDate DESC LIMIT 20];
         List<RelatedLeadDTO> res = new List<RelatedLeadDTO>();
 
         for (Lead__c l : leads) {
@@ -133,6 +179,7 @@ public without sharing class RunoCallIdentityService {
             dto.recordTypeId = l.RecordTypeId;
             dto.course = l.Course__c;
             dto.stage = l.Stage__c;
+            dto.expectedPaymentDate = l.Expected_payment_date__c;
             res.add(dto);
         }
 
@@ -140,54 +187,93 @@ public without sharing class RunoCallIdentityService {
     }
 
     @AuraEnabled
-    public static void updateRelatedLeadStages(List<LeadStageUpdate> updates, String callDisposition) {
-        if (updates == null || updates.isEmpty()) {
-            return;
-        }
-
-        if (callDisposition != 'Connected') {
-            throw new AuraHandledException('Related lead stage can only be updated for connected calls.');
-        }
+    public static void updateRelatedLeadStages(String jsonBody) {
+        RelatedLeadUpdateRequest request = String.isBlank(jsonBody)
+            ? null
+            : (RelatedLeadUpdateRequest) JSON.deserialize(jsonBody, RelatedLeadUpdateRequest.class);
+        List<LeadStageUpdate> updates = request != null ? request.updates : null;
+        if (updates == null || updates.isEmpty()) return;
 
         List<Lead__c> toUpdate = new List<Lead__c>();
-
         for (LeadStageUpdate u : updates) {
-            if (u == null || u.id == null) {
-                continue;
-            }
-
+            if (u == null || u.id == null) continue;
+            if (u.stage == null && String.isBlank(u.expectedPaymentDate)) continue;
             Lead__c l = new Lead__c(Id = u.id);
-            l.Stage__c = String.isBlank(u.stage) ? null : u.stage;
+            if (u.stage != null) l.Stage__c = u.stage;
+            if (String.isNotBlank(u.expectedPaymentDate)) l.Expected_payment_date__c = parseUiDate(u.expectedPaymentDate);
             toUpdate.add(l);
         }
+        if (!toUpdate.isEmpty()) update toUpdate;
+    }
 
-        if (!toUpdate.isEmpty()) {
-            update toUpdate;
+    private static Date parseUiDate(String value) {
+        if (String.isBlank(value)) {
+            return null;
         }
+        return Date.valueOf(value.trim());
+    }
+
+    private static Datetime parseUiDateTime(String value) {
+        if (String.isBlank(value)) {
+            return null;
+        }
+
+        String cleanValue = value.trim().replace('T', ' ');
+        if (cleanValue.endsWith('Z')) {
+            cleanValue = cleanValue.substring(0, cleanValue.length() - 1);
+        }
+        Integer dotIndex = cleanValue.indexOf('.');
+        if (dotIndex > 0) {
+            cleanValue = cleanValue.substring(0, dotIndex);
+        }
+
+        return Datetime.valueOf(cleanValue);
     }
 
     @AuraEnabled
-    public static Id createRelatedLead(Id candidateId, String course, Id sourceRecordId) {
-        if (candidateId == null) {
-            throw new AuraHandledException('Candidate Id is required.');
+    public static Id createRelatedLead(Id candidateId, Id studentId, String course, Id sourceRecordId) {
+        if (candidateId == null && studentId == null) {
+            throw new AuraHandledException('Candidate Id or Student Id is required.');
         }
 
         if (String.isBlank(course)) {
             throw new AuraHandledException('Course is required.');
         }
 
-        List<Lead__c> existing = [SELECT Id FROM Lead__c WHERE Candidate__c = :candidateId AND Course__c = :course LIMIT 1];
+        List<Lead__c> existing;
+        if (candidateId != null && studentId != null) {
+            existing = [SELECT Id FROM Lead__c WHERE (Candidate__c = :candidateId OR Student__c = :studentId) AND Course__c = :course LIMIT 1];
+        } else if (candidateId != null) {
+            existing = [SELECT Id FROM Lead__c WHERE Candidate__c = :candidateId AND Course__c = :course LIMIT 1];
+        } else {
+            existing = [SELECT Id FROM Lead__c WHERE Student__c = :studentId AND Course__c = :course LIMIT 1];
+        }
         if (!existing.isEmpty()) {
             throw new AuraHandledException('Lead already exists for this course.');
         }
 
-        Lead candidate = [SELECT Id, Email FROM Lead WHERE Id = :candidateId LIMIT 1];
-        Lead__c sourceLead;
+        Lead candidate;
+        if (candidateId != null) {
+            List<Lead> candidates = [SELECT Id, Name, Email, Phone FROM Lead WHERE Id = :candidateId LIMIT 1];
+            candidate = candidates.isEmpty() ? null : candidates[0];
+        }
 
+        Account student;
+        if (studentId != null) {
+            List<Account> students = [SELECT Id, Name, Email__c, Phone FROM Account WHERE Id = :studentId LIMIT 1];
+            student = students.isEmpty() ? null : students[0];
+        }
+
+        Lead__c sourceLead;
         if (sourceRecordId != null && sourceRecordId.getSObjectType() == Lead__c.SObjectType) {
-            sourceLead = [SELECT Id, Name, Phone__c, Email__c FROM Lead__c WHERE Id = :sourceRecordId LIMIT 1];
-        } else {
+            sourceLead = [SELECT Id, Name, Phone__c, Email__c, Candidate__c, Student__c FROM Lead__c WHERE Id = :sourceRecordId LIMIT 1];
+        } else if (candidateId != null) {
             List<Lead__c> leads = [SELECT Id, Name, Phone__c, Email__c FROM Lead__c WHERE Candidate__c = :candidateId ORDER BY CreatedDate DESC LIMIT 1];
+            if (!leads.isEmpty()) {
+                sourceLead = leads[0];
+            }
+        } else if (studentId != null) {
+            List<Lead__c> leads = [SELECT Id, Name, Phone__c, Email__c FROM Lead__c WHERE Student__c = :studentId ORDER BY CreatedDate DESC LIMIT 1];
             if (!leads.isEmpty()) {
                 sourceLead = leads[0];
             }
@@ -195,22 +281,28 @@ public without sharing class RunoCallIdentityService {
 
         Lead__c newLead = new Lead__c();
         newLead.Candidate__c = candidateId;
+        newLead.Student__c = studentId;
         newLead.Course__c = course;
 
-       // Set Email (optional now)
-if (!String.isBlank(candidate.Email)) {
-    newLead.Email__c = candidate.Email;
-} 
-else if (sourceLead != null && !String.isBlank(sourceLead.Email__c)) {
-    newLead.Email__c = sourceLead.Email__c;
-} 
-else {
-    newLead.Email__c = null; // ✅ allow null email
-}
+        if (candidate != null && String.isNotBlank(candidate.Email)) {
+            newLead.Email__c = candidate.Email;
+        } else if (student != null && String.isNotBlank(student.Email__c)) {
+            newLead.Email__c = student.Email__c;
+        } else if (sourceLead != null && String.isNotBlank(sourceLead.Email__c)) {
+            newLead.Email__c = sourceLead.Email__c;
+        } else {
+            newLead.Email__c = null;
+        }
 
         if (sourceLead != null) {
             newLead.Name = sourceLead.Name;
             newLead.Phone__c = sourceLead.Phone__c;
+        } else if (candidate != null) {
+            newLead.Name = candidate.Name;
+            newLead.Phone__c = candidate.Phone;
+        } else if (student != null) {
+            newLead.Name = student.Name;
+            newLead.Phone__c = student.Phone;
         } else {
             newLead.Name = 'New Lead';
         }

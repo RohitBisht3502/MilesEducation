@@ -63,24 +63,30 @@
                     </thead>
                     <tbody>
                         <template if:true={hasFilteredLeads}>
-                            <template for:each={filteredLeads} for:item="lead">
-                                <tr key={lead.id}>
-                                    <td>{lead.candidateIdDisplay}</td>
+                            <template for:each={filteredLeadGroups} for:item="group">
+                                <tr key={group.key}>
                                     <td>
-                                        <a class="lead-link" data-id={lead.id} onclick={handleLeadClick}>{lead.name}</a>
+                                        <template if:true={group.candidateId}>
+                                            <a class="lead-link" data-id={group.candidateId} onclick={handleCandidateClick}>{group.candidateIdDisplay}</a>
+                                        </template>
+                                        <template if:false={group.candidateId}>
+                                            {group.candidateIdDisplay}
+                                        </template>
+                                        <span class="group-meta">({group.candidateCount} lead(s))</span>
                                     </td>
-                                    <td><span class={lead.bucketBadgeClass}>{lead.bucketLabel}</span></td>
-                                    <td><span class="badge-level">{lead.levelLabel}</span></td>
-                                    <td>{lead.courseLabel}</td>
-                                    <td><span class={lead.inQueueClass}>{lead.inQueueSince}</span></td>
+                                    <td>{group.candidateNameDisplay}</td>
+                                    <td><span class={group.bucketBadgeClass}>{group.bucketDisplay}</span></td>
+                                    <td><span class="badge-level">{group.levelDisplay}</span></td>
+                                    <td>{group.courseDisplay}</td>
+                                    <td><span class={group.inQueueClass}>{group.inQueueSince}</span></td>
                                     <td>
                                         <lightning-button
-                                            label={lead.buttonLabel}
+                                            label={group.buttonLabel}
                                             variant="brand"
                                             icon-name="utility:call"
-                                            data-id={lead.id}
+                                            data-id={group.primaryLeadId}
                                             onclick={handleCall}
-                                            disabled={lead.isProcessing}>
+                                            disabled={group.isProcessing}>
                                         </lightning-button>
                                     </td>
                                 </tr>
@@ -106,12 +112,12 @@
                         </button>
                     </header>
 
-                    <c-runo-allocation-call-q1
+                    <c-runo-allocation-call-q2
                         record-id={currentLeadId}
                         auto-call="true"
                         oncallcomplete={handleCallComplete}
                         dispositions={dispositions.data}>
-                    </c-runo-allocation-call-q1>
+                    </c-runo-allocation-call-q2>
                 </div>
             </section>
         </template>

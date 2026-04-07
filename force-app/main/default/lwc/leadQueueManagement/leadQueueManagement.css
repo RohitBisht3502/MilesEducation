@@ -275,7 +275,18 @@
   padding: 11px 16px;
   font-size: 13px;
   color: var(--sf-gray-700);
+  vertical-align: middle;
   white-space: nowrap;
+}
+
+.candidate-cell {
+  font-weight: 600;
+}
+
+.course-cell {
+  min-width: 180px;
+  white-space: normal;
+  line-height: 1.4;
 }
 
 .data-table tbody td a {

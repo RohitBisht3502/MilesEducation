@@ -23,5 +23,6 @@ public without sharing class LeadQueueItemDTO {
     @AuraEnabled public String sequenceTag;
     @AuraEnabled public Id candidateId;
     @AuraEnabled public String candidateCode;
+    @AuraEnabled public String candidateName;
     @AuraEnabled public String queueName;
 }
