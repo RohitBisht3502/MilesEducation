@@ -127,6 +127,13 @@
           </div>
         </template>
 
+        <!-- UUID Error Message -->
+        <template if:true={showUuidErrorMessage}>
+          <div class="error-row">
+            <lightning-formatted-text value="UUID field is null."></lightning-formatted-text>
+          </div>
+        </template>
+
       </div>
     </section>
   </div>

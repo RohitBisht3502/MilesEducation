@@ -14,6 +14,7 @@ public without sharing class WebinarLiveAttendanceSyncService {
         public String registrant_id;
         public String participant_name;
         public Decimal duration;
+        public String webinar_status;
     }
 
     public static void enqueueSync(Set<Id> webinarRecordIds) {
@@ -35,11 +36,7 @@ public without sharing class WebinarLiveAttendanceSyncService {
                 return;
             }
 
-            List<Webinar__c> webinars = [
-                SELECT Id, Webinar_Id__c
-                FROM Webinar__c
-                WHERE Id IN :webinarRecordIds AND Webinar_Id__c != null
-            ];
+            List<Webinar__c> webinars = [SELECT Id, Webinar_Id__c FROM Webinar__c WHERE Id IN :webinarRecordIds AND Webinar_Id__c != null];
             System.debug(LoggingLevel.INFO, 'syncFuture | webinars found=' + webinars.size());
 
             for (Webinar__c wbRec : webinars) {
@@ -55,7 +52,7 @@ public without sharing class WebinarLiveAttendanceSyncService {
                 String resBody;
                 try {
                     System.debug(LoggingLevel.INFO, 'Callout start | webinarId=' + wbRec.Webinar_Id__c);
-                    resBody = Callout_WebinarAttendee.getLiveWebinarAttendees(wbRec.Webinar_Id__c);
+                    resBody = Callout_getWebinarParticpants.getLiveWebinarAttendees(wbRec.Webinar_Id__c);
                     System.debug(LoggingLevel.INFO, 'Callout success | bodyLen=' + (resBody == null ? 0 : resBody.length()));
                 } catch (Exception calloutEx) {
                     System.debug(LoggingLevel.ERROR, 'Callout failed | webinarId=' + wbRec.Webinar_Id__c + ' | err=' + calloutEx.getMessage());
@@ -77,6 +74,7 @@ public without sharing class WebinarLiveAttendanceSyncService {
                 Map<String, String> emailToRegistrantId = new Map<String, String>();
                 Map<String, String> emailToRegistrantName = new Map<String, String>();
                 Map<String, Decimal> emailToDuration = new Map<String, Decimal>();
+                Map<String, String> emailToWebinarStatus = new Map<String, String>();
 
                 for (RegistrantDTO r : input.registrants) {
                     if (r == null || String.isBlank(r.participant_email)) continue;
@@ -88,6 +86,7 @@ public without sharing class WebinarLiveAttendanceSyncService {
                     if (r.duration != null) {
                         emailToDuration.put(email, r.duration);
                     }
+                    emailToWebinarStatus.put(email, resolveAttendanceStatus(r.webinar_status));
                 }
 
                 System.debug(LoggingLevel.INFO, 'Emails collected | distinctEmails=' + emailSet.size());
@@ -98,20 +97,29 @@ public without sharing class WebinarLiveAttendanceSyncService {
                 }
 
                 // 4) Load members (for present + absent)
-                List<Webinar_Member__c> allMembers = [
-                    SELECT Id, Webinar__c, Lead__c, Lead__r.Email__c, Registrant_Id__c, Attendance_Status__c
-                    FROM Webinar_Member__c
-                    WHERE Webinar__c = :wbRec.Id
-                ];
+                List<Webinar_Member__c> allMembers = [SELECT Id, Webinar__c, Lead__c, Lead__r.Email__c, Candidate__c, Registrant_Id__c, Attendance_Status__c FROM Webinar_Member__c WHERE Webinar__c = :wbRec.Id];
                 System.debug(LoggingLevel.INFO, 'Members loaded | totalMembers=' + allMembers.size());
 
                 Map<String, Webinar_Member__c> emailToMember = new Map<String, Webinar_Member__c>();
+                Map<Id, Webinar_Member__c> candidateToMember = new Map<Id, Webinar_Member__c>();
                 for (Webinar_Member__c wm : allMembers) {
                     if (wm.Lead__r != null && !String.isBlank(wm.Lead__r.Email__c)) {
                         emailToMember.put(wm.Lead__r.Email__c.trim().toLowerCase(), wm);
                     }
+                    if (wm.Candidate__c != null && !candidateToMember.containsKey(wm.Candidate__c)) {
+                        candidateToMember.put(wm.Candidate__c, wm);
+                    }
                 }
                 System.debug(LoggingLevel.INFO, 'Member email map built | mappedEmails=' + emailToMember.size());
+
+                // changes by rohit - 2026-04-07: fallback to Email__c -> Candidate__c when lead email match is missing
+                Map<String, Id> emailToCandidateId = new Map<String, Id>();
+                for (Email__c emailRec : [SELECT Email__c, Candidate__c FROM Email__c WHERE Email__c IN :emailSet AND Candidate__c != null]) {
+                    if (String.isNotBlank(emailRec.Email__c) && !emailToCandidateId.containsKey(emailRec.Email__c.trim().toLowerCase())) {
+                        emailToCandidateId.put(emailRec.Email__c.trim().toLowerCase(), emailRec.Candidate__c);
+                    }
+                }
+                System.debug(LoggingLevel.INFO, 'Candidate email fallback map built | mappedEmails=' + emailToCandidateId.size());
 
                 // 5) Prepare present updates + enquiry inserts + new webinar member inserts
                 List<Webinar_Member__c> membersToUpdate = new List<Webinar_Member__c>();
@@ -124,9 +132,12 @@ public without sharing class WebinarLiveAttendanceSyncService {
 
                 for (String email : emailSet) {
                     Webinar_Member__c wm = emailToMember.get(email);
+                    if (wm == null && emailToCandidateId.containsKey(email)) {
+                        wm = candidateToMember.get(emailToCandidateId.get(email));
+                    }
 
                     if (wm != null) {
-                        wm.Attendance_Status__c = 'Present';
+                        wm.Attendance_Status__c = emailToWebinarStatus.containsKey(email) ? emailToWebinarStatus.get(email) : 'Present';
                         wm.Registrant_Id__c = emailToRegistrantId.get(email);
                         if (emailToDuration.containsKey(email)) {
                             wm.Duration__c = emailToDuration.get(email);
@@ -189,7 +200,7 @@ public without sharing class WebinarLiveAttendanceSyncService {
 
                         Webinar_Member__c newWm = new Webinar_Member__c();
                         newWm.Webinar__c = wbRec.Id;
-                        newWm.Attendance_Status__c = 'Present';
+                        newWm.Attendance_Status__c = emailToWebinarStatus.containsKey(email) ? emailToWebinarStatus.get(email) : 'Present';
                         newWm.Registrant_Id__c = emailToRegistrantId.get(email);
                         if (emailToDuration.containsKey(email)) {
                             newWm.Duration__c = emailToDuration.get(email);
@@ -228,37 +239,70 @@ public without sharing class WebinarLiveAttendanceSyncService {
         if (String.isBlank(resBody)) return null;
 
         try {
-            return (LiveAttendanceResponseDTO) JSON.deserialize(resBody, LiveAttendanceResponseDTO.class);
+            LiveAttendanceResponseDTO typedDto = (LiveAttendanceResponseDTO) JSON.deserialize(resBody, LiveAttendanceResponseDTO.class);
+            if (typedDto != null && typedDto.registrants != null && !typedDto.registrants.isEmpty()) {
+                return typedDto;
+            }
         } catch (Exception ex1) {
             System.debug(LoggingLevel.WARN, 'parseResponse typed failed | ' + ex1.getMessage());
-            try {
-                Map<String, Object> m = (Map<String, Object>) JSON.deserializeUntyped(resBody);
-                if (m == null || !m.containsKey('registrants')) return null;
+        }
 
-                List<Object> regs = (List<Object>) m.get('registrants');
-                LiveAttendanceResponseDTO dto = new LiveAttendanceResponseDTO();
-                dto.registrants = new List<RegistrantDTO>();
+        try {
+            Map<String, Object> m = (Map<String, Object>) JSON.deserializeUntyped(resBody);
+            if (m == null) return null;
 
-                if (regs != null) {
-                    for (Object o : regs) {
-                        Map<String, Object> rmap = (Map<String, Object>) o;
-                        RegistrantDTO r = new RegistrantDTO();
-                        r.participant_email = (String) rmap.get('participant_email');
-                        r.registrant_id = (String) rmap.get('registrant_id');
-                        r.participant_name = (String) rmap.get('participant_name');
-                        r.duration = parseDecimal(rmap.get('duration'));
-                        if (r.duration == null) {
-                            r.duration = parseDecimal(rmap.get('participant_duration'));
-                        }
-                        dto.registrants.add(r);
-                    }
-                }
-                return dto;
-            } catch (Exception ex2) {
-                System.debug(LoggingLevel.ERROR, 'parseResponse untyped failed | ' + ex2.getMessage());
+            // changes by rohit - 2026-04-07: support both old registrants payload and new participants payload
+            List<Object> regs;
+            if (m.containsKey('registrants')) {
+                regs = (List<Object>) m.get('registrants');
+            } else if (m.containsKey('participants')) {
+                regs = (List<Object>) m.get('participants');
+            } else {
                 return null;
             }
+
+            LiveAttendanceResponseDTO dto = new LiveAttendanceResponseDTO();
+            dto.registrants = new List<RegistrantDTO>();
+
+            if (regs != null) {
+                for (Object o : regs) {
+                    Map<String, Object> rmap = (Map<String, Object>) o;
+                    RegistrantDTO r = new RegistrantDTO();
+                    r.participant_email = (String) (rmap.containsKey('participant_email') ? rmap.get('participant_email') : rmap.get('email'));
+                    r.registrant_id = (String) (rmap.containsKey('registrant_id') ? rmap.get('registrant_id') : rmap.get('registrantId'));
+                    r.participant_name = (String) (rmap.containsKey('participant_name') ? rmap.get('participant_name') : rmap.get('email'));
+                    r.webinar_status = (String) (rmap.containsKey('webinarStatus') ? rmap.get('webinarStatus') : rmap.get('status'));
+                    r.duration = parseDecimal(rmap.get('duration'));
+                    if (r.duration == null) {
+                        r.duration = parseDecimal(rmap.get('participant_duration'));
+                    }
+                    if (r.duration == null) {
+                        r.duration = parseDecimal(rmap.get('durationSeconds'));
+                    }
+                    dto.registrants.add(r);
+                }
+            }
+            return dto;
+        } catch (Exception ex2) {
+            System.debug(LoggingLevel.ERROR, 'parseResponse untyped failed | ' + ex2.getMessage());
+            return null;
         }
+    }
+
+    private static String resolveAttendanceStatus(String apiStatus) {
+        if (String.isBlank(apiStatus)) {
+            return 'Present';
+        }
+
+        String normalized = apiStatus.trim().toLowerCase();
+        if (normalized == 'attended') {
+            return 'Attended';
+        }
+        if (normalized == 'present') {
+            return 'Present';
+        }
+
+        return 'Present';
     }
 
     private static Decimal parseDecimal(Object value) {

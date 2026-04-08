@@ -7,35 +7,58 @@ global class LeadInitialQueueAssignmentBatch implements Database.Batchable<SObje
     
     // Update with your Limited Queue's Developer Name
     private static final String LIMITED_QUEUE_NAME = 'High_Priority_Bangalore';
+
     
     // Batch start method
     global Database.QueryLocator start(Database.BatchableContext bc) {
-        Datetime timeLimit = Datetime.now().addMinutes(-30);
-        
-        // Get active cities
-        List<String> activeCities = new List<String>();
-        for (City__mdt city : [SELECT DeveloperName FROM City__mdt WHERE ON__c = true]) {
-            activeCities.add(city.DeveloperName);
-        }
-        
-        String query = 'SELECT Id, OwnerId, Queue_Stage__c, Next_Follow_Up_Date__c ' +
-                      'FROM Lead__c ' +
-                      'WHERE Queue_Stage__c = null ' +
-                      'AND Next_Follow_Up_Date__c = null ' +
-                      'AND CreatedDate <= :timeLimit ' + 
-            		  'AND Source_Bucket__c = \'Bucket 1\' ';
-        
-        // Add city filter only if there are active cities
-        if (!activeCities.isEmpty()) {
-            query += 'AND City__c IN :activeCities ';
-        } else {
-            // Return empty query if no active cities
-            query += 'AND CreatedDate = null ';
-        }
-        
-        return Database.getQueryLocator(query);
-    }
     
+    // Fetch config
+    Batch_Schedule_Config__mdt config = [
+        SELECT Start_Time__c, Time_Field__c 
+        FROM Batch_Schedule_Config__mdt 
+        LIMIT 1
+    ];
+    
+    // Default fallback (optional safety)
+    Datetime timeLimit = Datetime.now().addMinutes(-30);
+
+    if (config != null && config.Start_Time__c != null && config.Time_Field__c != null) {
+        
+        Integer timeValue = Integer.valueOf(config.Start_Time__c);
+        timeLimit = Datetime.now();
+        
+        if (config.Time_Field__c == 'Minutes') {
+            timeLimit = timeLimit.addMinutes(-timeValue);
+        } 
+        else if (config.Time_Field__c == 'Hours') {
+            timeLimit = timeLimit.addHours(-timeValue);
+        } 
+        else if (config.Time_Field__c == 'Days') {
+            timeLimit = timeLimit.addDays(-timeValue);
+        }
+    }
+
+    // Get active cities
+    List<String> activeCities = new List<String>();
+    for (City__mdt city : [SELECT DeveloperName FROM City__mdt WHERE ON__c = true]) {
+        activeCities.add(city.DeveloperName);
+    }
+
+    String query = 'SELECT Id, OwnerId, Queue_Stage__c, Next_Follow_Up_Date__c ' +
+                   'FROM Lead__c ' +
+                   'WHERE Queue_Stage__c = null ' +
+                   'AND Next_Follow_Up_Date__c = null ' +
+                   'AND CreatedDate <= :timeLimit ' +
+                   'AND Source_Bucket__c = \'Bucket 1\' ';
+
+    if (!activeCities.isEmpty()) {
+        query += 'AND City__c IN :activeCities ';
+    } else {
+        query += 'AND CreatedDate = null ';
+    }
+
+    return Database.getQueryLocator(query);
+}
     // Batch execute method
     global void execute(Database.BatchableContext bc, List<Lead__c> leads) {
         // Get Queue ID

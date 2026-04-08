@@ -396,21 +396,21 @@ public without sharing class CandidateTriggerHelperClass {
             return;
         }
 
-        // Map to store Candidate Id to its CPA Lead's Source
-        Map<Id, String> candidateToCpaSource = new Map<Id, String>();
-        for (Lead__c cpaLead : [SELECT Candidate__c, Source__c FROM Lead__c 
+        // Map to store Candidate Id to its CPA Lead record
+        Map<Id, Lead__c> candidateToCpaLeadMap = new Map<Id, Lead__c>();
+        for (Lead__c cpaLead : [SELECT Candidate__c, Source__c, City__c FROM Lead__c 
                                  WHERE Candidate__c IN :eligibleCandidateIds 
                                  AND Course__c = 'CPA' 
                                  AND Source__c IN ('Retail', 'IR', 'Corporate')]) {
-            candidateToCpaSource.put(cpaLead.Candidate__c, cpaLead.Source__c);
+            candidateToCpaLeadMap.put(cpaLead.Candidate__c, cpaLead);
         }
 
-        if (candidateToCpaSource.isEmpty()) {
+        if (candidateToCpaLeadMap.isEmpty()) {
             return;
         }
 
         Set<Id> candidatesWithExistingMCom = new Set<Id>();
-        for (Lead__c existingLead : [SELECT Candidate__c FROM Lead__c WHERE Candidate__c IN :candidateToCpaSource.keySet() AND Course__c = 'MCOM']) {
+        for (Lead__c existingLead : [SELECT Candidate__c FROM Lead__c WHERE Candidate__c IN :candidateToCpaLeadMap.keySet() AND Course__c = 'MCOM']) {
             candidatesWithExistingMCom.add(existingLead.Candidate__c);
         }
 
@@ -418,16 +418,17 @@ public without sharing class CandidateTriggerHelperClass {
         List<Lead__c> leadsToCreate = new List<Lead__c>();
 
         for (Lead lead : potentialCandidates) {
-            if (candidateToCpaSource.containsKey(lead.Id) && !candidatesWithExistingMCom.contains(lead.Id)) {
+            if (candidateToCpaLeadMap.containsKey(lead.Id) && !candidatesWithExistingMCom.contains(lead.Id)) {
+                Lead__c cpaLead = candidateToCpaLeadMap.get(lead.Id);
                 Lead__c newBridgeLead = new Lead__c();
                 newBridgeLead.Name = lead.Name;
                 newBridgeLead.Candidate__c = lead.Id;
                 newBridgeLead.Email__c = lead.Email;
                 newBridgeLead.Phone__c = lead.Phone;
-                newBridgeLead.City__c = lead.City__c;
+                newBridgeLead.City__c = String.isNotBlank(cpaLead.City__c) ? cpaLead.City__c : lead.City__c;
                 newBridgeLead.Course__c = 'MCOM';
                 newBridgeLead.OwnerId = lead.OwnerId;
-                newBridgeLead.Source__c = candidateToCpaSource.get(lead.Id);
+                newBridgeLead.Source__c = cpaLead.Source__c;
 
                 if (mcomRecordTypeId != null) {
                     newBridgeLead.RecordTypeId = mcomRecordTypeId;

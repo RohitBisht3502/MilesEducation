@@ -1,0 +1,267 @@
+/* file: force-app/main/default/lwc/gPFolderFilesView/gPFolderFilesView.css */
+:host {
+    display: block;
+    --navy-primary: #002B5B;
+    --blue-accent: #0A66C2;
+    --bg-light: #F8FAFC;
+    --border-color: #E2E8F0;
+    --text-primary: #1E293B;
+    --text-secondary: #64748B;
+    --verified-green: #059669;
+    --pending-amber: #D97706;
+    --recheck-red: #DC2626;
+}
+
+.gp-card {
+    position: relative;
+    background: white;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+}
+
+.gp-card-header {
+    background: var(--navy-primary);
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: white;
+}
+
+.gp-card-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.gp-card-header-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.gp-card-icon {
+    width: 24px;
+    height: 24px;
+    fill: white;
+}
+
+.gp-card-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+.gp-card-subtitle {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.82);
+}
+
+.course-card {
+    background: #fff;
+    border: 1px solid #dfe6f1;
+    margin: 16px;
+    border-radius: 14px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+.course-header {
+    padding: 12px 16px;
+    background: #eef4ff;
+    border-bottom: 1px solid #dfe6f1;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 10px;
+}
+
+.course-path {
+    font-weight: 600;
+    color: var(--blue-accent);
+}
+
+.folder-toggle {
+    cursor: pointer;
+}
+
+.folder-toggle-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.folder-chevron {
+    --slds-c-icon-color-foreground: #64748b;
+}
+
+.folder-header-icon {
+    --slds-c-icon-color-foreground: #64748b;
+}
+
+.status-summary {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.status-pill {
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid currentColor;
+}
+
+.row {
+    padding: 16px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e9edf5;
+    transition: background 0.2s;
+    cursor: default;
+}
+
+.row:hover {
+    background-color: #f8fafc;
+}
+
+.row-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex: 1;
+}
+
+.row-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.file-icon-shell {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: #eef4ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.title-block {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.subtitle {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.indent-1 { margin-left: 20px; }
+.indent-2 { margin-left: 40px; }
+.indent-3 { margin-left: 60px; }
+.indent-4 { margin-left: 80px; }
+
+.status-verified { color: var(--verified-green); }
+.status-recheck { color: var(--recheck-red); }
+.status-submitted { color: var(--blue-accent); }
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.view-btn {
+    --slds-c-button-radius-border: 12px;
+    --slds-c-button-spacing-inline-start: 14px;
+    --slds-c-button-spacing-inline-end: 14px;
+    --slds-c-button-sizing-border: 1px;
+    --slds-c-button-color-border: #d4dbe7;
+    --slds-c-button-text-color: #111827;
+    --slds-c-button-color-background: #ffffff;
+}
+
+.file-link {
+    color: #0f172a;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+}
+
+.file-link:hover {
+    color: #1d4ed8;
+}
+
+.file-icon {
+    --slds-c-icon-color-foreground-default: #2563eb;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 108px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1;
+}
+
+.status-under-review {
+    background: #f59e0b;
+}
+
+.status-approved {
+    background: #22c55e;
+}
+
+.status-rejected {
+    background: #ef4444;
+}
+
+.folder-icon {
+    --slds-c-icon-color-foreground: #64748b;
+}
+
+.chevron {
+    width: 20px;
+}
+
+.loading-state {
+    padding: 40px;
+    text-align: center;
+    color: var(--text-secondary);
+}

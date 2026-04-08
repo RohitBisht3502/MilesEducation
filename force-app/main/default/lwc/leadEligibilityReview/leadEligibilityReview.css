@@ -2,7 +2,8 @@
 .ler-path-wrapper {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid #dbeafe;
-    background: linear-gradient(90deg, #0b2f6a 0%, #1d4ed8 100%);
+    /* background: linear-gradient(90deg, #0b2f6a 0%, #1d4ed8 100%); */
+    background: linear-gradient(135deg, #002551 0%, #556E8B 100%);
     color: #fff;
 }
 

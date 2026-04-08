@@ -6,10 +6,10 @@
 :host {
   display: block;
   --miles-brand-primary: #0b5cab;
-  --miles-brand-accent: #e6f0ff;
-  --miles-box-type: #eef6ff;
-  --miles-box-title: #f4f9ff;
-  --miles-box-category: #eef3fb;
+  --miles-brand-accent: #fbfbfb;
+  --miles-box-type: #ffffff;
+  --miles-box-title: #ffffff;
+  --miles-box-category: #ffffff;
 }
 
 .uploader-wrapper {
@@ -30,7 +30,8 @@
 }
 
 .uploader-header {
-  background: var(--miles-brand-primary);
+  /* background: var(--miles-brand-primary); */
+  background: linear-gradient(135deg, #002551 0%, #556E8B 100%);
   color: #ffffff;
   padding: 18px 24px;
 }
@@ -203,4 +204,27 @@
 .slds-pill__remove:focus {
   outline: none;
   box-shadow: 0 0 0 3px rgba(234, 0, 30, 0.3);
+}
+
+/* UUID Error Message Styles */
+.uuid-error-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #fdf0ef;
+  border-left: 4px solid #ea001e;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #ea001e;
+  font-weight: 500;
+}
+
+.uuid-error-row lightning-icon {
+  flex-shrink: 0;
+}
+
+.uuid-error-row lightning-formatted-text {
+  flex: 1;
 }

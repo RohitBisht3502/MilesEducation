@@ -1,0 +1,78 @@
+<!-- file: force-app/main/default/lwc/gPFolderFilesView/gPFolderFilesView.html -->
+<template>
+    <div class="gp-card">
+        <template if:true={isViewingFile}>
+            <div class="loading-overlay">
+                <lightning-spinner variant="brand" size="small"></lightning-spinner>
+            </div>
+        </template>
+        <div class="gp-card-header">
+            <div class="gp-card-title-row">
+                <svg viewBox="0 0 24 24" class="gp-card-icon"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                <div class="gp-card-header-copy">
+                    <span class="gp-card-title">GP Folder Files View</span>
+                    <span class="gp-card-subtitle">{totalDocuments} documents uploaded</span>
+                </div>
+            </div>
+        </div>
+
+        <template if:true={isLoading}>
+            <div class="loading-state">
+                <lightning-spinner variant="brand" size="small"></lightning-spinner>
+                <p>Loading GP Files...</p>
+            </div>
+        </template>
+
+        <template if:false={isLoading}>
+            <template if:true={hasData}>
+                <template for:each={courseNodes} for:item="course" for:index="courseIdx">
+                    <div key={course.courseName} class="course-card">
+                        <div class="course-header folder-toggle" data-course={course.courseName} onclick={handleToggleFolder}>
+                            <div class="folder-toggle-left">
+                                <lightning-icon icon-name={course.toggleIcon} size="x-small" class="folder-chevron"></lightning-icon>
+                                <lightning-icon icon-name="utility:open_folder" size="x-small" class="folder-header-icon"></lightning-icon>
+                            </div>
+                            <span class="course-path">{course.folderLabel}</span>
+                        </div>
+                        
+                        <template if:true={course.isExpanded}>
+                        <div class="course-body">
+                            <template for:each={course.files} for:item="file">
+                                <div key={file.id} class="row file-row">
+                                    <div class="row-left">
+                                        <div class="file-icon-shell">
+                                            <lightning-icon icon-name={file.iconName} size="small" class="file-icon"></lightning-icon>
+                                        </div>
+                                        <div class="title-block">
+                                            <a class="file-link" onclick={handleNavigateRecord} data-record-id={file.id}>{file.name}</a>
+                                            <span class="subtitle">{file.fileType}</span>
+                                        </div>
+                                    </div>
+                                    <div class="row-right">
+                                        <span class={file.badgeClass}>{file.badgeLabel}</span>
+                                        <lightning-button
+                                            variant="brand-outline"
+                                            label="View"
+                                            size="small"
+                                            class="view-btn"
+                                            disabled={isViewingFile}
+                                            data-file-path={file.filePath}
+                                            onclick={handleViewFile}>
+                                        </lightning-button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        </template>
+                    </div>
+                </template>
+            </template>
+            
+            <template if:false={hasData}>
+                <div class="loading-state">
+                    <p>No related GP files found for this student.</p>
+                </div>
+            </template>
+        </template>
+    </div>
+</template>

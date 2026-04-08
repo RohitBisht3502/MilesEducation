@@ -11,27 +11,33 @@ import { NavigationMixin } from 'lightning/navigation';
 
 const ALLOWED_MIME_TO_EXT = {
   'application/pdf': 'pdf',
-  'application/msword': 'doc',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  // 'application/msword': 'doc',
+  // 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
   'image/jpeg': 'jpg',
   'image/jpg': 'jpg',
   'image/png': 'png',
   'text/plain': 'txt'
 };
 
-const ALLOWED_EXTENSIONS = new Set(['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'txt']);
+// const ALLOWED_EXTENSIONS = new Set(['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'txt']);
+
+const ALLOWED_EXTENSIONS = new Set(['pdf', 'jpg', 'jpeg', 'png', 'txt']);
+
 
 const EXTENSION_TO_MIME = {
   pdf: 'application/pdf',
-  doc: 'application/msword',
-  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  // doc: 'application/msword',
+  // docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
   png: 'image/png',
   txt: 'text/plain'
 };
 
-const ALLOWED_EXTENSIONS_LABEL = 'pdf, doc, docx, jpg, jpeg, png, txt';
+// const ALLOWED_EXTENSIONS_LABEL = 'pdf, doc, docx, jpg, jpeg, png, txt';
+
+const ALLOWED_EXTENSIONS_LABEL = 'pdf, jpg, jpeg, png, txt';
+
 
 export default class FileUploader extends NavigationMixin(LightningElement) {
   @api recordId;
@@ -57,23 +63,91 @@ export default class FileUploader extends NavigationMixin(LightningElement) {
     if (data) this.uuid = data.fields[this.uuidFieldApiName]?.value ?? null;
   }
 
+  // @wire(getPathOptions, { recordId: '$recordId', uuid: '$uuid' })
+  // wiredPathOptions({ data, error }) {
+  //   if (data) {
+  //     if (!this.uuid && data.uuid) {
+  //       this.uuid = data.uuid;
+  //     }
+  //     this.degreeOptions = data.degreeOptions || [];
+  //     this.allQualificationTitleOptions = data.qualificationTitles || [];
+  //     this.qualificationTypeOptions = this.buildTypeOptions(data.qualificationTypes || []);
+  //     this.categoryOptions = this.sortOptions(data.categories || []);
+  //     this.refreshTitleOptions();
+  //   } else if (error) {
+  //     // eslint-disable-next-line no-console
+  //     console.error('Failed to load path options', error);
+  //     const msg = this.getApexErrorMessage(error) || 'Failed to load folder options for upload.';
+  //     this.toast('Error', msg, 'error');
+  //   }
+  // }
+
   @wire(getPathOptions, { recordId: '$recordId', uuid: '$uuid' })
   wiredPathOptions({ data, error }) {
-    if (data) {
-      if (!this.uuid && data.uuid) {
-        this.uuid = data.uuid;
+      if (data) {
+          if (!this.uuid && data.uuid) {
+              this.uuid = data.uuid;
+          }
+          this.degreeOptions = data.degreeOptions || [];
+          this.allQualificationTitleOptions = data.qualificationTitles || [];
+          // Use buildTypeOptionsPreserveOrder instead of buildTypeOptions
+          this.qualificationTypeOptions = this.buildTypeOptionsPreserveOrder(data.qualificationTypes || []);
+          this.categoryOptions = this.sortOptions(data.categories || []);
+          this.refreshTitleOptions();
+      } else if (error) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to load path options', error);
+          this.toast('Error', 'Failed to load folder options for upload.', 'error');
       }
-      this.degreeOptions = data.degreeOptions || [];
-      this.allQualificationTitleOptions = data.qualificationTitles || [];
-      this.qualificationTypeOptions = this.buildTypeOptions(data.qualificationTypes || []);
-      this.categoryOptions = this.sortOptions(data.categories || []);
-      this.refreshTitleOptions();
-    } else if (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to load path options', error);
-      const msg = this.getApexErrorMessage(error) || 'Failed to load folder options for upload.';
-      this.toast('Error', msg, 'error');
-    }
+  }
+
+  buildTypeOptionsPreserveOrder(fallbackOptions) {
+      const map = new Map();
+      (fallbackOptions || []).forEach((opt) => {
+          if (!opt || !opt.value) return;
+          const label = opt.label || opt.value;
+          if (!map.has(opt.value)) {
+              map.set(opt.value, { label, value: opt.value });
+          }
+      });
+
+      if (this.degreeOptions && this.degreeOptions.length) {
+          this.degreeOptions.forEach((opt) => {
+              const value = opt.typeValue;
+              if (!value) return;
+              const label = opt.typeLabel || value;
+              if (!map.has(value)) {
+                  map.set(value, { label, value });
+              }
+          });
+      }
+
+      // Return as array without sorting - preserve Apex order
+      return Array.from(map.values());
+  }
+
+  buildTypeOptions(fallbackOptions) {
+      const map = new Map();
+      (fallbackOptions || []).forEach((opt) => {
+          if (!opt || !opt.value) return;
+          const label = opt.label || opt.value;
+          if (!map.has(opt.value)) {
+              map.set(opt.value, { label, value: opt.value });
+          }
+      });
+
+      if (this.degreeOptions && this.degreeOptions.length) {
+          this.degreeOptions.forEach((opt) => {
+              const value = opt.typeValue;
+              if (!value) return;
+              const label = opt.typeLabel || value;
+              if (!map.has(value)) {
+                  map.set(value, { label, value });
+              }
+          });
+      }
+
+      return this.sortOptions(Array.from(map.values()));
   }
 
   get computedFields() {
@@ -99,6 +173,10 @@ export default class FileUploader extends NavigationMixin(LightningElement) {
       this.selectedQualificationTitle,
       this.selectedCategory
     ]).toLowerCase();
+  }
+
+  get showUuidErrorMessage() {
+    return !this.uuid;
   }
 
   get isUploadDisabled() {
@@ -411,29 +489,29 @@ export default class FileUploader extends NavigationMixin(LightningElement) {
     return this.isFlatTypeSelected;
   }
 
-  buildTypeOptions(fallbackOptions) {
-    const map = new Map();
-    (fallbackOptions || []).forEach((opt) => {
-      if (!opt || !opt.value) return;
-      const label = opt.label || opt.value;
-      if (!map.has(opt.value)) {
-        map.set(opt.value, { label, value: opt.value });
-      }
-    });
+  // buildTypeOptions(fallbackOptions) {
+  //   const map = new Map();
+  //   (fallbackOptions || []).forEach((opt) => {
+  //     if (!opt || !opt.value) return;
+  //     const label = opt.label || opt.value;
+  //     if (!map.has(opt.value)) {
+  //       map.set(opt.value, { label, value: opt.value });
+  //     }
+  //   });
 
-    if (this.degreeOptions && this.degreeOptions.length) {
-      this.degreeOptions.forEach((opt) => {
-        const value = opt.typeValue;
-        if (!value) return;
-        const label = opt.typeLabel || value;
-        if (!map.has(value)) {
-          map.set(value, { label, value });
-        }
-      });
-    }
+  //   if (this.degreeOptions && this.degreeOptions.length) {
+  //     this.degreeOptions.forEach((opt) => {
+  //       const value = opt.typeValue;
+  //       if (!value) return;
+  //       const label = opt.typeLabel || value;
+  //       if (!map.has(value)) {
+  //         map.set(value, { label, value });
+  //       }
+  //     });
+  //   }
 
-    return this.sortOptions(Array.from(map.values()));
-  }
+  //   return this.sortOptions(Array.from(map.values()));
+  // }
 
   refreshTitleOptions() {
     if (this.isFlatTypeSelected) {
